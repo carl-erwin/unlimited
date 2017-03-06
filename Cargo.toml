@@ -1,6 +1,8 @@
 [package]
 name = "unlimited"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
 
 [dependencies]
+termion = "*"
+serde_json = "*"
