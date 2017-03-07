@@ -19,24 +19,32 @@ pub fn main_loop() {
 
     stdout.flush().unwrap();
 
+    let mut keys: Vec<Event> = Vec::new();
+
     let mut quit = false;
     while !quit {
         let stdin = stdin();
 
         for evt in stdin.events() {
-            let evt = evt.unwrap();
+
+            keys.push(evt.unwrap());
+
+            let evt = keys[keys.len() - 1].clone();
 
             write!(stdout,
-                   "{}{}",
+                   "{}{} keys.len() {}, ",
                    termion::clear::All,
-                   termion::cursor::Goto(1, 1))
+                   termion::cursor::Goto(1, 1),
+                   keys.len())
                 .unwrap();
 
             let (width, height) = terminal_size().unwrap();
 
             println!("terminal size ({},{})\r", width, height);
-
-            write!(stdout, "{}", termion::cursor::Goto(1, 2)).unwrap();
+            for e in &keys {
+                print!("{:?} ", e);
+            }
+            print!("\r\n");
 
             // Print recieved Events...
             match evt {
@@ -44,11 +52,24 @@ pub fn main_loop() {
                 Event::Key(k) => {
                     match k {
                         // Exit.
-                        Key::Char('q') => {
-                            quit = true;
-                            break;
+                        Key::Ctrl('r') => {
+                            keys.clear();
                         }
-                        Key::Char(c) => print!("{}", c),
+
+                        Key::Ctrl('c') => {
+                            if keys.len() > 1 {
+                                if let Event::Key(prev_event) = keys[keys.len() - 2] {
+                                    if let Key::Ctrl(prev_char) = prev_event {
+                                        if prev_char == 'x' {
+                                            quit = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Key::Char(c) => print!("'{}'", c),
                         Key::Alt(c) => print!("Alt-{}", c),
                         Key::Ctrl(c) => print!("Ctrl-{}", c),
                         Key::F(f) => print!("F{:?}", f),
