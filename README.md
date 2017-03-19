@@ -4,8 +4,7 @@
 NOTE: THIS PROJECT JUST STARTED
 
 **unlimitED!** is an experimental editor, and an excuse for me to learn the **Rust** language :-)<br/>
-It is based on previous ideas/implementation done in a previous c++ project of mine.<br/>
-
+It is based on previous ideas/implementation done in one of my previous c++ project.<br/>
 
 ------
 
