@@ -16,15 +16,15 @@ use core::screen::CodepointInfo;
 
 
 static TEXT: &'static str =
-r#"1 Hello world ! xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+r#"                                                                          [hit ctrl-x,ctrl-c to quit]
+2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -150,11 +150,7 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
 
 fn draw_screen(screen: &Screen, stdout: &mut Stdout) {
 
-    write!(stdout,
-           "{}{}",
-           termion::cursor::Goto(1, 1),
-           termion::clear::All)
-        .unwrap();
+    write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
 
     for l in 0..screen.height {
         let line = &screen.line[l];
@@ -162,12 +158,17 @@ fn draw_screen(screen: &Screen, stdout: &mut Stdout) {
             break;
         }
 
-        for c in 0..line.used {
+        for c in 0..line.width {
             let cpi = &line.chars[c];
             write!(stdout, "{}", cpi.displayed_cp);
         }
-        write!(stdout, "\r\n");
+
+        if l < screen.height - 1 {
+            write!(stdout, "\r\n");
+        }
     }
+
+    stdout.flush().unwrap();
 }
 
 
@@ -175,6 +176,7 @@ pub fn main_loop() {
 
     let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
 
+    write!(stdout, "{}", termion::cursor::Hide).unwrap();
     stdout.flush().unwrap();
 
     let mut keys: Vec<Event> = Vec::new();
@@ -183,15 +185,17 @@ pub fn main_loop() {
     while !quit {
 
         let (width, height) = terminal_size().unwrap();
-        let mut screen = Screen::new(width as usize, height as usize);
+        let mut scr = Screen::new(width as usize, height as usize);
 
-        fill_screen(&mut screen, TEXT.as_bytes());
-        draw_screen(&screen, &mut stdout);
+        fill_screen(&mut scr, TEXT.as_bytes());
+        draw_screen(&scr, &mut stdout);
 
         for evt in stdin().events() {
 
-            fill_screen(&mut screen, TEXT.as_bytes());
-            draw_screen(&screen, &mut stdout);
+            fill_screen(&mut scr, TEXT.as_bytes());
+            draw_screen(&scr, &mut stdout);
+
+            write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
 
             keys.push(evt.unwrap());
 
@@ -237,6 +241,7 @@ pub fn main_loop() {
                         Key::Insert => print!("<Insert>"),
                         Key::Esc => print!("<Esc>"),
                         _ => print!("Other"),
+
                     }
                 }
 
@@ -260,7 +265,12 @@ pub fn main_loop() {
             }
 
             // Flush again.
+            print!(" ");
             stdout.flush().unwrap();
         }
     }
+
+
+    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
+    stdout.flush().unwrap();
 }
