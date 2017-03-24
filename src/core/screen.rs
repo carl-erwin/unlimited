@@ -1,4 +1,4 @@
-use core::CodepointInfo;
+use core::codepointinfo::CodepointInfo;
 
 
 // the screen is composed of lines
@@ -67,7 +67,7 @@ impl Line {
     fn new(columns: usize) -> Line {
 
         let mut chars = Vec::new();
-        for c in 0..columns {
+        for _ in 0..columns {
             chars.push(CodepointInfo {
                 cp: ' ',
                 displayed_cp: ' ',

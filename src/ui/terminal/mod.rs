@@ -123,9 +123,6 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
 
     screen.clear();
 
-    let w = screen.width;
-    let h = screen.height;
-
     let mut offset = 0;
     for c in data {
 
@@ -140,7 +137,7 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
             offset: offset,
         };
 
-        let (ok, column) = screen.push(cpi);
+        let (ok, _) = screen.push(cpi);
         offset += 1;
         if ok == false {
             break;
@@ -161,11 +158,11 @@ fn draw_screen(screen: &Screen, stdout: &mut Stdout) {
 
         for c in 0..line.width {
             let cpi = &line.chars[c];
-            write!(stdout, "{}", cpi.displayed_cp);
+            write!(stdout, "{}", cpi.displayed_cp).unwrap();
         }
 
         if l < screen.height - 1 {
-            write!(stdout, "\r\n");
+            write!(stdout, "\r\n").unwrap();
         }
     }
 
