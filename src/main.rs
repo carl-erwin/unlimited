@@ -1,4 +1,8 @@
 extern crate unlimited;
+extern crate clap;
+
+use unlimited::core;
+use unlimited::ui;
 
 fn main() {
 
@@ -6,9 +10,10 @@ fn main() {
     // parse command line arguments
     // build/load configuration
 
-    // start core
-    unlimited::core::start();
+    core::start();
 
     // start ui
-    unlimited::ui::main_loop();
+    ui::main_loop();
+
+    core::stop();
 }

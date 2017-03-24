@@ -1,5 +1,6 @@
 extern crate termion;
 
+
 //
 use self::termion::event::{Event, Key, MouseEvent};
 use self::termion::input::{TermRead, MouseTerminal};
@@ -12,7 +13,7 @@ use std::io::{self, Write, stdin, Stdout};
 //
 
 use core::screen::Screen;
-use core::screen::CodepointInfo;
+use core::codepointinfo::CodepointInfo;
 
 
 static TEXT: &'static str =

@@ -1,3 +1,6 @@
+use core::CodepointInfo;
+
+
 // the screen is composed of lines
 pub struct Screen {
     pub line: Vec<Line>,
@@ -9,7 +12,7 @@ pub struct Screen {
 impl Screen {
     pub fn new(width: usize, height: usize) -> Screen {
         let mut line: Vec<Line> = Vec::new();
-        for h in 0..height {
+        for _ in 0..height {
             line.push(Line::new(width));
         }
 
@@ -35,7 +38,7 @@ impl Screen {
 
         let cp = cpi.cp;
         let line = &mut self.line[self.used];
-        let (ok, column) = line.push(cpi);
+        let (ok, _) = line.push(cpi);
 
         if ok == true {
             if cp == '\n' || cp == '\r' {
@@ -98,11 +101,4 @@ impl Line {
         }
         self.used = 0;
     }
-}
-
-// CodepointInfo contains displayed char attributes
-pub struct CodepointInfo {
-    pub cp: char,
-    pub displayed_cp: char,
-    pub offset: u64,
 }

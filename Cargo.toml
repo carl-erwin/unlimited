@@ -4,5 +4,7 @@ version = "0.0.1"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
 
 [dependencies]
+clap = "*"
 termion = "*"
 serde_json = "*"
+
