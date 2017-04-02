@@ -3,30 +3,16 @@ extern crate clap;
 
 use clap::{App, Arg};
 
-use unlimited::core;
-use unlimited::ui;
+use unlimited::core::config::Config;
+use unlimited::core::editor::Editor;
 
 fn main() {
     let config = parse_command_line();
-
-    if config.start_core {
-        core::start();
-    }
-
-    if config.start_ui {
-        ui::main_loop();
-    }
-
-    if config.start_core {
-        core::stop();
-    }
+    let mut editor = Editor::new(config);
+    editor.run();
 }
 
-
-// TODO:
-// parse command line arguments
-// build/load configuration
-fn parse_command_line() -> core::config::Config {
+fn parse_command_line() -> Config {
 
     let matches = App::new("unlimited")
         .version("0.0.1")
@@ -45,15 +31,15 @@ fn parse_command_line() -> core::config::Config {
         .get_matches();
 
 
-    let mut file_list = Vec::new();
+    let mut files_list = Vec::new();
     if matches.is_present("FILES") == true {
         let strs: Vec<&str> = matches.values_of("FILES").unwrap().collect();
-        file_list = strs.into_iter().map(|x| x.to_owned()).collect()
+        files_list = strs.into_iter().map(|x| x.to_owned()).collect()
     }
 
-    core::config::Config {
+    Config {
         start_core: !matches.is_present("NO_CORE"),
         start_ui: !matches.is_present("NO_UI"),
-        file_list: file_list,
+        files_list: files_list,
     }
 }
