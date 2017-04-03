@@ -3,6 +3,12 @@ name = "unlimited"
 version = "0.0.1"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
 
+
+[[bin]]
+doc = false
+name = "unlimited"
+path = "src/main.rs"
+
 [dependencies]
 clap = "*"
 termion = "*"

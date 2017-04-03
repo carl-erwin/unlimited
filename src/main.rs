@@ -19,15 +19,13 @@ fn parse_command_line() -> Config {
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("an experimental editor")
         .arg(Arg::with_name("NO_CORE")
-            .help("disable core")
-            .long("no-core"))
-        .arg(Arg::with_name("NO_UI")
-            .help("disable ui")
-            .long("no-ui"))
+                 .help("disable core")
+                 .long("no-core"))
+        .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
         .arg(Arg::with_name("FILES")
-            .help("Sets the input file to use")
-            .required(false)
-            .multiple(true))
+                 .help("Sets the input file to use")
+                 .required(false)
+                 .multiple(true))
         .get_matches();
 
 

@@ -58,52 +58,52 @@ A **ByteBuffer** represents a memory snapshot of a given **File**.<br/>
 - **ByteBufferId** aka **_bid_**<br/>
 An unsigned 64 bits integer that represent a given **ByteBuffer** instance<br/>
 
-- **EditorBuffer**<br/>
-An **EditorBuffer** represents a **ByteBuffer** and it's configuration.<br/>
-There is one and only one **EditorBuffer** per **ByteBuffer**.<br/>
-An **EditorBuffer** is always bound to a **ByteBuffer**.
+- **Buffer**<br/>
+An **Buffer** represents a **ByteBuffer** and it's configuration.<br/>
+There is one and only one **Buffer** per **ByteBuffer**.<br/>
+An **Buffer** is always bound to a **ByteBuffer**.
 
  It encapsulates:<br/>
 A **ByteBuffer**<br/>
-the **EditorView**(s)<br/>
+the **View**(s)<br/>
 the "shared" **Marks** (the cursor is a mark)<br/>
 the font configuration<br/> (will be moved in the ui)
 the selections<br/>
 the internal regions<br/>
 
-- **EditorView**<br/>
-an EditorView contains:<br/>
+- **View**<br/>
+a View contains:<br/>
 
  bid (ByteBufferId)<br/>
  ViewId<br/>
  Codec<br/>
  CodecCtx<br/>
- EditorInputMap<br/>
+ InputMap<br/>
  local Marks<br/>
 
-- **EditorEvent**<br/>
+- **Event**<br/>
 Messages sent between the ui and the core
 
 
-- Codec<br/>
+- **Codec**<br/>
 The codec is responible of the ByteBuffer interpretation
 
 TextCodec emits codepoints
 
-- CodecId<br/>
+- **CodecId**<br/>
 a unique 64 bits integer that represents the codec.
 
-- CodecCtx<br/>
+- **CodecCtx**<br/>
 A codec specific data structure
 
-- Mark<br/>
-A Mark represent a position in an EditorBuffer<br/>
+- **Mark**<br/>
+A Mark represent a position in a Buffer<br/>
 <br/>
 The **cursor** is a **Mark**.<br/>
 <br/>
 Marks can be fixed (it is up to the module managing the marks).<br/>
-Marks can be "local" to a given EditorView  (wich is attached to an **EditorBuffer**)<br/>
-Marks can be "shared" by EditorBuffer(s)<br/>
+Marks can be "local" to a given View  (wich is attached to a **Buffer**)<br/>
+Marks can be "shared" by Buffer(s)<br/>
 
 - **Selection**<br/>
 there are 2 kinds of selection:<br/>
@@ -111,8 +111,8 @@ there are 2 kinds of selection:<br/>
  * block selection (visual selection) : represents a rectangular selection depending on the displayed screen
 
 
-- **EditorInputMap**<br/>
-The EditorInputMap , will hold the action to be executed by the core.
+- **InputMap**<br/>
+The InputMap , will hold the action to be executed by the core.
 
 ------
 
@@ -130,16 +130,14 @@ I want the Ui (the view) to pilot the Core (model/controller):<br/>
 
 ### Startup
 
-    - parse command line arguments
-      *) store special options flags
-    - init sub systems
-    - setup modules/plugins
-    - create/restore/merge file/buffer list
-    - start core thread
-    - start/run select ui main loop (in the main thread)
+    * parse command line arguments<br/>
+      * store special options flags<br/>
+    * create/restore/merge file/buffer list<br/>
+    * init sub systems<br/>
+    * setup modules/plugins<br/>
+    * start core thread<br/>
+    * start/run select ui main loop (in the main thread)<br/>
 
     [Ui main loop]
     - the ui(s) request the list of opened buffers
-    - and from there th ui can request layout for a given buffer
-
-    ------
+    - and from there the ui can request layout for a given buffer

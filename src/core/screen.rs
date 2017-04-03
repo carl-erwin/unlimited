@@ -69,10 +69,10 @@ impl Line {
         let mut chars = Vec::new();
         for _ in 0..columns {
             chars.push(CodepointInfo {
-                cp: ' ',
-                displayed_cp: ' ',
-                offset: 0,
-            });
+                           cp: ' ',
+                           displayed_cp: ' ',
+                           offset: 0,
+                       });
         }
 
         Line {
