@@ -10,6 +10,8 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 ### Compiling
 
+On a working Rust (stable) environment
+
 ```
 git clone https://github.com/carl-erwin/unlimited
 cd unlimited
@@ -18,16 +20,25 @@ cargo build
 
 ------
 
+### Running
+
+```
+cargo run -- [FILE1] .. [FILEn]
+```
+
+
+------
+
 ### Goals
 
-Being simple and ultimately remove all limitations found in common editors. (the file's size beign the first)
+Ultimately remove all limitations found in common editors. (the file's size being the first)
 
 ------
 
 
 ### Contributing
 
-More later, when there will be some code...
+More later, when there will be something useable...
 
 ------
 
@@ -59,7 +70,7 @@ A **ByteBuffer** represents a memory snapshot of a given **File**.<br/>
 An unsigned 64 bits integer that represent a given **ByteBuffer** instance<br/>
 
 - **Buffer**<br/>
-An **Buffer** represents a **ByteBuffer** and it's configuration.<br/>
+A **Buffer** represents a **ByteBuffer** PLUS it's configuration.<br/>
 There is one and only one **Buffer** per **ByteBuffer**.<br/>
 An **Buffer** is always bound to a **ByteBuffer**.
 
@@ -128,16 +139,16 @@ I want the Ui (the view) to pilot the Core (model/controller):<br/>
 
 ------
 
-### Startup
+### Startup sequences
 
-    * parse command line arguments<br/>
-      * store special options flags<br/>
-    * create/restore/merge file/buffer list<br/>
-    * init sub systems<br/>
-    * setup modules/plugins<br/>
-    * start core thread<br/>
-    * start/run select ui main loop (in the main thread)<br/>
+- parse command line arguments<br/>
+- store special options flags<br/>
+- create/restore/merge file/buffer list<br/>
+- start core thread<br/>
+- initialize sub systems<br/>
+- setup modules/extensions<br/>
+- start/run select ui main loop (in the main thread)<br/>
 
-    [Ui main loop]
+ **Ui main loop**
     - the ui(s) request the list of opened buffers
     - and from there the ui can request layout for a given buffer
