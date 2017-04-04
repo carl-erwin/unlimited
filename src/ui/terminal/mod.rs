@@ -1,5 +1,5 @@
+//
 extern crate termion;
-
 
 //
 use self::termion::event::{Event, Key, MouseEvent};
@@ -9,9 +9,7 @@ use self::termion::terminal_size;
 
 use std::io::{self, Write, stdin, Stdout};
 
-
 //
-
 use core::screen::Screen;
 use core::codepointinfo::CodepointInfo;
 
@@ -181,7 +179,6 @@ pub fn main_loop() {
 
     let mut quit = false;
     while !quit {
-
         let (width, height) = terminal_size().unwrap();
         let mut scr = Screen::new(width as usize, height as usize);
 
@@ -267,7 +264,6 @@ pub fn main_loop() {
             stdout.flush().unwrap();
         }
     }
-
 
     write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
     stdout.flush().unwrap();

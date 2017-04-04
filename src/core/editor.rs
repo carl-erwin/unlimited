@@ -5,15 +5,13 @@ use std::collections::HashMap;
 use core;
 use ui;
 use core::config::Config;
-
 use core::buffer::BufferBuilder;
 use core::buffer::Buffer;
 use core::buffer;
-
 use core::byte_buffer;
 
 
-
+//
 pub type Id = u64;
 
 //
@@ -24,6 +22,7 @@ pub struct Editor {
 
 
 impl Editor {
+    ///
     pub fn new(config: Config) -> Editor {
         Editor {
             config: config,
@@ -51,22 +50,39 @@ impl Editor {
         }
     }
 
+    ///
     pub fn setup_default_buffers(&mut self) {
 
-        //let b =
-        BufferBuilder::new()
+        let b = BufferBuilder::new()
             .buffer_name("scratch")
+            .filename("/dev/null")
             .internal(true)
             .finalize();
 
-        // self.add_buffer(b);
+        self.buffer_map.insert(0, Box::new(b.unwrap()));
     }
 
+    ///
     pub fn load_files(&mut self) {
+
+        let mut id: u64 = 1;
+
         for f in &self.config.files_list {
-            println!("checking '{}'", f);
-            // add to buffer_map
-            // Buffer::new(filename)
+
+            let b = BufferBuilder::new()
+                .buffer_name(f)
+                .filename(f)
+                .internal(false)
+                .finalize();
+
+            match b {
+                Some(b) => {
+                    self.buffer_map.insert(id, Box::new(b));
+                    id += 1;
+                }
+                None => {}
+            }
+
         }
     }
 }

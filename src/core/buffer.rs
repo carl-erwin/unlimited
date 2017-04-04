@@ -4,6 +4,7 @@ use std::collections::HashMap;
 //
 use core;
 use core::byte_buffer::ByteBuffer;
+use core::byte_buffer::OpenMode;
 
 use core::view;
 use core::view::View;
@@ -11,43 +12,61 @@ use core::view::View;
 //
 pub type Id = u64;
 
+///
 pub struct BufferBuilder {
     internal: bool,
-    name: String,
+    buffer_name: String,
+    filename: String,
 }
 
+///
 impl BufferBuilder {
+    ///
     pub fn new() -> BufferBuilder {
         BufferBuilder {
             internal: false,
-            name: String::new(),
+            buffer_name: String::new(),
+            filename: String::new(),
         }
     }
 
+    ///
     pub fn internal<'a>(&'a mut self, flag: bool) -> &'a mut BufferBuilder {
         self.internal = flag;
         self
     }
 
+    ///
     pub fn buffer_name<'a>(&'a mut self, name: &str) -> &'a mut BufferBuilder {
-        self.name.clear();
-        self.name.push_str(name);
+        self.buffer_name.clear();
+        self.buffer_name.push_str(name);
+        self
+    }
+
+    ///
+    pub fn filename<'a>(&'a mut self, name: &str) -> &'a mut BufferBuilder {
+        self.filename.clear();
+        self.filename.push_str(name);
         self
     }
 
 
-    pub fn finalize(&self) -> Buffer {
-        Buffer {
-            id: 0,
-            name: self.name.clone(),
-            byte_buffer: None,
-            views: HashMap::new(),
-        }
+    ///
+    pub fn finalize(&self) -> Option<Buffer> {
+
+        let byte_buffer = ByteBuffer::new(&self.filename, OpenMode::ReadWrite);
+
+        Some(Buffer {
+                 id: 0,
+                 name: self.buffer_name.clone(),
+                 byte_buffer: byte_buffer,
+                 views: HashMap::new(),
+             })
     }
 }
 
 
-//
+///
 pub struct Buffer {
     pub id: Id,
     pub name: String,
