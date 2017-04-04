@@ -24,6 +24,8 @@ pub struct ByteBuffer {
 
 
 impl ByteBuffer {
+    /// Creates a new `Buffer`.
+    ///
     /// filename param[in] path to the file we want to load in the buffer, use "/dev/null" to create empty buffer
     /// this function allocate a buffer
     /// if filename is null the content will be stored in heap
@@ -46,7 +48,6 @@ impl ByteBuffer {
         false
     }
 
-
     /// set the name of the buffer
     pub fn set_name(&mut self, bid: Id, buffer_name: String) -> bool {
         false
@@ -62,42 +63,44 @@ impl ByteBuffer {
         self.filename.clone()
     }
 
-
     /// change the on disk target file
-    fn set_filename(&mut self, name: String) -> bool {
+    pub fn set_filename(&mut self, name: String) -> bool {
         self.filename = name;
         true
     }
 
     /// returns the number of bytes a given buffer contains
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.size
     }
 
-
-    /// returns the number of changes sine the last save
-    ///     0  => the no change since last save
-    ///     >0 => the number of changes since last save
-    fn nr_changes(&self) -> u64 {
+    /// returns the number of changes sine the last save<br/>
+    ///     0  => the no change since last save<br/>
+    ///     >0 => the number of changes since last save<br/>
+    pub fn nr_changes(&self) -> u64 {
         self.nr_changes
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
-    fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
+    pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         0
     }
 
     /// insert the 'data' Vec content in the buffer upto 'nr_bytes'
     /// return XXX on error (use ioresult)
-    fn write(&self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
+    pub fn write(&self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
         0
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data) before remove the bytes
-    fn remove(&self, offset: u64, nr_bytes: usize, removed_data: Option<&mut Vec<u8>>) -> usize {
+    pub fn remove(&self,
+                  offset: u64,
+                  nr_bytes: usize,
+                  removed_data: Option<&mut Vec<u8>>)
+                  -> usize {
 
         // copy removed data
         if let Some(v) = removed_data {
@@ -109,16 +112,14 @@ impl ByteBuffer {
         0
     }
 
-    // future blocvk api:
 
-    // can be used to know the number of blocks that compose the buffer, api to be used by indexer etc...
-    fn nr_pages(&self) -> u64 {
+    /// can be used to know the number of blocks that compose the buffer, api to be used by indexer etc...
+    pub fn nr_pages(&self) -> u64 {
         0
     }
 
-    //
-    fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
+    /// returns the position and size of a given page
+    pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
         (0, 0)
-
     }
 }

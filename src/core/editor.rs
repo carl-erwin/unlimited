@@ -6,7 +6,12 @@ use core;
 use ui;
 use core::config::Config;
 
-use core::buffer::*;
+use core::buffer::BufferBuilder;
+use core::buffer::Buffer;
+use core::buffer;
+
+use core::byte_buffer;
+
 
 
 pub type Id = u64;
@@ -14,7 +19,7 @@ pub type Id = u64;
 //
 pub struct Editor {
     pub config: Config,
-    pub buffer_map: HashMap<Id, Box<Buffer>>,
+    pub buffer_map: HashMap<buffer::Id, Box<Buffer>>,
 }
 
 

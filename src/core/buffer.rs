@@ -1,3 +1,15 @@
+//
+use std::collections::HashMap;
+
+//
+use core;
+use core::byte_buffer::ByteBuffer;
+
+use core::view;
+use core::view::View;
+
+//
+pub type Id = u64;
 
 pub struct BufferBuilder {
     internal: bool,
@@ -28,6 +40,8 @@ impl BufferBuilder {
         Buffer {
             id: 0,
             name: self.name.clone(),
+            byte_buffer: None,
+            views: HashMap::new(),
         }
     }
 }
@@ -35,6 +49,8 @@ impl BufferBuilder {
 
 //
 pub struct Buffer {
-    pub id: u64,
+    pub id: Id,
     pub name: String,
+    pub byte_buffer: Option<ByteBuffer>,
+    pub views: HashMap<view::Id, Box<View>>,
 }
