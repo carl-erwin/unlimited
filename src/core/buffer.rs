@@ -2,7 +2,6 @@
 use std::collections::HashMap;
 
 //
-use core;
 use core::byte_buffer::ByteBuffer;
 use core::byte_buffer::OpenMode;
 
@@ -67,6 +66,7 @@ impl BufferBuilder {
 
 
 ///
+#[derive(Debug)]
 pub struct Buffer {
     pub id: Id,
     pub name: String,

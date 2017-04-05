@@ -1,9 +1,10 @@
 mod terminal;
 
+use core::editor::Editor;
 
-pub fn main_loop() {
+pub fn main_loop(editor: &mut Editor) {
     // TODO: switch ui here
-    terminal::main_loop();
+    terminal::main_loop(editor);
     // gtk::main_loop();
     // webui::main_loop();
 }

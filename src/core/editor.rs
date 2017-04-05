@@ -8,7 +8,6 @@ use core::config::Config;
 use core::buffer::BufferBuilder;
 use core::buffer::Buffer;
 use core::buffer;
-use core::byte_buffer;
 
 
 //
@@ -42,7 +41,7 @@ impl Editor {
         }
 
         if self.config.start_ui {
-            ui::main_loop();
+            ui::main_loop(self);
         }
 
         if self.config.start_core {
@@ -54,18 +53,28 @@ impl Editor {
     pub fn setup_default_buffers(&mut self) {
 
         let b = BufferBuilder::new()
-            .buffer_name("scratch")
+            .buffer_name("debug-message")
             .file_name("/dev/null")
             .internal(true)
             .finalize();
 
         self.buffer_map.insert(0, Box::new(b.unwrap()));
+
+        let b = BufferBuilder::new()
+            .buffer_name("scratch")
+            .file_name("/dev/null")
+            .internal(true)
+            .finalize();
+
+        self.buffer_map.insert(1, Box::new(b.unwrap()));
+
+
     }
 
     ///
     pub fn load_files(&mut self) {
 
-        let mut id: u64 = 1;
+        let mut id: u64 = 2;
 
         for f in &self.config.files_list {
 

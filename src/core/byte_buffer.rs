@@ -1,13 +1,13 @@
 //
 use std::fs::File;
 use std::io::prelude::*;
-
 //
 pub type Id = u64;
 pub type Offset = u64;
 pub type PageSize = usize;
 
 //
+#[derive(Debug)]
 pub enum OpenMode {
     ReadOnly = 0,
     ReadWrite = 1,
@@ -18,12 +18,15 @@ pub enum OpenMode {
 /// The **ByteBuffer** represent a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
 /// The editor **Modes** use this api to read/modify the content of the file at the byte level
+#[derive(Debug)]
 pub struct ByteBuffer {
     pub id: Id,
     pub file_name: String,
     pub size: usize, // proxy to underlying structs
     pub nr_changes: u64, // number of changes since last save
-    pub file: File,
+    pub file: File, //
+    mode: OpenMode, //
+    pub data: Vec<u8>, // file bytes
 }
 
 
@@ -39,19 +42,28 @@ impl ByteBuffer {
     /// the allocated_bid pointer will be filled on successfull open operation
     pub fn new(file_name: &String, mode: OpenMode) -> Option<ByteBuffer> {
 
-        let file = match File::open(file_name) {
-            Ok(f) => Some(f),
-            Err(E) => return None,
+        // TODO: check permission
+        let mut file = match File::open(file_name) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("cannot open '{}' : {}", file_name, e);
+                return None;
+            }
         };
 
-        println!("'{}' opened", file_name);
+        let mut data = Vec::new();
+        let size = file.read_to_end(&mut data).unwrap_or(0);
+
+        println!("'{}' opened mode '{:?}' size '{}'", file_name, mode, size);
 
         Some(ByteBuffer {
                  id: 0,
                  file_name: file_name.clone(),
-                 size: 0,
+                 mode: mode,
+                 size: size,
                  nr_changes: 0,
-                 file: file.unwrap(),
+                 file: file,
+                 data: data,
              })
     }
 
@@ -87,7 +99,12 @@ impl ByteBuffer {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
-        0
+        let start_offset = ::std::cmp::min(offset as usize, self.size);
+        let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
+        for b in &self.data[start_offset..end_offset] {
+            data.push(*b);
+        }
+        (end_offset - start_offset) as usize
     }
 
     /// insert the 'data' Vec content in the buffer upto 'nr_bytes'
@@ -98,30 +115,35 @@ impl ByteBuffer {
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data) before remove the bytes
-    pub fn remove(&self,
+    pub fn remove(&mut self,
                   offset: u64,
                   nr_bytes: usize,
                   removed_data: Option<&mut Vec<u8>>)
                   -> usize {
+
+        let start_offset = ::std::cmp::min(offset as usize, self.size);
+        let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
 
         // copy removed data
         if let Some(v) = removed_data {
             self.read(offset, nr_bytes, v);
         }
 
-        // TODO: impl
+        self.data.drain(start_offset..end_offset);
 
-        0
+        let nr_bytes_removed = (end_offset - start_offset) as usize;
+        self.size -= nr_bytes_removed;
+        nr_bytes_removed
     }
 
 
     /// can be used to know the number of blocks that compose the buffer, api to be used by indexer etc...
     pub fn nr_pages(&self) -> u64 {
-        0
+        1
     }
 
     /// returns the position and size of a given page
     pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
-        (0, 0)
+        (0, self.size)
     }
 }
