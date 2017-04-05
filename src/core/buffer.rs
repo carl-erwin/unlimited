@@ -16,7 +16,7 @@ pub type Id = u64;
 pub struct BufferBuilder {
     internal: bool,
     buffer_name: String,
-    filename: String,
+    file_name: String,
 }
 
 ///
@@ -26,7 +26,7 @@ impl BufferBuilder {
         BufferBuilder {
             internal: false,
             buffer_name: String::new(),
-            filename: String::new(),
+            file_name: String::new(),
         }
     }
 
@@ -44,9 +44,9 @@ impl BufferBuilder {
     }
 
     ///
-    pub fn filename<'a>(&'a mut self, name: &str) -> &'a mut BufferBuilder {
-        self.filename.clear();
-        self.filename.push_str(name);
+    pub fn file_name<'a>(&'a mut self, name: &str) -> &'a mut BufferBuilder {
+        self.file_name.clear();
+        self.file_name.push_str(name);
         self
     }
 
@@ -54,7 +54,7 @@ impl BufferBuilder {
     ///
     pub fn finalize(&self) -> Option<Buffer> {
 
-        let byte_buffer = ByteBuffer::new(&self.filename, OpenMode::ReadWrite);
+        let byte_buffer = ByteBuffer::new(&self.file_name, OpenMode::ReadWrite);
 
         Some(Buffer {
                  id: 0,

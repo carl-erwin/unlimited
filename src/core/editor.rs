@@ -55,7 +55,7 @@ impl Editor {
 
         let b = BufferBuilder::new()
             .buffer_name("scratch")
-            .filename("/dev/null")
+            .file_name("/dev/null")
             .internal(true)
             .finalize();
 
@@ -71,7 +71,7 @@ impl Editor {
 
             let b = BufferBuilder::new()
                 .buffer_name(f)
-                .filename(f)
+                .file_name(f)
                 .internal(false)
                 .finalize();
 

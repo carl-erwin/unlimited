@@ -20,7 +20,7 @@ pub enum OpenMode {
 /// The editor **Modes** use this api to read/modify the content of the file at the byte level
 pub struct ByteBuffer {
     pub id: Id,
-    pub filename: String,
+    pub file_name: String,
     pub size: usize, // proxy to underlying structs
     pub nr_changes: u64, // number of changes since last save
     pub file: File,
@@ -30,25 +30,25 @@ pub struct ByteBuffer {
 impl ByteBuffer {
     /// Creates a new `Buffer`.
     ///
-    /// filename param[in] path to the file we want to load in the buffer, use "/dev/null" to create empty buffer
+    /// file_name param[in] path to the file we want to load in the buffer, use "/dev/null" to create empty buffer
     /// this function allocate a buffer
-    /// if filename is null the content will be stored in heap
-    /// if filename is non null the the content will be read from the file
-    /// if buffer_name is null , filename will be used to give a name to the buffer
+    /// if file_name is null the content will be stored in heap
+    /// if file_name is non null the the content will be read from the file
+    /// if buffer_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
-    pub fn new(filename: &String, mode: OpenMode) -> Option<ByteBuffer> {
+    pub fn new(file_name: &String, mode: OpenMode) -> Option<ByteBuffer> {
 
-        let file = match File::open(filename) {
+        let file = match File::open(file_name) {
             Ok(f) => Some(f),
             Err(E) => return None,
         };
 
-        println!("'{}' opened", filename);
+        println!("'{}' opened", file_name);
 
         Some(ByteBuffer {
                  id: 0,
-                 filename: filename.clone(),
+                 file_name: file_name.clone(),
                  size: 0,
                  nr_changes: 0,
                  file: file.unwrap(),
@@ -61,13 +61,13 @@ impl ByteBuffer {
     }
 
     /// returns the name of the file associated to the buffer
-    pub fn get_filename(&self) -> String {
-        self.filename.clone()
+    pub fn get_file_name(&self) -> String {
+        self.file_name.clone()
     }
 
     /// change the on disk target file
-    pub fn set_filename(&mut self, name: String) -> bool {
-        self.filename = name;
+    pub fn set_file_name(&mut self, name: String) -> bool {
+        self.file_name = name;
         true
     }
 
