@@ -155,12 +155,14 @@ pub fn main_loop(editor: &mut Editor) {
                             }
                             buf = editor.buffer_map.get(&bid);
                             clear_screen = true;
+                            break
                         },
 
                         Key::F(2) => {
                             bid += 1;
                             buf = editor.buffer_map.get(&bid);
                             clear_screen = true;
+                            break
                         },
 
 
