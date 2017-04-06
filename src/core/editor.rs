@@ -1,5 +1,6 @@
 //
 use std::collections::HashMap;
+use std::thread;
 
 //
 use core;
@@ -36,16 +37,19 @@ impl Editor {
 
         self.load_files();
 
-        if self.config.start_core {
-            core::start();
-        }
+        let core_th = if self.config.start_core {
+            Some(thread::spawn(move || core::start()))
+        } else {
+            None
+        };
 
         if self.config.start_ui {
             ui::main_loop(self);
         }
 
-        if self.config.start_core {
-            core::stop();
+        match core_th {
+            Some(core_handle) => core_handle.join().unwrap(),
+            None => {}
         }
     }
 
