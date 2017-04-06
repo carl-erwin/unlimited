@@ -106,13 +106,15 @@ pub fn main_loop(editor: &mut Editor) {
     let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-
     stdout.flush().unwrap();
 
     let mut keys: Vec<Event> = Vec::new();
 
     let mut quit = false;
     let mut clear_toggle_flag = true;
+
+    //
+    let display_status = true;
 
     // select file
     let mut bid = 2;
@@ -123,12 +125,22 @@ pub fn main_loop(editor: &mut Editor) {
         let mut scr = Screen::new(width as usize, height as usize);
 
         terminal_clear_screen(&mut stdout, &mut clear_toggle_flag);
+        write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+        stdout.flush().unwrap();
+
         draw_buffer(&buf, &mut scr, &mut stdout);
+        if display_status == true {
+            display_status_line(&buf, "", height, width, &mut stdout);
+        }
 
         for evt in stdin().events() {
 
             keys.push(evt.unwrap());
             let evt = keys[keys.len() - 1].clone();
+
+            terminal_clear_screen(&mut stdout, &mut clear_toggle_flag);
+            write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+            stdout.flush().unwrap();
 
             draw_buffer(&buf, &mut scr, &mut stdout);
 
@@ -172,12 +184,14 @@ pub fn main_loop(editor: &mut Editor) {
                             }
                             buf = editor.buffer_map.get(&bid);
                             clear_toggle_flag = true;
+                            break;
                         }
 
                         Key::F(2) => {
                             bid = ::std::cmp::min(bid + 1, (editor.buffer_map.len() - 1) as u64);
                             buf = editor.buffer_map.get(&bid);
                             clear_toggle_flag = true;
+                            break;
                         }
 
                         Key::F(f) => status = format!("F{:?}", f),
@@ -219,26 +233,49 @@ pub fn main_loop(editor: &mut Editor) {
                 Event::Unsupported(_) => {}
             }
 
-            /* display status */
-            // select/clear last line
-            terminal_goto_line(&mut stdout, 1, height);
-            terminal_clear_current_line(&mut stdout, width);
-            let file_name = match buf {
-                Some(ref b) => {
-                    match b.byte_buffer {
-                        Some(ref bb) => bb.file_name.as_str(),
-                        None => "",
-                    }
-                }
-                None => "",
-            };
-            print!("file: {} : event {}", file_name, status);
-            stdout.flush().unwrap();
+            if display_status == true {
+                display_status_line(&buf, &status, height, width, &mut stdout);
+            }
         }
     }
 
     // quit
     // clear, restore cursor
     write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
+    stdout.flush().unwrap();
+}
+
+
+fn display_status_line(buf: &Option<&Box<::core::buffer::Buffer>>,
+                       status: &str,
+                       line: u16,
+                       width: u16,
+                       mut stdout: &mut Stdout) {
+    // select/clear last line
+    let name = match *buf {
+        Some(ref b) => b.name.as_str(),
+        None => "",
+    };
+
+    let file_name = match *buf {
+        Some(ref b) => {
+            match b.byte_buffer {
+                Some(ref bb) => bb.file_name.as_str(),
+                None => "",
+            }
+        }
+        None => "",
+    };
+
+
+    terminal_goto_line(&mut stdout, 1, line);
+    terminal_clear_current_line(&mut stdout, width);
+
+    let status_str = format!("buffer_name '{}', file: '{}', event '{}'",
+                             name,
+                             file_name,
+                             status);
+
+    print!("{}", status_str);
     stdout.flush().unwrap();
 }
