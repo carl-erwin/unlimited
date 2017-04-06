@@ -17,7 +17,8 @@ pub enum OpenMode {
 
 /// The **ByteBuffer** represent a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
-/// The editor **Modes** use this api to read/modify the content of the file at the byte level
+/// The editor **Modes** use this api to read/modify the content
+/// of the file at the byte level
 #[derive(Debug)]
 pub struct ByteBuffer {
     pub id: Id,
@@ -33,7 +34,8 @@ pub struct ByteBuffer {
 impl ByteBuffer {
     /// Creates a new `Buffer`.
     ///
-    /// file_name param[in] path to the file we want to load in the buffer, use "/dev/null" to create empty buffer
+    /// file_name param[in] path to the file we want to load in the buffer,
+    /// use "/dev/null" to create empty buffer
     /// this function allocate a buffer
     /// if file_name is null the content will be stored in heap
     /// if file_name is non null the the content will be read from the file
@@ -50,6 +52,8 @@ impl ByteBuffer {
                 return None;
             }
         };
+
+        // TODO: check file's type => ignore directory (for now)
 
         let mut data = Vec::new();
         let size = file.read_to_end(&mut data).unwrap_or(0);
@@ -114,7 +118,8 @@ impl ByteBuffer {
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
-    /// if removed_data is provided will call self.read(offset, nr_bytes, data) before remove the bytes
+    /// if removed_data is provided will call self.read(offset, nr_bytes, data)
+    /// before remove the bytes
     pub fn remove(&mut self,
                   offset: u64,
                   nr_bytes: usize,
@@ -137,7 +142,8 @@ impl ByteBuffer {
     }
 
 
-    /// can be used to know the number of blocks that compose the buffer, api to be used by indexer etc...
+    /// can be used to know the number of blocks that compose the buffer,
+    /// api to be used by indexer etc...
     pub fn nr_pages(&self) -> u64 {
         1
     }
