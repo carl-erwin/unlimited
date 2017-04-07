@@ -68,7 +68,7 @@ pub struct Line {
 impl Line {
     fn new(columns: usize) -> Line {
 
-        let mut chars = Vec::new();
+        let mut chars = Vec::with_capacity(columns);
         for _ in 0..columns {
             chars.push(CodepointInfo {
                            cp: ' ',
