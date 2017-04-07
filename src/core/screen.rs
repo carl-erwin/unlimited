@@ -2,6 +2,7 @@ use core::codepointinfo::CodepointInfo;
 
 
 // the screen is composed of lines
+#[derive(Debug)]
 pub struct Screen {
     pub line: Vec<Line>,
     pub used: usize,
@@ -57,6 +58,7 @@ impl Screen {
 }
 
 // a line is composed of codepoints
+#[derive(Debug)]
 pub struct Line {
     pub chars: Vec<CodepointInfo>,
     pub used: usize,
