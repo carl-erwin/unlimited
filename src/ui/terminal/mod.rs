@@ -7,6 +7,8 @@ use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
 
+use self::termion::cursor::DetectCursorPos;
+
 use std::io::{self, Write, stdin, Stdout};
 
 //
@@ -82,15 +84,27 @@ fn draw_buffer(buf: &Option<&Box<::core::buffer::Buffer>>,
     }
 }
 
-fn terminal_clear_current_line(mut stdout: &mut Stdout, nr: u16) {
-    for _ in 0..nr {
+fn terminal_clear_current_line(mut stdout: &mut Stdout, line_width: u16) {
+    let (current_line, _) = match stdout.cursor_pos() {
+        Err(_) => { (0, 0) },
+        Ok((c, _)) => { (c as  u16, 0) },
+    };
+
+    for _ in 0..line_width {
         write!(stdout, " ").unwrap();
     }
+    terminal_goto_line(&mut stdout, current_line);
 }
 
-fn terminal_goto_line(mut stdout: &mut Stdout, x: u16, y: u16) {
+fn terminal_goto_line(mut stdout: &mut Stdout, y: u16) {
+    write!(stdout, "{}", termion::cursor::Goto(1, y)).unwrap();
+}
+
+/*
+fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
 }
+*/
 
 
 fn terminal_clear_screen(stdout: &mut Stdout, clear_toggle_flag: &mut bool) {
@@ -268,7 +282,7 @@ fn display_status_line(buf: &Option<&Box<::core::buffer::Buffer>>,
     };
 
 
-    terminal_goto_line(&mut stdout, 1, line);
+    terminal_goto_line(&mut stdout, line);
     terminal_clear_current_line(&mut stdout, width);
 
     let status_str = format!("buffer_name '{}', file: '{}', event '{}'",
