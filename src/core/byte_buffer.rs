@@ -117,10 +117,17 @@ impl ByteBuffer {
         nr_copied
     }
 
-    /// insert the 'data' Vec content in the buffer upto 'nr_bytes'
+    /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
-    pub fn write(&self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
-        0
+    pub fn write(&mut self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
+
+        let index = offset as usize;
+        for n in 0..nr_bytes {
+            self.data.insert(index + n, data[n]);
+        }
+        self.size += nr_bytes;
+
+        nr_bytes
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
@@ -142,8 +149,8 @@ impl ByteBuffer {
         }
 
         self.data.drain(start_offset..end_offset);
-
         self.size -= nr_bytes_removed;
+
         nr_bytes_removed
     }
 
@@ -162,4 +169,24 @@ impl ByteBuffer {
             (0, self.size)
         }
     }
+}
+
+
+#[test]
+fn test_byte_buffer() {
+    let mut bb = ByteBuffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+
+    let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    bb.write(0, 10, &data);
+    assert_eq!(bb.data, data);
+
+    let data = vec![0, 1, 2, 6, 7, 8, 9];
+    let mut rm = vec![];
+    let n = bb.remove(3, 3, Some(&mut rm));
+    assert_eq!(n, 3);
+    assert_eq!(bb.data, data);
+    let rm_expect = vec![3, 4, 5];
+    assert_eq!(rm, rm_expect);
+    println!("rm {:?}", rm);
+    println!("rm_expect {:?}", rm_expect);
 }
