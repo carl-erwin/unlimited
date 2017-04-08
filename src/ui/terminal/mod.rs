@@ -7,8 +7,6 @@ use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
 
-use self::termion::cursor::DetectCursorPos;
-
 use std::io::{self, Write, stdin, Stdout};
 
 //
@@ -89,11 +87,6 @@ fn terminal_clear_current_line(mut stdout: &mut Stdout, line_width: u16) {
         write!(stdout, " ").unwrap();
     }
 }
-
-fn terminal_goto_line(mut stdout: &mut Stdout, y: u16) {
-    write!(stdout, "{}", termion::cursor::Goto(1, y)).unwrap();
-}
-
 
 fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
