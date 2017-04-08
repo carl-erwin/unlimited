@@ -59,7 +59,11 @@ impl ByteBuffer {
         let size = file.read_to_end(&mut data).unwrap_or(0);
 
         println!("'{}' opened mode '{:?}' size '{}'", file_name, mode, size);
-
+        /*
+            for c in &data {
+                println!("c {} char '{}' ", *c, *c as char);
+            }
+        */
         Some(ByteBuffer {
                  id: 0,
                  file_name: file_name.clone(),
@@ -105,14 +109,16 @@ impl ByteBuffer {
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         let start_offset = ::std::cmp::min(offset as usize, self.size);
         let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
+        let nr_copied = (end_offset - start_offset) as usize;
+        data.reserve(nr_copied);
         for b in &self.data[start_offset..end_offset] {
             data.push(*b);
         }
-        (end_offset - start_offset) as usize
+        nr_copied
     }
 
     /// insert the 'data' Vec content in the buffer upto 'nr_bytes'
-    /// return XXX on error (use ioresult)
+    /// return the number of written bytes (TODO: use io::Result)
     pub fn write(&self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
         0
     }
@@ -128,15 +134,15 @@ impl ByteBuffer {
 
         let start_offset = ::std::cmp::min(offset as usize, self.size);
         let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
+        let nr_bytes_removed = (end_offset - start_offset) as usize;
 
         // copy removed data
         if let Some(v) = removed_data {
-            self.read(offset, nr_bytes, v);
+            self.read(offset, nr_bytes_removed, v);
         }
 
         self.data.drain(start_offset..end_offset);
 
-        let nr_bytes_removed = (end_offset - start_offset) as usize;
         self.size -= nr_bytes_removed;
         nr_bytes_removed
     }
@@ -150,6 +156,10 @@ impl ByteBuffer {
 
     /// returns the position and size of a given page
     pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
-        (0, self.size)
+        if page_index > 0 {
+            (0, self.size)
+        } else {
+            (0, self.size)
+        }
     }
 }
