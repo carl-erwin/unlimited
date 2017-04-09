@@ -119,18 +119,19 @@ pub fn main_loop(editor: &mut Editor) {
     // select file
     let mut bid = 2;
     let mut buf = editor.buffer_map.get(&bid);
+    let mut status_line_y = 0 as u16;
+    let mut status = String::new();
 
     while !quit {
         let (width, height) = terminal_size().unwrap();
         let mut scr = Screen::new(width as usize, height as usize);
 
-        terminal_clear_screen(&mut stdout, &mut clear_toggle_flag);
-        write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-        stdout.flush().unwrap();
+        status_line_y += 1;
+        status_line_y %= height;
 
         draw_buffer(&buf, &mut scr, &mut stdout);
         if display_status == true {
-            display_status_line(&buf, "", height, width, &mut stdout);
+            display_status_line(&buf, &status, status_line_y, width, &mut stdout);
         }
 
         for evt in stdin().events() {
@@ -138,14 +139,9 @@ pub fn main_loop(editor: &mut Editor) {
             keys.push(evt.unwrap());
             let evt = keys[keys.len() - 1].clone();
 
-            terminal_clear_screen(&mut stdout, &mut clear_toggle_flag);
-            write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-            stdout.flush().unwrap();
-
             draw_buffer(&buf, &mut scr, &mut stdout);
 
             // Print recieved Events...
-            let mut status = String::new();
             match evt {
 
                 Event::Key(k) => {
@@ -231,11 +227,13 @@ pub fn main_loop(editor: &mut Editor) {
                 }
 
                 Event::Unsupported(_) => {}
+
             }
 
             if display_status == true {
-                display_status_line(&buf, &status, height, width, &mut stdout);
+                display_status_line(&buf, &status, status_line_y, width, &mut stdout);
             }
+            break;
         }
     }
 
@@ -272,7 +270,8 @@ fn display_status_line(buf: &Option<&Box<::core::buffer::Buffer>>,
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let status_str = format!("buffer_name '{}', file: '{}', event '{}'",
+    let status_str = format!("line {} buffer_name '{}', file: '{}', event '{}'",
+                             line,
                              name,
                              file_name,
                              status);
