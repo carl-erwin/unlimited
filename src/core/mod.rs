@@ -20,6 +20,8 @@ pub mod byte_buffer;
 pub mod event;
 pub mod view;
 pub mod mark;
+pub mod text_codec;
+
 
 
 
