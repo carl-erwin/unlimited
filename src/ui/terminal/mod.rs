@@ -92,15 +92,6 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
 }
 
-
-fn terminal_clear_screen(stdout: &mut Stdout, clear_toggle_flag: &mut bool) {
-    if *clear_toggle_flag == true {
-        write!(stdout, "{}", termion::clear::All).unwrap();
-        stdout.flush().unwrap();
-    }
-    *clear_toggle_flag = false;
-}
-
 pub fn main_loop(editor: &mut Editor) {
 
     let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
@@ -111,7 +102,7 @@ pub fn main_loop(editor: &mut Editor) {
     let mut keys: Vec<Event> = Vec::new();
 
     let mut quit = false;
-    let mut clear_toggle_flag = true;
+    // let mut clear_toggle_flag = true;
 
     //
     let display_status = true;
@@ -179,14 +170,12 @@ pub fn main_loop(editor: &mut Editor) {
                                 bid -= 1;
                             }
                             buf = editor.buffer_map.get(&bid);
-                            clear_toggle_flag = true;
                             break;
                         }
 
                         Key::F(2) => {
                             bid = ::std::cmp::min(bid + 1, (editor.buffer_map.len() - 1) as u64);
                             buf = editor.buffer_map.get(&bid);
-                            clear_toggle_flag = true;
                             break;
                         }
 
