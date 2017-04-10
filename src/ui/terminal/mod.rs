@@ -42,20 +42,20 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
 }
 
 
-fn draw_screen(screen: &Screen, stdout: &mut Stdout) {
+fn draw_screen(screen: &Screen, mut stdout: &mut Stdout) {
 
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
 
     for l in 0..screen.height {
+
+        terminal_cursor_to(&mut stdout, 1, (l + 1) as u16);
+
         let line = &screen.line[l];
 
         for c in 0..line.width {
             let cpi = &line.chars[c];
-            write!(stdout, "{}", cpi.displayed_cp).unwrap();
-        }
 
-        if l < screen.height - 1 {
-            write!(stdout, "\r\n").unwrap();
+            write!(stdout, "{}", cpi.displayed_cp).unwrap();
         }
     }
 
