@@ -2,6 +2,7 @@
 extern crate termion;
 
 //
+use self::termion::screen::AlternateScreen;
 use self::termion::event::{Event, Key, MouseEvent};
 use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
@@ -31,6 +32,7 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
             cp: *c as char,
             displayed_cp: displayed_cp,
             offset: offset,
+            is_selected: false,
         };
 
         let (ok, _) = screen.push(cpi);
@@ -42,7 +44,7 @@ fn fill_screen(screen: &mut Screen, data: &[u8]) {
 }
 
 
-fn draw_screen(screen: &Screen, mut stdout: &mut Stdout) {
+fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
 
@@ -50,12 +52,17 @@ fn draw_screen(screen: &Screen, mut stdout: &mut Stdout) {
 
         terminal_cursor_to(&mut stdout, 1, (l + 1) as u16);
 
-        let line = &screen.line[l];
+        let line = screen.get_line(l).unwrap();
 
         for c in 0..line.width {
-            let cpi = &line.chars[c];
+
+            let cpi = line.get_cpi(c).unwrap();
+            if cpi.is_selected == true {
+                write!(stdout, "{}", termion::style::Invert).unwrap();
+            }
 
             write!(stdout, "{}", cpi.displayed_cp).unwrap();
+            write!(stdout, "{}", termion::style::Reset).unwrap();
         }
     }
 
@@ -73,7 +80,7 @@ fn draw_buffer(buf: &Option<&Box<::core::buffer::Buffer>>,
 
                 Some(ref byte_buf) => {
                     fill_screen(&mut scr, &byte_buf.data);
-                    draw_screen(&scr, &mut stdout);
+                    draw_screen(&mut scr, &mut stdout);
                 }
                 _ => {}
             }
@@ -94,7 +101,8 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 pub fn main_loop(editor: &mut Editor) {
 
-    let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let mut stdout = AlternateScreen::from(stdout);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
@@ -102,7 +110,6 @@ pub fn main_loop(editor: &mut Editor) {
     let mut keys: Vec<Event> = Vec::new();
 
     let mut quit = false;
-    // let mut clear_toggle_flag = true;
 
     //
     let display_status = true;
@@ -110,15 +117,13 @@ pub fn main_loop(editor: &mut Editor) {
     // select file
     let mut bid = 2;
     let mut buf = editor.buffer_map.get(&bid);
-    let mut status_line_y = 0 as u16;
     let mut status = String::new();
 
     while !quit {
         let (width, height) = terminal_size().unwrap();
         let mut scr = Screen::new(width as usize, height as usize);
 
-        status_line_y += 1;
-        status_line_y %= height;
+        let status_line_y = height;
 
         draw_buffer(&buf, &mut scr, &mut stdout);
         if display_status == true {
@@ -215,7 +220,9 @@ pub fn main_loop(editor: &mut Editor) {
                     };
                 }
 
-                Event::Unsupported(_) => {}
+                Event::Unsupported(e) => {
+                    status = format!("Event::Unsupported {:?}", e);
+                }
 
             }
 

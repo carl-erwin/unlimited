@@ -7,6 +7,7 @@ use core::byte_buffer::OpenMode;
 
 use core::view;
 use core::view::View;
+use core::mark::Mark;
 
 //
 pub type Id = u64;
@@ -60,6 +61,9 @@ impl BufferBuilder {
                  name: self.buffer_name.clone(),
                  byte_buffer: byte_buffer,
                  views: HashMap::new(),
+                 changed: false,
+                 moving_marks: Vec::new(),
+                 fixed_marks: Vec::new(),
              })
     }
 }
@@ -72,4 +76,7 @@ pub struct Buffer {
     pub name: String,
     pub byte_buffer: Option<ByteBuffer>,
     pub views: HashMap<view::Id, Box<View>>,
+    pub changed: bool,
+    pub moving_marks: Vec<Mark>, // TODO: in future version will be stored in byte_buffer
+    pub fixed_marks: Vec<Mark>,  // TODO: in future version will be stored in byte_buffer
 }

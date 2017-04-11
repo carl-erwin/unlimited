@@ -55,6 +55,22 @@ impl Screen {
         }
         self.used = 0;
     }
+
+    pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
+        if index < self.height {
+            Some(&mut self.line[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_line(&self, index: usize) -> Option<&Line> {
+        if index < self.height {
+            Some(&self.line[index])
+        } else {
+            None
+        }
+    }
 }
 
 // a line is composed of codepoints
@@ -74,6 +90,7 @@ impl Line {
                            cp: ' ',
                            displayed_cp: ' ',
                            offset: 0,
+                           is_selected: false,
                        });
         }
 
@@ -102,5 +119,21 @@ impl Line {
             self.chars[w].offset = 0;
         }
         self.used = 0;
+    }
+
+    pub fn get_cpi(&self, index: usize) -> Option<&CodepointInfo> {
+        if index < self.width {
+            Some(&self.chars[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
+        if index < self.width {
+            Some(&mut self.chars[index])
+        } else {
+            None
+        }
     }
 }
