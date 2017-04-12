@@ -1,12 +1,10 @@
 //
-use std::collections::HashMap;
+use std::rc::Rc;
 
 //
 use core::byte_buffer::ByteBuffer;
 use core::byte_buffer::OpenMode;
 
-use core::view;
-use core::view::View;
 use core::mark::Mark;
 
 //
@@ -52,19 +50,25 @@ impl BufferBuilder {
 
 
     ///
-    pub fn finalize(&self) -> Option<Buffer> {
+    pub fn finalize(&self) -> Option<Rc<Buffer>> {
 
         let byte_buffer = ByteBuffer::new(&self.file_name, OpenMode::ReadWrite);
+        let byte_buffer = match byte_buffer {
+            Some(bb) => bb,
+            None => return None,
+        };
 
-        Some(Buffer {
-                 id: 0,
-                 name: self.buffer_name.clone(),
-                 byte_buffer: byte_buffer,
-                 views: HashMap::new(),
-                 changed: false,
-                 moving_marks: Vec::new(),
-                 fixed_marks: Vec::new(),
-             })
+        // TODO: in future version will be stored in byte_buffer meta data
+        let moving_marks = vec![Mark { offset: 0 }];
+
+        Some(Rc::new(Buffer {
+                         id: 0,
+                         name: self.buffer_name.clone(),
+                         byte_buffer: byte_buffer,
+                         changed: false,
+                         moving_marks: moving_marks,
+                         fixed_marks: Vec::new(),
+                     }))
     }
 }
 
@@ -74,9 +78,10 @@ impl BufferBuilder {
 pub struct Buffer {
     pub id: Id,
     pub name: String,
-    pub byte_buffer: Option<ByteBuffer>,
-    pub views: HashMap<view::Id, Box<View>>,
+    pub byte_buffer: ByteBuffer,
     pub changed: bool,
-    pub moving_marks: Vec<Mark>, // TODO: in future version will be stored in byte_buffer
-    pub fixed_marks: Vec<Mark>,  // TODO: in future version will be stored in byte_buffer
+
+    // TODO: in future version marks will be stored in byte_buffer meta data
+    pub moving_marks: Vec<Mark>,
+    pub fixed_marks: Vec<Mark>,
 }

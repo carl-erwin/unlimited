@@ -1,6 +1,7 @@
 //
 extern crate termion;
 
+
 //
 use self::termion::screen::AlternateScreen;
 use self::termion::event::{Event, Key, MouseEvent};
@@ -11,35 +12,50 @@ use self::termion::terminal_size;
 use std::io::{self, Write, stdin, Stdout};
 
 //
+use core::view::View;
 use core::screen::Screen;
 use core::codepointinfo::CodepointInfo;
 
 use core::editor::Editor;
 
-fn fill_screen(screen: &mut Screen, data: &[u8]) {
+fn fill_screen(view: &mut View) {
 
-    screen.clear();
+    match view.buffer {
 
-    let mut offset = 0;
-    for c in data {
+        Some(ref buf) => {
 
-        let mut displayed_cp: char = *c as char;
-        if *c as char == '\n' as char {
-            displayed_cp = ' ';
+            let data = &buf.byte_buffer.data;
+
+            view.screen.clear();
+
+            let mut offset = 0;
+            for c in data {
+
+                let mut displayed_cp: char = *c as char;
+                if *c as char == '\n' as char {
+                    displayed_cp = ' ';
+                }
+
+                let cpi = CodepointInfo {
+                    cp: *c as char,
+                    displayed_cp: displayed_cp,
+                    offset: offset,
+                    is_selected: false,
+                };
+
+                let (ok, _) = view.screen.push(cpi);
+                offset += 1;
+                if ok == false {
+                    break;
+                }
+            }
+
+            for m in &buf.moving_marks {
+
+                if m.offset >= view.start_offset && m.offset >= view.start_offset {}
+            }
         }
-
-        let cpi = CodepointInfo {
-            cp: *c as char,
-            displayed_cp: displayed_cp,
-            offset: offset,
-            is_selected: false,
-        };
-
-        let (ok, _) = screen.push(cpi);
-        offset += 1;
-        if ok == false {
-            break;
-        }
+        None => {}
     }
 }
 
@@ -54,9 +70,10 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
         let line = screen.get_line(l).unwrap();
 
-        for c in 0..line.width {
+        for c in 0..line.used {
 
             let cpi = line.get_cpi(c).unwrap();
+
             if cpi.is_selected == true {
                 write!(stdout, "{}", termion::style::Invert).unwrap();
             }
@@ -64,29 +81,26 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
             write!(stdout, "{}", cpi.displayed_cp).unwrap();
             write!(stdout, "{}", termion::style::Reset).unwrap();
         }
+
+        for _ in line.used..line.width {
+            write!(stdout, " ").unwrap();
+        }
     }
 
     stdout.flush().unwrap();
 }
 
 
+/*
+    TODO:
+    1 : be explicit
+    2 : create editor internal result type Result<>
+    3 : use idomatic    func()? style
+*/
+fn draw_view(mut view: &mut View, mut stdout: &mut Stdout) {
 
-fn draw_buffer(buf: &Option<&Box<::core::buffer::Buffer>>,
-               mut scr: &mut Screen,
-               mut stdout: &mut Stdout) {
-    match *buf {
-        Some(ref b) => {
-            match b.byte_buffer {
-
-                Some(ref byte_buf) => {
-                    fill_screen(&mut scr, &byte_buf.data);
-                    draw_screen(&mut scr, &mut stdout);
-                }
-                _ => {}
-            }
-        }
-        _ => {}
-    }
+    fill_screen(&mut view);
+    draw_screen(&mut view.screen, &mut stdout);
 }
 
 fn terminal_clear_current_line(mut stdout: &mut Stdout, line_width: u16) {
@@ -99,8 +113,40 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
 }
 
-pub fn main_loop(editor: &mut Editor) {
 
+/*
+ TODO: create a view per buffer
+*/
+fn setup_views(editor: &mut Editor, width: usize, height: usize) {
+
+    let mut views = Vec::new();
+
+    let mut vid = 0;
+
+    for (_, b) in &editor.buffer_map {
+
+        let view = View::new(vid,
+                             0 as u64,
+                             width as usize,
+                             height as usize,
+                             Some(b.clone()));
+        views.push(view);
+        vid += 1;
+    }
+
+    for view in views {
+        &editor.view_map.insert(view.id, Box::new(view));
+    }
+}
+
+
+pub fn main_loop(mut editor: &mut Editor) {
+
+    let (width, height) = terminal_size().unwrap();
+
+    setup_views(editor, width as usize, height as usize);
+
+    //
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
     let mut stdout = AlternateScreen::from(stdout);
 
@@ -108,34 +154,36 @@ pub fn main_loop(editor: &mut Editor) {
     stdout.flush().unwrap();
 
     let mut keys: Vec<Event> = Vec::new();
-
     let mut quit = false;
 
     //
+    let mut status = String::new();
     let display_status = true;
 
-    // select file
-    let mut bid = 2;
-    let mut buf = editor.buffer_map.get(&bid);
-    let mut status = String::new();
+    let display_view = true;
+
+    // select view
+    let mut vid = 0;
 
     while !quit {
-        let (width, height) = terminal_size().unwrap();
-        let mut scr = Screen::new(width as usize, height as usize);
+
+        let nb_view = editor.view_map.len();
+        let mut view = editor.view_map.get_mut(&vid);
 
         let status_line_y = height;
 
-        draw_buffer(&buf, &mut scr, &mut stdout);
+        if display_view == true {
+            draw_view(&mut view.as_mut().unwrap(), &mut stdout);
+        }
+
         if display_status == true {
-            display_status_line(&buf, &status, status_line_y, width, &mut stdout);
+            display_status_line(&mut view.as_mut().unwrap(), &status, status_line_y, width, &mut stdout);
         }
 
         for evt in stdin().events() {
 
             keys.push(evt.unwrap());
             let evt = keys[keys.len() - 1].clone();
-
-            draw_buffer(&buf, &mut scr, &mut stdout);
 
             // Print recieved Events...
             match evt {
@@ -171,16 +219,14 @@ pub fn main_loop(editor: &mut Editor) {
                         Key::Ctrl(c) => status = format!("Ctrl-{}", c),
 
                         Key::F(1) => {
-                            if bid > 0 {
-                                bid -= 1;
+                            if vid > 0 {
+                                vid -= 1;
                             }
-                            buf = editor.buffer_map.get(&bid);
                             break;
                         }
 
                         Key::F(2) => {
-                            bid = ::std::cmp::min(bid + 1, (editor.buffer_map.len() - 1) as u64);
-                            buf = editor.buffer_map.get(&bid);
+                            vid = ::std::cmp::min(vid + 1, (nb_view - 1) as u64);
                             break;
                         }
 
@@ -226,9 +272,11 @@ pub fn main_loop(editor: &mut Editor) {
 
             }
 
+/*
             if display_status == true {
-                display_status_line(&buf, &status, status_line_y, width, &mut stdout);
+                //display_status_line(&buf, &status, status_line_y, width, &mut stdout);
             }
+*/
             break;
         }
     }
@@ -240,24 +288,19 @@ pub fn main_loop(editor: &mut Editor) {
 }
 
 
-fn display_status_line(buf: &Option<&Box<::core::buffer::Buffer>>,
+fn display_status_line(view: &View,
                        status: &str,
                        line: u16,
                        width: u16,
                        mut stdout: &mut Stdout) {
     // select/clear last line
-    let name = match *buf {
+    let name = match view.buffer {
         Some(ref b) => b.name.as_str(),
         None => "",
     };
 
-    let file_name = match *buf {
-        Some(ref b) => {
-            match b.byte_buffer {
-                Some(ref bb) => bb.file_name.as_str(),
-                None => "",
-            }
-        }
+    let file_name = match view.buffer {
+        Some(ref b) => b.byte_buffer.file_name.as_str(),
         None => "",
     };
 

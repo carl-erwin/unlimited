@@ -1,6 +1,8 @@
 //
+use std::rc::Rc;
 use std::collections::HashMap;
 use std::thread;
+
 
 //
 use core;
@@ -10,23 +12,47 @@ use core::buffer::BufferBuilder;
 use core::buffer::Buffer;
 use core::buffer;
 
+use core::view::View;
+use core::view;
+
+
 
 //
 pub type Id = u64;
 
 //
-pub struct Editor {
+/* Hierarchy Reminder
+
+    core
+        Editor
+            config
+            buffer_map<Rc<buffer>>
+            view_map
+            Option<&view>
+                &buffer
+                list<mode>
+                input_map
+
+    ui
+        (vid, bid)
+
+*/
+pub struct Editor<'a> {
     pub config: Config,
-    pub buffer_map: HashMap<buffer::Id, Box<Buffer>>,
+    pub buffer_map: HashMap<buffer::Id, Rc<Buffer>>,
+    pub view_map: HashMap<view::Id, Box<View>>,
+    pub view: Option<&'a View>,
 }
 
 
-impl Editor {
+impl<'a> Editor<'a> {
     ///
-    pub fn new(config: Config) -> Editor {
+    pub fn new(config: Config) -> Editor<'a> {
         Editor {
             config: config,
             buffer_map: HashMap::new(),
+            view_map: HashMap::new(),
+            view: None,
         }
     }
 
@@ -62,7 +88,7 @@ impl Editor {
             .internal(true)
             .finalize();
 
-        self.buffer_map.insert(0, Box::new(b.unwrap()));
+        self.buffer_map.insert(0, b.unwrap());
 
         let b = BufferBuilder::new()
             .buffer_name("scratch")
@@ -70,9 +96,7 @@ impl Editor {
             .internal(true)
             .finalize();
 
-        self.buffer_map.insert(1, Box::new(b.unwrap()));
-
-
+        self.buffer_map.insert(1, b.unwrap());
     }
 
     ///
@@ -90,12 +114,11 @@ impl Editor {
 
             match b {
                 Some(b) => {
-                    self.buffer_map.insert(id, Box::new(b));
+                    self.buffer_map.insert(id, b);
                     id += 1;
                 }
                 None => {}
             }
-
         }
     }
 }
