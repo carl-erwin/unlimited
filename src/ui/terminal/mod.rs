@@ -18,6 +18,98 @@ use core::codepointinfo::CodepointInfo;
 
 use core::editor::Editor;
 
+//
+struct ViewState {
+    keys: Vec<Event>,
+    quit: bool,
+    status: String,
+    display_status: bool,
+    display_view: bool,
+    vid: u64,
+    nb_view: usize,
+}
+
+impl ViewState {
+    fn new() -> ViewState {
+        ViewState {
+            keys: Vec::new(),
+            quit: false,
+            status: String::new(),
+            display_status: true,
+            display_view: true,
+            vid: 0,
+            nb_view: 0,
+        }
+    }
+}
+
+pub fn main_loop(mut editor: &mut Editor) {
+
+    let mut view_state = ViewState::new();
+
+    let (width, height) = terminal_size().unwrap();
+
+    setup_views(editor, width as usize, height as usize);
+
+    //
+    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let mut stdout = AlternateScreen::from(stdout);
+
+    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+    stdout.flush().unwrap();
+
+    while !view_state.quit {
+
+        view_state.nb_view = editor.view_map.len();
+        let mut view = editor.view_map.get_mut(&view_state.vid);
+
+        let status_line_y = height;
+
+        if view_state.display_view == true {
+            draw_view(&mut view.as_mut().unwrap(), &mut stdout);
+        }
+
+        if view_state.display_status == true {
+            display_status_line(&mut view.as_mut().unwrap(),
+                                &view_state.status,
+                                status_line_y,
+                                width,
+                                &mut stdout);
+        }
+
+        process_input_events(&mut view_state);
+    }
+
+    // quit
+    // clear, restore cursor
+    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
+    stdout.flush().unwrap();
+}
+
+
+fn setup_views(editor: &mut Editor, width: usize, height: usize) {
+
+    let mut views = Vec::new();
+
+    let mut vid = 0;
+
+    for (_, b) in &editor.document_map {
+
+        let view = View::new(vid,
+                             0 as u64,
+                             width as usize,
+                             height as usize,
+                             Some(b.clone()));
+        views.push(view);
+        vid += 1;
+    }
+
+    for view in views {
+        &editor.view_map.insert(view.id, Box::new(view));
+    }
+}
+
+
 fn fill_screen(view: &mut View) {
 
     match view.document {
@@ -114,185 +206,104 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 }
 
 
-/*
- TODO: create a view per buffer
-*/
-fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
-    let mut views = Vec::new();
+fn process_input_events(view_state: &mut ViewState) {
+    for evt in stdin().events() {
 
-    let mut vid = 0;
+        view_state.keys.push(evt.unwrap());
+        let evt = view_state.keys[view_state.keys.len() - 1].clone();
 
-    for (_, b) in &editor.document_map {
+        // Print recieved Events...
+        match evt {
 
-        let view = View::new(vid,
-                             0 as u64,
-                             width as usize,
-                             height as usize,
-                             Some(b.clone()));
-        views.push(view);
-        vid += 1;
-    }
+            Event::Key(k) => {
+                match k {
+                    // Exit.
+                    Key::Ctrl('r') => {
+                        view_state.keys.clear();
+                    }
 
-    for view in views {
-        &editor.view_map.insert(view.id, Box::new(view));
-    }
-}
-
-
-pub fn main_loop(mut editor: &mut Editor) {
-
-    let (width, height) = terminal_size().unwrap();
-
-    setup_views(editor, width as usize, height as usize);
-
-    //
-    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
-    let mut stdout = AlternateScreen::from(stdout);
-
-    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-    stdout.flush().unwrap();
-
-    let mut keys: Vec<Event> = Vec::new();
-    let mut quit = false;
-
-    //
-    let mut status = String::new();
-    let display_status = true;
-
-    let display_view = true;
-
-    // select view
-    let mut vid = 0;
-
-    while !quit {
-
-        let nb_view = editor.view_map.len();
-        let mut view = editor.view_map.get_mut(&vid);
-
-        let status_line_y = height;
-
-        if display_view == true {
-            draw_view(&mut view.as_mut().unwrap(), &mut stdout);
-        }
-
-        if display_status == true {
-            display_status_line(&mut view.as_mut().unwrap(), &status, status_line_y, width, &mut stdout);
-        }
-
-        for evt in stdin().events() {
-
-            keys.push(evt.unwrap());
-            let evt = keys[keys.len() - 1].clone();
-
-            // Print recieved Events...
-            match evt {
-
-                Event::Key(k) => {
-                    match k {
-                        // Exit.
-                        Key::Ctrl('r') => {
-                            keys.clear();
-                        }
-
-                        Key::Ctrl('c') => {
-                            if keys.len() > 1 {
-                                if let Event::Key(prev_event) = keys[keys.len() - 2] {
-                                    if let Key::Ctrl(prev_char) = prev_event {
-                                        if prev_char == 'x' {
-                                            quit = true;
-                                            break;
-                                        }
+                    Key::Ctrl('c') => {
+                        if view_state.keys.len() > 1 {
+                            if let Event::Key(prev_event) =
+                                view_state.keys[view_state.keys.len() - 2] {
+                                if let Key::Ctrl(prev_char) = prev_event {
+                                    if prev_char == 'x' {
+                                        view_state.quit = true;
+                                        break;
                                     }
                                 }
                             }
                         }
-
-                        Key::Char(c) => {
-                            if c == '\n' {
-                                status = format!("'{}'", "<newline>");
-                            } else {
-                                status = format!("'{}'", c);
-                            }
-                        }
-                        Key::Alt(c) => status = format!("Alt-{}", c),
-                        Key::Ctrl(c) => status = format!("Ctrl-{}", c),
-
-                        Key::F(1) => {
-                            if vid > 0 {
-                                vid -= 1;
-                            }
-                            break;
-                        }
-
-                        Key::F(2) => {
-                            vid = ::std::cmp::min(vid + 1, (nb_view - 1) as u64);
-                            break;
-                        }
-
-                        Key::F(f) => status = format!("F{:?}", f),
-                        Key::Left => status = format!("<left>"),
-                        Key::Right => status = format!("<right>"),
-                        Key::Up => status = format!("<up>"),
-                        Key::Down => status = format!("<down>"),
-                        Key::Backspace => status = format!("<backspace>"),
-                        Key::Home => status = format!("<Home>"),
-                        Key::End => status = format!("<End>"),
-                        Key::PageUp => status = format!("<PageUp>"),
-                        Key::PageDown => status = format!("<PageDown>"),
-                        Key::Delete => status = format!("<Delete>"),
-                        Key::Insert => status = format!("<Insert>"),
-                        Key::Esc => status = format!("<Esc>"),
-                        _ => status = format!("Other"),
                     }
-                }
 
-                Event::Mouse(m) => {
-                    match m {
-                        MouseEvent::Press(mb, x, y) => {
-                            status = format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})",
-                                             mb,
-                                             x,
-                                             y);
+                    Key::Char(c) => {
+                        if c == '\n' {
+                            view_state.status = format!("'{}'", "<newline>");
+                        } else {
+                            view_state.status = format!("'{}'", c);
                         }
+                    }
+                    Key::Alt(c) => view_state.status = format!("Alt-{}", c),
+                    Key::Ctrl(c) => view_state.status = format!("Ctrl-{}", c),
 
-                        MouseEvent::Release(x, y) => {
-                            status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+                    Key::F(1) => {
+                        if view_state.vid > 0 {
+                            view_state.vid -= 1;
                         }
+                        break;
+                    }
 
-                        MouseEvent::Hold(x, y) => {
-                            status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
-                        }
-                    };
+                    Key::F(2) => {
+                        view_state.vid = ::std::cmp::min(view_state.vid + 1,
+                                                         (view_state.nb_view - 1) as u64);
+                        break;
+                    }
+
+                    Key::F(f) => view_state.status = format!("F{:?}", f),
+                    Key::Left => view_state.status = format!("<left>"),
+                    Key::Right => view_state.status = format!("<right>"),
+                    Key::Up => view_state.status = format!("<up>"),
+                    Key::Down => view_state.status = format!("<down>"),
+                    Key::Backspace => view_state.status = format!("<backspace>"),
+                    Key::Home => view_state.status = format!("<Home>"),
+                    Key::End => view_state.status = format!("<End>"),
+                    Key::PageUp => view_state.status = format!("<PageUp>"),
+                    Key::PageDown => view_state.status = format!("<PageDown>"),
+                    Key::Delete => view_state.status = format!("<Delete>"),
+                    Key::Insert => view_state.status = format!("<Insert>"),
+                    Key::Esc => view_state.status = format!("<Esc>"),
+                    _ => view_state.status = format!("Other"),
                 }
-
-                Event::Unsupported(e) => {
-                    status = format!("Event::Unsupported {:?}", e);
-                }
-
             }
 
-/*
-            if display_status == true {
-                //display_status_line(&buf, &status, status_line_y, width, &mut stdout);
+            Event::Mouse(m) => {
+                match m {
+                    MouseEvent::Press(mb, x, y) => {
+                        view_state.status =
+                            format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
+                    }
+
+                    MouseEvent::Release(x, y) => {
+                        view_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+                    }
+
+                    MouseEvent::Hold(x, y) => {
+                        view_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
+                    }
+                };
             }
-*/
-            break;
+
+            Event::Unsupported(e) => {
+                view_state.status = format!("Event::Unsupported {:?}", e);
+            }
         }
-    }
 
-    // quit
-    // clear, restore cursor
-    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
-    stdout.flush().unwrap();
+        break;
+    }
 }
 
-
-fn display_status_line(view: &View,
-                       status: &str,
-                       line: u16,
-                       width: u16,
-                       mut stdout: &mut Stdout) {
+fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut stdout: &mut Stdout) {
     // select/clear last line
     let name = match view.document {
         Some(ref b) => b.name.as_str(),
@@ -303,7 +314,6 @@ fn display_status_line(view: &View,
         Some(ref b) => b.buffer.file_name.as_str(),
         None => "",
     };
-
 
     terminal_cursor_to(&mut stdout, 1, line);
     terminal_clear_current_line(&mut stdout, width);
