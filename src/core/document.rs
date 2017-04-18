@@ -1,5 +1,6 @@
 //
 use std::rc::Rc;
+use std::cell::RefCell;
 
 //
 use core::buffer::Buffer;
@@ -50,7 +51,7 @@ impl DocumentBuilder {
 
 
     ///
-    pub fn finalize(&self) -> Option<Rc<Document>> {
+    pub fn finalize(&self) -> Option<Rc<RefCell<Document>>> {
 
         let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
         let buffer = match buffer {
@@ -61,14 +62,14 @@ impl DocumentBuilder {
         // TODO: in future version will be stored in buffer meta data
         let moving_marks = vec![Mark { offset: 0 }];
 
-        Some(Rc::new(Document {
-                         id: 0,
-                         name: self.document_name.clone(),
-                         buffer: buffer,
-                         changed: false,
-                         moving_marks: moving_marks,
-                         fixed_marks: Vec::new(),
-                     }))
+        Some(Rc::new(RefCell::new(Document {
+                                      id: 0,
+                                      name: self.document_name.clone(),
+                                      buffer: buffer,
+                                      changed: false,
+                                      moving_marks: moving_marks,
+                                      fixed_marks: Vec::new(),
+                                  })))
     }
 }
 

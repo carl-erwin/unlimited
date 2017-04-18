@@ -116,7 +116,7 @@ fn fill_screen(view: &mut View) {
 
         Some(ref buf) => {
 
-            let data = &buf.buffer.data;
+            let data = &buf.borrow().buffer.data;
 
             view.screen.clear();
 
@@ -148,7 +148,7 @@ fn fill_screen(view: &mut View) {
             // brute force for now
             let mut screen = &mut view.screen;
 
-            for m in &buf.moving_marks {
+            for m in &buf.borrow().moving_marks {
 
                 // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {
@@ -322,15 +322,13 @@ fn process_input_events(view_state: &mut ViewState) {
 
 fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut stdout: &mut Stdout) {
     // select/clear last line
-    let name = match view.document {
-        Some(ref b) => b.name.as_str(),
-        None => "",
+    let doc = match view.document {
+        Some(ref d) => d.borrow(),
+        None => return,
     };
 
-    let file_name = match view.document {
-        Some(ref b) => b.buffer.file_name.as_str(),
-        None => "",
-    };
+    let name = doc.name.as_str();
+    let file_name = doc.buffer.file_name.as_str();
 
     terminal_cursor_to(&mut stdout, 1, line);
     terminal_clear_current_line(&mut stdout, width);

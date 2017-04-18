@@ -1,5 +1,6 @@
 //
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::thread;
 
@@ -40,7 +41,7 @@ pub type Id = u64;
 */
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: HashMap<document::Id, Rc<Document>>,
+    pub document_map: HashMap<document::Id, Rc<RefCell<Document>>>,
     pub view_map: HashMap<view::Id, Box<View>>,
     pub view: Option<&'a View>,
 }

@@ -1,5 +1,6 @@
 //
 use std::rc::Rc;
+use std::cell::RefCell;
 
 //
 use core::document::Document;
@@ -12,7 +13,7 @@ pub struct View {
     pub id: Id,
     pub start_offset: u64,
     pub end_offset: u64,
-    pub document: Option<Rc<Document>>, // Rc<Buffer> ?
+    pub document: Option<Rc<RefCell<Document>>>, // Rc<Buffer> ?
     pub screen: Box<Screen>, // mandatory ?
 }
 
@@ -22,7 +23,7 @@ impl View {
                start_offset: u64,
                width: usize,
                height: usize,
-               document: Option<Rc<Document>>)
+               document: Option<Rc<RefCell<Document>>>)
                -> View {
 
         let screen = Box::new(Screen::new(width, height));
