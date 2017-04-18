@@ -59,23 +59,23 @@ The Design will evolve at will. Suggestions are welcome.
 - **File**<br/>
 A regular on disk file
 
-- **ByteBuffer**<br/>
-A **ByteBuffer** represents a memory snapshot of a given **File**.<br/>
-**ByteBuffer**(s) can be loaded from a file.<br/>
-**ByteBuffer**(s) can be saved to a file.<br/>
-**ByteBuffer**(s) can be dettached from file.<br/>
-**ByteBuffer**(s) can be created whitout any file.<br/>
-
-- **ByteBufferId** aka **_bid_**<br/>
-An unsigned 64 bits integer that represent a given **ByteBuffer** instance<br/>
-
 - **Buffer**<br/>
-A **Buffer** represents a **ByteBuffer** PLUS it's configuration.<br/>
-There is one and only one **Buffer** per **ByteBuffer**.<br/>
-An **Buffer** is always bound to a **ByteBuffer**.
+A **Buffer** represents a memory snapshot of a given **File**.<br/>
+**Buffer**(s) can be loaded from a file.<br/>
+**Buffer**(s) can be saved to a file.<br/>
+**Buffer**(s) can be dettached from file.<br/>
+**Buffer**(s) can be created whitout any file.<br/>
+
+- **BufferId** aka **_bid_**<br/>
+An unsigned 64 bits integer that represent a given **Buffer** instance<br/>
+
+- **Document**<br/>
+A **Document** represents a **Buffer** PLUS it's configuration.<br/>
+There is one and only one **Document** per **Buffer**.<br/>
+An **Document** is always bound to a **Buffer**.
 
  It encapsulates:<br/>
-A **ByteBuffer**<br/>
+A **Buffer**<br/>
 the **View**(s)<br/>
 the "shared" **Marks** (the cursor is a mark)<br/>
 the font configuration<br/> (will be moved in the ui)
@@ -85,7 +85,7 @@ the internal regions<br/>
 - **View**<br/>
 a View contains:<br/>
 
- bid (ByteBufferId)<br/>
+ bid (BufferId)<br/>
  ViewId<br/>
  Codec<br/>
  CodecCtx<br/>
@@ -97,7 +97,7 @@ Messages sent between the ui and the core
 
 
 - **Codec**<br/>
-The codec is responible of the ByteBuffer interpretation
+The codec is responible of the Buffer interpretation
 
 TextCodec emits codepoints
 
@@ -108,13 +108,13 @@ a unique 64 bits integer that represents the codec.
 A codec specific data structure
 
 - **Mark**<br/>
-A Mark represent a position in a Buffer<br/>
+A Mark represent a position in a Document<br/>
 <br/>
 The **cursor** is a **Mark**.<br/>
 <br/>
 Marks can be fixed (it is up to the module managing the marks).<br/>
-Marks can be "local" to a given View  (wich is attached to a **Buffer**)<br/>
-Marks can be "shared" by Buffer(s)<br/>
+Marks can be "local" to a given View  (wich is attached to a **Document**)<br/>
+Marks can be "shared" by Document(s)<br/>
 
 - **Selection**<br/>
 there are 2 kinds of selection:<br/>
@@ -143,12 +143,12 @@ I want the Ui (the view) to pilot the Core (model/controller):<br/>
 
 - parse command line arguments<br/>
 - store special options flags<br/>
-- create/restore/merge file/buffer list<br/>
+- create/restore/merge file/Document list<br/>
 - start core thread<br/>
 - initialize sub systems<br/>
 - setup modules/extensions<br/>
 - start/run select ui main loop (in the main thread)<br/>
 
  **Ui main loop**
-    - the ui(s) request the list of opened buffers
-    - and from there the ui can request layout for a given buffer
+    - the ui(s) request the list of opened Documents
+    - and from there the ui can request layout for a given Document
