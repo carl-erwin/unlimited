@@ -8,9 +8,10 @@ use std::thread;
 use core;
 use ui;
 use core::config::Config;
-use core::buffer::BufferBuilder;
-use core::buffer::Buffer;
-use core::buffer;
+
+use core::document::DocumentBuilder;
+use core::document::Document;
+use core::document;
 
 use core::view::View;
 use core::view;
@@ -26,7 +27,7 @@ pub type Id = u64;
     core
         Editor
             config
-            buffer_map<Rc<buffer>>
+            document_map<Rc<buffer>>
             view_map
             Option<&view>
                 &buffer
@@ -39,7 +40,7 @@ pub type Id = u64;
 */
 pub struct Editor<'a> {
     pub config: Config,
-    pub buffer_map: HashMap<buffer::Id, Rc<Buffer>>,
+    pub document_map: HashMap<document::Id, Rc<Document>>,
     pub view_map: HashMap<view::Id, Box<View>>,
     pub view: Option<&'a View>,
 }
@@ -50,7 +51,7 @@ impl<'a> Editor<'a> {
     pub fn new(config: Config) -> Editor<'a> {
         Editor {
             config: config,
-            buffer_map: HashMap::new(),
+            document_map: HashMap::new(),
             view_map: HashMap::new(),
             view: None,
         }
@@ -82,21 +83,21 @@ impl<'a> Editor<'a> {
     ///
     pub fn setup_default_buffers(&mut self) {
 
-        let b = BufferBuilder::new()
-            .buffer_name("debug-message")
+        let b = DocumentBuilder::new()
+            .document_name("debug-message")
             .file_name("/dev/null")
             .internal(true)
             .finalize();
 
-        self.buffer_map.insert(0, b.unwrap());
+        self.document_map.insert(0, b.unwrap());
 
-        let b = BufferBuilder::new()
-            .buffer_name("scratch")
+        let b = DocumentBuilder::new()
+            .document_name("scratch")
             .file_name("/dev/null")
             .internal(true)
             .finalize();
 
-        self.buffer_map.insert(1, b.unwrap());
+        self.document_map.insert(1, b.unwrap());
     }
 
     ///
@@ -106,15 +107,15 @@ impl<'a> Editor<'a> {
 
         for f in &self.config.files_list {
 
-            let b = BufferBuilder::new()
-                .buffer_name(f)
+            let b = DocumentBuilder::new()
+                .document_name(f)
                 .file_name(f)
                 .internal(false)
                 .finalize();
 
             match b {
                 Some(b) => {
-                    self.buffer_map.insert(id, b);
+                    self.document_map.insert(id, b);
                     id += 1;
                 }
                 None => {}

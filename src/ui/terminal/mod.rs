@@ -20,7 +20,7 @@ use core::editor::Editor;
 
 fn fill_screen(view: &mut View) {
 
-    match view.buffer {
+    match view.document {
 
         Some(ref buf) => {
 
@@ -123,7 +123,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
     let mut vid = 0;
 
-    for (_, b) in &editor.buffer_map {
+    for (_, b) in &editor.document_map {
 
         let view = View::new(vid,
                              0 as u64,
@@ -294,12 +294,12 @@ fn display_status_line(view: &View,
                        width: u16,
                        mut stdout: &mut Stdout) {
     // select/clear last line
-    let name = match view.buffer {
+    let name = match view.document {
         Some(ref b) => b.name.as_str(),
         None => "",
     };
 
-    let file_name = match view.buffer {
+    let file_name = match view.document {
         Some(ref b) => b.byte_buffer.file_name.as_str(),
         None => "",
     };
@@ -309,7 +309,7 @@ fn display_status_line(view: &View,
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let status_str = format!("line {} buffer_name '{}', file: '{}', event '{}'",
+    let status_str = format!("line {} document_name '{}', file: '{}', event '{}'",
                              line,
                              name,
                              file_name,

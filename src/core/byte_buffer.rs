@@ -39,7 +39,7 @@ impl ByteBuffer {
     /// this function allocate a buffer
     /// if file_name is null the content will be stored in heap
     /// if file_name is non null the the content will be read from the file
-    /// if buffer_name is null , file_name will be used to give a name to the buffer
+    /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
     pub fn new(file_name: &String, mode: OpenMode) -> Option<ByteBuffer> {

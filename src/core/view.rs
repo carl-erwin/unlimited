@@ -2,7 +2,7 @@
 use std::rc::Rc;
 
 //
-use core::buffer::Buffer;
+use core::document::Document;
 use core::screen::Screen;
 
 pub type Id = u64;
@@ -12,7 +12,7 @@ pub struct View {
     pub id: Id,
     pub start_offset: u64,
     pub end_offset: u64,
-    pub buffer: Option<Rc<Buffer>>, // Rc<Buffer> ?
+    pub document: Option<Rc<Document>>, // Rc<Buffer> ?
     pub screen: Box<Screen>, // mandatory ?
 }
 
@@ -22,7 +22,7 @@ impl View {
                start_offset: u64,
                width: usize,
                height: usize,
-               buffer: Option<Rc<Buffer>>)
+               document: Option<Rc<Document>>)
                -> View {
 
         let screen = Box::new(Screen::new(width, height));
@@ -31,7 +31,7 @@ impl View {
             id: id,
             start_offset: start_offset,
             end_offset: start_offset, // will be recomputed later
-            buffer: buffer,
+            document: document,
             screen: screen,
         }
     }

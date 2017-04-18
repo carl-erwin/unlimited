@@ -3,7 +3,7 @@ pub mod editor;
 pub mod config;
 pub mod screen;
 pub mod codepointinfo;
-pub mod buffer;
+pub mod document;
 pub mod byte_buffer;
 pub mod event;
 pub mod view;
