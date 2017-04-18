@@ -120,6 +120,8 @@ fn fill_screen(view: &mut View) {
 
             view.screen.clear();
 
+            view.start_offset = 0;
+
             let mut offset = 0;
             for c in data {
 
@@ -141,10 +143,25 @@ fn fill_screen(view: &mut View) {
                     break;
                 }
             }
+            view.end_offset = offset;
+
+            // brute force for now
+            let mut screen = &mut view.screen;
 
             for m in &buf.moving_marks {
 
-                if m.offset >= view.start_offset && m.offset >= view.start_offset {}
+                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+                if m.offset >= view.start_offset && m.offset <= view.end_offset {
+                    for l in 0..screen.height {
+                        let line = screen.get_mut_line(l).unwrap();
+                        for c in 0..line.used {
+                            let mut cpi = line.get_mut_cpi(c).unwrap();
+                            if cpi.offset == m.offset {
+                                cpi.is_selected = true;
+                            }
+                        }
+                    }
+                }
             }
         }
         None => {}
