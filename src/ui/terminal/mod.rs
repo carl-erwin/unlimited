@@ -24,7 +24,7 @@ fn fill_screen(view: &mut View) {
 
         Some(ref buf) => {
 
-            let data = &buf.byte_buffer.data;
+            let data = &buf.buffer.data;
 
             view.screen.clear();
 
@@ -300,7 +300,7 @@ fn display_status_line(view: &View,
     };
 
     let file_name = match view.document {
-        Some(ref b) => b.byte_buffer.file_name.as_str(),
+        Some(ref b) => b.buffer.file_name.as_str(),
         None => "",
     };
 

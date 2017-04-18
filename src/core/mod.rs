@@ -4,7 +4,7 @@ pub mod config;
 pub mod screen;
 pub mod codepointinfo;
 pub mod document;
-pub mod byte_buffer;
+pub mod buffer;
 pub mod event;
 pub mod view;
 pub mod mark;

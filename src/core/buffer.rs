@@ -15,12 +15,12 @@ pub enum OpenMode {
 
 
 
-/// The **ByteBuffer** represent a linear array of bytes.<br/>
+/// The **Buffer** represent a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
 /// The editor **Modes** use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
-pub struct ByteBuffer {
+pub struct Buffer {
     pub id: Id,
     pub file_name: String,
     pub size: usize, // proxy to underlying structs
@@ -31,7 +31,7 @@ pub struct ByteBuffer {
 }
 
 
-impl ByteBuffer {
+impl Buffer {
     /// Creates a new `Buffer`.
     ///
     /// file_name param[in] path to the file we want to load in the buffer,
@@ -42,7 +42,7 @@ impl ByteBuffer {
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
-    pub fn new(file_name: &String, mode: OpenMode) -> Option<ByteBuffer> {
+    pub fn new(file_name: &String, mode: OpenMode) -> Option<Buffer> {
 
         // TODO: check permission
         let mut file = match File::open(file_name) {
@@ -64,7 +64,7 @@ impl ByteBuffer {
                 println!("c {} char '{}' ", *c, *c as char);
             }
         */
-        Some(ByteBuffer {
+        Some(Buffer {
                  id: 0,
                  file_name: file_name.clone(),
                  mode: mode,
@@ -173,8 +173,8 @@ impl ByteBuffer {
 
 
 #[test]
-fn test_byte_buffer() {
-    let mut bb = ByteBuffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+fn test_buffer() {
+    let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     bb.write(0, 10, &data);
