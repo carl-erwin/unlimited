@@ -19,7 +19,7 @@ use core::codepointinfo::CodepointInfo;
 use core::editor::Editor;
 
 //
-struct ViewState {
+struct UiState {
     keys: Vec<Event>,
     quit: bool,
     status: String,
@@ -29,9 +29,9 @@ struct ViewState {
     nb_view: usize,
 }
 
-impl ViewState {
-    fn new() -> ViewState {
-        ViewState {
+impl UiState {
+    fn new() -> UiState {
+        UiState {
             keys: Vec::new(),
             quit: false,
             status: String::new(),
@@ -45,7 +45,7 @@ impl ViewState {
 
 pub fn main_loop(mut editor: &mut Editor) {
 
-    let mut view_state = ViewState::new();
+    let mut view_state = UiState::new();
 
     let (width, height) = terminal_size().unwrap();
 
@@ -145,12 +145,12 @@ fn fill_screen(view: &mut View) {
             }
             view.end_offset = offset;
 
-            // brute force for now
+    // brute force for now
             let mut screen = &mut view.screen;
 
             for m in &buf.borrow().moving_marks {
 
-                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+    // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {
                     for l in 0..screen.height {
                         let line = screen.get_mut_line(l).unwrap();
@@ -224,18 +224,18 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 
 
-fn process_input_events(view_state: &mut ViewState) {
+fn process_input_events(view_state: &mut UiState) {
     for evt in stdin().events() {
 
         view_state.keys.push(evt.unwrap());
         let evt = view_state.keys[view_state.keys.len() - 1].clone();
 
-        // Print recieved Events...
+    // Print recieved Events...
         match evt {
 
             Event::Key(k) => {
                 match k {
-                    // Exit.
+    // Exit.
                     Key::Ctrl('r') => {
                         view_state.keys.clear();
                     }
@@ -321,7 +321,7 @@ fn process_input_events(view_state: &mut ViewState) {
 }
 
 fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut stdout: &mut Stdout) {
-    // select/clear last line
+
     let doc = match view.document {
         Some(ref d) => d.borrow(),
         None => return,
@@ -330,6 +330,7 @@ fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut std
     let name = doc.name.as_str();
     let file_name = doc.buffer.file_name.as_str();
 
+    // select/clear last line
     terminal_cursor_to(&mut stdout, 1, line);
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
