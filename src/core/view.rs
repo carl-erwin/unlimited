@@ -13,8 +13,8 @@ pub struct View {
     pub id: Id,
     pub start_offset: u64,
     pub end_offset: u64,
-    pub document: Option<Rc<RefCell<Document>>>, // Rc<Buffer> ?
-    pub screen: Box<Screen>, // mandatory ?
+    pub document: Option<Rc<RefCell<Document>>>,
+    pub screen: Box<Screen>,
 }
 
 

@@ -3,6 +3,12 @@
 // See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
 
+use std::char;
+
+pub const UTF8_ACCEPT: u32 = 0;
+pub const UTF8_REJECT: u32 = 1;
+
+
 static UTF8D: &'static [u8] = &[
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 20..3f
@@ -21,24 +27,24 @@ static UTF8D: &'static [u8] = &[
 ];
 
 
-
 /*
     state 0 => initial state or decoding successful
     state 1 => error
     state x => intermediate states need more inputs
 */
 #[inline]
-pub fn utf8_decode_byte(state: u32, byte: u8, codep: &mut u32) -> u32 {
+pub fn utf8_decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
 
     let cp_type = UTF8D[byte as usize] as u32;
 
-    *codep = if state != 0 {
+    *codep = if *state != UTF8_ACCEPT {
         (byte & 0x3f) as u32 | (*codep << 6)
     } else {
         (0xff >> cp_type) as u32 & (byte as u32)
     };
 
-    UTF8D[256 + (state * 16) as usize + cp_type as usize] as u32
+    *state = UTF8D[256 + (*state * 16) as usize + cp_type as usize] as u32;
+    *state
 }
 
 // return 0 on error, or the number of written bytes
@@ -73,6 +79,12 @@ pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 }
 
 
+pub fn u32_to_char(codep: u32) -> char {
+    unsafe { char::from_u32_unchecked(codep) }
+}
+
+
+
 #[test]
 fn test_utf8_codec_encode() {
 
@@ -95,10 +107,10 @@ fn test_utf8_codec_decode() {
         println!("decode byte '{:x}'", *b);
         state = utf8_decode_byte(state, *b, &mut codep);
         match state {
-            0 => {
+            UTF8_ACCEPT => {
                 break;
             }
-            1 => {
+            UTF8_REJECT => {
                 print!("invalid utf8 sequence");
                 break;
             }
@@ -109,6 +121,8 @@ fn test_utf8_codec_decode() {
     }
 
     println!("decoded codepoint value {:x}", codep);
+    let c = u32_to_char(codep);
+    println!("decoded codepoint char {}", c);
 
     assert_eq!(codep, 0x20ac);
 }

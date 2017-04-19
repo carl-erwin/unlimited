@@ -18,6 +18,12 @@ use core::codepointinfo::CodepointInfo;
 
 use core::editor::Editor;
 
+use core::text_codec::utf8_decode_byte;
+use core::text_codec::{UTF8_ACCEPT, UTF8_REJECT};
+
+use core::text_codec::u32_to_char;
+
+
 //
 struct UiState {
     keys: Vec<Event>,
@@ -110,7 +116,25 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 }
 
 
-fn fill_screen(view: &mut View) {
+fn screen_putstr(screen: &mut Screen, s: &String) {
+
+    let v: Vec<char> = s.chars().collect();
+    for c in &v {
+        let cpi = CodepointInfo {
+            cp: *c,
+            displayed_cp: *c,
+            offset: 0xffffffffffffffff,
+            is_selected: false,
+        };
+        let (ok, _) = screen.push(cpi);
+        if ok == false {
+            break;
+        }
+    }
+}
+
+
+fn fill_screen(mut view: &mut View) {
 
     match view.document {
 
@@ -121,24 +145,70 @@ fn fill_screen(view: &mut View) {
             let mut offset = view.start_offset;
 
             let data = &buf.borrow().buffer.data;
-            for c in data {
 
-                let mut displayed_cp: char = *c as char;
-                if *c as char == '\n' as char {
-                    displayed_cp = ' ';
-                }
+            let mut state: u32 = 0;
+            let mut cp_val: u32 = 0;
 
-                let cpi = CodepointInfo {
-                    cp: *c as char,
-                    displayed_cp: displayed_cp,
-                    offset: offset,
-                    is_selected: false,
-                };
+            let mut cp_start_offset = view.start_offset;
+            for b in data {
 
-                let (ok, _) = view.screen.push(cpi);
+                let cp;
+
+                state = utf8_decode_byte(&mut state, *b, &mut cp_val);
+
+                /*
+                let s = &format!(" |decoding byte {:x} sequence @ offset {}, state {}\n",
+                                 *b,
+                                 offset,
+                                 state);
+                screen_putstr(&mut view.screen, &s);
+                */
+
                 offset += 1;
-                if ok == false {
-                    break;
+                match state {
+                    UTF8_ACCEPT | UTF8_REJECT => {
+
+                        if state == UTF8_REJECT {
+                            /*
+                            let s = &format!(" |invalid utf8 byte {:x} sequence @ offset {}\n",
+                                             *b,
+                                             cp_start_offset);
+                            screen_putstr(&mut view.screen, &s);
+                            */
+                            cp = u32_to_char(0xfffd);
+
+                            // restart on error
+                            cp_val = 0;
+                            state = 0;
+                            state = utf8_decode_byte(&mut state, *b, &mut cp_val);
+
+                        } else {
+                            cp = u32_to_char(cp_val);
+                            cp_val = 0;
+                            state = 0;
+                        }
+
+                        let mut displayed_cp = cp;
+                        if cp == '\n' as char {
+                            displayed_cp = ' ';
+                        }
+
+                        let cpi = CodepointInfo {
+                            cp: cp,
+                            displayed_cp: displayed_cp,
+                            offset: cp_start_offset,
+                            is_selected: false,
+                        };
+
+                        cp_start_offset = offset;
+
+                        let (ok, _) = view.screen.push(cpi);
+                        if ok == false {
+                            break;
+                        }
+                    }
+
+                    _ => {}
                 }
             }
             view.end_offset = offset;
@@ -185,6 +255,7 @@ fn fill_screen(view: &mut View) {
 fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
+    write!(stdout, "{}", termion::style::Reset).unwrap();
 
     for l in 0..screen.height {
 
