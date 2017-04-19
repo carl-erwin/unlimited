@@ -164,6 +164,11 @@ fn fill_screen(view: &mut View) {
                         let line = screen.get_mut_line(l).unwrap();
                         for c in 0..line.used {
                             let mut cpi = line.get_mut_cpi(c).unwrap();
+
+                            if cpi.offset > m.offset {
+                                break;
+                            }
+
                             if cpi.offset == m.offset {
                                 cpi.is_selected = true;
                             }
