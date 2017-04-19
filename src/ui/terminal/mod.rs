@@ -45,7 +45,7 @@ impl UiState {
 
 pub fn main_loop(mut editor: &mut Editor) {
 
-    let mut view_state = UiState::new();
+    let mut ui_state = UiState::new();
 
     let (width, height) = terminal_size().unwrap();
 
@@ -58,26 +58,26 @@ pub fn main_loop(mut editor: &mut Editor) {
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
 
-    while !view_state.quit {
+    while !ui_state.quit {
 
-        view_state.nb_view = editor.view_map.len();
-        let mut view = editor.view_map.get_mut(&view_state.vid);
+        ui_state.nb_view = editor.view_map.len();
+        let mut view = editor.view_map.get_mut(&ui_state.vid);
 
         let status_line_y = height;
 
-        if view_state.display_view == true {
+        if ui_state.display_view == true {
             draw_view(&mut view.as_mut().unwrap(), &mut stdout);
         }
 
-        if view_state.display_status == true {
+        if ui_state.display_status == true {
             display_status_line(&mut view.as_mut().unwrap(),
-                                &view_state.status,
+                                &ui_state.status,
                                 status_line_y,
                                 width,
                                 &mut stdout);
         }
 
-        process_input_events(&mut view_state);
+        process_input_events(&mut ui_state, &mut view.as_mut().unwrap());
     }
 
     // quit
@@ -116,13 +116,11 @@ fn fill_screen(view: &mut View) {
 
         Some(ref buf) => {
 
-            let data = &buf.borrow().buffer.data;
-
             view.screen.clear();
 
-            view.start_offset = 0;
+            let mut offset = view.start_offset;
 
-            let mut offset = 0;
+            let data = &buf.borrow().buffer.data;
             for c in data {
 
                 let mut displayed_cp: char = *c as char;
@@ -145,12 +143,12 @@ fn fill_screen(view: &mut View) {
             }
             view.end_offset = offset;
 
-    // brute force for now
+            // brute force for now
             let mut screen = &mut view.screen;
 
             for m in &buf.borrow().moving_marks {
 
-    // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {
                     for l in 0..screen.height {
                         let line = screen.get_mut_line(l).unwrap();
@@ -224,29 +222,28 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 
 
-fn process_input_events(view_state: &mut UiState) {
+fn process_input_events(ui_state: &mut UiState, view: &mut View) {
     for evt in stdin().events() {
 
-        view_state.keys.push(evt.unwrap());
-        let evt = view_state.keys[view_state.keys.len() - 1].clone();
+        ui_state.keys.push(evt.unwrap());
+        let evt = ui_state.keys[ui_state.keys.len() - 1].clone();
 
-    // Print recieved Events...
+        // Print recieved Events...
         match evt {
 
             Event::Key(k) => {
                 match k {
-    // Exit.
+                    // Exit.
                     Key::Ctrl('r') => {
-                        view_state.keys.clear();
+                        ui_state.keys.clear();
                     }
 
                     Key::Ctrl('c') => {
-                        if view_state.keys.len() > 1 {
-                            if let Event::Key(prev_event) =
-                                view_state.keys[view_state.keys.len() - 2] {
+                        if ui_state.keys.len() > 1 {
+                            if let Event::Key(prev_event) = ui_state.keys[ui_state.keys.len() - 2] {
                                 if let Key::Ctrl(prev_char) = prev_event {
                                     if prev_char == 'x' {
-                                        view_state.quit = true;
+                                        ui_state.quit = true;
                                         break;
                                     }
                                 }
@@ -256,63 +253,87 @@ fn process_input_events(view_state: &mut UiState) {
 
                     Key::Char(c) => {
                         if c == '\n' {
-                            view_state.status = format!("'{}'", "<newline>");
+                            ui_state.status = format!("'{}'", "<newline>");
                         } else {
-                            view_state.status = format!("'{}'", c);
+                            ui_state.status = format!("'{}'", c);
                         }
                     }
-                    Key::Alt(c) => view_state.status = format!("Alt-{}", c),
-                    Key::Ctrl(c) => view_state.status = format!("Ctrl-{}", c),
+                    Key::Alt(c) => ui_state.status = format!("Alt-{}", c),
+                    Key::Ctrl(c) => ui_state.status = format!("Ctrl-{}", c),
 
                     Key::F(1) => {
-                        if view_state.vid > 0 {
-                            view_state.vid -= 1;
+                        if ui_state.vid > 0 {
+                            ui_state.vid -= 1;
                         }
                         break;
                     }
 
                     Key::F(2) => {
-                        view_state.vid = ::std::cmp::min(view_state.vid + 1,
-                                                         (view_state.nb_view - 1) as u64);
+                        ui_state.vid = ::std::cmp::min(ui_state.vid + 1,
+                                                       (ui_state.nb_view - 1) as u64);
                         break;
                     }
 
-                    Key::F(f) => view_state.status = format!("F{:?}", f),
-                    Key::Left => view_state.status = format!("<left>"),
-                    Key::Right => view_state.status = format!("<right>"),
-                    Key::Up => view_state.status = format!("<up>"),
-                    Key::Down => view_state.status = format!("<down>"),
-                    Key::Backspace => view_state.status = format!("<backspace>"),
-                    Key::Home => view_state.status = format!("<Home>"),
-                    Key::End => view_state.status = format!("<End>"),
-                    Key::PageUp => view_state.status = format!("<PageUp>"),
-                    Key::PageDown => view_state.status = format!("<PageDown>"),
-                    Key::Delete => view_state.status = format!("<Delete>"),
-                    Key::Insert => view_state.status = format!("<Insert>"),
-                    Key::Esc => view_state.status = format!("<Esc>"),
-                    _ => view_state.status = format!("Other"),
+                    Key::F(f) => ui_state.status = format!("F{:?}", f),
+                    Key::Left => {
+                        ui_state.status = {
+                            let mut doc = view.document.as_mut().unwrap().borrow_mut();
+                            for m in &mut doc.moving_marks {
+                                if m.offset > 0 {
+                                    m.offset -= 1;
+                                }
+                            }
+                            format!("<left>")
+                        }
+                    }
+                    Key::Right => {
+                        ui_state.status = {
+                            let mut doc = view.document.as_mut().unwrap().borrow_mut();
+                            let buffer_size = doc.buffer.size as u64;
+
+                            for m in &mut doc.moving_marks {
+                                m.offset += 1;
+                                if m.offset > buffer_size {
+                                    m.offset = buffer_size
+                                }
+                            }
+
+                            format!("<right>")
+                        }
+                    }
+                    Key::Up => ui_state.status = format!("<up>"),
+                    Key::Down => ui_state.status = format!("<down>"),
+                    Key::Backspace => ui_state.status = format!("<backspace>"),
+                    Key::Home => ui_state.status = format!("<Home>"),
+                    Key::End => ui_state.status = format!("<End>"),
+                    Key::PageUp => ui_state.status = format!("<PageUp>"),
+                    Key::PageDown => ui_state.status = format!("<PageDown>"),
+                    Key::Delete => ui_state.status = format!("<Delete>"),
+                    Key::Insert => ui_state.status = format!("<Insert>"),
+                    Key::Esc => ui_state.status = format!("<Esc>"),
+                    _ => ui_state.status = format!("Other"),
                 }
             }
 
             Event::Mouse(m) => {
                 match m {
                     MouseEvent::Press(mb, x, y) => {
-                        view_state.status =
+                        ui_state.status =
                             format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
                     }
 
                     MouseEvent::Release(x, y) => {
-                        view_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+                        ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
                     }
 
                     MouseEvent::Hold(x, y) => {
-                        view_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
+                        ui_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
                     }
                 };
             }
 
             Event::Unsupported(e) => {
-                view_state.status = format!("Event::Unsupported {:?}", e);
+                ui_state.status = format!("Event::Unsupported {:?}", e);
             }
         }
 
