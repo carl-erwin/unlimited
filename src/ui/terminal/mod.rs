@@ -143,6 +143,16 @@ fn fill_screen(view: &mut View) {
             }
             view.end_offset = offset;
 
+            if view.end_offset == buf.borrow().buffer.size as u64 {
+                view.screen
+                    .push(CodepointInfo {
+                              cp: ' ',
+                              displayed_cp: ' ',
+                              offset: offset,
+                              is_selected: false,
+                          });
+            }
+
             // brute force for now
             let mut screen = &mut view.screen;
 
