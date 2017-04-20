@@ -116,7 +116,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 }
 
 
-fn screen_putstr(mut screen: &mut Screen, s: &String) -> bool {
+fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 
     let v: Vec<char> = s.chars().collect();
     for c in &v {
@@ -160,7 +160,7 @@ fn decode_slice(data: &[u8],
     let mut cp_val: u32 = 0;
     let mut cp_start_offset = base_offset;
 
-    for b in data {        
+    for b in data {
         let cp: char;
 
         state = utf8_decode_byte(&mut state, *b, &mut cp_val);
@@ -219,6 +219,17 @@ fn fill_screen(mut view: &mut View) {
 
             screen.clear();
 
+            // render first screen line
+            {
+                let s = " unlimitED! v0.0.1\n\n";
+                screen_putstr(&mut screen, &s);
+                let mut line = screen.get_mut_line(0).unwrap();
+                for c in 0..line.width {
+                    let mut cpi = line.get_mut_cpi(c).unwrap();
+                    cpi.is_selected = true;
+                }
+            }
+
             let data = &buf.borrow().buffer.data;
             let len = data.len();
 
@@ -276,7 +287,7 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
         let line = screen.get_line(l).unwrap();
 
-        for c in 0..line.used {
+        for c in 0..line.width {
 
             let cpi = line.get_cpi(c).unwrap();
 
@@ -288,9 +299,11 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
             write!(stdout, "{}", termion::style::Reset).unwrap();
         }
 
+        /*
         for _ in line.used..line.width {
             write!(stdout, " ").unwrap();
         }
+        */
     }
 
     stdout.flush().unwrap();
