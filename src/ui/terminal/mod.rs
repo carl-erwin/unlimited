@@ -116,21 +116,96 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 }
 
 
-fn screen_putstr(screen: &mut Screen, s: &String) {
+fn screen_putstr(mut screen: &mut Screen, s: &String) -> bool {
 
     let v: Vec<char> = s.chars().collect();
     for c in &v {
-        let cpi = CodepointInfo {
-            cp: *c,
-            displayed_cp: *c,
-            offset: 0xffffffffffffffff,
-            is_selected: false,
-        };
-        let (ok, _) = screen.push(cpi);
+        let ok = screen_putchar(&mut screen, *c, 0xffffffffffffffff);
         if ok == false {
-            break;
+            return false;
         }
     }
+
+    true
+}
+
+fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
+
+    let mut displayed_cp = c;
+    if c == '\n' as char {
+        displayed_cp = ' ';
+    }
+
+    let cpi = CodepointInfo {
+        cp: c,
+        displayed_cp: displayed_cp,
+        offset: offset,
+        is_selected: false,
+    };
+
+    let (ok, _) = screen.push(cpi);
+    ok
+}
+
+
+fn decode_slice(data: &[u8],
+                base_offset: u64,
+                mut screen: &mut Screen,
+                cb: fn(&mut Screen, char, u64) -> bool)
+                -> u64 {
+
+    let debug_error = false;
+    let mut offset = base_offset;
+    let mut state: u32 = 0;
+    let mut cp_val: u32 = 0;
+    let mut cp_start_offset = base_offset;
+
+    for b in data {        
+        let cp: char;
+
+        state = utf8_decode_byte(&mut state, *b, &mut cp_val);
+
+        if debug_error == true {
+            let s = &format!(" |decoding byte {:x} sequence @ offset {}\n", *b, offset);
+            screen_putstr(&mut screen, &s);
+        }
+
+        match state {
+            UTF8_ACCEPT => {
+                cp = u32_to_char(cp_val);
+                cb(&mut screen, cp, cp_start_offset);
+                cp_start_offset = offset + 1;
+
+                // reset state
+                cp_val = 0;
+                state = UTF8_ACCEPT;
+            }
+
+            UTF8_REJECT => {
+                if debug_error == true {
+                    let s = &format!(" |error decoding byte {:x} sequence @ offset {}\n",
+                                     *b,
+                                     offset);
+                    screen_putstr(&mut screen, &s);
+                }
+
+                for i in cp_start_offset..offset + 1 {
+                    cb(&mut screen, '�', i);
+                }
+                cp_start_offset = offset + 1;
+
+                // reset state
+                cp_val = 0;
+                state = UTF8_ACCEPT;
+            }
+
+            _ => { /* intermediate state */ }
+        }
+
+        offset += 1;
+    }
+
+    offset
 }
 
 
@@ -140,92 +215,30 @@ fn fill_screen(mut view: &mut View) {
 
         Some(ref buf) => {
 
-            view.screen.clear();
+            let mut screen = &mut view.screen;
 
-            let mut offset = view.start_offset;
+            screen.clear();
 
             let data = &buf.borrow().buffer.data;
+            let len = data.len();
 
-            let mut state: u32 = 0;
-            let mut cp_val: u32 = 0;
-
-            let mut cp_start_offset = view.start_offset;
-            for b in data {
-
-                let cp;
-
-                state = utf8_decode_byte(&mut state, *b, &mut cp_val);
-
-                /*
-                let s = &format!(" |decoding byte {:x} sequence @ offset {}, state {}\n",
-                                 *b,
-                                 offset,
-                                 state);
-                screen_putstr(&mut view.screen, &s);
-                */
-
-                offset += 1;
-                match state {
-                    UTF8_ACCEPT | UTF8_REJECT => {
-
-                        if state == UTF8_REJECT {
-                            /*
-                            let s = &format!(" |invalid utf8 byte {:x} sequence @ offset {}\n",
-                                             *b,
-                                             cp_start_offset);
-                            screen_putstr(&mut view.screen, &s);
-                            */
-                            cp = u32_to_char(0xfffd);
-
-                            // restart on error
-                            cp_val = 0;
-                            state = 0;
-                            state = utf8_decode_byte(&mut state, *b, &mut cp_val);
-
-                        } else {
-                            cp = u32_to_char(cp_val);
-                            cp_val = 0;
-                            state = 0;
-                        }
-
-                        let mut displayed_cp = cp;
-                        if cp == '\n' as char {
-                            displayed_cp = ' ';
-                        }
-
-                        let cpi = CodepointInfo {
-                            cp: cp,
-                            displayed_cp: displayed_cp,
-                            offset: cp_start_offset,
-                            is_selected: false,
-                        };
-
-                        cp_start_offset = offset;
-
-                        let (ok, _) = view.screen.push(cpi);
-                        if ok == false {
-                            break;
-                        }
-                    }
-
-                    _ => {}
-                }
-            }
-            view.end_offset = offset;
+            // TODO: return -> Vec<CodepointInfo>
+            // let max_cp = ::std::cmp::min(data.len(), screen.width * screen.height * 4);
+            view.end_offset = decode_slice(&data[0..len],
+                                           view.start_offset,
+                                           &mut screen,
+                                           screen_putchar);
 
             if view.end_offset == buf.borrow().buffer.size as u64 {
-                view.screen
-                    .push(CodepointInfo {
-                              cp: ' ',
-                              displayed_cp: ' ',
-                              offset: offset,
-                              is_selected: false,
-                          });
+                screen.push(CodepointInfo {
+                                cp: ' ',
+                                displayed_cp: ' ',
+                                offset: view.end_offset,
+                                is_selected: false,
+                            });
             }
 
             // brute force for now
-            let mut screen = &mut view.screen;
-
             for m in &buf.borrow().moving_marks {
 
                 // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>

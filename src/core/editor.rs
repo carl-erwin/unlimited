@@ -61,7 +61,9 @@ impl<'a> Editor<'a> {
     /// load files/buffers/etc ...
     pub fn run(&mut self) {
 
-        self.setup_default_buffers();
+        if 0 == 1 {
+            self.setup_default_buffers();
+        }
 
         self.load_files();
 
