@@ -33,6 +33,8 @@ struct UiState {
     display_view: bool,
     vid: u64,
     nb_view: usize,
+    last_offset: u64,
+    mark_offset: u64,
 }
 
 impl UiState {
@@ -45,6 +47,8 @@ impl UiState {
             display_view: true,
             vid: 0,
             nb_view: 0,
+            last_offset: 0,
+            mark_offset: 0,
         }
     }
 }
@@ -72,12 +76,12 @@ pub fn main_loop(mut editor: &mut Editor) {
         let status_line_y = height;
 
         if ui_state.display_view == true {
-            draw_view(&mut view.as_mut().unwrap(), &mut stdout);
+            draw_view(&mut ui_state, &mut view.as_mut().unwrap(), &mut stdout);
         }
 
         if ui_state.display_status == true {
-            display_status_line(&mut view.as_mut().unwrap(),
-                                &ui_state.status,
+            display_status_line(&ui_state,
+                                &mut view.as_mut().unwrap(),
                                 status_line_y,
                                 width,
                                 &mut stdout);
@@ -129,51 +133,45 @@ fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     true
 }
 
-fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
 
-    let mut displayed_cp = c;
-    if c == '\n' as char {
-        displayed_cp = ' ';
-    }
+//
+fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 
-    let cpi = CodepointInfo {
+    let displayed_cp = match c {
+        '\n' | '\t' => ' ',
+        _ => c,
+    };
+
+    CodepointInfo {
         cp: c,
         displayed_cp: displayed_cp,
         offset: offset,
         is_selected: false,
-    };
+    }
+}
 
-    let (ok, _) = screen.push(cpi);
+
+fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
+    let (ok, _) = screen.push(filter_codepoint(c, offset));
     ok
 }
 
 
-fn decode_slice(data: &[u8],
-                base_offset: u64,
-                mut screen: &mut Screen,
-                cb: fn(&mut Screen, char, u64) -> bool)
-                -> u64 {
+fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<CodepointInfo>, u64) {
 
-    let debug_error = false;
     let mut offset = base_offset;
     let mut state: u32 = 0;
     let mut cp_val: u32 = 0;
     let mut cp_start_offset = base_offset;
 
+    let mut vec = Vec::with_capacity(max_cpi);
+
     for b in data {
-        let cp: char;
-
         state = utf8_decode_byte(&mut state, *b, &mut cp_val);
-
-        if debug_error == true {
-            let s = &format!(" |decoding byte {:x} sequence @ offset {}\n", *b, offset);
-            screen_putstr(&mut screen, &s);
-        }
-
         match state {
             UTF8_ACCEPT => {
-                cp = u32_to_char(cp_val);
-                cb(&mut screen, cp, cp_start_offset);
+                let cp = u32_to_char(cp_val);
+                vec.push(filter_codepoint(cp, cp_start_offset));
                 cp_start_offset = offset + 1;
 
                 // reset state
@@ -182,15 +180,8 @@ fn decode_slice(data: &[u8],
             }
 
             UTF8_REJECT => {
-                if debug_error == true {
-                    let s = &format!(" |error decoding byte {:x} sequence @ offset {}\n",
-                                     *b,
-                                     offset);
-                    screen_putstr(&mut screen, &s);
-                }
-
                 for i in cp_start_offset..offset + 1 {
-                    cb(&mut screen, '�', i);
+                    vec.push(filter_codepoint('�', i));
                 }
                 cp_start_offset = offset + 1;
 
@@ -203,13 +194,31 @@ fn decode_slice(data: &[u8],
         }
 
         offset += 1;
+        if vec.len() == max_cpi {
+            break;
+        }
     }
 
-    offset
+    (vec, offset)
+}
+
+fn decode_slice_to_screen(data: &[u8], base_offset: u64, mut screen: &mut Screen) -> u64 {
+
+    let max_cpi = screen.width * screen.height;
+    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_cpi);
+
+    for cpi in &vec {
+        let (ok, _) = screen.push(cpi.clone());
+        if ok == false {
+            break;
+        }
+    }
+
+    last_offset
 }
 
 
-fn fill_screen(mut view: &mut View) {
+fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
     match view.document {
 
@@ -233,12 +242,7 @@ fn fill_screen(mut view: &mut View) {
             let data = &buf.borrow().buffer.data;
             let len = data.len();
 
-            // TODO: return -> Vec<CodepointInfo>
-            // let max_cp = ::std::cmp::min(data.len(), screen.width * screen.height * 4);
-            view.end_offset = decode_slice(&data[0..len],
-                                           view.start_offset,
-                                           &mut screen,
-                                           screen_putchar);
+            view.end_offset = decode_slice_to_screen(&data[0..len], view.start_offset, &mut screen);
 
             if view.end_offset == buf.borrow().buffer.size as u64 {
                 screen.push(CodepointInfo {
@@ -248,6 +252,8 @@ fn fill_screen(mut view: &mut View) {
                                 is_selected: false,
                             });
             }
+
+            ui_state.last_offset = view.end_offset;
 
             // brute force for now
             for m in &buf.borrow().moving_marks {
@@ -265,6 +271,7 @@ fn fill_screen(mut view: &mut View) {
 
                             if cpi.offset == m.offset {
                                 cpi.is_selected = true;
+                                ui_state.mark_offset = m.offset;
                             }
                         }
                     }
@@ -316,9 +323,9 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(mut view: &mut View, mut stdout: &mut Stdout) {
+fn draw_view(mut ui_state: &mut UiState, mut view: &mut View, mut stdout: &mut Stdout) {
 
-    fill_screen(&mut view);
+    fill_screen(&mut ui_state, &mut view);
     draw_screen(&mut view.screen, &mut stdout);
 }
 
@@ -453,7 +460,11 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View) {
     }
 }
 
-fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut stdout: &mut Stdout) {
+fn display_status_line(ui_state: &UiState,
+                       view: &View,
+                       line: u16,
+                       width: u16,
+                       mut stdout: &mut Stdout) {
 
     let doc = match view.document {
         Some(ref d) => d.borrow(),
@@ -468,11 +479,16 @@ fn display_status_line(view: &View, status: &str, line: u16, width: u16, mut std
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let status_str = format!("line {} document_name '{}', file: '{}', event '{}'",
+    let status_str = format!("line {} document_name '{}' \
+                             , file('{}'), event('{}') \
+                             last_offset({}) mark({})",
                              line,
                              name,
                              file_name,
-                             status);
+                             ui_state.status,
+                             ui_state.last_offset,
+                             ui_state.mark_offset,
+                             );
 
     print!("{}", status_str);
     stdout.flush().unwrap();
