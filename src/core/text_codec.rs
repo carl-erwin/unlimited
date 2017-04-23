@@ -47,6 +47,40 @@ pub fn utf8_decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
     *state
 }
 
+
+
+#[inline]
+pub fn utf8_is_codepoint_start(byte: u8) -> bool {
+
+    if byte < 0x80 {
+        return true;
+    }
+
+    if byte >= 0xC2 && byte <= 0xDF {
+        return true;
+    }
+
+    if byte >= 0xC2 && byte <= 0xDF {
+        return true;
+    }
+
+    if byte >= 0xE0 && byte <= 0xEC {
+        return true;
+    }
+
+    if byte >= 0xED && byte <= 0xEF {
+        return true;
+    }
+
+    if byte >= 0xF0 && byte <= 0xF4 {
+        return true;
+    }
+
+    false
+}
+
+
+
 // return 0 on error, or the number of written bytes
 pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
     if codepoint < 0x80 {
@@ -75,7 +109,7 @@ pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
         return 4;
     }
 
-    return 0;
+    0
 }
 
 
