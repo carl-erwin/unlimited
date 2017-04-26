@@ -1,6 +1,7 @@
-// Derived from : Bjoern Hoehrmann work
-// Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
-// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+// {
+//   Derived from : Bjoern Hoehrmann work
+//   Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+//   See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
 
 use std::char;
@@ -47,6 +48,8 @@ pub fn utf8_decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
     *state
 }
 
+
+// }
 
 
 #[inline]

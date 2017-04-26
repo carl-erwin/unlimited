@@ -4,7 +4,7 @@ extern crate termion;
 
 //
 use self::termion::screen::AlternateScreen;
-use self::termion::event::{Event, Key, MouseEvent};
+
 use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
@@ -16,7 +16,12 @@ use core::view::View;
 use core::screen::Screen;
 use core::codepointinfo::CodepointInfo;
 
+use core::event::InputEvent;
+use core::event::Key;
+
+
 use core::editor::Editor;
+
 
 use core::text_codec::utf8_decode_byte;
 use core::text_codec::{UTF8_ACCEPT, UTF8_REJECT};
@@ -26,7 +31,7 @@ use core::text_codec::u32_to_char;
 
 //
 struct UiState {
-    keys: Vec<Event>,
+    keys: Vec<InputEvent>,
     quit: bool,
     status: String,
     display_status: bool,
@@ -87,7 +92,9 @@ pub fn main_loop(mut editor: &mut Editor) {
                                 &mut stdout);
         }
 
-        process_input_events(&mut ui_state, &mut view.as_mut().unwrap());
+        let evt = get_input_event(&mut ui_state, &mut view.as_mut().unwrap());
+
+        process_input_events(&mut ui_state, &mut view.as_mut().unwrap(), evt);
     }
 
     // quit
@@ -341,123 +348,267 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 
 
-fn process_input_events(ui_state: &mut UiState, view: &mut View) {
+fn get_input_event(ui_state: &mut UiState, view: &mut View) -> InputEvent {
+
     for evt in stdin().events() {
 
-        ui_state.keys.push(evt.unwrap());
-        let evt = ui_state.keys[ui_state.keys.len() - 1].clone();
+        let evt = evt.unwrap();
 
-        // Print recieved Events...
+        // translate termion event
         match evt {
 
-            Event::Key(k) => {
+            self::termion::event::Event::Key(k) => {
                 match k {
-                    // Exit.
-                    Key::Ctrl('r') => {
-                        ui_state.keys.clear();
+
+                    self::termion::event::Key::Ctrl('c') => {
+
+                        ui_state.status = format!("Ctrl-c");
+
+                        return InputEvent::KeyPress {
+                                   ctrl: true,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::UNICODE('c'),
+                               };
                     }
 
-                    Key::Ctrl('c') => {
-                        if ui_state.keys.len() > 1 {
-                            if let Event::Key(prev_event) = ui_state.keys[ui_state.keys.len() - 2] {
-                                if let Key::Ctrl(prev_char) = prev_event {
-                                    if prev_char == 'x' {
-                                        ui_state.quit = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                    self::termion::event::Key::Char('\n') => {
+                        ui_state.status = format!("{}", "<newline>");
+
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::UNICODE('\n'),
+                               };
                     }
 
-                    Key::Char(c) => {
-                        if c == '\n' {
-                            ui_state.status = format!("'{}'", "<newline>");
-                        } else {
-                            ui_state.status = format!("'{}'", c);
-                        }
-                    }
-                    Key::Alt(c) => ui_state.status = format!("Alt-{}", c),
-                    Key::Ctrl(c) => ui_state.status = format!("Ctrl-{}", c),
+                    self::termion::event::Key::Char(c) => {
+                        ui_state.status = format!("{}", c);
 
-                    Key::F(1) => {
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::UNICODE(c),
+                               };
+                    }
+
+                    self::termion::event::Key::Alt(c) => {
+                        ui_state.status = format!("Alt-{}", c);
+
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: true,
+                                   shift: false,
+                                   key: Key::UNICODE(c),
+                               };
+                    }
+
+                    self::termion::event::Key::Ctrl(c) => {
+                        ui_state.status = format!("Ctrl-{}", c);
+
+                        return InputEvent::KeyPress {
+                                   ctrl: true,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::UNICODE(c),
+                               };
+                    }
+
+                    self::termion::event::Key::F(1) => {
                         if ui_state.vid > 0 {
                             ui_state.vid -= 1;
                         }
                         break;
                     }
 
-                    Key::F(2) => {
+                    self::termion::event::Key::F(2) => {
                         ui_state.vid = ::std::cmp::min(ui_state.vid + 1,
                                                        (ui_state.nb_view - 1) as u64);
                         break;
                     }
 
-                    Key::F(f) => ui_state.status = format!("F{:?}", f),
-                    Key::Left => {
-                        ui_state.status = {
-                            let mut doc = view.document.as_mut().unwrap().borrow_mut();
-                            for m in &mut doc.moving_marks {
-                                if m.offset > 0 {
-                                    m.offset -= 1;
-                                }
-                            }
-                            format!("<left>")
-                        }
-                    }
-                    Key::Right => {
-                        ui_state.status = {
-                            let mut doc = view.document.as_mut().unwrap().borrow_mut();
-                            let buffer_size = doc.buffer.size as u64;
+                    self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
+                    self::termion::event::Key::Left => {
 
-                            for m in &mut doc.moving_marks {
-                                m.offset += 1;
-                                if m.offset > buffer_size {
-                                    m.offset = buffer_size
-                                }
-                            }
-
-                            format!("<right>")
-                        }
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Left,
+                               };
                     }
-                    Key::Up => ui_state.status = format!("<up>"),
-                    Key::Down => ui_state.status = format!("<down>"),
-                    Key::Backspace => ui_state.status = format!("<backspace>"),
-                    Key::Home => ui_state.status = format!("<Home>"),
-                    Key::End => ui_state.status = format!("<End>"),
-                    Key::PageUp => ui_state.status = format!("<PageUp>"),
-                    Key::PageDown => ui_state.status = format!("<PageDown>"),
-                    Key::Delete => ui_state.status = format!("<Delete>"),
-                    Key::Insert => ui_state.status = format!("<Insert>"),
-                    Key::Esc => ui_state.status = format!("<Esc>"),
+                    self::termion::event::Key::Right => {
+
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Right,
+                               };
+                    }
+                    self::termion::event::Key::Up => ui_state.status = format!("<up>"),
+                    self::termion::event::Key::Down => ui_state.status = format!("<down>"),
+                    self::termion::event::Key::Backspace => ui_state.status = format!("<backspc>"),
+                    self::termion::event::Key::Home => ui_state.status = format!("<Home>"),
+                    self::termion::event::Key::End => ui_state.status = format!("<End>"),
+                    self::termion::event::Key::PageUp => ui_state.status = format!("<PageUp>"),
+                    self::termion::event::Key::PageDown => ui_state.status = format!("<PageDown>"),
+                    self::termion::event::Key::Delete => ui_state.status = format!("<Delete>"),
+                    self::termion::event::Key::Insert => ui_state.status = format!("<Insert>"),
+                    self::termion::event::Key::Esc => ui_state.status = format!("<Esc>"),
                     _ => ui_state.status = format!("Other"),
                 }
             }
 
-            Event::Mouse(m) => {
+            self::termion::event::Event::Mouse(m) => {
                 match m {
-                    MouseEvent::Press(mb, x, y) => {
+                    self::termion::event::MouseEvent::Press(mb, x, y) => {
                         ui_state.status =
                             format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
+
+                        return InputEvent::ButtonPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   x: x as i32,
+                                   y: y as i32,
+                                   button: 0, // TODO -> enum to ...
+                               };
                     }
 
-                    MouseEvent::Release(x, y) => {
+                    self::termion::event::MouseEvent::Release(x, y) => {
                         ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+
+                        return InputEvent::ButtonRelease {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   x: x as i32,
+                                   y: y as i32,
+                                   button: 0, // TODO -> enum to ...
+                               };
                     }
 
-                    MouseEvent::Hold(x, y) => {
+                    self::termion::event::MouseEvent::Hold(x, y) => {
                         ui_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
                     }
                 };
             }
 
-            Event::Unsupported(e) => {
+            self::termion::event::Event::Unsupported(e) => {
                 ui_state.status = format!("Event::Unsupported {:?}", e);
             }
         }
 
         break;
     }
+
+    ::core::event::InputEvent::NoInputEvent
+}
+
+
+fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent) {
+
+    ui_state.keys.push(ev.clone());
+
+    let mut clear_keys = true;
+    match ev {
+
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('c'),
+        } => {
+            if ui_state.keys.len() > 1 {
+
+                let prev_ev = &ui_state.keys[ui_state.keys.len() - 2];
+                match *prev_ev {
+                    InputEvent::KeyPress {
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                        key: Key::UNICODE('x'),
+                    } => {
+                        ui_state.quit = true;
+                        clear_keys = false;
+                    }
+                    _ => {}
+                }
+            } else {
+                clear_keys = true;
+            }
+        }
+
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('x'),
+        } => {
+            clear_keys = false;
+        }
+
+        // ctrl+?
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE(_),
+        } => {}
+
+        // left
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Left,
+        } => {
+            let mut doc = view.document.as_mut().unwrap().borrow_mut();
+            for m in &mut doc.moving_marks {
+
+                // TODO: mark_move_backward(&mut m, &view);
+
+                if m.offset > 0 {
+                    m.offset -= 1;
+                }
+            }
+            ui_state.status = format!("<left>");
+
+        }
+
+        // right
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Right,
+        } => {
+            let mut doc = view.document.as_mut().unwrap().borrow_mut();
+            let buffer_size = doc.buffer.size as u64;
+
+            for m in &mut doc.moving_marks {
+
+                // TODO: mark_move_forward(&mut m, &view);
+
+                m.offset += 1;
+                if m.offset > buffer_size {
+                    m.offset = buffer_size
+                }
+            }
+
+            ui_state.status = format!("<right>");
+        }
+
+        _ => {}
+    }
+
+    if clear_keys {
+        ui_state.keys.clear();
+    }
+
 }
 
 fn display_status_line(ui_state: &UiState,
@@ -481,14 +632,14 @@ fn display_status_line(ui_state: &UiState,
 
     let status_str = format!("line {} document_name '{}' \
                              , file('{}'), event('{}') \
-                             last_offset({}) mark({})",
+                             last_offset({}) mark({}) keys({})",
                              line,
                              name,
                              file_name,
                              ui_state.status,
                              ui_state.last_offset,
                              ui_state.mark_offset,
-                             );
+                             ui_state.keys.len());
 
     print!("{}", status_str);
     stdout.flush().unwrap();
