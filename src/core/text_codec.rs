@@ -142,7 +142,7 @@ fn test_utf8_codec_decode() {
     let sequence: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
     for b in &sequence {
         println!("decode byte '{:x}'", *b);
-        state = utf8_decode_byte(state, *b, &mut codep);
+        state = utf8_decode_byte(&mut state, *b, &mut codep);
         match state {
             UTF8_ACCEPT => {
                 break;
