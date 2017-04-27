@@ -2,7 +2,7 @@ use core::codepointinfo::CodepointInfo;
 
 
 // the screen is composed of lines
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Screen {
     pub line: Vec<Line>,
     pub used: usize,
@@ -24,6 +24,21 @@ impl Screen {
             height: height,
         }
     }
+
+    pub fn resize(&mut self, width: usize, height: usize) {
+
+        self.line.resize(height, Line::new(width));
+        for i in 0..height {
+            self.line[i].chars.resize(width, CodepointInfo::new());
+            self.line[i].width = width;
+            self.line[i].used = 0;
+        }
+        self.width = width;
+        self.height = height;
+        self.used = 0;
+    }
+
+
 
     /// append
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
@@ -74,7 +89,7 @@ impl Screen {
 }
 
 // a line is composed of codepoints
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Line {
     pub chars: Vec<CodepointInfo>,
     pub used: usize,
@@ -86,12 +101,7 @@ impl Line {
 
         let mut chars = Vec::with_capacity(columns);
         for _ in 0..columns {
-            chars.push(CodepointInfo {
-                           cp: ' ',
-                           displayed_cp: ' ',
-                           offset: 0,
-                           is_selected: false,
-                       });
+            chars.push(CodepointInfo::new());
         }
 
         Line {
@@ -136,4 +146,35 @@ impl Line {
             None
         }
     }
+}
+
+
+
+#[test]
+fn test_screen() {
+
+    let mut scr = Screen::new(640, 480);
+    assert_eq!(640, scr.width);
+    assert_eq!(480, scr.height);
+    assert_eq!(scr.height, scr.line.len());
+    assert_eq!(scr.width, scr.line[0].chars.len());
+
+    scr.resize(800, 600);
+    assert_eq!(800, scr.width);
+    assert_eq!(600, scr.height);
+    assert_eq!(scr.height, scr.line.len());
+    assert_eq!(scr.width, scr.line[0].chars.len());
+
+
+    scr.resize(1024, 768);
+    assert_eq!(1024, scr.width);
+    assert_eq!(768, scr.height);
+    assert_eq!(scr.height, scr.line.len());
+    assert_eq!(scr.width, scr.line[0].chars.len());
+
+    scr.resize(640, 480);
+    assert_eq!(640, scr.width);
+    assert_eq!(480, scr.height);
+    assert_eq!(scr.height, scr.line.len());
+    assert_eq!(scr.width, scr.line[0].chars.len());
 }
