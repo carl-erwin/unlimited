@@ -7,3 +7,15 @@ pub struct CodepointInfo {
     pub offset: u64,
     pub is_selected: bool,
 }
+
+
+impl CodepointInfo {
+    pub fn new() -> CodepointInfo {
+        CodepointInfo {
+            cp: ' ',
+            displayed_cp: ' ',
+            offset: 0,
+            is_selected: false,
+        }
+    }
+}
