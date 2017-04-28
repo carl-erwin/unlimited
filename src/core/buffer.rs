@@ -177,8 +177,16 @@ fn test_buffer() {
     let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
     bb.write(0, 10, &data);
     assert_eq!(bb.data, data);
+    assert_eq!(data.len(), bb.size());
+
+    let mut rdata = Vec::new();
+
+    let nread = bb.read(0, bb.size(), &mut rdata);
+    assert_eq!(rdata, data);
+    assert_eq!(nread, bb.size());
 
     let data = vec![0, 1, 2, 6, 7, 8, 9];
     let mut rm = vec![];
