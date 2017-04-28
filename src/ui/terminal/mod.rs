@@ -92,7 +92,7 @@ pub fn main_loop(mut editor: &mut Editor) {
                                 &mut stdout);
         }
 
-        let evt = get_input_event(&mut ui_state, &mut view.as_mut().unwrap());
+        let evt = get_input_event(&mut ui_state);
 
         process_input_events(&mut ui_state, &mut view.as_mut().unwrap(), evt);
     }
@@ -348,7 +348,7 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 
 
-fn get_input_event(ui_state: &mut UiState, view: &mut View) -> InputEvent {
+fn get_input_event(ui_state: &mut UiState) -> InputEvent {
 
     for evt in stdin().events() {
 
