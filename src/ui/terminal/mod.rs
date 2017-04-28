@@ -23,7 +23,7 @@ use core::event::Key;
 use core::editor::Editor;
 
 
-use core::text::codec::utf8::utf8_decode_byte;
+use core::text::codec::utf8;
 use core::text::codec::utf8::{UTF8_ACCEPT, UTF8_REJECT};
 
 use core::text::codec::u32_to_char;
@@ -174,7 +174,7 @@ fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<Co
     let mut vec = Vec::with_capacity(max_cpi);
 
     for b in data {
-        state = utf8_decode_byte(&mut state, *b, &mut cp_val);
+        state = utf8::decode_byte(&mut state, *b, &mut cp_val);
         match state {
             UTF8_ACCEPT => {
                 let cp = u32_to_char(cp_val);

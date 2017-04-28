@@ -4,10 +4,6 @@
 //   See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
 
-use std::char;
-
-use ::core::text::codec::u32_to_char;
-
 pub const UTF8_ACCEPT: u32 = 0;
 pub const UTF8_REJECT: u32 = 1;
 
@@ -31,12 +27,12 @@ static UTF8D: &'static [u8] = &[
 
 
 /*
-    state 0 => initial state or decoding successful
-    state 1 => error
-    state x => intermediate states need more inputs
+    state UTF8_ACCEPT => initial state or decoding successful
+    state UTF8_REJECT => error
+    state other => intermediate states need more inputs
 */
 #[inline]
-pub fn utf8_decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
+pub fn decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
 
     let cp_type = UTF8D[byte as usize] as u32;
 
@@ -55,7 +51,7 @@ pub fn utf8_decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
 
 
 #[inline]
-pub fn utf8_is_codepoint_start(byte: u8) -> bool {
+pub fn is_codepoint_start(byte: u8) -> bool {
 
     if byte < 0x80 {
         return true;
@@ -87,7 +83,7 @@ pub fn utf8_is_codepoint_start(byte: u8) -> bool {
 
 
 // return 0 on error, or the number of written bytes
-pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
+pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
     if codepoint < 0x80 {
         out[0] = (codepoint & 0x7F) as u8;
         return 1;
@@ -121,26 +117,30 @@ pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 
 
 #[test]
-fn test_utf8_codec_encode() {
+fn test_codec_encode() {
 
     let expect_cp: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
     let mut mut_cp: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
 
-    let n = utf8_encode(0x20ac as u32, &mut mut_cp);
+    let n = encode(0x20ac as u32, &mut mut_cp);
     assert_eq!(n, 3);
     assert_eq!(mut_cp, expect_cp);
 
 }
 
 #[test]
-fn test_utf8_codec_decode() {
+fn test_codec_decode() {
+
+    use core::text::codec::u32_to_char;
+
+
     let mut state: u32 = 0;
     let mut codep: u32 = 0;
 
     let sequence: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
     for b in &sequence {
         println!("decode byte '{:x}'", *b);
-        state = utf8_decode_byte(&mut state, *b, &mut codep);
+        state = decode_byte(&mut state, *b, &mut codep);
         match state {
             UTF8_ACCEPT => {
                 break;
