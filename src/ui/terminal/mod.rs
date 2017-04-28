@@ -23,10 +23,10 @@ use core::event::Key;
 use core::editor::Editor;
 
 
-use core::text_codec::utf8_decode_byte;
-use core::text_codec::{UTF8_ACCEPT, UTF8_REJECT};
+use core::text::codec::utf8::utf8_decode_byte;
+use core::text::codec::utf8::{UTF8_ACCEPT, UTF8_REJECT};
 
-use core::text_codec::u32_to_char;
+use core::text::codec::u32_to_char;
 
 
 //

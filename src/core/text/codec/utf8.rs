@@ -6,6 +6,8 @@
 
 use std::char;
 
+use ::core::text::codec::u32_to_char;
+
 pub const UTF8_ACCEPT: u32 = 0;
 pub const UTF8_REJECT: u32 = 1;
 
@@ -115,10 +117,6 @@ pub fn utf8_encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
     0
 }
 
-
-pub fn u32_to_char(codep: u32) -> char {
-    unsafe { char::from_u32_unchecked(codep) }
-}
 
 
 

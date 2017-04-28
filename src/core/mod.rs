@@ -8,7 +8,8 @@ pub mod buffer;
 pub mod event;
 pub mod view;
 pub mod mark;
-pub mod text_codec;
+
+pub mod text;
 
 
 pub mod server;
