@@ -126,6 +126,7 @@ impl Buffer {
             self.data.insert(index + n, data[n]);
         }
         self.size += nr_bytes;
+        self.nr_changes += 1;
 
         nr_bytes
     }
@@ -150,6 +151,7 @@ impl Buffer {
 
         self.data.drain(start_offset..end_offset);
         self.size -= nr_bytes_removed;
+        self.nr_changes += 1;
 
         nr_bytes_removed
     }
