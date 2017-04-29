@@ -105,7 +105,7 @@ impl Line {
         }
 
         Line {
-            chars: chars,
+            chars,
             used: 0,
             width: columns,
         }

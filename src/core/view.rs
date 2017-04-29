@@ -38,15 +38,13 @@ impl View {
         let moving_marks = vec![Mark { offset: 0 }];
 
         View {
-            id: id,
-            start_offset: start_offset,
+            id,
+            start_offset,
             end_offset: start_offset, // will be recomputed later
-            document: document,
-            screen: screen,
-                    // TODO: in future version will be stored in buffer meta data
-            moving_marks: moving_marks,
+            document,
+            screen,
+            moving_marks,
             fixed_marks: Vec::new(),
-
         }
     }
 }

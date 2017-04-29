@@ -67,11 +67,11 @@ impl Buffer {
         Some(Buffer {
                  id: 0,
                  file_name: file_name.clone(),
-                 mode: mode,
-                 size: size,
+                 mode,
+                 size,
                  nr_changes: 0,
-                 file: file,
-                 data: data,
+                 file,
+                 data,
              })
     }
 

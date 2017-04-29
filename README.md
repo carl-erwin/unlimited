@@ -10,7 +10,7 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 ### Compiling
 
-On a working Rust (stable) environment
+On a working Rust (stable >= 1.17.0) environment
 
 ```
 git clone https://github.com/carl-erwin/unlimited
