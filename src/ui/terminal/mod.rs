@@ -263,7 +263,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
             ui_state.last_offset = view.end_offset;
 
             // brute force for now
-            for m in &buf.borrow().moving_marks {
+            for m in &view.moving_marks {
 
                 // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {
@@ -648,8 +648,7 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent)
             shift: false,
             key: Key::Left,
         } => {
-            let mut doc = view.document.as_mut().unwrap().borrow_mut();
-            for m in &mut doc.moving_marks {
+            for m in &mut view.moving_marks {
 
                 // TODO: mark_move_backward(&mut m, &view);
 
@@ -668,10 +667,10 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent)
             shift: false,
             key: Key::Right,
         } => {
-            let mut doc = view.document.as_mut().unwrap().borrow_mut();
+            let doc = view.document.as_mut().unwrap().borrow_mut();
             let buffer_size = doc.buffer.size as u64;
 
-            for m in &mut doc.moving_marks {
+            for m in &mut view.moving_marks {
 
                 // TODO: mark_move_forward(&mut m, &view);
 

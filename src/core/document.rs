@@ -6,8 +6,6 @@ use std::cell::RefCell;
 use core::buffer::Buffer;
 use core::buffer::OpenMode;
 
-use core::mark::Mark;
-
 //
 pub type Id = u64;
 
@@ -59,16 +57,11 @@ impl DocumentBuilder {
             None => return None,
         };
 
-        // TODO: in future version will be stored in buffer meta data
-        let moving_marks = vec![Mark { offset: 0 }];
-
         Some(Rc::new(RefCell::new(Document {
                                       id: 0,
                                       name: self.document_name.clone(),
                                       buffer: buffer,
                                       changed: false,
-                                      moving_marks: moving_marks,
-                                      fixed_marks: Vec::new(),
                                   })))
     }
 }
@@ -81,8 +74,4 @@ pub struct Document {
     pub name: String,
     pub buffer: Buffer,
     pub changed: bool,
-
-    // TODO: in future version marks will be stored in buffer meta data
-    pub moving_marks: Vec<Mark>,
-    pub fixed_marks: Vec<Mark>,
 }

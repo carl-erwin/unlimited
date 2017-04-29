@@ -6,6 +6,8 @@ use std::cell::RefCell;
 use core::document::Document;
 use core::screen::Screen;
 
+use core::mark::Mark;
+
 pub type Id = u64;
 
 #[derive(Debug)]
@@ -15,6 +17,10 @@ pub struct View {
     pub end_offset: u64,
     pub document: Option<Rc<RefCell<Document>>>,
     pub screen: Box<Screen>,
+
+    // TODO: in future version marks will be stored in buffer meta data
+    pub moving_marks: Vec<Mark>,
+    pub fixed_marks: Vec<Mark>,
 }
 
 
@@ -28,12 +34,19 @@ impl View {
 
         let screen = Box::new(Screen::new(width, height));
 
+        // TODO: in future version will be stored in buffer meta data
+        let moving_marks = vec![Mark { offset: 0 }];
+
         View {
             id: id,
             start_offset: start_offset,
             end_offset: start_offset, // will be recomputed later
             document: document,
             screen: screen,
+                    // TODO: in future version will be stored in buffer meta data
+            moving_marks: moving_marks,
+            fixed_marks: Vec::new(),
+
         }
     }
 }
