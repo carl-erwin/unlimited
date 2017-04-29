@@ -131,8 +131,7 @@ fn test_codec_encode() {
 #[test]
 fn test_codec_decode() {
 
-    use core::text::codec::u32_to_char;
-
+    use core::codec::text::u32_to_char;
 
     let mut state: u32 = 0;
     let mut codep: u32 = 0;
