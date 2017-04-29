@@ -361,7 +361,6 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                 match k {
 
                     self::termion::event::Key::Ctrl('c') => {
-
                         ui_state.status = format!("Ctrl-c");
 
                         return InputEvent::KeyPress {
@@ -430,8 +429,9 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                     }
 
                     self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
-                    self::termion::event::Key::Left => {
 
+                    self::termion::event::Key::Left => {
+                        ui_state.status = format!("<left>");
                         return InputEvent::KeyPress {
                                    ctrl: false,
                                    alt: false,
@@ -440,7 +440,7 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                                };
                     }
                     self::termion::event::Key::Right => {
-
+                        ui_state.status = format!("<right>");
                         return InputEvent::KeyPress {
                                    ctrl: false,
                                    alt: false,
@@ -448,16 +448,98 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                                    key: Key::Right,
                                };
                     }
-                    self::termion::event::Key::Up => ui_state.status = format!("<up>"),
-                    self::termion::event::Key::Down => ui_state.status = format!("<down>"),
-                    self::termion::event::Key::Backspace => ui_state.status = format!("<backspc>"),
-                    self::termion::event::Key::Home => ui_state.status = format!("<Home>"),
-                    self::termion::event::Key::End => ui_state.status = format!("<End>"),
-                    self::termion::event::Key::PageUp => ui_state.status = format!("<PageUp>"),
-                    self::termion::event::Key::PageDown => ui_state.status = format!("<PageDown>"),
-                    self::termion::event::Key::Delete => ui_state.status = format!("<Delete>"),
-                    self::termion::event::Key::Insert => ui_state.status = format!("<Insert>"),
-                    self::termion::event::Key::Esc => ui_state.status = format!("<Esc>"),
+                    self::termion::event::Key::Up => {
+                        ui_state.status = format!("<up>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Up,
+                               };
+                    }
+                    self::termion::event::Key::Down => {
+                        ui_state.status = format!("<down>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Down,
+                               };
+                    }
+                    self::termion::event::Key::Backspace => {
+                        ui_state.status = format!("<backspc>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::BackSpace,
+                               };
+                    }
+                    self::termion::event::Key::Home => {
+                        ui_state.status = format!("<Home>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Home,
+                               };
+
+                    }
+                    self::termion::event::Key::End => {
+                        ui_state.status = format!("<End>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::End,
+                               };
+
+                    }
+                    self::termion::event::Key::PageUp => {
+                        ui_state.status = format!("<PageUp>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::PageUp,
+                               };
+                    }
+                    self::termion::event::Key::PageDown => {
+                        ui_state.status = format!("<PageDown>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::PageDown,
+                               };
+                    }
+                    self::termion::event::Key::Delete => {
+                        ui_state.status = format!("<Delete>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Delete,
+                               };
+                    }
+                    self::termion::event::Key::Insert => {
+                        ui_state.status = format!("<Insert>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Insert,
+                               };
+                    }
+                    self::termion::event::Key::Esc => {
+                        ui_state.status = format!("<Esc>");
+                        return InputEvent::KeyPress {
+                                   ctrl: false,
+                                   alt: false,
+                                   shift: false,
+                                   key: Key::Escape,
+                               };
+                    }
                     _ => ui_state.status = format!("Other"),
                 }
             }

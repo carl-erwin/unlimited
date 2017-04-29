@@ -61,6 +61,7 @@ pub enum Key {
     Escape,
     Delete,
     BackSpace,
+    Insert,
     Home,
     Left,
     Up,
