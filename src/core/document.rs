@@ -67,7 +67,7 @@ impl DocumentBuilder {
 }
 
 
-///
+
 #[derive(Debug)]
 pub struct Document {
     pub id: Id,

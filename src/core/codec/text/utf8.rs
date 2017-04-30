@@ -114,6 +114,72 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 }
 
 
+// TODO: change this with temporary (cp, offset, size) until from_offset
+pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
+
+    // rewind upto 4 bytes
+    // and decode forward / save offset
+    let cp_start_offset = if from_offset > 4 { from_offset - 4 } else { 0 };
+
+    // TODO: replace vec by array
+    let mut vec = Vec::with_capacity(8);
+    let mut off: u64 = 0;
+
+    while off != from_offset {
+        let (cp, _, size) = get_codepoint(data, off);
+        vec.push((cp, size, off));
+        off += size as u64;
+    }
+
+    if vec.len() != 0 {
+        vec[vec.len() - 1].2
+    } else {
+        from_offset
+    }
+}
+
+pub fn get_next_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
+    let (_, _, size) = get_codepoint(data, from_offset);
+    from_offset + size as u64
+}
+
+
+pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
+
+    let mut state = 0;
+    let mut codep = 0;
+    let mut size = 0;
+
+    for off in from_offset as usize..data.len() {
+
+        let b = data[off];
+
+        size += 1;
+        state = decode_byte(&mut state, b, &mut codep);
+        match state {
+            0 => {
+                break;
+            }
+            1 => {
+                // decode error : invalid sequence
+                codep = 0xfffd;
+                size = 1; // force restart @ next byte
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    // TODO return Result<(char, usize), status> -> state != 1|0 -> need mode data
+    (::core::codec::text::u32_to_char(codep), from_offset, size)
+}
+
+pub fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
+    let offset = get_previous_codepoint_start(data, from_offset);
+    get_codepoint(data, offset)
+}
+
+
 
 
 #[test]
@@ -145,7 +211,7 @@ fn test_codec_decode() {
                 break;
             }
             UTF8_REJECT => {
-                print!("invalid utf8 sequence");
+                println!("invalid utf8 sequence");
                 break;
             }
             _ => {
@@ -159,4 +225,52 @@ fn test_codec_decode() {
     println!("decoded codepoint char {}", c);
 
     assert_eq!(codep, 0x20ac);
+}
+
+#[test]
+fn test2_codec_decode() {
+
+    let data: [u8; 27] = [0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61, 0x0a, 0x82, 0xac, 0xe2, 0x82, 0x61,
+                          0x0a, 0xac, 0xe2, 0x82, 0x61, 0x0a, 0xe2, 0x82, 0x61, 0x0a, 0x82, 0x61,
+                          0x0a, 0x61, 0x0a];
+
+    let mut state: u32 = 0;
+    let mut codep: u32 = 0;
+
+    for b in &data {
+        println!("decode byte '{:x}'", *b);
+        state = decode_byte(&mut state, *b, &mut codep);
+        println!("state  '{}'", state);
+        match state {
+            UTF8_ACCEPT => {
+                println!("decoded cp = '{:?}'", codep);
+                state = 0;
+                codep = 0;
+            }
+            UTF8_REJECT => {
+                println!("invalid utf8 sequence, restart");
+                state = 0;
+                codep = 0;
+                state = decode_byte(&mut state, *b, &mut codep);
+                match state {
+                    UTF8_ACCEPT => {
+                        println!("decoded cp = '{:?}'", codep);
+                        state = 0;
+                        codep = 0;
+                    }
+                    UTF8_REJECT => {
+                        println!("invalid utf8 sequence, restart");
+                        state = 0;
+                        codep = 0;
+                    }
+                    _ => {}
+
+                }
+            }
+
+            _ => {
+                continue;
+            }
+        }
+    }
 }

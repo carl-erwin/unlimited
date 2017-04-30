@@ -145,7 +145,7 @@ fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 
     let displayed_cp = match c {
-        '\n' | '\t' => ' ',
+        '\r' | '\n' | '\t' => ' ',
         _ => c,
     };
 
@@ -166,47 +166,26 @@ fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
 
 fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<CodepointInfo>, u64) {
 
-    let mut offset = base_offset;
     let mut state: u32 = 0;
     let mut cp_val: u32 = 0;
     let mut cp_start_offset = base_offset;
 
     let mut vec = Vec::with_capacity(max_cpi);
 
-    for b in data {
-        state = utf8::decode_byte(&mut state, *b, &mut cp_val);
-        match state {
-            UTF8_ACCEPT => {
-                let cp = u32_to_char(cp_val);
-                vec.push(filter_codepoint(cp, cp_start_offset));
-                cp_start_offset = offset + 1;
+    let mut off: u64 = 0;
+    let last_off = data.len() as u64;
 
-                // reset state
-                cp_val = 0;
-                state = UTF8_ACCEPT;
-            }
+    while off != last_off {
 
-            UTF8_REJECT => {
-                for i in cp_start_offset..offset + 1 {
-                    vec.push(filter_codepoint('�', i));
-                }
-                cp_start_offset = offset + 1;
-
-                // reset state
-                cp_val = 0;
-                state = UTF8_ACCEPT;
-            }
-
-            _ => { /* intermediate state */ }
-        }
-
-        offset += 1;
+        let (cp, _, size) = utf8::get_codepoint(data, off);
+        vec.push(filter_codepoint(cp, off));
+        off += size as u64;
         if vec.len() == max_cpi {
             break;
         }
     }
 
-    (vec, offset)
+    (vec, off)
 }
 
 fn decode_slice_to_screen(data: &[u8], base_offset: u64, mut screen: &mut Screen) -> u64 {
@@ -214,11 +193,23 @@ fn decode_slice_to_screen(data: &[u8], base_offset: u64, mut screen: &mut Screen
     let max_cpi = screen.width * screen.height;
     let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_cpi);
 
+    let mut prev_cp = ' ';
     for cpi in &vec {
-        let (ok, _) = screen.push(cpi.clone());
+
+        let (ok, _) = match (prev_cp, cpi.cp) {
+            ('\r', '\n') => {
+                prev_cp = ' ';
+                (true, 0 as usize)
+            }
+            _ => {
+                prev_cp = cpi.cp;
+                screen.push(cpi.clone())
+            }
+        };
         if ok == false {
             break;
         }
+
     }
 
     last_offset
@@ -262,6 +253,9 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
             ui_state.last_offset = view.end_offset;
 
+            // render marks
+
+
             // brute force for now
             for m in &view.moving_marks {
 
@@ -284,6 +278,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
                     }
                 }
             }
+
         }
         None => {}
     }
@@ -591,7 +586,7 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
 }
 
 
-fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent) {
+fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEvent) {
 
     ui_state.keys.push(ev.clone());
 
@@ -633,6 +628,28 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent)
             clear_keys = false;
         }
 
+        // ctrl+a
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('a'),
+        } => {
+
+            view.move_marks_to_beginning_of_line();
+        }
+
+        // ctrl+e
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('e'),
+        } => {
+
+            view.move_marks_to_end_of_line();
+        }
+
         // ctrl+?
         InputEvent::KeyPress {
             ctrl: true,
@@ -648,16 +665,10 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent)
             shift: false,
             key: Key::Left,
         } => {
-            for m in &mut view.moving_marks {
 
-                // TODO: mark_move_backward(&mut m, &view);
+            view.move_marks_backward();
 
-                if m.offset > 0 {
-                    m.offset -= 1;
-                }
-            }
             ui_state.status = format!("<left>");
-
         }
 
         // right
@@ -667,18 +678,8 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: InputEvent)
             shift: false,
             key: Key::Right,
         } => {
-            let doc = view.document.as_mut().unwrap().borrow_mut();
-            let buffer_size = doc.buffer.size as u64;
 
-            for m in &mut view.moving_marks {
-
-                // TODO: mark_move_forward(&mut m, &view);
-
-                m.offset += 1;
-                if m.offset > buffer_size {
-                    m.offset = buffer_size
-                }
-            }
+            view.move_marks_forward();
 
             ui_state.status = format!("<right>");
         }
