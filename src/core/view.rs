@@ -154,4 +154,42 @@ impl View {
             m.offset = prev_offset;
         }
     }
+
+
+    pub fn insert_codepoint(&mut self, codepoint: char) {
+
+        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
+
+        let data_size = utf8::encode(codepoint as u32, &mut data);
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            doc.buffer.write(m.offset, data_size, data);
+            m.offset += data_size as u64;
+        }
+    }
+
+    pub fn remove_codepoint(&mut self) {
+
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+            doc.buffer.remove(m.offset, size, None);
+        }
+    }
+
+    pub fn remove_previous_codepoint(&mut self) {
+
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+            if m.offset == 0 {
+                continue;
+            }
+
+            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+            let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+
+            doc.buffer.remove(m.offset, size, None);
+        }
+    }
 }
