@@ -84,7 +84,9 @@ pub fn main_loop(mut editor: &mut Editor) {
         let status_line_y = height;
 
         if ui_state.display_view == true {
-            draw_view(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), &mut stdout);
+            draw_view(&mut ui_state,
+                      &mut view.as_mut().unwrap().borrow_mut(),
+                      &mut stdout);
         }
 
         if ui_state.display_status == true {
@@ -125,7 +127,9 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
     }
 
     for view in views {
-        &editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
+        &editor
+             .view_map
+             .insert(view.id, Rc::new(RefCell::new(view)));
     }
 }
 
@@ -260,7 +264,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
 
             // brute force for now
-            for m in &view.moving_marks {
+            for m in view.moving_marks.borrow().iter() {
 
                 // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {

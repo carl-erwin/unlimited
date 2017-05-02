@@ -25,9 +25,7 @@ pub struct View {
     pub screen: Box<Screen>,
 
     // TODO: in future version marks will be stored in buffer meta data
-    //pub moving_marks: Rc<RefCell<Vec<Mark>>>,
-    pub moving_marks: Vec<Mark>,
-
+    pub moving_marks: Rc<RefCell<Vec<Mark>>>,
     pub fixed_marks: Rc<RefCell<Vec<Mark>>>,
 }
 
@@ -43,8 +41,7 @@ impl View {
         let screen = Box::new(Screen::new(width, height));
 
         // TODO: in future version will be stored in buffer meta data
-        // let moving_marks = Rc::new(RefCell::new(vec![Mark { offset: 0 }]));
-        let moving_marks = vec![Mark { offset: 0 }];
+        let moving_marks = Rc::new(RefCell::new(vec![Mark { offset: 0 }]));
 
         View {
             id,
@@ -61,7 +58,7 @@ impl View {
     pub fn move_marks_backward(&mut self) {
         let doc = self.document.as_mut().unwrap().borrow_mut();
 
-        for m in &mut self.moving_marks {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
         }
     }
@@ -70,14 +67,14 @@ impl View {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
 
-        for m in &mut self.moving_marks {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
         }
     }
 
     pub fn move_marks_to_beginning_of_line(&mut self) {
 
-        for m in &mut self.moving_marks {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
 
             if m.offset == 0 {
                 continue;
@@ -125,7 +122,7 @@ impl View {
         let doc = self.document.as_mut().unwrap().borrow_mut();
         let max_offset = doc.buffer.data.len() as u64;
 
-        for m in &mut self.moving_marks {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
 
             let mut prev_offset = m.offset;
 
