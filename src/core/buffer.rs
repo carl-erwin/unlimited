@@ -119,7 +119,7 @@ impl Buffer {
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
-    pub fn write(&mut self, offset: u64, nr_bytes: usize, data: &Vec<u8>) -> usize {
+    pub fn write(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
 
         let index = offset as usize;
         for n in 0..nr_bytes {
