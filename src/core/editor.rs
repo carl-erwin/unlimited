@@ -39,22 +39,20 @@ pub type Id = u64;
         (vid, bid)
 
 */
-pub struct Editor<'a> {
+pub struct Editor {
     pub config: Config,
     pub document_map: HashMap<document::Id, Rc<RefCell<Document>>>,
-    pub view_map: HashMap<view::Id, Box<View>>,
-    pub view: Option<&'a View>,
+    pub view_map: HashMap<view::Id, Rc<RefCell<View>>>,
 }
 
 
-impl<'a> Editor<'a> {
+impl Editor {
     ///
-    pub fn new(config: Config) -> Editor<'a> {
+    pub fn new(config: Config) -> Editor {
         Editor {
             config: config,
             document_map: HashMap::new(),
             view_map: HashMap::new(),
-            view: None,
         }
     }
 

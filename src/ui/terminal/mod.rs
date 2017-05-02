@@ -1,3 +1,6 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 //
 extern crate termion;
 
@@ -81,12 +84,12 @@ pub fn main_loop(mut editor: &mut Editor) {
         let status_line_y = height;
 
         if ui_state.display_view == true {
-            draw_view(&mut ui_state, &mut view.as_mut().unwrap(), &mut stdout);
+            draw_view(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), &mut stdout);
         }
 
         if ui_state.display_status == true {
             display_status_line(&ui_state,
-                                &mut view.as_mut().unwrap(),
+                                &mut view.as_mut().unwrap().borrow_mut(),
                                 status_line_y,
                                 width,
                                 &mut stdout);
@@ -94,7 +97,7 @@ pub fn main_loop(mut editor: &mut Editor) {
 
         let evt = get_input_event(&mut ui_state);
 
-        process_input_events(&mut ui_state, &mut view.as_mut().unwrap(), evt);
+        process_input_events(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), evt);
     }
 
     // quit
@@ -122,7 +125,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
     }
 
     for view in views {
-        &editor.view_map.insert(view.id, Box::new(view));
+        &editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
     }
 }
 
