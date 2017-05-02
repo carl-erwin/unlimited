@@ -691,6 +691,43 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             ui_state.status = format!("<right>");
         }
 
+        // delete
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Delete,
+        } => {
+
+            view.remove_codepoint();
+            ui_state.status = format!("<del>");
+        }
+
+        // backspace
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::BackSpace,
+        } => {
+
+            view.remove_previous_codepoint();
+
+            ui_state.status = format!("<backspace>");
+        }
+
+        // insert text
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE(cp),
+        } => {
+
+            view.insert_codepoint(cp);
+            ui_state.status = format!("<insert [0x{:x}]>", cp as u32);
+        }
+
         _ => {}
     }
 
