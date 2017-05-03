@@ -26,6 +26,7 @@ impl Mark {
                         get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64) {
 
         self.offset = get_next_codepoint_start(&buffer.data, self.offset);
+        // TODO: if '\r\n' must move + 1
     }
 
     pub fn move_backward(&mut self,

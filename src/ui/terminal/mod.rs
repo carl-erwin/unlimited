@@ -25,11 +25,7 @@ use core::event::Key;
 
 use core::editor::Editor;
 
-
 use core::codec::text::utf8;
-use core::codec::text::utf8::{UTF8_ACCEPT, UTF8_REJECT};
-
-use core::codec::text::u32_to_char;
 
 
 //
@@ -173,13 +169,9 @@ fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
 
 fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<CodepointInfo>, u64) {
 
-    let mut state: u32 = 0;
-    let mut cp_val: u32 = 0;
-    let mut cp_start_offset = base_offset;
-
     let mut vec = Vec::with_capacity(max_cpi);
 
-    let mut off: u64 = 0;
+    let mut off: u64 = base_offset;
     let last_off = data.len() as u64;
 
     while off != last_off {
@@ -204,10 +196,13 @@ fn decode_slice_to_screen(data: &[u8], base_offset: u64, mut screen: &mut Screen
     for cpi in &vec {
 
         let (ok, _) = match (prev_cp, cpi.cp) {
-            ('\r', '\n') => {
-                prev_cp = ' ';
-                (true, 0 as usize)
-            }
+            // TODO: handle \r\n
+            /*
+                ('\r', '\n') => {
+                    prev_cp = ' ';
+                    (true, 0 as usize)
+                }
+            */
             _ => {
                 prev_cp = cpi.cp;
                 screen.push(cpi.clone())

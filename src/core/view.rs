@@ -82,10 +82,9 @@ impl View {
 
             let doc = self.document.as_mut().unwrap().borrow_mut();
 
-            let start_offset = m.offset;
             let mut prev_offset = m.offset;
             loop {
-                let (cp, offset, size) = utf8::get_prev_codepoint(&doc.buffer.data, prev_offset);
+                let (cp, offset, _) = utf8::get_prev_codepoint(&doc.buffer.data, prev_offset);
                 if offset == 0 {
                     m.offset = 0;
                     break;
@@ -127,19 +126,14 @@ impl View {
             let mut prev_offset = m.offset;
 
             loop {
-                let (cp, mut offset, size) = utf8::get_codepoint(&doc.buffer.data, prev_offset);
+                let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, prev_offset);
                 if prev_offset == max_offset {
                     break;
                 }
                 match cp {
 
                     '\r' => {
-                        match utf8::get_codepoint(&doc.buffer.data, offset) {
-                            ('\n', _, _) => {
-                                offset += 1;
-                            }
-                            _ => {}
-                        }
+                        // TODO: handle \r\n
                         break;
                     }
 
@@ -172,7 +166,7 @@ impl View {
 
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
             doc.buffer.remove(m.offset, size, None);
         }
     }
@@ -187,8 +181,7 @@ impl View {
             }
 
             m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
-            let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-
+            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
             doc.buffer.remove(m.offset, size, None);
         }
     }
