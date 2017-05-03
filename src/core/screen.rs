@@ -124,11 +124,7 @@ impl Line {
 
     pub fn clear(&mut self) {
         for w in 0..self.width {
-            // TODO: self.chars[w].clear()
-            self.chars[w].cp = ' ';
-            self.chars[w].displayed_cp = ' ';
-            self.chars[w].offset = 0;
-            self.chars[w].is_selected = false;
+            self.chars[w] = CodepointInfo::new();
         }
         self.used = 0;
     }
