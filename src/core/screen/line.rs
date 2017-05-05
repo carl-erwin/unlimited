@@ -59,4 +59,20 @@ impl Line {
             None
         }
     }
+
+    pub fn get_used_cpi(&self, index: usize) -> Option<&CodepointInfo> {
+        if index < self.used {
+            Some(&self.chars[index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut_used_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
+        if index < self.used {
+            Some(&mut self.chars[index])
+        } else {
+            None
+        }
+    }
 }

@@ -100,18 +100,49 @@ impl Screen {
         }
     }
 
-
-    pub fn get_cpinfo(&self, x: usize, y:usize) -> Option<&CodepointInfo> {
-        None
+    pub fn get_mut_used_line(&mut self, index: usize) -> Option<&mut Line> {
+        if index < self.used {
+            Some(&mut self.line[index])
+        } else {
+            None
+        }
     }
 
-    pub fn get_mut_cpinfo(&self, x: usize, y:usize) -> Option<&mut CodepointInfo> {
-        None
+    pub fn get_used_line(&self, index: usize) -> Option<&Line> {
+        if index < self.used {
+            Some(&self.line[index])
+        } else {
+            None
+        }
     }
 
+    pub fn get_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
+        match self.get_line(y) {
+            None => None,
+            Some(l) => l.get_cpi(x),
+        }
+    }
 
+    pub fn get_mut_cpinfo(&mut self, x: usize, y: usize) -> Option<&mut CodepointInfo> {
+        match self.get_mut_line(y) {
+            None => None,
+            Some(l) => l.get_mut_cpi(x),
+        }
+    }
 
+    pub fn get_used_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
+        match self.get_used_line(y) {
+            None => None,
+            Some(l) => l.get_used_cpi(x),
+        }
+    }
 
+    pub fn get_mut_used_cpinfo(&mut self, x: usize, y: usize) -> Option<&mut CodepointInfo> {
+        match self.get_mut_used_line(y) {
+            None => None,
+            Some(l) => l.get_mut_used_cpi(x),
+        }
+    }
 }
 
 
