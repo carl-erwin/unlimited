@@ -149,6 +149,65 @@ impl View {
         }
     }
 
+    pub fn move_marks_to_previous_line(&mut self) {
+
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            // if view.is_mark_on_screen(m) {
+            // yes get coordinates
+            let (_, x, y) = self.screen.find_used_cpi_by_offset(m.offset);
+            if y > 0 {
+                let new_y = y - 1;
+                let l = self.screen.get_line(new_y).unwrap();
+                let new_x = ::std::cmp::min(x, l.used - 1);
+                let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                m.offset = cpi.offset;
+            } else {
+
+            }
+
+            // } else {
+            //    build_screen_by_offset(m.offset) and call the code above / in util function
+            //
+            // }
+
+        }
+    }
+
+    pub fn move_marks_to_next_line(&mut self) {
+
+        let doc = self.document.as_mut().unwrap().borrow_mut();
+        let max_offset = doc.buffer.data.len() as u64;
+
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+            if m.offset == max_offset {
+                continue;
+            }
+
+            // if view.is_mark_on_screen(m) {
+            // yes get coordinates
+            let (_, x, y) = self.screen.find_used_cpi_by_offset(m.offset);
+            if y < self.screen.height {
+                let new_y = y + 1;
+                let l = self.screen.get_line(new_y).unwrap();
+                let new_x = ::std::cmp::min(x, l.used - 1);
+                let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                m.offset = cpi.offset;
+            } else {
+
+            }
+
+            // } else {
+            //    build_screen_by_offset(m.offset) and call the code above / in util function
+            //
+            // }
+
+        }
+    }
+
+
+
+
 
     pub fn insert_codepoint(&mut self, codepoint: char) {
 

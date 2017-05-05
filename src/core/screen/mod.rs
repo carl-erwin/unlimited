@@ -182,6 +182,20 @@ impl Screen {
             }
         }
     }
+
+    pub fn find_used_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
+        // TODO: use dichotomic search
+        for y in 0..self.used {
+            let l = self.get_used_line(y).unwrap();
+            for x in 0..l.used {
+                let cpi = l.get_used_cpi(x).unwrap();
+                if cpi.offset == offset {
+                    return (Some(cpi), x, y);
+                }
+            }
+        }
+        (None, 0, 0)
+    }
 }
 
 

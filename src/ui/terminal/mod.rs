@@ -229,7 +229,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
             screen.clear();
 
             // render first screen line
-            {
+            if 0 == 1 {
                 let s = " unlimitED! v0.0.1\n\n";
                 screen_putstr(&mut screen, &s);
                 let mut line = screen.get_mut_line(0).unwrap();
@@ -673,6 +673,32 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             ui_state.status = format!("<left>");
         }
 
+        // up
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Up,
+        } => {
+
+            view.move_marks_to_previous_line();
+
+            ui_state.status = format!("<up>");
+        }
+
+        // down
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Down,
+        } => {
+
+            view.move_marks_to_next_line();
+
+            ui_state.status = format!("<down>");
+        }
+
         // right
         InputEvent::KeyPress {
             ctrl: false,
@@ -751,14 +777,18 @@ fn display_status_line(ui_state: &UiState,
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
+    let (_, x, y) = view.screen.find_used_cpi_by_offset(ui_state.mark_offset);
+
     let status_str = format!("line {} document_name '{}' \
                              , file('{}'), event('{}') \
-                             last_offset({}) mark({}) keys({})",
+                             last_offset({}) mark(({},{})@{}) keys({})",
                              line,
                              name,
                              file_name,
                              ui_state.status,
                              ui_state.last_offset,
+                             x,
+                             y,
                              ui_state.mark_offset,
                              ui_state.keys.len());
 
