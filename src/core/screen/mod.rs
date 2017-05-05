@@ -1,11 +1,24 @@
+pub mod line;
+
 use core::codepointinfo::CodepointInfo;
 
+use self::line::Line;
+
+
+
+#[derive(Debug, Clone)]
+struct Dimension {
+    l: usize,
+    c: usize,
+    w: usize,
+    h: usize,
+}
 
 // the screen is composed of lines
 #[derive(Debug, Clone)]
 pub struct Screen {
     pub line: Vec<Line>,
-    pub used: usize,
+    pub used: usize, // number of used line
     pub width: usize,
     pub height: usize,
 }
@@ -86,64 +99,19 @@ impl Screen {
             None
         }
     }
-}
 
-// a line is composed of codepoints
-#[derive(Debug, Clone)]
-pub struct Line {
-    pub chars: Vec<CodepointInfo>,
-    pub used: usize,
-    pub width: usize,
-}
 
-impl Line {
-    fn new(columns: usize) -> Line {
-
-        let mut chars = Vec::with_capacity(columns);
-        for _ in 0..columns {
-            chars.push(CodepointInfo::new());
-        }
-
-        Line {
-            chars,
-            used: 0,
-            width: columns,
-        }
+    pub fn get_cpinfo(&self, x: usize, y:usize) -> Option<&CodepointInfo> {
+        None
     }
 
-    fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
-
-        if self.used < self.width {
-            self.chars[self.used] = cpi;
-            self.used += 1;
-            (true, self.used)
-        } else {
-            (false, self.used)
-        }
+    pub fn get_mut_cpinfo(&self, x: usize, y:usize) -> Option<&mut CodepointInfo> {
+        None
     }
 
-    pub fn clear(&mut self) {
-        for w in 0..self.width {
-            self.chars[w] = CodepointInfo::new();
-        }
-        self.used = 0;
-    }
 
-    pub fn get_cpi(&self, index: usize) -> Option<&CodepointInfo> {
-        if index < self.width {
-            Some(&self.chars[index])
-        } else {
-            None
-        }
-    }
 
-    pub fn get_mut_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
-        if index < self.width {
-            Some(&mut self.chars[index])
-        } else {
-            None
-        }
-    }
+
 }
 
 
