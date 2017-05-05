@@ -143,6 +143,45 @@ impl Screen {
             Some(l) => l.get_mut_used_cpi(x),
         }
     }
+
+
+    pub fn get_mut_first_cpinfo(&mut self) -> (Option<&mut CodepointInfo>, usize, usize) {
+        match self.get_mut_used_line(0) {
+            None => (None, 0, 0),
+            Some(l) => (l.get_mut_used_cpi(0), 0, 0),
+        }
+    }
+
+
+    pub fn get_mut_last_cpinfo(&mut self) -> (Option<&mut CodepointInfo>, usize, usize) {
+        let y = self.used;
+        match self.get_mut_used_line(y) {
+            None => (None, 0, 0),
+            Some(l) => {
+                let x = l.used;
+                (l.get_mut_used_cpi(0), x, y)
+            }
+        }
+    }
+
+    pub fn get_first_cpinfo(&self) -> (Option<&CodepointInfo>, usize, usize) {
+        match self.get_used_line(0) {
+            None => (None, 0, 0),
+            Some(l) => (l.get_used_cpi(0), 0, 0),
+        }
+    }
+
+
+    pub fn get_last_cpinfo(&self) -> (Option<&CodepointInfo>, usize, usize) {
+        let y = self.used;
+        match self.get_used_line(y) {
+            None => (None, 0, 0),
+            Some(l) => {
+                let x = l.used;
+                (l.get_used_cpi(0), x, y)
+            }
+        }
+    }
 }
 
 
