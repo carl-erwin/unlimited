@@ -9,10 +9,13 @@ pub struct Line {
     pub chars: Vec<CodepointInfo>,
     pub used: usize,
     pub width: usize,
+    pub read_only: bool,
 }
 
 impl Line {
     pub fn new(columns: usize) -> Line {
+
+        assert_eq!(columns > 0, true);
 
         let mut chars = Vec::with_capacity(columns);
         for _ in 0..columns {
@@ -23,16 +26,18 @@ impl Line {
             chars,
             used: 0,
             width: columns,
+            read_only: false,
         }
     }
 
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
 
-        if self.used < self.width {
+        if self.used < self.width && self.read_only == false {
             self.chars[self.used] = cpi;
             self.used += 1;
             (true, self.used)
         } else {
+            self.read_only = true;
             (false, self.used)
         }
     }
@@ -42,6 +47,7 @@ impl Line {
             self.chars[w] = CodepointInfo::new();
         }
         self.used = 0;
+        self.read_only = false;
     }
 
     pub fn get_cpi(&self, index: usize) -> Option<&CodepointInfo> {

@@ -154,7 +154,7 @@ impl View {
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             // if view.is_mark_on_screen(m) {
             // yes get coordinates
-            let (_, x, y) = self.screen.find_used_cpi_by_offset(m.offset);
+            let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
             if y > 0 {
                 let new_y = y - 1;
                 let l = self.screen.get_line(new_y).unwrap();
@@ -184,23 +184,25 @@ impl View {
                 continue;
             }
 
-            // if view.is_mark_on_screen(m) {
-            // yes get coordinates
-            let (_, x, y) = self.screen.find_used_cpi_by_offset(m.offset);
-            if y < self.screen.height {
-                let new_y = y + 1;
-                let l = self.screen.get_line(new_y).unwrap();
-                let new_x = ::std::cmp::min(x, l.used - 1);
-                let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                m.offset = cpi.offset;
+            if self.screen.contains_offset(m.offset) {
+                // yes get coordinates
+                let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
+                if y < self.screen.height - 1 {
+                    let new_y = y + 1;
+                    let l = self.screen.get_line(new_y).unwrap();
+                    if l.used > 0 {
+                        let new_x = ::std::cmp::min(x, l.used - 1);
+                        let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                        m.offset = cpi.offset;
+                    }
+                } else {
+
+                }
+
             } else {
+                //    build_screen_by_offset(m.offset) and call the code above / in util function
 
             }
-
-            // } else {
-            //    build_screen_by_offset(m.offset) and call the code above / in util function
-            //
-            // }
 
         }
     }

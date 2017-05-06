@@ -60,15 +60,6 @@ impl Screen {
             return (false, self.used);
         }
 
-        if self.line[self.used].read_only {
-            self.used += 1;
-        }
-
-        if self.used == self.height {
-            return (false, self.used);
-        }
-
-
         let cp = cpi.cp;
         let line = &mut self.line[self.used];
         let (ok, _) = line.push(cpi);
@@ -76,6 +67,7 @@ impl Screen {
         if ok == true {
             if cp == '\n' || cp == '\r' {
                 line.read_only = true;
+                self.used += 1;
             }
         }
         (ok, self.used)
@@ -187,28 +179,18 @@ impl Screen {
         }
     }
 
-    pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
+    pub fn find_used_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
-        for y in 0..self.height {
-            let l = self.get_line(y).unwrap();
-            for x in 0..l.width {
-                let cpi = l.get_cpi(x).unwrap();
+        for y in 0..self.used {
+            let l = self.get_used_line(y).unwrap();
+            for x in 0..l.used {
+                let cpi = l.get_used_cpi(x).unwrap();
                 if cpi.offset == offset {
                     return (Some(cpi), x, y);
                 }
             }
         }
         (None, 0, 0)
-    }
-
-
-    pub fn contains_offset(&self, offset: u64) -> bool {
-        //TODO: cache first/las_ offset as self.members
-        let (cpi, _, _) = self.find_cpi_by_offset(offset);
-        match cpi {
-            Some(_) => true,
-            _ => false,
-        }
     }
 }
 

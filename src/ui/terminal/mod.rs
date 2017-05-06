@@ -66,8 +66,8 @@ pub fn main_loop(mut editor: &mut Editor) {
     setup_views(editor, width as usize, height as usize);
 
     //
-    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
-    let mut stdout = AlternateScreen::from(stdout);
+    let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    // let mut stdout = AlternateScreen::from(stdout);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
@@ -167,7 +167,11 @@ fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
 }
 
 
-fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<CodepointInfo>, u64) {
+fn decode_slice_to_vec(data: &[u8],
+                       base_offset: u64,
+                       max_offset: u64,
+                       max_cpi: usize)
+                       -> (Vec<CodepointInfo>, u64) {
 
     let mut vec = Vec::with_capacity(max_cpi);
 
@@ -184,13 +188,28 @@ fn decode_slice_to_vec(data: &[u8], base_offset: u64, max_cpi: usize) -> (Vec<Co
         }
     }
 
+    // eof handling
+    if last_off == max_offset {
+        vec.push(CodepointInfo {
+                     cp: ' ',
+                     displayed_cp: '$',
+                     offset: last_off,
+                     is_selected: !false,
+                 });
+    }
+
+
     (vec, off)
 }
 
-fn decode_slice_to_screen(data: &[u8], base_offset: u64, mut screen: &mut Screen) -> u64 {
+fn decode_slice_to_screen(data: &[u8],
+                          base_offset: u64,
+                          max_offset: u64,
+                          mut screen: &mut Screen)
+                          -> u64 {
 
     let max_cpi = screen.width * screen.height;
-    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_cpi);
+    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
 
     let mut prev_cp = ' ';
     for cpi in &vec {
@@ -241,17 +260,10 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
             let data = &buf.borrow().buffer.data;
             let len = data.len();
+            let max_offset = buf.borrow().buffer.size as u64;
 
-            view.end_offset = decode_slice_to_screen(&data[0..len], view.start_offset, &mut screen);
-
-            if view.end_offset == buf.borrow().buffer.size as u64 {
-                screen.push(CodepointInfo {
-                                cp: ' ',
-                                displayed_cp: ' ',
-                                offset: view.end_offset,
-                                is_selected: false,
-                            });
-            }
+            view.end_offset =
+                decode_slice_to_screen(&data[0..len], view.start_offset, max_offset, &mut screen);
 
             ui_state.last_offset = view.end_offset;
 
@@ -777,7 +789,7 @@ fn display_status_line(ui_state: &UiState,
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let (_, x, y) = view.screen.find_used_cpi_by_offset(ui_state.mark_offset);
+    let (_, x, y) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
 
     let status_str = format!("line {} document_name '{}' \
                              , file('{}'), event('{}') \
