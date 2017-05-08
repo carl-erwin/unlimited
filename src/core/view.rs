@@ -165,7 +165,7 @@ impl View {
         let doc = self.document.as_mut().unwrap().borrow_mut();
         let max_offset = doc.buffer.data.len() as u64;
 
-        let mut screen = self.screen.clone(); // TODO: use cache
+        let screen = self.screen.clone(); // TODO: use cache
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
 
@@ -226,26 +226,43 @@ impl View {
         // build tmp screens until first offset of the original screen if found
         // build_screen from this offset
         // the window MUST cover to screen => height * 2
-        if let Some(screen) = self.build_screen_by_offset(m.offset, width, height * 2) {
-
-            // offset is on this virtual screen ?
-            match screen.find_cpi_by_offset(offset_to_find) {
-                (Some(cpi), x, y) => {
-                    assert_eq!(x, 0);
-                    let new_start_y = if y > height { y - height + 1 } else { 0 };
-
-                    if let Some(l) = screen.get_line(new_start_y) {
-                        if let Some(cpi) = l.get_first_cpi() {
-                            m.offset = cpi.offset;
-                            let doc = self.document.as_mut().unwrap().borrow_mut();
-                            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
-                            self.start_offset = m.offset;
-                        }
-                    }
-                }
-                _ => {}
+        // TODO: always in last index ?
+        let lines = self.get_lines_offsets(m.offset, offset_to_find, width, height);
+        let index = {
+            if lines.len() > 0 {
+                lines.len() - 1
+            } else {
+                panic!("");
             }
+        };
 
+        let index = if index >= height {
+            index - height + 1
+        } else {
+            0
+        };
+
+        self.start_offset = lines[index].0;
+
+        // TEST
+        if 0 == 1 {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            let data = &doc.buffer.data;
+            let len = data.len();
+            let max_offset = len as u64;
+
+            let mut screen = Screen::new(width, height);
+            let _ = decode_slice_to_screen(&data[0 as usize..len],
+                                           self.start_offset,
+                                           max_offset,
+                                           &mut screen);
+            match screen.find_cpi_by_offset(offset_to_find) {
+                (Some(_), x, y) => {
+                    assert_eq!(x, 0);
+                    assert_eq!(y, screen.current_line_index - 1);
+                }
+                _ => panic!("implementation error"),
+            }
         }
     }
 
@@ -263,39 +280,81 @@ impl View {
         // get last used line , if contains eof return
         if let Some(l) = self.screen.get_last_used_line() {
             if let Some(cpi) = l.get_first_cpi() {
-
                 // set first offset of last used line as next screen start
                 self.start_offset = cpi.offset;
-                // let off = cpi.offset;
-
-                /*
-                    // build_screen from this offset
-                    if let Some(screen) =
-                    self.build_screen_by_offset(offset, self.screen.width, self.screen.height * 2){
-                        self.start_offset = screen.get_last_used_line
-                    }
-                */
             }
         }
-
-        // test
-        let w = self.screen.width;
-        let h = self.screen.height;
-        let offset = self.start_offset;
-        if let Some(screen) = self.build_screen_by_offset(offset, w, h) {
-            match screen.find_cpi_by_offset(self.start_offset) {
-                (Some(_), x, y) => {
-                    assert_eq!(x, 0);
-                }
-                _ => {
-                    panic!("cannot find offset");
-                }
-            }
-        }
-
     }
 
-    // TODO: move to view::
+
+    fn get_lines_offsets(&mut self,
+                         start_offset: u64,
+                         end_offset: u64,
+                         screen_width: usize,
+                         screen_height: usize)
+                         -> Vec<(u64, u64)> {
+
+        let mut v = Vec::new();
+
+        let mut m = Mark::new(start_offset);
+
+        let doc = self.document.as_mut().unwrap().borrow_mut();
+
+        // get beginning of the line @offset
+        m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+
+        // and build tmp screens until end_offset if found
+        let mut screen = Screen::new(screen_width, screen_height);
+
+        // fill screen
+        let data = &doc.buffer.data;
+        let len = data.len();
+        let max_offset = len as u64;
+        loop {
+            let _ =
+                decode_slice_to_screen(&data[0 as usize..len], m.offset, max_offset, &mut screen);
+
+            // push lines offsets
+            for i in 0..screen.current_line_index {
+
+                if v.len() != 0 && i == 0 {
+                    // do not push line range twice
+                    continue;
+                }
+
+                let s = screen.line[i].get_first_cpi().unwrap().offset;
+                let e = screen.line[i].get_last_cpi().unwrap().offset;
+
+                v.push((s, e));
+
+                if s >= end_offset && e >= end_offset {
+                    return v;
+                }
+            }
+
+            // check to activate only in debug builds
+            /*
+            match screen.find_cpi_by_offset(m.offset) {
+                (Some(cpi), x, y) => {
+                    assert_eq!(x, 0);
+                    assert_eq!(y, 0);
+                    assert_eq!(cpi.offset, m.offset);
+                }
+                _ => panic!("implementation error"),
+            }
+            */
+
+            if let Some(l) = screen.get_last_used_line() {
+                if let Some(cpi) = l.get_first_cpi() {
+                    m.offset = cpi.offset; // update next screen start
+                }
+            }
+
+            screen.clear(); // prepare next screen
+        }
+    }
+
+
     pub fn build_screen_by_offset(&mut self,
                                   offset: u64,
                                   screen_width: usize,

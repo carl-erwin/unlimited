@@ -8,13 +8,8 @@ pub mod buffer;
 pub mod event;
 pub mod view;
 pub mod mark;
-
 pub mod codec;
-
 pub mod server;
-
-
-use std::io::{stderr, Stderr, Write};
 
 
 

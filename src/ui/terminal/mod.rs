@@ -12,7 +12,7 @@ use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
 
 //
-use core::view::{View, decode_slice_to_screen, filter_codepoint, screen_putstr, screen_putchar};
+use core::view::{View, decode_slice_to_screen, screen_putstr};
 use core::screen::Screen;
 use core::event::InputEvent;
 use core::event::Key;
@@ -58,8 +58,8 @@ pub fn main_loop(mut editor: &mut Editor) {
     setup_views(editor, width as usize, height as usize);
 
     //
-    let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
-    // let mut stdout = AlternateScreen::from(stdout);
+    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let mut stdout = AlternateScreen::from(stdout);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
