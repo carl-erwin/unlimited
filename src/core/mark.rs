@@ -40,6 +40,81 @@ impl Mark {
         // TODO: if '\r\n' must move - 1
         self.offset = get_previous_codepoint_start(&buffer.data, self.offset);
     }
+
+    pub fn move_to_beginning_of_line(&mut self,
+                                     buffer: &Buffer,
+                                     get_prev_codepoint: fn(data: &[u8], from_offset: u64)
+                                                            -> (char, u64, usize)) {
+
+        if self.offset == 0 {
+            return;
+        }
+
+        let mut prev_offset = self.offset;
+        loop {
+            let (cp, offset, _) = get_prev_codepoint(&buffer.data, prev_offset);
+            if offset == 0 {
+                self.offset = 0;
+                break;
+            }
+
+            match cp {
+                '\n' => {
+                    self.offset = offset + 1;
+
+                    if prev_offset > 0 {
+                        match get_prev_codepoint(&buffer.data, prev_offset) {
+                            ('\r', offset, _) => {
+                                self.offset = offset;
+                            }
+                            _ => {}
+                        }
+                    }
+                    break;
+                }
+
+                '\r' => {
+                    self.offset = offset + 1;
+                    break;
+                }
+
+                _ => prev_offset = offset,
+            }
+        }
+    }
+
+
+    pub fn move_to_end_of_line(&mut self,
+                               buffer: &Buffer,
+                               get_codepoint: fn(data: &[u8], from_offset: u64)
+                                                 -> (char, u64, usize)) {
+
+        let max_offset = buffer.data.len() as u64;
+
+        let mut prev_offset = self.offset;
+
+        loop {
+            let (cp, offset, size) = get_codepoint(&buffer.data, prev_offset);
+            if prev_offset == max_offset {
+                break;
+            }
+            match cp {
+
+                '\r' => {
+                    // TODO: handle \r\n
+                    break;
+                }
+
+                '\n' => {
+                    break;
+                }
+
+                _ => {}
+            }
+            prev_offset = offset + size as u64;
+        }
+        self.offset = prev_offset;
+    }
 }
 
 

@@ -66,7 +66,6 @@ impl View {
     pub fn move_marks_forward(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
-
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
         }
@@ -74,80 +73,21 @@ impl View {
 
     pub fn move_marks_to_beginning_of_line(&mut self) {
 
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
-            if m.offset == 0 {
-                continue;
-            }
-
-            let doc = self.document.as_mut().unwrap().borrow_mut();
-
-            let mut prev_offset = m.offset;
-            loop {
-                let (cp, offset, _) = utf8::get_prev_codepoint(&doc.buffer.data, prev_offset);
-                if offset == 0 {
-                    m.offset = 0;
-                    break;
-                }
-
-                match cp {
-                    '\n' => {
-                        m.offset = offset + 1;
-
-                        if prev_offset > 0 {
-                            match utf8::get_prev_codepoint(&doc.buffer.data, prev_offset) {
-                                ('\r', offset, _) => {
-                                    m.offset = offset;
-                                }
-                                _ => {}
-                            }
-                        }
-                        break;
-                    }
-
-                    '\r' => {
-                        m.offset = offset + 1;
-                        break;
-                    }
-
-                    _ => prev_offset = offset,
-                }
-            }
+        let doc = self.document.as_mut().unwrap().borrow_mut();
+        for mut m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
         }
     }
+
 
     pub fn move_marks_to_end_of_line(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
-        let max_offset = doc.buffer.data.len() as u64;
-
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
-            let mut prev_offset = m.offset;
-
-            loop {
-                let (cp, offset, size) = utf8::get_codepoint(&doc.buffer.data, prev_offset);
-                if prev_offset == max_offset {
-                    break;
-                }
-                match cp {
-
-                    '\r' => {
-                        // TODO: handle \r\n
-                        break;
-                    }
-
-                    '\n' => {
-                        break;
-                    }
-
-                    _ => {}
-                }
-                prev_offset = offset + size as u64;
-            }
-            m.offset = prev_offset;
+        for mut m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            m.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
         }
     }
+
 
     pub fn move_marks_to_previous_line(&mut self) {
 
