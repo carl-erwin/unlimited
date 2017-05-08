@@ -14,6 +14,10 @@ pub mod codec;
 pub mod server;
 
 
+use std::io::{stderr, Stderr, Write};
+
+
+
 // TODO: move to better module : core::utils ?
 pub struct OffsetRange {
     pub start: u64,

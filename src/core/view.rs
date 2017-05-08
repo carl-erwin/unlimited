@@ -205,6 +205,9 @@ impl View {
         let width = self.screen.width;
         let height = self.screen.height;
 
+        // the offset to find is the first screen codepoint
+        let offset_to_find = self.start_offset;
+
         // go to N previous physical lines ... here N is height
         // rewind width*height chars
         let mut m = Mark::new(self.start_offset);
@@ -220,22 +223,47 @@ impl View {
             m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
         }
 
-        // and build tmp screens until first offset of the original screen if found
+        // build tmp screens until first offset of the original screen if found
         // build_screen from this offset
+        // the window MUST cover to screen => height * 2
         if let Some(screen) = self.build_screen_by_offset(m.offset, width, height * 2) {
-            if let Some(l) = screen.get_first_used_line() {
-                if let Some(cpi) = l.get_first_cpi() {
-                    self.start_offset = cpi.offset;
+
+            // offset is on this virtual screen ?
+            match screen.find_cpi_by_offset(offset_to_find) {
+                (Some(cpi), x, y) => {
+                    assert_eq!(x, 0);
+                    let new_start_y = if y > height { y - height + 1 } else { 0 };
+
+                    if let Some(l) = screen.get_line(new_start_y) {
+                        if let Some(cpi) = l.get_first_cpi() {
+                            m.offset = cpi.offset;
+                            let doc = self.document.as_mut().unwrap().borrow_mut();
+                            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                            self.start_offset = m.offset;
+                        }
+                    }
                 }
+                _ => {}
             }
+
         }
     }
 
     pub fn scroll_to_next_screen(&mut self) {
 
+        let max_offset = {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            doc.buffer.data.len() as u64
+        };
+
+        if self.screen.contains_offset(max_offset) {
+            return;
+        }
+
         // get last used line , if contains eof return
         if let Some(l) = self.screen.get_last_used_line() {
             if let Some(cpi) = l.get_first_cpi() {
+
                 // set first offset of last used line as next screen start
                 self.start_offset = cpi.offset;
                 // let off = cpi.offset;
@@ -249,10 +277,24 @@ impl View {
                 */
             }
         }
+
+        // test
+        let w = self.screen.width;
+        let h = self.screen.height;
+        let offset = self.start_offset;
+        if let Some(screen) = self.build_screen_by_offset(offset, w, h) {
+            match screen.find_cpi_by_offset(self.start_offset) {
+                (Some(_), x, y) => {
+                    assert_eq!(x, 0);
+                    assert_eq!(y, 0);
+                }
+                _ => {
+                    panic!("cannot find offset");
+                }
+            }
+        }
+
     }
-
-
-    pub fn scroll_to_offset(&mut self, offset: u64) {}
 
     // TODO: move to view::
     pub fn build_screen_by_offset(&mut self,
@@ -275,28 +317,41 @@ impl View {
         let data = &doc.buffer.data;
         let len = data.len();
         let max_offset = len as u64;
+        let mut found = false;
 
         loop {
-            let end_offset = decode_slice_to_screen(&data[m.offset as usize..len],
-                                                    m.offset,
-                                                    max_offset,
-                                                    &mut screen);
-            if end_offset == max_offset || screen.contains_offset(offset) {
+            let end_offset =
+                decode_slice_to_screen(&data[0 as usize..len], m.offset, max_offset, &mut screen);
+
+            match screen.find_cpi_by_offset(m.offset) {
+                (Some(cpi), x, y) => {
+                    assert_eq!(x, 0);
+                    assert_eq!(y, 0);
+                    assert_eq!(cpi.offset, m.offset);
+                }
+                _ => panic!("implementation error"),
+            }
+
+            if screen.contains_offset(offset) {
+                return Some(screen);
+            }
+
+            if end_offset == max_offset {
                 return Some(screen);
             }
 
             if let Some(l) = screen.get_last_used_line() {
-
                 if let Some(cpi) = l.get_first_cpi() {
-
                     m.offset = cpi.offset; // update next screen start
-
                 } else {
-                    return Some(screen.clone());
+                    found = true;
                 }
-
             } else {
-                return Some(screen.clone());
+                found = true;
+            }
+
+            if found {
+                return Some(screen);
             }
 
             screen.clear(); // prepare next screen
@@ -307,7 +362,6 @@ impl View {
 
 
 //////////////////////////////////
-
 
 pub fn decode_slice_to_screen(data: &[u8],
                               base_offset: u64,
@@ -376,7 +430,6 @@ fn decode_slice_to_vec(data: &[u8],
                  });
     }
 
-
     (vec, off)
 }
 
@@ -397,3 +450,29 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
         is_selected: false,
     }
 }
+
+
+pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
+
+    let v: Vec<char> = s.chars().collect();
+    for c in &v {
+        let ok = screen_putchar(&mut screen, *c, 0xffffffffffffffff);
+        if ok == false {
+            return false;
+        }
+    }
+
+    true
+}
+
+
+pub fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
+    let (ok, _) = screen.push(filter_codepoint(c, offset));
+    ok
+}
+
+
+
+
+#[test]
+fn test_view() {}
