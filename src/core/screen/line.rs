@@ -65,6 +65,15 @@ impl Line {
         }
     }
 
+    pub fn get_first_cpi(&self) -> Option<&CodepointInfo> {
+        if 0 < self.nb_chars {
+            Some(&self.chars[0])
+        } else {
+            None
+        }
+    }
+
+
     pub fn get_mut_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
         if index < self.width {
             Some(&mut self.chars[index])

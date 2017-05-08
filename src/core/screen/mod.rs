@@ -109,6 +109,24 @@ impl Screen {
         }
     }
 
+    /// there must be 2 line a least
+    pub fn get_first_used_line(&self) -> Option<&Line> {
+        if 0 < self.current_line_index {
+            Some(&self.line[0])
+        } else {
+            None
+        }
+    }
+
+    /// there must be 2 line a least
+    pub fn get_last_used_line(&self) -> Option<&Line> {
+        if self.current_line_index > 0 {
+            Some(&self.line[self.current_line_index - 1])
+        } else {
+            None
+        }
+    }
+
     pub fn get_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
         match self.get_line(y) {
             None => None,

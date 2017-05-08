@@ -7,6 +7,7 @@ use core::document::Document;
 use core::screen::Screen;
 
 use core::mark::Mark;
+use core::codepointinfo::CodepointInfo;
 
 
 use core::codec::text::utf8;
@@ -55,6 +56,49 @@ impl View {
     }
 
 
+
+
+
+
+    pub fn insert_codepoint(&mut self, codepoint: char) {
+
+        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
+
+        let data_size = utf8::encode(codepoint as u32, &mut data);
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            doc.buffer.write(m.offset, data_size, data);
+            m.offset += data_size as u64;
+        }
+    }
+
+
+    pub fn remove_codepoint(&mut self) {
+
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+            doc.buffer.remove(m.offset, size, None);
+        }
+    }
+
+
+    pub fn remove_previous_codepoint(&mut self) {
+
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+            if m.offset == 0 {
+                continue;
+            }
+
+            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+            doc.buffer.remove(m.offset, size, None);
+        }
+    }
+
+
     pub fn move_marks_backward(&mut self) {
         let doc = self.document.as_mut().unwrap().borrow_mut();
 
@@ -63,6 +107,7 @@ impl View {
         }
     }
 
+
     pub fn move_marks_forward(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
@@ -70,6 +115,7 @@ impl View {
             m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
         }
     }
+
 
     pub fn move_marks_to_beginning_of_line(&mut self) {
 
@@ -113,10 +159,13 @@ impl View {
         }
     }
 
+
     pub fn move_marks_to_next_line(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
         let max_offset = doc.buffer.data.len() as u64;
+
+        let mut screen = self.screen.clone(); // TODO: use cache
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
 
@@ -124,15 +173,15 @@ impl View {
                 continue;
             }
 
-            if self.screen.contains_offset(m.offset) {
+            if screen.contains_offset(m.offset) {
                 // yes get coordinates
-                let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
-                if y < self.screen.height - 1 {
+                let (_, x, y) = screen.find_cpi_by_offset(m.offset);
+                if y < screen.height - 1 {
                     let new_y = y + 1;
-                    let l = self.screen.get_line(new_y).unwrap();
+                    let l = screen.get_line(new_y).unwrap();
                     if l.nb_chars > 0 {
                         let new_x = ::std::cmp::min(x, l.nb_chars - 1);
-                        let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                        let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                         m.offset = cpi.offset;
                     }
                 } else {
@@ -147,43 +196,204 @@ impl View {
         }
     }
 
+    pub fn scroll_to_previous_screen(&mut self) {
 
+        if self.start_offset == 0 {
+            return;
+        }
 
+        let width = self.screen.width;
+        let height = self.screen.height;
 
+        // go to N previous physical lines ... here N is height
+        // rewind width*height chars
+        let mut m = Mark::new(self.start_offset);
+        if m.offset > (width * height) as u64 {
+            m.offset -= (width * height) as u64
+        } else {
+            m.offset = 0;
+        }
 
-    pub fn insert_codepoint(&mut self, codepoint: char) {
+        // get start of line
+        {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+        }
 
-        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
-
-        let data_size = utf8::encode(codepoint as u32, &mut data);
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            doc.buffer.write(m.offset, data_size, data);
-            m.offset += data_size as u64;
+        // and build tmp screens until first offset of the original screen if found
+        // build_screen from this offset
+        if let Some(screen) = self.build_screen_by_offset(m.offset, width, height * 2) {
+            if let Some(l) = screen.get_first_used_line() {
+                if let Some(cpi) = l.get_first_cpi() {
+                    self.start_offset = cpi.offset;
+                }
+            }
         }
     }
 
-    pub fn remove_codepoint(&mut self) {
+    pub fn scroll_to_next_screen(&mut self) {
 
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-            doc.buffer.remove(m.offset, size, None);
+        // get last used line , if contains eof return
+        if let Some(l) = self.screen.get_last_used_line() {
+            if let Some(cpi) = l.get_first_cpi() {
+                // set first offset of last used line as next screen start
+                self.start_offset = cpi.offset;
+                // let off = cpi.offset;
+
+                /*
+                    // build_screen from this offset
+                    if let Some(screen) =
+                    self.build_screen_by_offset(offset, self.screen.width, self.screen.height * 2){
+                        self.start_offset = screen.get_last_used_line
+                    }
+                */
+            }
         }
     }
 
-    pub fn remove_previous_codepoint(&mut self) {
 
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+    pub fn scroll_to_offset(&mut self, offset: u64) {}
 
-            if m.offset == 0 {
-                continue;
+    // TODO: move to view::
+    pub fn build_screen_by_offset(&mut self,
+                                  offset: u64,
+                                  screen_width: usize,
+                                  screen_height: usize)
+                                  -> Option<Screen> {
+
+        let mut m = Mark::new(offset);
+
+        let doc = self.document.as_mut().unwrap().borrow_mut();
+
+        // get beginning of the line @offset
+        m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+
+        // and build tmp screens until offset if found
+        let mut screen = Screen::new(screen_width, screen_height);
+
+        // fill screen
+        let data = &doc.buffer.data;
+        let len = data.len();
+        let max_offset = len as u64;
+
+        loop {
+            let end_offset = decode_slice_to_screen(&data[m.offset as usize..len],
+                                                    m.offset,
+                                                    max_offset,
+                                                    &mut screen);
+            if end_offset == max_offset || screen.contains_offset(offset) {
+                return Some(screen);
             }
 
-            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
-            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-            doc.buffer.remove(m.offset, size, None);
+            if let Some(l) = screen.get_last_used_line() {
+
+                if let Some(cpi) = l.get_first_cpi() {
+
+                    m.offset = cpi.offset; // update next screen start
+
+                } else {
+                    return Some(screen.clone());
+                }
+
+            } else {
+                return Some(screen.clone());
+            }
+
+            screen.clear(); // prepare next screen
         }
+    }
+}
+
+
+
+//////////////////////////////////
+
+
+pub fn decode_slice_to_screen(data: &[u8],
+                              base_offset: u64,
+                              max_offset: u64,
+                              mut screen: &mut Screen)
+                              -> u64 {
+
+    let max_cpi = screen.width * screen.height;
+    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
+
+    let mut prev_cp = ' ';
+    for cpi in &vec {
+
+        let (ok, _) = match (prev_cp, cpi.cp) {
+            // TODO: handle \r\n
+            /*
+                ('\r', '\n') => {
+                    prev_cp = ' ';
+                    (true, 0 as usize)
+                }
+            */
+            _ => {
+                prev_cp = cpi.cp;
+                screen.push(cpi.clone())
+            }
+        };
+        if ok == false {
+            break;
+        }
+
+    }
+
+    last_offset
+}
+
+
+
+fn decode_slice_to_vec(data: &[u8],
+                       base_offset: u64,
+                       max_offset: u64,
+                       max_cpi: usize)
+                       -> (Vec<CodepointInfo>, u64) {
+
+    let mut vec = Vec::with_capacity(max_cpi);
+
+    let mut off: u64 = base_offset;
+    let last_off = data.len() as u64;
+
+    while off != last_off {
+
+        let (cp, _, size) = utf8::get_codepoint(data, off);
+        vec.push(filter_codepoint(cp, off));
+        off += size as u64;
+        if vec.len() == max_cpi {
+            break;
+        }
+    }
+
+    // eof handling
+    if last_off == max_offset {
+        vec.push(CodepointInfo {
+                     cp: ' ',
+                     displayed_cp: '$',
+                     offset: last_off,
+                     is_selected: !false,
+                 });
+    }
+
+
+    (vec, off)
+}
+
+
+
+//
+pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
+
+    let displayed_cp = match c {
+        '\r' | '\n' | '\t' => ' ',
+        _ => c,
+    };
+
+    CodepointInfo {
+        cp: c,
+        displayed_cp: displayed_cp,
+        offset: offset,
+        is_selected: false,
     }
 }

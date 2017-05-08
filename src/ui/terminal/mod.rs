@@ -1,31 +1,23 @@
+//
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::io::{self, Write, stdin, Stdout};
 
 //
 extern crate termion;
 
-
-//
 use self::termion::screen::{AlternateScreen, ToMainScreen};
-
 use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
 
-use std::io::{self, Write, stdin, Stdout};
-
 //
-use core::view::View;
+use core::view::{View, decode_slice_to_screen, filter_codepoint};
 use core::screen::Screen;
-use core::codepointinfo::CodepointInfo;
-
 use core::event::InputEvent;
 use core::event::Key;
-
-
 use core::editor::Editor;
 
-use core::codec::text::utf8;
 
 
 //
@@ -47,7 +39,7 @@ impl UiState {
             keys: Vec::new(),
             quit: false,
             status: String::new(),
-            display_status: true,
+            display_status: !true,
             display_view: true,
             vid: 0,
             nb_view: 0,
@@ -146,21 +138,6 @@ fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 }
 
 
-//
-fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
-
-    let displayed_cp = match c {
-        '\r' | '\n' | '\t' => ' ',
-        _ => c,
-    };
-
-    CodepointInfo {
-        cp: c,
-        displayed_cp: displayed_cp,
-        offset: offset,
-        is_selected: false,
-    }
-}
 
 
 fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
@@ -169,74 +146,6 @@ fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
 }
 
 
-fn decode_slice_to_vec(data: &[u8],
-                       base_offset: u64,
-                       max_offset: u64,
-                       max_cpi: usize)
-                       -> (Vec<CodepointInfo>, u64) {
-
-    let mut vec = Vec::with_capacity(max_cpi);
-
-    let mut off: u64 = base_offset;
-    let last_off = data.len() as u64;
-
-    while off != last_off {
-
-        let (cp, _, size) = utf8::get_codepoint(data, off);
-        vec.push(filter_codepoint(cp, off));
-        off += size as u64;
-        if vec.len() == max_cpi {
-            break;
-        }
-    }
-
-    // eof handling
-    if last_off == max_offset {
-        vec.push(CodepointInfo {
-                     cp: ' ',
-                     displayed_cp: '$',
-                     offset: last_off,
-                     is_selected: !false,
-                 });
-    }
-
-
-    (vec, off)
-}
-
-fn decode_slice_to_screen(data: &[u8],
-                          base_offset: u64,
-                          max_offset: u64,
-                          mut screen: &mut Screen)
-                          -> u64 {
-
-    let max_cpi = screen.width * screen.height;
-    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
-
-    let mut prev_cp = ' ';
-    for cpi in &vec {
-
-        let (ok, _) = match (prev_cp, cpi.cp) {
-            // TODO: handle \r\n
-            /*
-                ('\r', '\n') => {
-                    prev_cp = ' ';
-                    (true, 0 as usize)
-                }
-            */
-            _ => {
-                prev_cp = cpi.cp;
-                screen.push(cpi.clone())
-            }
-        };
-        if ok == false {
-            break;
-        }
-
-    }
-
-    last_offset
-}
 
 
 fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
@@ -724,6 +633,30 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             view.move_marks_forward();
 
             ui_state.status = format!("<right>");
+        }
+
+        // page_up
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::PageUp,
+        } => {
+
+            view.scroll_to_previous_screen();
+            ui_state.status = format!("<page_up>");
+        }
+
+        // page_down
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::PageDown,
+        } => {
+
+            view.scroll_to_next_screen();
+            ui_state.status = format!("<page_down>");
         }
 
         // delete

@@ -21,6 +21,11 @@ impl Mark {
         fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize;
     }
    */
+
+    pub fn new(offset: u64) -> Mark {
+        Mark { offset }
+    }
+
     pub fn move_forward(&mut self,
                         buffer: &Buffer,
                         get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64) {
