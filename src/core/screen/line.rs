@@ -42,11 +42,19 @@ impl Line {
         if self.nb_chars < self.width && self.read_only == false {
             self.chars[self.nb_chars] = cpi;
             self.nb_chars += 1;
+
+            if self.nb_chars == self.width {
+                self.read_only = true;
+            }
+
             (true, self.nb_chars)
         } else {
             self.read_only = true;
             (false, self.nb_chars)
         }
+
+
+
     }
 
     pub fn clear(&mut self) {

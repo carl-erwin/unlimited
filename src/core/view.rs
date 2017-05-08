@@ -286,7 +286,6 @@ impl View {
             match screen.find_cpi_by_offset(self.start_offset) {
                 (Some(_), x, y) => {
                     assert_eq!(x, 0);
-                    assert_eq!(y, 0);
                 }
                 _ => {
                     panic!("cannot find offset");
