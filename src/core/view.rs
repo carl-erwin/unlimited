@@ -158,7 +158,7 @@ impl View {
             if y > 0 {
                 let new_y = y - 1;
                 let l = self.screen.get_line(new_y).unwrap();
-                let new_x = ::std::cmp::min(x, l.used - 1);
+                let new_x = ::std::cmp::min(x, l.nb_chars - 1);
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                 m.offset = cpi.offset;
             } else {
@@ -190,8 +190,8 @@ impl View {
                 if y < self.screen.height - 1 {
                     let new_y = y + 1;
                     let l = self.screen.get_line(new_y).unwrap();
-                    if l.used > 0 {
-                        let new_x = ::std::cmp::min(x, l.used - 1);
+                    if l.nb_chars > 0 {
+                        let new_x = ::std::cmp::min(x, l.nb_chars - 1);
                         let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                         m.offset = cpi.offset;
                     }

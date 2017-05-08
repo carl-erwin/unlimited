@@ -34,15 +34,12 @@ impl Screen {
 
         self.line.resize(height, Line::new(width));
         for i in 0..height {
-            self.line[i].chars.resize(width, CodepointInfo::new());
-            self.line[i].width = width;
-            self.line[i].used = 0;
+            self.line[i].resize(width);
         }
         self.width = width;
         self.height = height;
         self.current_line_index = 0;
     }
-
 
 
     /// append
@@ -154,7 +151,7 @@ impl Screen {
         match self.get_mut_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
-                let x = l.used;
+                let x = l.nb_chars;
                 (l.get_mut_used_cpi(0), x, y)
             }
         }
@@ -173,8 +170,12 @@ impl Screen {
         match self.get_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
-                let x = l.used;
-                (l.get_used_cpi(0), x, y)
+                if l.nb_chars > 0 {
+                    let x = l.nb_chars - 1;
+                    (l.get_used_cpi(0), x, y)
+                } else {
+                    (None, 0, 0)
+                }
             }
         }
     }

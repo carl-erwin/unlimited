@@ -279,7 +279,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
                 if m.offset >= view.start_offset && m.offset <= view.end_offset {
                     for l in 0..screen.height {
                         let line = screen.get_mut_line(l).unwrap();
-                        for c in 0..line.used {
+                        for c in 0..line.nb_chars {
                             let mut cpi = line.get_mut_cpi(c).unwrap();
 
                             if cpi.offset > m.offset {
