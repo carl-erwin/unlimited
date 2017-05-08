@@ -17,17 +17,16 @@ fn parse_command_line() -> Config {
     let matches = App::new("unlimited")
         .version("0.0.1")
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
-        .about("an experimental editor")
+        .about("unlimited is an experimental editor")
         .arg(Arg::with_name("NO_CORE")
                  .help("disable core")
                  .long("no-core"))
         .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
         .arg(Arg::with_name("FILES")
-                 .help("Sets the input file to use")
+                 .help("list of the files to open")
                  .required(false)
                  .multiple(true))
         .get_matches();
-
 
     let mut files_list = Vec::new();
     if matches.is_present("FILES") == true {
