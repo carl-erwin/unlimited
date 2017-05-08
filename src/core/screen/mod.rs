@@ -6,19 +6,11 @@ use self::line::Line;
 
 
 
-#[derive(Debug, Clone)]
-struct Dimension {
-    l: usize,
-    c: usize,
-    w: usize,
-    h: usize,
-}
-
 // the screen is composed of lines
 #[derive(Debug, Clone)]
 pub struct Screen {
     pub line: Vec<Line>,
-    pub used: usize, // number of used line
+    pub current_line_index: usize,
     pub width: usize,
     pub height: usize,
 }
@@ -32,7 +24,7 @@ impl Screen {
 
         Screen {
             line: line,
-            used: 0,
+            current_line_index: 0,
             width: width,
             height: height,
         }
@@ -48,7 +40,7 @@ impl Screen {
         }
         self.width = width;
         self.height = height;
-        self.used = 0;
+        self.current_line_index = 0;
     }
 
 
@@ -56,21 +48,21 @@ impl Screen {
     /// append
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
 
-        if self.used == self.height {
-            return (false, self.used);
+        if self.current_line_index == self.height {
+            return (false, self.current_line_index);
         }
 
-        if self.line[self.used].read_only {
-            self.used += 1;
+        if self.line[self.current_line_index].read_only {
+            self.current_line_index += 1;
         }
 
-        if self.used == self.height {
-            return (false, self.used);
+        if self.current_line_index == self.height {
+            return (false, self.current_line_index);
         }
 
 
         let cp = cpi.cp;
-        let line = &mut self.line[self.used];
+        let line = &mut self.line[self.current_line_index];
         let (ok, _) = line.push(cpi);
 
         if ok == true {
@@ -78,14 +70,14 @@ impl Screen {
                 line.read_only = true;
             }
         }
-        (ok, self.used)
+        (ok, self.current_line_index)
     }
 
     pub fn clear(&mut self) {
         for h in 0..self.height {
             self.line[h].clear();
         }
-        self.used = 0;
+        self.current_line_index = 0;
     }
 
     pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
@@ -105,7 +97,7 @@ impl Screen {
     }
 
     pub fn get_mut_used_line(&mut self, index: usize) -> Option<&mut Line> {
-        if index < self.used {
+        if index < self.current_line_index {
             Some(&mut self.line[index])
         } else {
             None
@@ -113,7 +105,7 @@ impl Screen {
     }
 
     pub fn get_used_line(&self, index: usize) -> Option<&Line> {
-        if index < self.used {
+        if index < self.current_line_index {
             Some(&self.line[index])
         } else {
             None
@@ -158,7 +150,7 @@ impl Screen {
 
 
     pub fn get_mut_last_cpinfo(&mut self) -> (Option<&mut CodepointInfo>, usize, usize) {
-        let y = self.used;
+        let y = self.current_line_index;
         match self.get_mut_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
@@ -177,7 +169,7 @@ impl Screen {
 
 
     pub fn get_last_cpinfo(&self) -> (Option<&CodepointInfo>, usize, usize) {
-        let y = self.used;
+        let y = self.current_line_index;
         match self.get_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
