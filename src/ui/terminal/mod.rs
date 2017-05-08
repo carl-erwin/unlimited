@@ -6,7 +6,7 @@ extern crate termion;
 
 
 //
-use self::termion::screen::AlternateScreen;
+use self::termion::screen::{AlternateScreen, ToMainScreen};
 
 use self::termion::input::{TermRead, MouseTerminal};
 use self::termion::raw::IntoRawMode;
@@ -66,8 +66,8 @@ pub fn main_loop(mut editor: &mut Editor) {
     setup_views(editor, width as usize, height as usize);
 
     //
-    let mut stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
-    // let mut stdout = AlternateScreen::from(stdout);
+    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let mut stdout = AlternateScreen::from(stdout);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
@@ -101,6 +101,8 @@ pub fn main_loop(mut editor: &mut Editor) {
     // quit
     // clear, restore cursor
     write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
+    write!(stdout, "{}{}", ToMainScreen, termion::cursor::Show).unwrap();
+
     stdout.flush().unwrap();
 }
 
