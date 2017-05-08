@@ -121,6 +121,21 @@ impl Editor {
                 }
                 None => {}
             }
+
+        }
+
+        // default buffer ?
+        if self.document_map.len() == 0 {
+
+            // edit.get_untitled_count() -> 1
+
+            let b = DocumentBuilder::new()
+                .document_name("untitled-1")
+                .file_name("/dev/null")
+                .internal(false)
+                .finalize();
+
+            self.document_map.insert(id, b.unwrap());
         }
     }
 }
