@@ -144,7 +144,7 @@ impl View {
             if y > 0 {
                 let new_y = y - 1;
                 let l = self.screen.get_line(new_y).unwrap();
-                let new_x = ::std::cmp::min(x, l.nb_chars - 1);
+                let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                 m.offset = cpi.offset;
             } else {
@@ -179,8 +179,8 @@ impl View {
                 if y < screen.height - 1 {
                     let new_y = y + 1;
                     let l = screen.get_line(new_y).unwrap();
-                    if l.nb_chars > 0 {
-                        let new_x = ::std::cmp::min(x, l.nb_chars - 1);
+                    if l.nb_cells > 0 {
+                        let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                         let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                         m.offset = cpi.offset;
                     }
@@ -343,6 +343,12 @@ impl View {
                 _ => panic!("implementation error"),
             }
             */
+
+
+
+
+
+
 
             if let Some(l) = screen.get_last_used_line() {
                 if let Some(cpi) = l.get_first_cpi() {

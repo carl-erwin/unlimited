@@ -169,7 +169,7 @@ impl Screen {
         match self.get_mut_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
-                let x = l.nb_chars;
+                let x = l.nb_cells;
                 (l.get_mut_used_cpi(0), x, y)
             }
         }
@@ -188,8 +188,8 @@ impl Screen {
         match self.get_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
-                if l.nb_chars > 0 {
-                    let x = l.nb_chars - 1;
+                if l.nb_cells > 0 {
+                    let x = l.nb_cells - 1;
                     (l.get_used_cpi(0), x, y)
                 } else {
                     (None, 0, 0)
@@ -232,24 +232,24 @@ fn test_screen() {
     assert_eq!(640, scr.width);
     assert_eq!(480, scr.height);
     assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].chars.len());
+    assert_eq!(scr.width, scr.line[0].cells.len());
 
     scr.resize(800, 600);
     assert_eq!(800, scr.width);
     assert_eq!(600, scr.height);
     assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].chars.len());
+    assert_eq!(scr.width, scr.line[0].cells.len());
 
 
     scr.resize(1024, 768);
     assert_eq!(1024, scr.width);
     assert_eq!(768, scr.height);
     assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].chars.len());
+    assert_eq!(scr.width, scr.line[0].cells.len());
 
     scr.resize(640, 480);
     assert_eq!(640, scr.width);
     assert_eq!(480, scr.height);
     assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].chars.len());
+    assert_eq!(scr.width, scr.line[0].cells.len());
 }
