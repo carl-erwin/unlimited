@@ -149,13 +149,73 @@ impl View {
                 m.offset = cpi.offset;
             } else {
 
+                // mark is offscren
+                let screen_width = self.screen.width;
+                let screen_height = self.screen.height;
+
+                // sync_offset
+                let end_offset = m.offset;
+                let start_offset = if end_offset as usize > (screen_width * screen_height) {
+                    let doc = self.document.as_ref().unwrap().borrow_mut();
+
+                    let off = end_offset - (screen_width * screen_height) as u64;
+                    let mut tmp = Mark::new(off);
+                    tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                    tmp.offset
+                } else {
+                    0
+                };
+
+                let lines =
+                    self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
+
+                // find start_offset index
+                let mut index: usize = 0;
+                while index != lines.len() {
+                    if (lines[index].0 <= end_offset) && (end_offset <= lines[index].1) {
+                        if index > 0 {
+                            index -= 1;
+                        }
+                        break;
+                    }
+                    index += 1;
+                }
+
+                let line_start_off = lines[index].0;
+                let line_end_off = lines[index].1;
+                let mut tmp_mark = Mark::new(line_start_off);
+
+                // compute offscreen column
+                let new_x = {
+                    let doc = self.document.as_ref().unwrap().borrow_mut();
+                    let mut s = Mark::new(lines[index + 1].0);
+                    let e = Mark::new(lines[index + 1].1);
+                    let mut count = 0;
+                    while s.offset != e.offset {
+
+                        if s.offset == m.offset {
+                            break;
+                        }
+
+                        s.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                        count += 1;
+                    }
+                    count
+                };
+
+                let doc = self.document.as_ref().unwrap().borrow_mut();
+                for i in 0..new_x {
+                    tmp_mark.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                }
+
+                if tmp_mark.offset > line_end_off {
+                    tmp_mark.offset = line_end_off;
+                }
+
+                if tmp_mark.offset < m.offset {
+                    m.offset = tmp_mark.offset;
+                }
             }
-
-            // } else {
-            //    build_screen_by_offset(m.offset) and call the code above / in util function
-            //
-            // }
-
         }
     }
 
@@ -186,6 +246,11 @@ impl View {
                     }
                 } else {
 
+                    // if ! main mark  -> no screen update
+                    // self.scroll_down(1);
+
+                    // rebuild_screen here
+                    // self.start_offset = cpi.offset;
                 }
 
             } else {
@@ -293,7 +358,7 @@ impl View {
 
         // get last used line , if contains eof return
         match self.screen.get_used_line_clipped(nb_lines) {
-            (Some(l), LineIndex) => {
+            (Some(l), _) => {
                 if let Some(cpi) = l.get_first_cpi() {
                     // set first offset of last used line as next screen start
                     self.start_offset = cpi.offset;
