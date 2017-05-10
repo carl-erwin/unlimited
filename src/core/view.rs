@@ -268,6 +268,20 @@ impl View {
 
     pub fn scroll_to_next_screen(&mut self) {
 
+        let nb = self.screen.height - 1;
+        return self.scroll_down(nb);
+    }
+
+    pub fn scroll_down(&mut self, nb_lines: usize) {
+
+        if nb_lines == 0 {
+            return;
+        }
+
+        if nb_lines >= self.screen.height {
+            return;
+        }
+
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
             doc.buffer.data.len() as u64
@@ -278,11 +292,15 @@ impl View {
         }
 
         // get last used line , if contains eof return
-        if let Some(l) = self.screen.get_last_used_line() {
-            if let Some(cpi) = l.get_first_cpi() {
-                // set first offset of last used line as next screen start
-                self.start_offset = cpi.offset;
+        match self.screen.get_used_line_clipped(nb_lines) {
+            (Some(l), LineIndex) => {
+                if let Some(cpi) = l.get_first_cpi() {
+                    // set first offset of last used line as next screen start
+                    self.start_offset = cpi.offset;
+                }
             }
+
+            _ => {}
         }
     }
 
