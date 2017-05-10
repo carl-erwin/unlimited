@@ -410,7 +410,9 @@ impl View {
 
                 v.push((s, e));
 
-                if s >= end_offset && e >= end_offset {
+                if s >= end_offset
+                /*&& e >= end_offset*/
+                {
                     return v;
                 }
             }
