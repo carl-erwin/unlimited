@@ -332,46 +332,17 @@ impl View {
                 }
             }
 
-            // check to activate only in debug builds
-            /*
-            match screen.find_cpi_by_offset(m.offset) {
-                (Some(cpi), x, y) => {
-                    assert_eq!(x, 0);
-                    assert_eq!(y, 0);
-                    assert_eq!(cpi.offset, m.offset);
+            // TODO: activate only in debug builds
+            if 0 == 1 {
+                match screen.find_cpi_by_offset(m.offset) {
+                    (Some(cpi), x, y) => {
+                        assert_eq!(x, 0);
+                        assert_eq!(y, 0);
+                        assert_eq!(cpi.offset, m.offset);
+                    }
+                    _ => panic!("implementation error"),
                 }
-                _ => panic!("implementation error"),
             }
-            */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
             if let Some(l) = screen.get_last_used_line() {
                 if let Some(cpi) = l.get_first_cpi() {
