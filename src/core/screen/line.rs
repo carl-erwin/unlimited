@@ -1,7 +1,7 @@
 use core::codepointinfo::CodepointInfo;
 
 
-
+pub type LineCellIndex = usize;
 
 // a cell contains codepoint informations
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(width: usize) -> Line {
+    pub fn new(width: LineCellIndex) -> Line {
 
         assert_eq!(width > 0, true);
 
@@ -46,14 +46,14 @@ impl Line {
         }
     }
 
-    pub fn resize(&mut self, width: usize) {
+    pub fn resize(&mut self, width: LineCellIndex) {
         self.cells.resize(width, LineCell::new());
         self.nb_cells = 0;
         self.width = width;
         self.read_only = false;
     }
 
-    pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
+    pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
 
         if self.nb_cells < self.width && self.read_only == false {
             self.cells[self.nb_cells].cpi = cpi;
@@ -79,7 +79,7 @@ impl Line {
         self.read_only = false;
     }
 
-    pub fn get_cpi(&self, index: usize) -> Option<&CodepointInfo> {
+    pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
         if index < self.width {
             Some(&self.cells[index].cpi)
         } else {
@@ -104,7 +104,7 @@ impl Line {
     }
 
 
-    pub fn get_mut_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
+    pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
         if index < self.width {
             Some(&mut self.cells[index].cpi)
         } else {
@@ -112,7 +112,7 @@ impl Line {
         }
     }
 
-    pub fn get_used_cpi(&self, index: usize) -> Option<&CodepointInfo> {
+    pub fn get_used_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
         if index < self.nb_cells {
             Some(&self.cells[index].cpi)
         } else {
@@ -120,11 +120,23 @@ impl Line {
         }
     }
 
-    pub fn get_mut_used_cpi(&mut self, index: usize) -> Option<&mut CodepointInfo> {
+    pub fn get_mut_used_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
         if index < self.nb_cells {
             Some(&mut self.cells[index].cpi)
         } else {
             None
         }
+    }
+
+    pub fn get_used_cpi_clipped(&self,
+                                index: LineCellIndex)
+                                -> (Option<&CodepointInfo>, LineCellIndex) {
+
+        if self.nb_cells == 0 {
+            return (None, 0);
+        }
+
+        let index = ::std::cmp::min(index, self.nb_cells - 1);
+        (self.get_used_cpi(index), index)
     }
 }

@@ -10,6 +10,7 @@ pub enum Event {
     }, // CloseEvent{ view: u32 } ??
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InputEvent {
     InvalidInputEvent,

@@ -39,7 +39,7 @@ impl UiState {
             keys: Vec::new(),
             quit: false,
             status: String::new(),
-            display_status: !true,
+            display_status: true,
             display_view: true,
             vid: 0,
             nb_view: 0,
@@ -249,6 +249,16 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 
 fn get_input_event(ui_state: &mut UiState) -> InputEvent {
 
+    fn termion_mouse_button_to_u32(mb: self::termion::event::MouseButton) -> u32 {
+        match mb {
+            self::termion::event::MouseButton::Left => 0,
+            self::termion::event::MouseButton::Right => 1,
+            self::termion::event::MouseButton::Middle => 2,
+            self::termion::event::MouseButton::WheelUp => 3,
+            self::termion::event::MouseButton::WheelDown => 4,
+        }
+    }
+
     for evt in stdin().events() {
 
         let evt = evt.unwrap();
@@ -449,13 +459,15 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                         ui_state.status =
                             format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
 
+                        let button = termion_mouse_button_to_u32(mb);
+
                         return InputEvent::ButtonPress {
                                    ctrl: false,
                                    alt: false,
                                    shift: false,
-                                   x: x as i32,
-                                   y: y as i32,
-                                   button: 0, // TODO -> enum to ...
+                                   x: (x - 1) as i32,
+                                   y: (y - 1) as i32,
+                                   button,
                                };
                     }
 
@@ -466,9 +478,9 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
                                    ctrl: false,
                                    alt: false,
                                    shift: false,
-                                   x: x as i32,
-                                   y: y as i32,
-                                   button: 0, // TODO -> enum to ...
+                                   x: (x - 1) as i32,
+                                   y: (y - 1) as i32,
+                                   button: 0xff,
                                };
                     }
 
@@ -673,6 +685,32 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.insert_codepoint(cp);
             ui_state.status = format!("<insert [0x{:x}]>", cp as u32);
+        }
+
+        // mouse button pressed
+        InputEvent::ButtonPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            x,
+            y,
+            button,
+        } => {
+            view.button_press(button, x, y);
+            ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+        }
+
+        // mouse button released
+        InputEvent::ButtonRelease {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            x,
+            y,
+            button,
+        } => {
+            view.button_release(button, x, y);
+            ui_state.status = format!("<unclick({},@({},{}))]>", button, x, y);
         }
 
         _ => {}

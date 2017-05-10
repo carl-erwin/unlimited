@@ -3,14 +3,15 @@ pub mod line;
 use core::codepointinfo::CodepointInfo;
 
 use self::line::Line;
+use self::line::LineCellIndex;
 
-
+pub type LineIndex = usize;
 
 // the screen is composed of lines
 #[derive(Debug, Clone)]
 pub struct Screen {
     pub line: Vec<Line>,
-    pub current_line_index: usize,
+    pub current_line_index: LineCellIndex,
     pub width: usize,
     pub height: usize,
 }
@@ -99,6 +100,11 @@ impl Screen {
         } else {
             None
         }
+    }
+
+    pub fn get_used_line_clipped(&mut self, index: usize) -> (Option<&Line>, LineIndex) {
+        let index = ::std::cmp::min(index, self.current_line_index);
+        (self.get_used_line(index), index)
     }
 
     pub fn get_used_line(&self, index: usize) -> Option<&Line> {
@@ -197,6 +203,24 @@ impl Screen {
             }
         }
     }
+
+
+    pub fn get_used_cpinfo_clipped(&mut self,
+                                   x: usize,
+                                   y: usize)
+                                   -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
+
+        match self.get_used_line_clipped(y) {
+            (None, li) => (None, x, li),
+            (Some(l), li) => {
+                match l.get_used_cpi_clipped(x) {
+                    (optcpi, lci) => (optcpi, lci, li),
+                }
+            }
+        }
+    }
+
+
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search

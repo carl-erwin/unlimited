@@ -350,6 +350,29 @@ impl View {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             if let Some(l) = screen.get_last_used_line() {
                 if let Some(cpi) = l.get_first_cpi() {
                     m.offset = cpi.offset; // update next screen start
@@ -419,6 +442,45 @@ impl View {
             }
 
             screen.clear(); // prepare next screen
+        }
+    }
+
+    pub fn button_press(&mut self, button: u32, x: i32, y: i32) {
+
+        match button {
+            0 => {}
+            _ => {
+                return;
+            }
+        }
+
+        // move cursor to (x,y)
+        let (x, y) = (x as usize, y as usize);
+        let (cpi, x, y) = self.screen.get_used_cpinfo_clipped(x, y);
+
+        match cpi {
+            Some(cpi) => {
+                for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                    m.offset = cpi.offset;
+                    // we only move one mark
+                    break; // TODO: add main mark ref
+                }
+
+            }
+            _ => {}
+        }
+    }
+
+    pub fn button_release(&mut self, button: u32, x: i32, y: i32) {
+        let button = if button == 0xff {
+            // TODO: return last pressed button
+            0xff
+        } else {
+            button
+        };
+
+        match button {
+            _ => {}
         }
     }
 }
