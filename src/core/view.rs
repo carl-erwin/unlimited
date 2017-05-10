@@ -305,7 +305,7 @@ impl View {
     }
 
 
-    fn get_lines_offsets(&mut self,
+    fn get_lines_offsets(&self,
                          start_offset: u64,
                          end_offset: u64,
                          screen_width: usize,
@@ -316,7 +316,7 @@ impl View {
 
         let mut m = Mark::new(start_offset);
 
-        let doc = self.document.as_mut().unwrap().borrow_mut();
+        let doc = self.document.as_ref().unwrap().borrow_mut();
 
         // get beginning of the line @offset
         m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
