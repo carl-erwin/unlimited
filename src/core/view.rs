@@ -62,13 +62,26 @@ impl View {
 
     pub fn insert_codepoint(&mut self, codepoint: char) {
 
-        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
+        let mut scroll_needed = false;
 
-        let data_size = utf8::encode(codepoint as u32, &mut data);
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            doc.buffer.write(m.offset, data_size, data);
-            m.offset += data_size as u64;
+        {
+            let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
+            let data_size = utf8::encode(codepoint as u32, &mut data);
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                doc.buffer.write(m.offset, data_size, data);
+                m.offset += data_size as u64;
+
+                // TODO: add main mark check
+                let (_, _, y) = self.screen.find_cpi_by_offset(m.offset);
+                if y == self.screen.height - 1 && codepoint == '\n' {
+                    scroll_needed = true;
+                }
+            }
+        }
+
+        if scroll_needed == true {
+            self.scroll_down(1);
         }
     }
 
@@ -85,16 +98,28 @@ impl View {
 
     pub fn remove_previous_codepoint(&mut self) {
 
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+        let mut scroll_needed = false;
 
-            if m.offset == 0 {
-                continue;
+        {
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+                if m.offset == 0 {
+                    continue;
+                }
+
+                m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+                let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+                doc.buffer.remove(m.offset, size, None);
+
+                if m.offset < self.start_offset {
+                    scroll_needed = true;
+                }
             }
+        }
 
-            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
-            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-            doc.buffer.remove(m.offset, size, None);
+        if scroll_needed == true {
+            self.scroll_up(0); // resync merged line
         }
     }
 
@@ -151,7 +176,9 @@ impl View {
                 m.offset = cpi.offset;
             } else {
 
-                scroll_needed = true;
+                if self.screen.contains_offset(m.offset) {
+                    scroll_needed = true;
+                }
 
                 // mark is offscren
                 let screen_width = self.screen.width;
@@ -243,6 +270,7 @@ impl View {
             }
 
             let mut is_offscreen = true;
+
             if screen.contains_offset(m.offset) {
                 // yes get coordinates
                 let (_, x, y) = screen.find_cpi_by_offset(m.offset);
@@ -257,6 +285,8 @@ impl View {
                         let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                         m.offset = cpi.offset;
                     }
+                } else {
+                    scroll_needed = true;
                 }
             }
 
@@ -327,8 +357,6 @@ impl View {
                 }
 
                 m.offset = tmp_mark.offset;
-
-                scroll_needed = true;
             }
         }
 
@@ -338,73 +366,8 @@ impl View {
     }
 
     pub fn scroll_to_previous_screen(&mut self) {
-
-        if self.start_offset == 0 {
-            return;
-        }
-
-        let width = self.screen.width;
-        let height = self.screen.height;
-
-        // the offset to find is the first screen codepoint
-        let offset_to_find = self.start_offset;
-
-        // go to N previous physical lines ... here N is height
-        // rewind width*height chars
-        let mut m = Mark::new(self.start_offset);
-        if m.offset > (width * height) as u64 {
-            m.offset -= (width * height) as u64
-        } else {
-            m.offset = 0;
-        }
-
-        // get start of line
-        {
-            let doc = self.document.as_mut().unwrap().borrow_mut();
-            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
-        }
-
-        // build tmp screens until first offset of the original screen if found
-        // build_screen from this offset
-        // the window MUST cover to screen => height * 2
-        // TODO: always in last index ?
-        let lines = self.get_lines_offsets(m.offset, offset_to_find, width, height);
-        let index = {
-            if lines.len() > 0 {
-                lines.len() - 1
-            } else {
-                panic!("");
-            }
-        };
-
-        let index = if index >= height {
-            index - height + 1
-        } else {
-            0
-        };
-
-        self.start_offset = lines[index].0;
-
-        // TEST
-        if 0 == 1 {
-            let doc = self.document.as_mut().unwrap().borrow_mut();
-            let data = &doc.buffer.data;
-            let len = data.len();
-            let max_offset = len as u64;
-
-            let mut screen = Screen::new(width, height);
-            let _ = decode_slice_to_screen(&data[0 as usize..len],
-                                           self.start_offset,
-                                           max_offset,
-                                           &mut screen);
-            match screen.find_cpi_by_offset(offset_to_find) {
-                (Some(_), x, y) => {
-                    assert_eq!(x, 0);
-                    assert_eq!(y, screen.current_line_index - 1);
-                }
-                _ => panic!("implementation error"),
-            }
-        }
+        let nb = self.screen.height - 1;
+        self.scroll_up(nb);
     }
 
     pub fn scroll_up(&mut self, nb_lines: usize) {
@@ -445,7 +408,13 @@ impl View {
                   .iter()
                   .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1) {
             None => 0,
-            Some(i) => ::std::cmp::min(lines.len() - 1, i - nb_lines),
+            Some(i) => {
+                if i >= nb_lines {
+                    ::std::cmp::min(lines.len() - 1, i - nb_lines)
+                } else {
+                    0
+                }
+            }
         };
 
         self.start_offset = lines[index].0;
@@ -453,9 +422,8 @@ impl View {
 
 
     pub fn scroll_to_next_screen(&mut self) {
-
         let nb = self.screen.height - 1;
-        return self.scroll_down(nb);
+        self.scroll_down(nb);
     }
 
     pub fn scroll_down(&mut self, nb_lines: usize) {
