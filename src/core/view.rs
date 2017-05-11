@@ -169,17 +169,13 @@ impl View {
                 let lines =
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
-                // find start_offset index
-                let mut index: usize = 0;
-                while index != lines.len() {
-                    if (lines[index].0 <= end_offset) && (end_offset <= lines[index].1) {
-                        if index > 0 {
-                            index -= 1;
-                        }
-                        break;
-                    }
-                    index += 1;
-                }
+                // find "previous" line index
+                let index = match lines
+                          .iter()
+                          .position(|e| e.0 <= end_offset && end_offset <= e.1) {
+                    None | Some(0) => continue,
+                    Some(i) => i - 1,
+                };
 
                 let line_start_off = lines[index].0;
                 let line_end_off = lines[index].1;
