@@ -14,6 +14,7 @@ pub struct Screen {
     pub current_line_index: LineCellIndex,
     pub width: usize,
     pub height: usize,
+    pub nb_push: usize,
 }
 
 impl Screen {
@@ -28,6 +29,7 @@ impl Screen {
             current_line_index: 0,
             width: width,
             height: height,
+            nb_push: 0,
         }
     }
 
@@ -40,6 +42,7 @@ impl Screen {
         self.width = width;
         self.height = height;
         self.current_line_index = 0;
+        self.nb_push = 0;
     }
 
 
@@ -64,6 +67,7 @@ impl Screen {
         let (ok, _) = line.push(cpi);
 
         if ok == true {
+            self.nb_push += 1;
             if cp == '\n' || cp == '\r' {
                 line.read_only = true;
             }
@@ -76,6 +80,7 @@ impl Screen {
             self.line[h].clear();
         }
         self.current_line_index = 0;
+        self.nb_push = 0;
     }
 
     pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
