@@ -137,6 +137,8 @@ impl View {
 
     pub fn move_marks_to_previous_line(&mut self) {
 
+        let mut scroll_needed = false;
+
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             // if view.is_mark_on_screen(m) {
             // yes get coordinates
@@ -148,6 +150,8 @@ impl View {
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                 m.offset = cpi.offset;
             } else {
+
+                scroll_needed = true;
 
                 // mark is offscren
                 let screen_width = self.screen.width;
@@ -213,6 +217,11 @@ impl View {
                 }
             }
         }
+
+        if scroll_needed == true {
+            self.scroll_up(1);
+        }
+
     }
 
 
@@ -224,6 +233,8 @@ impl View {
         };
 
         let screen = self.screen.clone(); // TODO: use cache
+
+        let mut scroll_needed = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
 
@@ -316,7 +327,13 @@ impl View {
                 }
 
                 m.offset = tmp_mark.offset;
+
+                scroll_needed = true;
             }
+        }
+
+        if scroll_needed == true {
+            self.scroll_down(1);
         }
     }
 
@@ -389,6 +406,51 @@ impl View {
             }
         }
     }
+
+    pub fn scroll_up(&mut self, nb_lines: usize) {
+
+        if self.start_offset == 0 {
+            return;
+        }
+
+        let width = self.screen.width;
+        let height = self.screen.height;
+
+        // the offset to find is the first screen codepoint
+        let offset_to_find = self.start_offset;
+
+        // go to N previous physical lines ... here N is height
+        // rewind width*height chars
+        let mut m = Mark::new(self.start_offset);
+        if m.offset > (width * height) as u64 {
+            m.offset -= (width * height) as u64
+        } else {
+            m.offset = 0;
+        }
+
+        // get start of line
+        {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+        }
+
+        // build tmp screens until first offset of the original screen if found
+        // build_screen from this offset
+        // the window MUST cover to screen => height * 2
+        // TODO: always in last index ?
+        let lines = self.get_lines_offsets(m.offset, offset_to_find, width, height);
+
+        // find line index
+        let index = match lines
+                  .iter()
+                  .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1) {
+            None => 0,
+            Some(i) => ::std::cmp::min(lines.len() - 1, i - nb_lines),
+        };
+
+        self.start_offset = lines[index].0;
+    }
+
 
     pub fn scroll_to_next_screen(&mut self) {
 
