@@ -39,7 +39,7 @@ impl UiState {
             keys: Vec::new(),
             quit: false,
             status: String::new(),
-            display_status: true,
+            display_status: !true,
             display_view: true,
             vid: 0,
             nb_view: 0,
