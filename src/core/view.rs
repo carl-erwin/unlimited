@@ -56,10 +56,6 @@ impl View {
     }
 
 
-
-
-
-
     pub fn insert_codepoint(&mut self, codepoint: char) {
 
         let mut scroll_needed = false;
