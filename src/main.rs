@@ -18,9 +18,9 @@ fn parse_command_line() -> Config {
         .version("0.0.1")
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .arg(Arg::with_name("NO_CORE")
-                 .help("disable core")
-                 .long("no-core"))
+        .arg(Arg::with_name("START_CORE")
+                 .help("enable core")
+                 .long("start-core"))
         .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
         .arg(Arg::with_name("FILES")
                  .help("list of the files to open")
@@ -35,8 +35,8 @@ fn parse_command_line() -> Config {
     }
 
     Config {
-        start_core: !matches.is_present("NO_CORE"),
         start_ui: !matches.is_present("NO_UI"),
-        files_list: files_list,
+        start_core: matches.is_present("START_CORE"),
+        files_list,
     }
 }
