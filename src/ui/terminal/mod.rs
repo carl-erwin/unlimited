@@ -576,6 +576,16 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             view.remove_codepoint();
         }
 
+        // ctrl+s
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('s'),
+        } => {
+            view.save_document();
+        }
+
         // ctrl+?
         InputEvent::KeyPress {
             ctrl: true,
