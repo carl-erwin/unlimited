@@ -117,20 +117,31 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 // TODO: change this with temporary (cp, offset, size) until from_offset
 pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
 
-    // TODO: replace vec by array
-    let mut vec = Vec::with_capacity(8);
+    //                 cp    size   offset
+    let mut cp_info: [(char, usize, u64); 8] = [('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0),
+                                                ('\0', 0, 0)];
+    let mut nr_cpinfo = 0;
 
     // rewind upto 4 bytes
     // and decode forward / save offset
     let mut off = if from_offset > 4 { from_offset - 4 } else { 0 };
     while off != from_offset {
         let (cp, _, size) = get_codepoint(data, off);
-        vec.push((cp, size, off));
+
+        cp_info[nr_cpinfo] = (cp, size, off);
+        nr_cpinfo += 1;
+
         off += size as u64;
     }
 
-    if vec.len() != 0 {
-        vec[vec.len() - 1].2
+    if nr_cpinfo != 0 {
+        cp_info[nr_cpinfo - 1].2
     } else {
         from_offset
     }
