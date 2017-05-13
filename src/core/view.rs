@@ -69,14 +69,15 @@ impl View {
             let data_size = utf8::encode(codepoint as u32, &mut data);
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                doc.buffer.write(m.offset, data_size, data);
-                m.offset += data_size as u64;
 
                 // TODO: add main mark check
                 let (_, _, y) = self.screen.find_cpi_by_offset(m.offset);
                 if y == self.screen.height - 1 && codepoint == '\n' {
                     scroll_needed = true;
                 }
+
+                doc.buffer.write(m.offset, data_size, data);
+                m.offset += data_size as u64;
             }
         }
 
