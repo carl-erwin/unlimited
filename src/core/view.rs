@@ -1,3 +1,17 @@
+/* TODO
+
+  add function center_screen_arround_offset(data, view_modes, offset, screen_description)
+  where screen_description {
+   width,
+   height,
+   option<screen_cache>
+  }
+
+  this function will called to refresh the view screen when
+  the user modifies the buffer
+*/
+
+
 //
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -464,6 +478,7 @@ impl View {
     }
 
 
+    // TODO: move to core/view/layout.rs
     fn get_lines_offsets(&self,
                          start_offset: u64,
                          end_offset: u64,
