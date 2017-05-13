@@ -483,8 +483,7 @@ impl View {
         let len = data.len();
         let max_offset = len as u64;
         loop {
-            let _ =
-                decode_slice_to_screen(&data[0 as usize..len], m.offset, max_offset, &mut screen);
+            let _ = build_screen_layout(&data[0 as usize..len], m.offset, max_offset, &mut screen);
 
             // push lines offsets
             // FIXME: find a better way to iterate over the used lines
@@ -587,12 +586,15 @@ impl View {
 
 
 //////////////////////////////////
-
-pub fn decode_slice_to_screen(data: &[u8],
-                              base_offset: u64,
-                              max_offset: u64,
-                              mut screen: &mut Screen)
-                              -> u64 {
+// This function will run the confgured filters
+// until the screen is full or eof is reached
+// the filters will be configured per view to allow multiple interpretation a the same document
+// data will be replace by a "FileMMap"
+pub fn build_screen_layout(data: &[u8],
+                           base_offset: u64,
+                           max_offset: u64,
+                           mut screen: &mut Screen)
+                           -> u64 {
 
     let max_cpi = screen.width * screen.height;
     let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);

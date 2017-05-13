@@ -12,7 +12,7 @@ use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
 
 //
-use core::view::{View, decode_slice_to_screen, screen_putstr};
+use core::view::{View, build_screen_layout, screen_putstr};
 use core::screen::Screen;
 use core::event::InputEvent;
 use core::event::Key;
@@ -153,7 +153,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
             let max_offset = buf.borrow().buffer.size as u64;
 
             view.end_offset =
-                decode_slice_to_screen(&data[0..len], view.start_offset, max_offset, &mut screen);
+                build_screen_layout(&data[0..len], view.start_offset, max_offset, &mut screen);
 
             ui_state.last_offset = view.end_offset;
 
