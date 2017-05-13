@@ -566,6 +566,16 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             view.move_marks_to_end_of_line();
         }
 
+        // ctrl+d
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('d'),
+        } => {
+            view.remove_codepoint();
+        }
+
         // ctrl+?
         InputEvent::KeyPress {
             ctrl: true,
