@@ -75,3 +75,20 @@ pub struct Document {
     pub buffer: Buffer,
     pub changed: bool,
 }
+
+impl Document {
+    // FIXME: move to Buffer
+    pub fn sync_to_disk(&self) -> ::std::io::Result<()> {
+        use std::fs;
+        use std::fs::File;
+        use std::io::prelude::*;
+
+        let tmp_file_ext = "ued_tmp"; // TODO: move to global config
+        let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
+        let mut f = File::create(&tmp_file_name)?;
+
+        f.write_all(&self.buffer.data)?;
+        f.sync_all()?;
+        fs::rename(&tmp_file_name, &self.buffer.file_name)
+    }
+}

@@ -455,6 +455,14 @@ impl View {
         }
     }
 
+    pub fn save_document(&mut self) -> bool {
+        let doc = self.document.as_mut().unwrap().borrow_mut();
+        match doc.sync_to_disk() {
+            Err(_) => false,
+            Ok(_) => true,
+        }
+    }
+
 
     fn get_lines_offsets(&self,
                          start_offset: u64,
