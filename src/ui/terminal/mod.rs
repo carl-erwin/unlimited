@@ -59,7 +59,12 @@ pub fn main_loop(mut editor: &mut Editor) {
 
     let mut ui_state = UiState::new();
 
-    let (width, height) = terminal_size().unwrap();
+    let (width, height) = if ui_state.display_status == true {
+        let (width, height) = terminal_size().unwrap();
+        (width, height - 1)
+    } else {
+        terminal_size().unwrap()
+    };
 
     setup_views(editor, width as usize, height as usize);
 
@@ -79,7 +84,7 @@ pub fn main_loop(mut editor: &mut Editor) {
         ui_state.nb_view = editor.view_map.len();
         let mut view = editor.view_map.get_mut(&ui_state.vid);
 
-        let status_line_y = height;
+        let status_line_y = height + 1;
 
         if ui_state.display_view == true {
             draw_view(&mut ui_state,
