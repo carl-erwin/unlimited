@@ -1,15 +1,19 @@
 //
+use std::thread;
+use std::time::Duration;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::io::{self, Write, stdin, Stdout};
+use std::io::{self, Read, Write, Stdout};
 
 //
 extern crate termion;
 
 use self::termion::screen::{AlternateScreen, ToMainScreen};
-use self::termion::input::{TermRead, MouseTerminal};
+use self::termion::input::MouseTerminal;
 use self::termion::raw::IntoRawMode;
 use self::termion::terminal_size;
+use self::termion::async_stdin;
+use self::termion::event::parse_event;
 
 //
 use core::view::{View, build_screen_layout, screen_putstr};
@@ -31,6 +35,7 @@ struct UiState {
     nb_view: usize,
     last_offset: u64,
     mark_offset: u64,
+    input_wait_time_ms: u64,
 }
 
 impl UiState {
@@ -45,6 +50,7 @@ impl UiState {
             nb_view: 0,
             last_offset: 0,
             mark_offset: 0,
+            input_wait_time_ms: 20,
         }
     }
 }
@@ -63,6 +69,10 @@ pub fn main_loop(mut editor: &mut Editor) {
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
+
+
+    let mut stdin = async_stdin().bytes();
+
 
     while !ui_state.quit {
 
@@ -85,9 +95,10 @@ pub fn main_loop(mut editor: &mut Editor) {
                                 &mut stdout);
         }
 
-        let evt = get_input_event(&mut ui_state);
-
-        process_input_events(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), evt);
+        let vec_evt = get_input_event(&mut stdin, &mut ui_state);
+        for evt in vec_evt {
+            process_input_events(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), evt);
+        }
     }
 
     // quit
@@ -246,8 +257,8 @@ fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
 }
 
 
+fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiState) -> InputEvent {
 
-fn get_input_event(ui_state: &mut UiState) -> InputEvent {
 
     fn termion_mouse_button_to_u32(mb: self::termion::event::MouseButton) -> u32 {
         match mb {
@@ -259,250 +270,290 @@ fn get_input_event(ui_state: &mut UiState) -> InputEvent {
         }
     }
 
-    for evt in stdin().events() {
 
-        let evt = evt.unwrap();
+    // translate termion event
+    match evt {
 
-        // translate termion event
-        match evt {
+        self::termion::event::Event::Key(k) => {
+            match k {
 
-            self::termion::event::Event::Key(k) => {
-                match k {
+                self::termion::event::Key::Ctrl('c') => {
+                    ui_state.status = format!("Ctrl-c");
 
-                    self::termion::event::Key::Ctrl('c') => {
-                        ui_state.status = format!("Ctrl-c");
-
-                        return InputEvent::KeyPress {
-                                   ctrl: true,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::UNICODE('c'),
-                               };
-                    }
-
-                    self::termion::event::Key::Char('\n') => {
-                        ui_state.status = format!("{}", "<newline>");
-
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::UNICODE('\n'),
-                               };
-                    }
-
-                    self::termion::event::Key::Char(c) => {
-                        ui_state.status = format!("{}", c);
-
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::UNICODE(c),
-                               };
-                    }
-
-                    self::termion::event::Key::Alt(c) => {
-                        ui_state.status = format!("Alt-{}", c);
-
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: true,
-                                   shift: false,
-                                   key: Key::UNICODE(c),
-                               };
-                    }
-
-                    self::termion::event::Key::Ctrl(c) => {
-                        ui_state.status = format!("Ctrl-{}", c);
-
-                        return InputEvent::KeyPress {
-                                   ctrl: true,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::UNICODE(c),
-                               };
-                    }
-
-                    self::termion::event::Key::F(1) => {
-                        if ui_state.vid > 0 {
-                            ui_state.vid -= 1;
-                        }
-                        break;
-                    }
-
-                    self::termion::event::Key::F(2) => {
-                        ui_state.vid = ::std::cmp::min(ui_state.vid + 1,
-                                                       (ui_state.nb_view - 1) as u64);
-                        break;
-                    }
-
-                    self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
-
-                    self::termion::event::Key::Left => {
-                        ui_state.status = format!("<left>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Left,
-                               };
-                    }
-                    self::termion::event::Key::Right => {
-                        ui_state.status = format!("<right>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Right,
-                               };
-                    }
-                    self::termion::event::Key::Up => {
-                        ui_state.status = format!("<up>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Up,
-                               };
-                    }
-                    self::termion::event::Key::Down => {
-                        ui_state.status = format!("<down>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Down,
-                               };
-                    }
-                    self::termion::event::Key::Backspace => {
-                        ui_state.status = format!("<backspc>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::BackSpace,
-                               };
-                    }
-                    self::termion::event::Key::Home => {
-                        ui_state.status = format!("<Home>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Home,
-                               };
-
-                    }
-                    self::termion::event::Key::End => {
-                        ui_state.status = format!("<End>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::End,
-                               };
-
-                    }
-                    self::termion::event::Key::PageUp => {
-                        ui_state.status = format!("<PageUp>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::PageUp,
-                               };
-                    }
-                    self::termion::event::Key::PageDown => {
-                        ui_state.status = format!("<PageDown>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::PageDown,
-                               };
-                    }
-                    self::termion::event::Key::Delete => {
-                        ui_state.status = format!("<Delete>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Delete,
-                               };
-                    }
-                    self::termion::event::Key::Insert => {
-                        ui_state.status = format!("<Insert>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Insert,
-                               };
-                    }
-                    self::termion::event::Key::Esc => {
-                        ui_state.status = format!("<Esc>");
-                        return InputEvent::KeyPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   key: Key::Escape,
-                               };
-                    }
-                    _ => ui_state.status = format!("Other"),
+                    return InputEvent::KeyPress {
+                               ctrl: true,
+                               alt: false,
+                               shift: false,
+                               key: Key::UNICODE('c'),
+                           };
                 }
-            }
 
-            self::termion::event::Event::Mouse(m) => {
-                match m {
-                    self::termion::event::MouseEvent::Press(mb, x, y) => {
-                        ui_state.status =
-                            format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
+                self::termion::event::Key::Char('\n') => {
+                    ui_state.status = format!("{}", "<newline>");
 
-                        let button = termion_mouse_button_to_u32(mb);
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::UNICODE('\n'),
+                           };
+                }
 
-                        return InputEvent::ButtonPress {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   x: (x - 1) as i32,
-                                   y: (y - 1) as i32,
-                                   button,
-                               };
+                self::termion::event::Key::Char(c) => {
+                    ui_state.status = format!("{}", c);
+
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::UNICODE(c),
+                           };
+                }
+
+                self::termion::event::Key::Alt(c) => {
+                    ui_state.status = format!("Alt-{}", c);
+
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: true,
+                               shift: false,
+                               key: Key::UNICODE(c),
+                           };
+                }
+
+                self::termion::event::Key::Ctrl(c) => {
+                    ui_state.status = format!("Ctrl-{}", c);
+
+                    return InputEvent::KeyPress {
+                               ctrl: true,
+                               alt: false,
+                               shift: false,
+                               key: Key::UNICODE(c),
+                           };
+                }
+
+                self::termion::event::Key::F(1) => {
+                    if ui_state.vid > 0 {
+                        ui_state.vid -= 1;
                     }
+                }
 
-                    self::termion::event::MouseEvent::Release(x, y) => {
-                        ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+                self::termion::event::Key::F(2) => {
+                    ui_state.vid = ::std::cmp::min(ui_state.vid + 1, (ui_state.nb_view - 1) as u64);
+                }
 
-                        return InputEvent::ButtonRelease {
-                                   ctrl: false,
-                                   alt: false,
-                                   shift: false,
-                                   x: (x - 1) as i32,
-                                   y: (y - 1) as i32,
-                                   button: 0xff,
-                               };
-                    }
+                self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
 
-                    self::termion::event::MouseEvent::Hold(x, y) => {
-                        ui_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
-                    }
-                };
-            }
+                self::termion::event::Key::Left => {
+                    ui_state.status = format!("<left>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Left,
+                           };
+                }
+                self::termion::event::Key::Right => {
+                    ui_state.status = format!("<right>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Right,
+                           };
+                }
+                self::termion::event::Key::Up => {
+                    ui_state.status = format!("<up>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Up,
+                           };
+                }
+                self::termion::event::Key::Down => {
+                    ui_state.status = format!("<down>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Down,
+                           };
+                }
+                self::termion::event::Key::Backspace => {
+                    ui_state.status = format!("<backspc>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::BackSpace,
+                           };
+                }
+                self::termion::event::Key::Home => {
+                    ui_state.status = format!("<Home>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Home,
+                           };
 
-            self::termion::event::Event::Unsupported(e) => {
-                ui_state.status = format!("Event::Unsupported {:?}", e);
+                }
+                self::termion::event::Key::End => {
+                    ui_state.status = format!("<End>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::End,
+                           };
+
+                }
+                self::termion::event::Key::PageUp => {
+                    ui_state.status = format!("<PageUp>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::PageUp,
+                           };
+                }
+                self::termion::event::Key::PageDown => {
+                    ui_state.status = format!("<PageDown>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::PageDown,
+                           };
+                }
+                self::termion::event::Key::Delete => {
+                    ui_state.status = format!("<Delete>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Delete,
+                           };
+                }
+                self::termion::event::Key::Insert => {
+                    ui_state.status = format!("<Insert>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Insert,
+                           };
+                }
+                self::termion::event::Key::Esc => {
+                    ui_state.status = format!("<Esc>");
+                    return InputEvent::KeyPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               key: Key::Escape,
+                           };
+                }
+                _ => ui_state.status = format!("Other"),
             }
         }
 
-        break;
+        self::termion::event::Event::Mouse(m) => {
+            match m {
+                self::termion::event::MouseEvent::Press(mb, x, y) => {
+                    ui_state.status =
+                        format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
+
+                    let button = termion_mouse_button_to_u32(mb);
+
+                    return InputEvent::ButtonPress {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               x: (x - 1) as i32,
+                               y: (y - 1) as i32,
+                               button,
+                           };
+                }
+
+                self::termion::event::MouseEvent::Release(x, y) => {
+                    ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
+
+                    return InputEvent::ButtonRelease {
+                               ctrl: false,
+                               alt: false,
+                               shift: false,
+                               x: (x - 1) as i32,
+                               y: (y - 1) as i32,
+                               button: 0xff,
+                           };
+                }
+
+                self::termion::event::MouseEvent::Hold(x, y) => {
+                    ui_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
+                }
+            };
+        }
+
+        self::termion::event::Event::Unsupported(e) => {
+            ui_state.status = format!("Event::Unsupported {:?}", e);
+        }
     }
 
     ::core::event::InputEvent::NoInputEvent
 }
 
 
+fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
+                   ui_state: &mut UiState)
+                   -> Vec<InputEvent> {
+
+    let mut v = Vec::<InputEvent>::new();
+
+    // prepare async read
+    loop {
+        let b = stdin.next();
+        match b {
+            Some(b) => {
+                match b {
+                    Ok(val) => {
+                        match parse_event(val, &mut stdin) {
+                            Err(_) => {
+                            }
+                            Ok(evt) => {
+                                let evt = translate_termion_event(evt, ui_state);
+                                v.push(evt);
+                                ui_state.input_wait_time_ms = 0;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                    }
+                }
+            }
+            None => {
+                if v.len() != 0 {
+                    break;
+                }
+
+                // TODO: use last input event time
+                ui_state.status = format!(" async no event");
+                ui_state.input_wait_time_ms += 10;
+                ui_state.input_wait_time_ms = ::std::cmp::max(ui_state.input_wait_time_ms, 20);
+                thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
+            }
+        }
+    }
+
+    v
+}
+
 fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEvent) {
+
+    if ev == ::core::event::InputEvent::NoInputEvent {
+        // ignore no input event event :-)
+        return;
+    }
 
     ui_state.keys.push(ev.clone());
 
@@ -765,12 +816,11 @@ fn display_status_line(ui_state: &UiState,
 
     let status_str = format!("line {} document_name '{}' \
                              , file('{}'), event('{}') \
-                             last_offset({}) mark(({},{})@{}) keys({})",
+                             mark(({},{})@{}) keys({})",
                              line,
                              name,
                              file_name,
                              ui_state.status,
-                             ui_state.last_offset,
                              x,
                              y,
                              ui_state.mark_offset,
