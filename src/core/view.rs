@@ -299,8 +299,6 @@ impl View {
             doc.buffer.data.len() as u64
         };
 
-        let screen = self.screen.clone(); // TODO: use cache
-
         let mut scroll_needed = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
@@ -311,18 +309,18 @@ impl View {
 
             let mut is_offscreen = true;
 
-            if screen.contains_offset(m.offset) {
+            if self.screen.contains_offset(m.offset) {
                 // yes get coordinates
-                let (_, x, y) = screen.find_cpi_by_offset(m.offset);
-                if y < screen.height - 1 {
+                let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
+                if y < self.screen.height - 1 {
 
                     is_offscreen = false;
 
                     let new_y = y + 1;
-                    let l = screen.get_line(new_y).unwrap();
+                    let l = self.screen.get_line(new_y).unwrap();
                     if l.nb_cells > 0 {
                         let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                        let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
+                        let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                         m.offset = cpi.offset;
                     }
                 } else {
@@ -344,13 +342,15 @@ impl View {
                     tmp.offset
                 };
 
+                // a codepoint can use 4 bytes the virtual end is
+                // + 1 full line away
                 let end_offset = ::std::cmp::min(m.offset + (4 * screen_width) as u64, max_offset);
 
                 // get lines start, end offset
                 let lines =
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
-                // find "next" line index
+                // find the cursor index
                 let index = match lines
                           .iter()
                           .position(|e| e.0 <= m.offset && m.offset <= e.1) {
@@ -359,7 +359,7 @@ impl View {
                         if i == lines.len() - 1 {
                             continue;
                         } else {
-                            i + 1
+                            i
                         }
                     }
                 };
@@ -367,10 +367,10 @@ impl View {
                 // compute column
                 let new_x = {
                     let doc = self.document.as_ref().unwrap().borrow_mut();
-                    let mut s = Mark::new(lines[index - 1].0);
-                    let e = Mark::new(lines[index - 1].1);
+                    let mut s = Mark::new(lines[index].0);
+                    let e = Mark::new(lines[index].1);
                     let mut count = 0;
-                    while s.offset != e.offset {
+                    while s.offset < e.offset {
 
                         if s.offset == m.offset {
                             break;
@@ -382,11 +382,12 @@ impl View {
                     count
                 };
 
-                // get line start
-                let line_start_off = lines[index].0;
-                let line_end_off = lines[index].1;
-                let mut tmp_mark = Mark::new(line_start_off);
+                // get next line start/end offsets
+                let next_index = index + 1;
+                let line_start_off = lines[next_index].0;
+                let line_end_off = lines[next_index].1;
 
+                let mut tmp_mark = Mark::new(line_start_off);
                 let doc = self.document.as_ref().unwrap().borrow_mut();
                 for _ in 0..new_x {
                     tmp_mark.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
@@ -398,11 +399,17 @@ impl View {
 
                 m.offset = tmp_mark.offset;
             }
+
+            if m.offset > self.end_offset {
+                scroll_needed = true;
+            }
         }
 
+        // only if main mark
         if scroll_needed == true {
             self.scroll_down(1);
         }
+
     }
 
     pub fn scroll_to_previous_screen(&mut self) {
