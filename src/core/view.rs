@@ -134,21 +134,50 @@ impl View {
         }
     }
 
-
+    // TODO: maintain main mark Option<(x,y)>
     pub fn move_marks_backward(&mut self) {
-        let doc = self.document.as_mut().unwrap().borrow_mut();
 
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+        let mut scroll_needed = false;
+
+        {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+                // TODO: add main mark check
+                if m.offset <= self.start_offset {
+                    scroll_needed = true;
+                }
+
+                m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+            }
+        }
+
+        if scroll_needed == true {
+            self.scroll_up(1);
         }
     }
 
 
     pub fn move_marks_forward(&mut self) {
 
-        let doc = self.document.as_mut().unwrap().borrow_mut();
-        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+        let mut scroll_needed = false;
+
+        {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+
+                // TODO: add main mark check
+                if m.offset >= self.end_offset {
+                    scroll_needed = true;
+                }
+
+                m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+            }
+        }
+
+        if scroll_needed == true {
+            self.scroll_down(1);
         }
     }
 
