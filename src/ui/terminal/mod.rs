@@ -103,6 +103,10 @@ pub fn main_loop(mut editor: &mut Editor) {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for evt in vec_evt {
             process_input_events(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), evt);
+
+            // re-sync view on each event/update or else the main mark will be offscreen
+            // TODO: add a view flag to call this
+            fill_screen(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut());
         }
     }
 
