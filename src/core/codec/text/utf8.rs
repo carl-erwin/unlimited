@@ -131,7 +131,7 @@ pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
     // rewind upto 4 bytes
     // and decode forward / save offset
     let mut off = if from_offset > 4 { from_offset - 4 } else { 0 };
-    while off != from_offset {
+    while off < from_offset {
         let (cp, _, size) = get_codepoint(data, off);
 
         cp_info[nr_cpinfo] = (cp, size, off);
