@@ -653,8 +653,9 @@ pub fn build_screen_layout(data: &[u8],
                            -> u64 {
 
     let max_cpi = screen.width * screen.height;
-    let (vec, last_offset) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
+    let (vec, _) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
 
+    let mut last_pushed_offset = base_offset;
     let mut prev_cp = ' ';
     for cpi in &vec {
 
@@ -674,10 +675,10 @@ pub fn build_screen_layout(data: &[u8],
         if ok == false {
             break;
         }
-
+        last_pushed_offset = cpi.offset;
     }
 
-    last_offset
+    last_pushed_offset
 }
 
 
