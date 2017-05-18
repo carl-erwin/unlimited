@@ -66,7 +66,7 @@ impl Screen {
         let line = &mut self.line[self.current_line_index];
         let (ok, _) = line.push(cpi);
 
-        if ok == true {
+        if ok {
             self.nb_push += 1;
             if cp == '\n' || cp == '\r' {
                 line.read_only = true;

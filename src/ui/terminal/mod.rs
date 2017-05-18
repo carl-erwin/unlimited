@@ -59,7 +59,7 @@ pub fn main_loop(mut editor: &mut Editor) {
 
     let mut ui_state = UiState::new();
 
-    let (width, height) = if ui_state.display_status == true {
+    let (width, height) = if ui_state.display_status {
         let (width, height) = terminal_size().unwrap();
         (width, height - 1)
     } else {
@@ -86,15 +86,15 @@ pub fn main_loop(mut editor: &mut Editor) {
 
         let status_line_y = height + 1;
 
-        if ui_state.display_view == true {
+        if ui_state.display_view {
             draw_view(&mut ui_state,
                       &mut view.as_mut().unwrap().borrow_mut(),
                       &mut stdout);
         }
 
-        if ui_state.display_status == true {
+        if ui_state.display_status {
             display_status_line(&ui_state,
-                                &mut view.as_mut().unwrap().borrow_mut(),
+                                &view.as_mut().unwrap().borrow_mut(),
                                 status_line_y,
                                 width,
                                 &mut stdout);
@@ -102,7 +102,9 @@ pub fn main_loop(mut editor: &mut Editor) {
 
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for evt in vec_evt {
-            process_input_events(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut(), evt);
+            process_input_events(&mut ui_state,
+                                 &mut view.as_mut().unwrap().borrow_mut(),
+                                 &evt);
 
             // re-sync view on each event/update or else the main mark will be offscreen
             // TODO: add a view flag to call this
@@ -123,23 +125,18 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
     let mut views = Vec::new();
 
-    let mut vid = 0;
+    for (vid, b) in editor.document_map.iter().enumerate() {
 
-    for (_, b) in &editor.document_map {
-
-        let view = View::new(vid,
+        let view = View::new(vid as u64,
                              0 as u64,
                              width as usize,
                              height as usize,
-                             Some(b.clone()));
+                             Some(b.1.clone()));
         views.push(view);
-        vid += 1;
     }
 
     for view in views {
-        &editor
-             .view_map
-             .insert(view.id, Rc::new(RefCell::new(view)));
+        editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
     }
 }
 
@@ -149,62 +146,58 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
 fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
-    match view.document {
+    if let Some(ref buf) = view.document {
 
-        Some(ref buf) => {
+        let mut screen = &mut view.screen;
 
-            let mut screen = &mut view.screen;
+        screen.clear();
 
-            screen.clear();
-
-            // render first screen line
-            if 0 == 1 {
-                let s = " unlimitED! v0.0.1\n\n";
-                screen_putstr(&mut screen, &s);
-                let mut line = screen.get_mut_line(0).unwrap();
-                for c in 0..line.width {
-                    let mut cpi = line.get_mut_cpi(c).unwrap();
-                    cpi.is_selected = true;
-                }
+        // render first screen line
+        if 0 == 1 {
+            let s = " unlimitED! v0.0.1\n\n";
+            screen_putstr(&mut screen, s);
+            let mut line = screen.get_mut_line(0).unwrap();
+            for c in 0..line.width {
+                let mut cpi = line.get_mut_cpi(c).unwrap();
+                cpi.is_selected = true;
             }
+        }
 
-            let data = &buf.borrow().buffer.data;
-            let len = data.len();
-            let max_offset = buf.borrow().buffer.size as u64;
+        let data = &buf.borrow().buffer.data;
+        let len = data.len();
+        let max_offset = buf.borrow().buffer.size as u64;
 
-            view.end_offset =
-                build_screen_layout(&data[0..len], view.start_offset, max_offset, &mut screen);
+        view.end_offset =
+            build_screen_layout(&data[0..len], view.start_offset, max_offset, &mut screen);
 
-            ui_state.last_offset = view.end_offset;
+        ui_state.last_offset = view.end_offset;
 
-            // render marks
+        // render marks
 
 
-            // brute force for now
-            for m in view.moving_marks.borrow().iter() {
+        // brute force for now
+        for m in view.moving_marks.borrow().iter() {
 
-                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
-                if m.offset >= view.start_offset && m.offset <= view.end_offset {
-                    for l in 0..screen.height {
-                        let line = screen.get_mut_line(l).unwrap();
-                        for c in 0..line.nb_cells {
-                            let mut cpi = line.get_mut_cpi(c).unwrap();
+            // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+            if m.offset >= view.start_offset && m.offset <= view.end_offset {
+                for l in 0..screen.height {
+                    let line = screen.get_mut_line(l).unwrap();
+                    for c in 0..line.nb_cells {
+                        let mut cpi = line.get_mut_cpi(c).unwrap();
 
-                            if cpi.offset > m.offset {
-                                break;
-                            }
+                        if cpi.offset > m.offset {
+                            break;
+                        }
 
-                            if cpi.offset == m.offset {
-                                cpi.is_selected = true;
-                                ui_state.mark_offset = m.offset;
-                            }
+                        if cpi.offset == m.offset {
+                            cpi.is_selected = true;
+                            ui_state.mark_offset = m.offset;
                         }
                     }
                 }
             }
-
         }
-        None => {}
+
     }
 }
 
@@ -224,7 +217,7 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
             let cpi = line.get_cpi(c).unwrap();
 
-            if cpi.is_selected == true {
+            if cpi.is_selected {
                 write!(stdout, "{}", termion::style::Invert).unwrap();
             }
 
@@ -287,7 +280,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
             match k {
 
                 self::termion::event::Key::Ctrl('c') => {
-                    ui_state.status = format!("Ctrl-c");
+                    ui_state.status = "Ctrl-c".to_owned();
 
                     return InputEvent::KeyPress {
                                ctrl: true,
@@ -298,7 +291,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 }
 
                 self::termion::event::Key::Char('\n') => {
-                    ui_state.status = format!("{}", "<newline>");
+                    ui_state.status = "<newline>".to_owned();
 
                     return InputEvent::KeyPress {
                                ctrl: false,
@@ -354,7 +347,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
 
                 self::termion::event::Key::Left => {
-                    ui_state.status = format!("<left>");
+                    ui_state.status = "<left>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -363,7 +356,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Right => {
-                    ui_state.status = format!("<right>");
+                    ui_state.status = "<right>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -372,7 +365,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Up => {
-                    ui_state.status = format!("<up>");
+                    ui_state.status = "<up>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -381,7 +374,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Down => {
-                    ui_state.status = format!("<down>");
+                    ui_state.status = "<down>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -390,7 +383,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Backspace => {
-                    ui_state.status = format!("<backspc>");
+                    ui_state.status = "<backspc>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -399,7 +392,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Home => {
-                    ui_state.status = format!("<Home>");
+                    ui_state.status = "<Home>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -409,7 +402,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
 
                 }
                 self::termion::event::Key::End => {
-                    ui_state.status = format!("<End>");
+                    ui_state.status = "<End>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -419,7 +412,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
 
                 }
                 self::termion::event::Key::PageUp => {
-                    ui_state.status = format!("<PageUp>");
+                    ui_state.status = "<PageUp>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -428,7 +421,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::PageDown => {
-                    ui_state.status = format!("<PageDown>");
+                    ui_state.status = "<PageDown>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -437,7 +430,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Delete => {
-                    ui_state.status = format!("<Delete>");
+                    ui_state.status = "<Delete>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -446,7 +439,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Insert => {
-                    ui_state.status = format!("<Insert>");
+                    ui_state.status = "<Insert>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -455,7 +448,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                            };
                 }
                 self::termion::event::Key::Esc => {
-                    ui_state.status = format!("<Esc>");
+                    ui_state.status = "<Esc>".to_owned();
                     return InputEvent::KeyPress {
                                ctrl: false,
                                alt: false,
@@ -463,7 +456,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                                key: Key::Escape,
                            };
                 }
-                _ => ui_state.status = format!("Other"),
+                _ => ui_state.status = "Other".to_owned(),
             }
         }
 
@@ -521,51 +514,45 @@ fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
 
     // prepare async read
     loop {
-        let b = stdin.next();
-        match b {
-            Some(b) => {
-                match b {
-                    Ok(val) => {
-                        match parse_event(val, &mut stdin) {
-                            Err(_) => {}
-                            Ok(evt) => {
-                                let evt = translate_termion_event(evt, ui_state);
-                                v.push(evt);
-                                ui_state.input_wait_time_ms = 0;
-                            }
-                        }
-                    }
-                    Err(_) => {}
-                }
-            }
-            None => {
-                if v.len() != 0 {
-                    break;
-                }
 
-                // TODO: use last input event time
-                ui_state.status = format!(" async no event");
-                ui_state.input_wait_time_ms += 10;
-                ui_state.input_wait_time_ms = ::std::cmp::max(ui_state.input_wait_time_ms, 20);
-                thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
+        let b = stdin.next();
+        if let Some(b) = b {
+            if let Ok(val) = b {
+                if let Ok(evt) = parse_event(val, &mut stdin) {
+                    let evt = translate_termion_event(evt, ui_state);
+                    v.push(evt);
+                    ui_state.input_wait_time_ms = 0;
+                }
             }
+
+        } else {
+
+            if !v.is_empty() {
+                break;
+            }
+
+            // TODO: use last input event time
+            ui_state.status = " async no event".to_owned();
+            ui_state.input_wait_time_ms += 10;
+            ui_state.input_wait_time_ms = ::std::cmp::max(ui_state.input_wait_time_ms, 20);
+            thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
         }
     }
 
     v
 }
 
-fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEvent) {
+fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputEvent) {
 
-    if ev == ::core::event::InputEvent::NoInputEvent {
-        // ignore no input event event :-)
+    if *ev == ::core::event::InputEvent::NoInputEvent {
+        // ignore no input event event :-
         return;
     }
 
     ui_state.keys.push(ev.clone());
 
     let mut clear_keys = true;
-    match ev {
+    match *ev {
 
         InputEvent::KeyPress {
             ctrl: true,
@@ -576,18 +563,16 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             if ui_state.keys.len() > 1 {
 
                 let prev_ev = &ui_state.keys[ui_state.keys.len() - 2];
-                match *prev_ev {
-                    InputEvent::KeyPress {
-                        ctrl: true,
-                        alt: false,
-                        shift: false,
-                        key: Key::UNICODE('x'),
-                    } => {
-                        ui_state.quit = true;
-                        clear_keys = false;
-                    }
-                    _ => {}
+                if let InputEvent::KeyPress {
+                           ctrl: true,
+                           alt: false,
+                           shift: false,
+                           key: Key::UNICODE('x'),
+                       } = *prev_ev {
+                    ui_state.quit = true;
+                    clear_keys = false;
                 }
+
             } else {
                 clear_keys = true;
             }
@@ -649,8 +634,10 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE(_),
-        } => {}
+            key: Key::UNICODE(c),
+        } => {
+            ui_state.status = format!("ctrl+<{}>", c);
+        }
 
         // left
         InputEvent::KeyPress {
@@ -662,7 +649,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.move_marks_backward();
 
-            ui_state.status = format!("<left>");
+            ui_state.status = "<left>".to_owned();
         }
 
         // up
@@ -675,7 +662,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.move_marks_to_previous_line();
 
-            ui_state.status = format!("<up>");
+            ui_state.status = "<up>".to_owned();
         }
 
         // down
@@ -688,7 +675,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.move_marks_to_next_line();
 
-            ui_state.status = format!("<down>");
+            ui_state.status = "<down>".to_owned();
         }
 
         // right
@@ -701,7 +688,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.move_marks_forward();
 
-            ui_state.status = format!("<right>");
+            ui_state.status = "<right>".to_owned();
         }
 
         // page_up
@@ -713,7 +700,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
         } => {
 
             view.scroll_to_previous_screen();
-            ui_state.status = format!("<page_up>");
+            ui_state.status = "<page_up>".to_owned();
         }
 
         // page_down
@@ -725,7 +712,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
         } => {
 
             view.scroll_to_next_screen();
-            ui_state.status = format!("<page_down>");
+            ui_state.status = "<page_down>".to_owned();
         }
 
         // delete
@@ -737,7 +724,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
         } => {
 
             view.remove_codepoint();
-            ui_state.status = format!("<del>");
+            ui_state.status = "<del>".to_owned();
         }
 
         // backspace
@@ -750,7 +737,7 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: InputEv
 
             view.remove_previous_codepoint();
 
-            ui_state.status = format!("<backspace>");
+            ui_state.status = "<backspace>".to_owned();
         }
 
         // insert text

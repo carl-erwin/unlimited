@@ -1,6 +1,6 @@
 
 // CodepointInfo contains displayed char attributes
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CodepointInfo {
     pub cp: char,
     pub displayed_cp: char,

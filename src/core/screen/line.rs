@@ -4,7 +4,7 @@ use core::codepointinfo::CodepointInfo;
 pub type LineCellIndex = usize;
 
 // a cell contains codepoint informations
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct LineCell {
     pub cpi: CodepointInfo,
     pub is_used: bool,
@@ -20,7 +20,7 @@ impl LineCell {
 }
 
 // a line is composed of cells
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Line {
     pub cells: Vec<LineCell>,
     pub nb_cells: usize,
@@ -55,7 +55,7 @@ impl Line {
 
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
 
-        if self.nb_cells < self.width && self.read_only == false {
+        if self.nb_cells < self.width && !self.read_only {
             self.cells[self.nb_cells].cpi = cpi;
             self.cells[self.nb_cells].is_used = true;
             self.nb_cells += 1;

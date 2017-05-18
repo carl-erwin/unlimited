@@ -159,12 +159,10 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     let mut codep = 0;
     let mut size = 0;
 
-    for off in from_offset as usize..data.len() {
-
-        let b = data[off];
+    for b in data.iter().skip(from_offset as usize) {
 
         size += 1;
-        state = decode_byte(&mut state, b, &mut codep);
+        state = decode_byte(&mut state, *b, &mut codep);
         match state {
             0 => {
                 break;

@@ -91,7 +91,7 @@ impl View {
             }
         }
 
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_down(1);
         }
     }
@@ -129,7 +129,7 @@ impl View {
             }
         }
 
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_up(0); // resync merged line
         }
     }
@@ -153,7 +153,7 @@ impl View {
             }
         }
 
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_up(1);
         }
     }
@@ -176,7 +176,7 @@ impl View {
             }
         }
 
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_down(1);
         }
     }
@@ -285,7 +285,7 @@ impl View {
             }
         }
 
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_up(1);
         }
 
@@ -328,7 +328,7 @@ impl View {
                 }
             }
 
-            if is_offscreen == true {
+            if is_offscreen {
 
                 // mark is offscren
                 let screen_width = self.screen.width;
@@ -406,7 +406,7 @@ impl View {
         }
 
         // only if main mark
-        if scroll_needed == true {
+        if scroll_needed {
             self.scroll_down(1);
         }
 
@@ -493,15 +493,11 @@ impl View {
         }
 
         // get last used line , if contains eof return
-        match self.screen.get_used_line_clipped(nb_lines) {
-            (Some(l), _) => {
-                if let Some(cpi) = l.get_first_cpi() {
-                    // set first offset of last used line as next screen start
-                    self.start_offset = cpi.offset;
-                }
+        if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
+            if let Some(cpi) = l.get_first_cpi() {
+                // set first offset of last used line as next screen start
+                self.start_offset = cpi.offset;
             }
-
-            _ => {}
         }
     }
 
@@ -548,7 +544,7 @@ impl View {
                 let s = screen.line[i].get_first_cpi().unwrap().offset;
                 let e = screen.line[i].get_last_cpi().unwrap().offset;
 
-                if v.len() != 0 && i == 0 {
+                if !v.is_empty() && i == 0 {
                     // do not push line range twice
                     continue;
                 }
@@ -612,16 +608,12 @@ impl View {
         let (x, y) = (x as usize, y as usize);
         let (cpi, _, _) = self.screen.get_used_cpinfo_clipped(x, y);
 
-        match cpi {
-            Some(cpi) => {
-                for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                    m.offset = cpi.offset;
-                    // we only move one mark
-                    break; // TODO: add main mark ref
-                }
-
+        if let Some(cpi) = cpi {
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                m.offset = cpi.offset;
+                // we only move one mark
+                break; // TODO: add main mark ref
             }
-            _ => {}
         }
     }
 
@@ -669,10 +661,10 @@ pub fn build_screen_layout(data: &[u8],
             */
             _ => {
                 prev_cp = cpi.cp;
-                screen.push(cpi.clone())
+                screen.push(*cpi)
             }
         };
-        if ok == false {
+        if !ok {
             break;
         }
         last_pushed_offset = cpi.offset;
@@ -741,7 +733,7 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     let v: Vec<char> = s.chars().collect();
     for c in &v {
         let ok = screen_putchar(&mut screen, *c, 0xffffffffffffffff);
-        if ok == false {
+        if !ok {
             return false;
         }
     }

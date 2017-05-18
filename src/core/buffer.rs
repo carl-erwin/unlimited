@@ -42,7 +42,7 @@ impl Buffer {
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
-    pub fn new(file_name: &String, mode: OpenMode) -> Option<Buffer> {
+    pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer> {
 
         // TODO: check permission
         let mut file = match File::open(file_name) {
@@ -66,7 +66,7 @@ impl Buffer {
         */
         Some(Buffer {
                  id: 0,
-                 file_name: file_name.clone(),
+                 file_name: file_name.to_owned(),
                  mode,
                  size,
                  nr_changes: 0,
@@ -122,9 +122,10 @@ impl Buffer {
     pub fn write(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
 
         let index = offset as usize;
-        for n in 0..nr_bytes {
-            self.data.insert(index + n, data[n]);
+        for (n, b) in data.iter().enumerate().take(nr_bytes) {
+            self.data.insert(index + n, *b);
         }
+
         self.size += nr_bytes;
         self.nr_changes += 1;
 
@@ -163,14 +164,17 @@ impl Buffer {
         1
     }
 
+    /*
     /// returns the position and size of a given page
     pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
-        if page_index > 0 {
-            (0, self.size)
-        } else {
-            (0, self.size)
-        }
+        // if page_index > 0 {
+        //    (0, self.size)
+        // } else {
+        //    (0, self.size)
+        // }
+        (0, self.size)
     }
+*/
 }
 
 

@@ -29,7 +29,7 @@ fn parse_command_line() -> Config {
         .get_matches();
 
     let mut files_list = Vec::new();
-    if matches.is_present("FILES") == true {
+    if matches.is_present("FILES") {
         let strs: Vec<&str> = matches.values_of("FILES").unwrap().collect();
         files_list = strs.into_iter().map(|x| x.to_owned()).collect()
     }

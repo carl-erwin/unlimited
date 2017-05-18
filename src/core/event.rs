@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Event {
     InputEvent,
     LayoutEvent,

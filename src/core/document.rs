@@ -10,6 +10,7 @@ use core::buffer::OpenMode;
 pub type Id = u64;
 
 ///
+#[derive(Default)]
 pub struct DocumentBuilder {
     internal: bool,
     document_name: String,
@@ -28,7 +29,7 @@ impl DocumentBuilder {
     }
 
     ///
-    pub fn internal<'a>(&'a mut self, flag: bool) -> &'a mut DocumentBuilder {
+    pub fn internal(&mut self, flag: bool) -> &mut DocumentBuilder {
         self.internal = flag;
         self
     }

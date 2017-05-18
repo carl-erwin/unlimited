@@ -75,9 +75,8 @@ impl Editor {
             ui::main_loop(self);
         }
 
-        match core_th {
-            Some(core_handle) => core_handle.join().unwrap(),
-            None => {}
+        if let Some(core_handle) = core_th {
+            core_handle.join().unwrap()
         }
     }
 
@@ -114,18 +113,14 @@ impl Editor {
                 .internal(false)
                 .finalize();
 
-            match b {
-                Some(b) => {
-                    self.document_map.insert(id, b);
-                    id += 1;
-                }
-                None => {}
+            if let Some(b) = b {
+                self.document_map.insert(id, b);
+                id += 1;
             }
-
         }
 
         // default buffer ?
-        if self.document_map.len() == 0 {
+        if self.document_map.is_empty() {
 
             // edit.get_untitled_count() -> 1
 

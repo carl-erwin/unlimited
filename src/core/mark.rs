@@ -68,11 +68,8 @@ impl Mark {
                     self.offset = offset + 1;
 
                     if prev_offset > 0 {
-                        match get_prev_codepoint(&buffer.data, prev_offset) {
-                            ('\r', offset, _) => {
-                                self.offset = offset;
-                            }
-                            _ => {}
+                        if let ('\r', offset, _) = get_prev_codepoint(&buffer.data, prev_offset) {
+                            self.offset = offset;
                         }
                     }
                     break;
@@ -105,12 +102,8 @@ impl Mark {
             }
             match cp {
 
-                '\r' => {
+                '\r' | '\n' => {
                     // TODO: handle \r\n
-                    break;
-                }
-
-                '\n' => {
                     break;
                 }
 
