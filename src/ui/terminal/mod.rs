@@ -821,19 +821,29 @@ fn display_status_line(ui_state: &UiState,
     terminal_clear_current_line(&mut stdout, width);
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let (_, x, y) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
+    let (_, ex, ey) = view.screen.find_cpi_by_offset(view.end_offset);
+    let (cpi, x, y) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
 
-    let status_str = format!("line {} document_name '{}' \
-                             , file('{}'), event('{}') \
-                             mark(({},{})@{}) keys({})",
-                             line,
+    let mcp = match cpi {
+        Some(cpi) => cpi.cp as u32,
+        _ => 0xffd,
+    };
+
+    let status_str = format!("doc_name[{}] \
+                             , file[{}], \
+                             eos(({},{})@{}) \
+                             m(({},{})@{}:'{}') \
+                             ev[{}] ",
                              name,
                              file_name,
-                             ui_state.status,
+                             ex,
+                             ey,
+                             view.end_offset,
                              x,
                              y,
                              ui_state.mark_offset,
-                             ui_state.keys.len());
+                             mcp,
+                             ui_state.status);
 
     print!("{}", status_str);
     stdout.flush().unwrap();
