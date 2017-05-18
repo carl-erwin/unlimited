@@ -527,8 +527,7 @@ fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
                 match b {
                     Ok(val) => {
                         match parse_event(val, &mut stdin) {
-                            Err(_) => {
-                            }
+                            Err(_) => {}
                             Ok(evt) => {
                                 let evt = translate_termion_event(evt, ui_state);
                                 v.push(evt);
@@ -536,8 +535,7 @@ fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
                             }
                         }
                     }
-                    Err(_) => {
-                    }
+                    Err(_) => {}
                 }
             }
             None => {
