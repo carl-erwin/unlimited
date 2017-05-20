@@ -479,24 +479,50 @@ impl View {
             return;
         }
 
-        if nb_lines >= self.screen.height {
-            return;
-        }
-
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
             doc.buffer.data.len() as u64
         };
 
-        if self.screen.contains_offset(max_offset) {
-            return;
-        }
+        if nb_lines >= self.screen.height {
+            // will be slower than just reading the current screen
 
-        // get last used line , if contains eof return
-        if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
-            if let Some(cpi) = l.get_first_cpi() {
-                // set first offset of last used line as next screen start
-                self.start_offset = cpi.offset;
+            let screen_width = self.screen.width;
+            let screen_height = self.screen.height + 32;
+
+            let start_offset = self.start_offset;
+            let end_offset = ::std::cmp::min(self.start_offset +
+                                             (4 * nb_lines * screen_width) as u64,
+                                             max_offset);
+
+            let lines =
+                self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
+
+            // find line index and take lines[(index + nb_lines)].0 as new start of view
+            let index = match lines
+                      .iter()
+                      .position(|e| e.0 <= start_offset && start_offset <= e.1) {
+                None => 0,
+                Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
+            };
+
+            self.start_offset = lines[index].0;
+
+        } else {
+
+            if self.screen.contains_offset(max_offset) {
+                return;
+            }
+
+            // just read the current screen
+
+
+            // get last used line , if contains eof return
+            if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
+                if let Some(cpi) = l.get_first_cpi() {
+                    // set first offset of last used line as next screen start
+                    self.start_offset = cpi.offset;
+                }
             }
         }
     }
@@ -523,6 +549,10 @@ impl View {
         let mut m = Mark::new(start_offset);
 
         let doc = self.document.as_ref().unwrap().borrow_mut();
+
+        let screen_width = ::std::cmp::max(1, screen_width);
+        let screen_height = ::std::cmp::max(4, screen_height);
+
 
         // get beginning of the line @offset
         m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
