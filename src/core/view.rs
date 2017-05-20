@@ -413,7 +413,7 @@ impl View {
     }
 
     pub fn scroll_to_previous_screen(&mut self) {
-        let nb = self.screen.height - 1;
+        let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_up(nb);
     }
 
@@ -469,7 +469,7 @@ impl View {
 
 
     pub fn scroll_to_next_screen(&mut self) {
-        let nb = self.screen.height - 1;
+        let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_down(nb);
     }
 
