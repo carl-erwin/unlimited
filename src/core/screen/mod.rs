@@ -231,10 +231,11 @@ impl Screen {
         // TODO: use dichotomic search
         for y in 0..self.height {
             let l = self.get_line(y).unwrap();
+            if l.nb_cells == 0 {
+                continue;
+            }
+
             for x in 0..l.width {
-                if l.nb_cells == 0 {
-                    break;
-                }
                 let cpi = l.get_cpi(x).unwrap();
                 if cpi.offset == offset {
                     return (Some(cpi), x, y);
