@@ -664,10 +664,10 @@ impl View {
 
 
 //////////////////////////////////
-// This function will run the confgured filters
+// This function will run the configured filters
 // until the screen is full or eof is reached
-// the filters will be configured per view to allow multiple interpretation a the same document
-// data will be replace by a "FileMMap"
+// the filters will be configured per view to allow multiple interpretation of the same document
+// data will be replaced by a "FileMMap"
 pub fn build_screen_layout(data: &[u8],
                            base_offset: u64,
                            max_offset: u64,
