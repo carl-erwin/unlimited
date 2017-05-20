@@ -828,7 +828,7 @@ fn display_status_line(ui_state: &UiState,
     let status_str = format!("doc_name[{}] \
                              , file[{}], \
                              eos(({},{})@{}) \
-                             m(({},{})@{}:'{}') \
+                             m(({},{})@{}:'{:08x}') \
                              ev[{}] ",
                              name,
                              file_name,
