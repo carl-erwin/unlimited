@@ -593,8 +593,13 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputE
             alt: false,
             shift: false,
             key: Key::UNICODE('a'),
+        } |
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Home,
         } => {
-
             view.move_marks_to_beginning_of_line();
         }
 
@@ -604,6 +609,12 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputE
             alt: false,
             shift: false,
             key: Key::UNICODE('e'),
+        } |
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::End,
         } => {
 
             view.move_marks_to_end_of_line();
