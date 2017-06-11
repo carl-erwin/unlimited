@@ -588,7 +588,7 @@ impl View {
 
             // eof reached ?
             // FIXME: the api is not yet READY
-            // we must find a way to cover all fill lines
+            // we must find a way to cover all filled lines
             if screen.current_line_index < screen.height {
                 let s = screen.line[screen.current_line_index]
                     .get_first_cpi()

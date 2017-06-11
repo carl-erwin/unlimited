@@ -228,7 +228,7 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
         }
 
         /*
-        for _ in line.used..line.width {
+        for _ in line.nb_cells..line.width {
             write!(stdout, " ").unwrap();
         }
         */
@@ -547,7 +547,7 @@ fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
 fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputEvent) {
 
     if *ev == ::core::event::InputEvent::NoInputEvent {
-        // ignore no input event event :-
+        // ignore no input event event :-)
         return;
     }
 
