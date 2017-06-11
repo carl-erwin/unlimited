@@ -741,11 +741,16 @@ fn decode_slice_to_vec(data: &[u8],
 
 
 
-//
+// TODO return array of CodePointInfo  0x7f -> <ESC>
 pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 
-    let displayed_cp = match c {
+    let displayed_cp: char = match c {
         '\r' | '\n' | '\t' => ' ',
+
+        _ if c < ' ' => '�',
+
+        _ if c == 0x7f as char => '�',
+
         _ => c,
     };
 
