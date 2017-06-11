@@ -204,8 +204,10 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
 fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
+    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
+    // stdout.flush().unwrap();
 
     for l in 0..screen.height {
 
