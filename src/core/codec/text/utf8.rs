@@ -85,7 +85,7 @@ pub fn is_codepoint_start(byte: u8) -> bool {
 // return 0 on error, or the number of written bytes
 pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
     if codepoint < 0x80 {
-        out[0] = (codepoint & 0x7F) as u8;
+        out[0] = codepoint as u8;
         return 1;
     }
 
