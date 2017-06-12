@@ -675,7 +675,12 @@ pub fn build_screen_layout(data: &[u8],
                            -> u64 {
 
     let max_cpi = screen.width * screen.height;
+
+    // utf8
     let (vec, _) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
+
+    // hexa
+    //let (vec, _) = raw_slice_to_hex_vec(data, base_offset, max_offset, max_cpi);
 
     let mut last_pushed_offset = base_offset;
     let mut prev_cp = ' ';
@@ -739,6 +744,80 @@ fn decode_slice_to_vec(data: &[u8],
     (vec, off)
 }
 
+//
+fn raw_slice_to_hex_vec(data: &[u8],
+                        base_offset: u64,
+                        max_offset: u64,
+                        max_cpi: usize)
+                        -> (Vec<CodepointInfo>, u64) {
+
+    let mut vec = Vec::with_capacity(max_cpi);
+
+    let mut off: u64 = base_offset;
+    let last_off = data.len() as u64;
+
+    let hexchars: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c',
+                                'd', 'e', 'f'];
+
+    while off < last_off {
+
+        let mut width = 0;
+        for i in 0..16 {
+
+            if off + i >= last_off {
+                break;
+            }
+
+
+            let hi: usize = (data[(off + i) as usize] >> 4) as usize;
+            let low: usize = (data[(off + i) as usize] & 0x0f) as usize;
+
+            let cp = hexchars[hi];
+            vec.push(filter_codepoint(cp, off + i));
+            let cp = hexchars[low];
+            vec.push(filter_codepoint(cp, off + i));
+            vec.push(filter_codepoint(' ', off + i));
+
+            if vec.len() == max_cpi {
+                break;
+            }
+            width += 1;
+        }
+
+        if 0 == 1 {
+            vec.push(filter_codepoint('|', off + width));
+            vec.push(filter_codepoint(' ', off + width));
+
+            for i in 0..16 {
+
+                if off + i >= last_off {
+                    break;
+                }
+
+                let c: char = data[(off + i) as usize] as char;
+                vec.push(filter_codepoint(c, off + i));
+                if vec.len() == max_cpi {
+                    break;
+                }
+            }
+        }
+
+        vec.push(filter_codepoint('\n', off));
+        off += width;
+    }
+
+    // eof handling
+    if last_off == max_offset {
+        vec.push(CodepointInfo {
+                     cp: ' ',
+                     displayed_cp: '$',
+                     offset: last_off,
+                     is_selected: !false,
+                 });
+    }
+
+    (vec, off)
+}
 
 
 // TODO return array of CodePointInfo  0x7f -> <ESC>
