@@ -26,17 +26,21 @@ impl Mark {
         Mark { offset }
     }
 
-    pub fn move_forward(&mut self,
-                        buffer: &Buffer,
-                        get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64) {
+    pub fn move_forward(
+        &mut self,
+        buffer: &Buffer,
+        get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
+    ) {
 
         self.offset = get_next_codepoint_start(&buffer.data, self.offset);
         // TODO: if '\r\n' must move + 1
     }
 
-    pub fn move_backward(&mut self,
-                         buffer: &Buffer,
-                         get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64) {
+    pub fn move_backward(
+        &mut self,
+        buffer: &Buffer,
+        get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
+    ) {
 
         if self.offset == 0 {
             return;
@@ -46,10 +50,11 @@ impl Mark {
         self.offset = get_previous_codepoint_start(&buffer.data, self.offset);
     }
 
-    pub fn move_to_beginning_of_line(&mut self,
-                                     buffer: &Buffer,
-                                     get_prev_codepoint: fn(data: &[u8], from_offset: u64)
-                                                            -> (char, u64, usize)) {
+    pub fn move_to_beginning_of_line(
+        &mut self,
+        buffer: &Buffer,
+        get_prev_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+    ) {
 
         if self.offset == 0 {
             return;
@@ -86,10 +91,11 @@ impl Mark {
     }
 
 
-    pub fn move_to_end_of_line(&mut self,
-                               buffer: &Buffer,
-                               get_codepoint: fn(data: &[u8], from_offset: u64)
-                                                 -> (char, u64, usize)) {
+    pub fn move_to_end_of_line(
+        &mut self,
+        buffer: &Buffer,
+        get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+    ) {
 
         let max_offset = buffer.data.len() as u64;
 

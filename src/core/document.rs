@@ -59,11 +59,11 @@ impl DocumentBuilder {
         };
 
         Some(Rc::new(RefCell::new(Document {
-                                      id: 0,
-                                      name: self.document_name.clone(),
-                                      buffer: buffer,
-                                      changed: false,
-                                  })))
+            id: 0,
+            name: self.document_name.clone(),
+            buffer: buffer,
+            changed: false,
+        })))
     }
 }
 

@@ -87,24 +87,30 @@ pub fn main_loop(mut editor: &mut Editor) {
         let status_line_y = height + 1;
 
         if ui_state.display_view {
-            draw_view(&mut ui_state,
-                      &mut view.as_mut().unwrap().borrow_mut(),
-                      &mut stdout);
+            draw_view(
+                &mut ui_state,
+                &mut view.as_mut().unwrap().borrow_mut(),
+                &mut stdout,
+            );
         }
 
         if ui_state.display_status {
-            display_status_line(&ui_state,
-                                &view.as_mut().unwrap().borrow_mut(),
-                                status_line_y,
-                                width,
-                                &mut stdout);
+            display_status_line(
+                &ui_state,
+                &view.as_mut().unwrap().borrow_mut(),
+                status_line_y,
+                width,
+                &mut stdout,
+            );
         }
 
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for evt in vec_evt {
-            process_input_events(&mut ui_state,
-                                 &mut view.as_mut().unwrap().borrow_mut(),
-                                 &evt);
+            process_input_events(
+                &mut ui_state,
+                &mut view.as_mut().unwrap().borrow_mut(),
+                &evt,
+            );
 
             // re-sync view on each event/update or else the main mark will be offscreen
             // TODO: add a view flag to call this
@@ -127,11 +133,13 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
     for (vid, b) in editor.document_map.iter().enumerate() {
 
-        let view = View::new(vid as u64,
-                             0 as u64,
-                             width as usize,
-                             height as usize,
-                             Some(b.1.clone()));
+        let view = View::new(
+            vid as u64,
+            0 as u64,
+            width as usize,
+            height as usize,
+            Some(b.1.clone()),
+        );
         views.push(view);
     }
 
@@ -285,55 +293,55 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                     ui_state.status = "Ctrl-c".to_owned();
 
                     return InputEvent::KeyPress {
-                               ctrl: true,
-                               alt: false,
-                               shift: false,
-                               key: Key::UNICODE('c'),
-                           };
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                        key: Key::UNICODE('c'),
+                    };
                 }
 
                 self::termion::event::Key::Char('\n') => {
                     ui_state.status = "<newline>".to_owned();
 
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::UNICODE('\n'),
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::UNICODE('\n'),
+                    };
                 }
 
                 self::termion::event::Key::Char(c) => {
                     ui_state.status = format!("{}", c);
 
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::UNICODE(c),
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::UNICODE(c),
+                    };
                 }
 
                 self::termion::event::Key::Alt(c) => {
                     ui_state.status = format!("Alt-{}", c);
 
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: true,
-                               shift: false,
-                               key: Key::UNICODE(c),
-                           };
+                        ctrl: false,
+                        alt: true,
+                        shift: false,
+                        key: Key::UNICODE(c),
+                    };
                 }
 
                 self::termion::event::Key::Ctrl(c) => {
                     ui_state.status = format!("Ctrl-{}", c);
 
                     return InputEvent::KeyPress {
-                               ctrl: true,
-                               alt: false,
-                               shift: false,
-                               key: Key::UNICODE(c),
-                           };
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                        key: Key::UNICODE(c),
+                    };
                 }
 
                 self::termion::event::Key::F(1) => {
@@ -351,112 +359,112 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 self::termion::event::Key::Left => {
                     ui_state.status = "<left>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Left,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Left,
+                    };
                 }
                 self::termion::event::Key::Right => {
                     ui_state.status = "<right>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Right,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Right,
+                    };
                 }
                 self::termion::event::Key::Up => {
                     ui_state.status = "<up>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Up,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Up,
+                    };
                 }
                 self::termion::event::Key::Down => {
                     ui_state.status = "<down>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Down,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Down,
+                    };
                 }
                 self::termion::event::Key::Backspace => {
                     ui_state.status = "<backspc>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::BackSpace,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::BackSpace,
+                    };
                 }
                 self::termion::event::Key::Home => {
                     ui_state.status = "<Home>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Home,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Home,
+                    };
 
                 }
                 self::termion::event::Key::End => {
                     ui_state.status = "<End>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::End,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::End,
+                    };
 
                 }
                 self::termion::event::Key::PageUp => {
                     ui_state.status = "<PageUp>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::PageUp,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::PageUp,
+                    };
                 }
                 self::termion::event::Key::PageDown => {
                     ui_state.status = "<PageDown>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::PageDown,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::PageDown,
+                    };
                 }
                 self::termion::event::Key::Delete => {
                     ui_state.status = "<Delete>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Delete,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Delete,
+                    };
                 }
                 self::termion::event::Key::Insert => {
                     ui_state.status = "<Insert>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Insert,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Insert,
+                    };
                 }
                 self::termion::event::Key::Esc => {
                     ui_state.status = "<Esc>".to_owned();
                     return InputEvent::KeyPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               key: Key::Escape,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        key: Key::Escape,
+                    };
                 }
                 _ => ui_state.status = "Other".to_owned(),
             }
@@ -471,26 +479,26 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                     let button = termion_mouse_button_to_u32(mb);
 
                     return InputEvent::ButtonPress {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               x: (x - 1) as i32,
-                               y: (y - 1) as i32,
-                               button,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        x: (x - 1) as i32,
+                        y: (y - 1) as i32,
+                        button,
+                    };
                 }
 
                 self::termion::event::MouseEvent::Release(x, y) => {
                     ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
 
                     return InputEvent::ButtonRelease {
-                               ctrl: false,
-                               alt: false,
-                               shift: false,
-                               x: (x - 1) as i32,
-                               y: (y - 1) as i32,
-                               button: 0xff,
-                           };
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                        x: (x - 1) as i32,
+                        y: (y - 1) as i32,
+                        button: 0xff,
+                    };
                 }
 
                 self::termion::event::MouseEvent::Hold(x, y) => {
@@ -508,9 +516,10 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
 }
 
 
-fn get_input_event(mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
-                   ui_state: &mut UiState)
-                   -> Vec<InputEvent> {
+fn get_input_event(
+    mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
+    ui_state: &mut UiState,
+) -> Vec<InputEvent> {
 
     let mut v = Vec::<InputEvent>::new();
 
@@ -566,11 +575,12 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputE
 
                 let prev_ev = &ui_state.keys[ui_state.keys.len() - 2];
                 if let InputEvent::KeyPress {
-                           ctrl: true,
-                           alt: false,
-                           shift: false,
-                           key: Key::UNICODE('x'),
-                       } = *prev_ev {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                    key: Key::UNICODE('x'),
+                } = *prev_ev
+                {
                     ui_state.quit = true;
                     clear_keys = false;
                 }
@@ -800,11 +810,13 @@ fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputE
 
 }
 
-fn display_status_line(ui_state: &UiState,
-                       view: &View,
-                       line: u16,
-                       width: u16,
-                       mut stdout: &mut Stdout) {
+fn display_status_line(
+    ui_state: &UiState,
+    view: &View,
+    line: u16,
+    width: u16,
+    mut stdout: &mut Stdout,
+) {
 
     let doc = match view.document {
         Some(ref d) => d.borrow(),
@@ -827,21 +839,23 @@ fn display_status_line(ui_state: &UiState,
         _ => 0xffd,
     };
 
-    let status_str = format!("doc_name[{}] \
+    let status_str = format!(
+        "doc_name[{}] \
                              , file[{}], \
                              eos(({},{})@{}) \
                              m(({},{})@{}:'{:08x}') \
                              ev[{}] ",
-                             name,
-                             file_name,
-                             ex,
-                             ey,
-                             view.end_offset,
-                             x,
-                             y,
-                             ui_state.mark_offset,
-                             mcp,
-                             ui_state.status);
+        name,
+        file_name,
+        ex,
+        ey,
+        view.end_offset,
+        x,
+        y,
+        ui_state.mark_offset,
+        mcp,
+        ui_state.status
+    );
 
     print!("{}", status_str);
     stdout.flush().unwrap();

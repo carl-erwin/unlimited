@@ -22,24 +22,23 @@ pub fn start() {
     let tcp = TcpListener::bind(&addr, &handle).unwrap();
 
     // Iterate incoming connections
-    let server = tcp.incoming()
-        .for_each(|(tcp, _)| {
-            // Split up the read and write halves
-            let (reader, writer) = tcp.split();
+    let server = tcp.incoming().for_each(|(tcp, _)| {
+        // Split up the read and write halves
+        let (reader, writer) = tcp.split();
 
-            // Future of the copy
-            let bytes_copied = io::copy(reader, writer);
+        // Future of the copy
+        let bytes_copied = io::copy(reader, writer);
 
-            // ... after which we'll print what happened
-            let handle_conn = bytes_copied
-                .map(|(n, _, _)| println!("wrote {} bytes", n))
-                .map_err(|err| println!("IO error {:?}", err));
+        // ... after which we'll print what happened
+        let handle_conn = bytes_copied
+            .map(|(n, _, _)| println!("wrote {} bytes", n))
+            .map_err(|err| println!("IO error {:?}", err));
 
-            // Spawn the future as a concurrent task
-            handle.spawn(handle_conn);
+        // Spawn the future as a concurrent task
+        handle.spawn(handle_conn);
 
-            Ok(())
-        });
+        Ok(())
+    });
 
     // Spin up the server on the event loop
     core.run(server).unwrap();

@@ -65,14 +65,14 @@ impl Buffer {
             }
         */
         Some(Buffer {
-                 id: 0,
-                 file_name: file_name.to_owned(),
-                 mode,
-                 size,
-                 nr_changes: 0,
-                 file,
-                 data,
-             })
+            id: 0,
+            file_name: file_name.to_owned(),
+            mode,
+            size,
+            nr_changes: 0,
+            file,
+            data,
+        })
     }
 
     /// close a previously opened buffer see buffer_open
@@ -135,11 +135,12 @@ impl Buffer {
     /// remove up to 'nr_bytes' from the buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data)
     /// before remove the bytes
-    pub fn remove(&mut self,
-                  offset: u64,
-                  nr_bytes: usize,
-                  removed_data: Option<&mut Vec<u8>>)
-                  -> usize {
+    pub fn remove(
+        &mut self,
+        offset: u64,
+        nr_bytes: usize,
+        removed_data: Option<&mut Vec<u8>>,
+    ) -> usize {
 
         let start_offset = ::std::cmp::min(offset as usize, self.size);
         let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);

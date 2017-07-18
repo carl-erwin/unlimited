@@ -128,9 +128,10 @@ impl Line {
         }
     }
 
-    pub fn get_used_cpi_clipped(&self,
-                                index: LineCellIndex)
-                                -> (Option<&CodepointInfo>, LineCellIndex) {
+    pub fn get_used_cpi_clipped(
+        &self,
+        index: LineCellIndex,
+    ) -> (Option<&CodepointInfo>, LineCellIndex) {
 
         if self.nb_cells == 0 {
             return (None, 0);

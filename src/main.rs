@@ -18,14 +18,16 @@ fn parse_command_line() -> Config {
         .version("0.0.1")
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .arg(Arg::with_name("START_CORE")
-                 .help("enable core")
-                 .long("start-core"))
+        .arg(Arg::with_name("START_CORE").help("enable core").long(
+            "start-core",
+        ))
         .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
-        .arg(Arg::with_name("FILES")
-                 .help("list of the files to open")
-                 .required(false)
-                 .multiple(true))
+        .arg(
+            Arg::with_name("FILES")
+                .help("list of the files to open")
+                .required(false)
+                .multiple(true),
+        )
         .get_matches();
 
     let mut files_list = Vec::new();

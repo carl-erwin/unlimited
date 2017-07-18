@@ -46,12 +46,13 @@ pub struct View {
 
 
 impl View {
-    pub fn new(id: Id,
-               start_offset: u64,
-               width: usize,
-               height: usize,
-               document: Option<Rc<RefCell<Document>>>)
-               -> View {
+    pub fn new(
+        id: Id,
+        start_offset: u64,
+        width: usize,
+        height: usize,
+        document: Option<Rc<RefCell<Document>>>,
+    ) -> View {
 
         let screen = Box::new(Screen::new(width, height));
 
@@ -241,9 +242,9 @@ impl View {
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
                 // find "previous" line index
-                let index = match lines
-                          .iter()
-                          .position(|e| e.0 <= end_offset && end_offset <= e.1) {
+                let index = match lines.iter().position(
+                    |e| e.0 <= end_offset && end_offset <= e.1,
+                ) {
                     None | Some(0) => continue,
                     Some(i) => i - 1,
                 };
@@ -351,9 +352,9 @@ impl View {
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
                 // find the cursor index
-                let index = match lines
-                          .iter()
-                          .position(|e| e.0 <= m.offset && m.offset <= e.1) {
+                let index = match lines.iter().position(
+                    |e| e.0 <= m.offset && m.offset <= e.1,
+                ) {
                     None => continue,
                     Some(i) => {
                         if i == lines.len() - 1 {
@@ -451,9 +452,9 @@ impl View {
         let lines = self.get_lines_offsets(m.offset, offset_to_find, width, height);
 
         // find line index
-        let index = match lines
-                  .iter()
-                  .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1) {
+        let index = match lines.iter().position(|e| {
+            e.0 <= offset_to_find && offset_to_find <= e.1
+        }) {
             None => 0,
             Some(i) => {
                 if i >= nb_lines {
@@ -491,17 +492,18 @@ impl View {
             let screen_height = self.screen.height + 32;
 
             let start_offset = self.start_offset;
-            let end_offset = ::std::cmp::min(self.start_offset +
-                                             (4 * nb_lines * screen_width) as u64,
-                                             max_offset);
+            let end_offset = ::std::cmp::min(
+                self.start_offset + (4 * nb_lines * screen_width) as u64,
+                max_offset,
+            );
 
             let lines =
                 self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
             // find line index and take lines[(index + nb_lines)].0 as new start of view
-            let index = match lines
-                      .iter()
-                      .position(|e| e.0 <= start_offset && start_offset <= e.1) {
+            let index = match lines.iter().position(
+                |e| e.0 <= start_offset && start_offset <= e.1,
+            ) {
                 None => 0,
                 Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
             };
@@ -537,12 +539,13 @@ impl View {
 
 
     // TODO: move to core/view/layout.rs
-    fn get_lines_offsets(&self,
-                         start_offset: u64,
-                         end_offset: u64,
-                         screen_width: usize,
-                         screen_height: usize)
-                         -> Vec<(u64, u64)> {
+    fn get_lines_offsets(
+        &self,
+        start_offset: u64,
+        end_offset: u64,
+        screen_width: usize,
+        screen_height: usize,
+    ) -> Vec<(u64, u64)> {
 
         let mut v = Vec::<(u64, u64)>::new();
 
@@ -594,6 +597,7 @@ impl View {
                     .get_first_cpi()
                     .unwrap()
                     .offset;
+
                 let e = screen.line[screen.current_line_index]
                     .get_last_cpi()
                     .unwrap()
@@ -668,11 +672,12 @@ impl View {
 // until the screen is full or eof is reached
 // the filters will be configured per view to allow multiple interpretation of the same document
 // data will be replaced by a "FileMMap"
-pub fn build_screen_layout(data: &[u8],
-                           base_offset: u64,
-                           max_offset: u64,
-                           mut screen: &mut Screen)
-                           -> u64 {
+pub fn build_screen_layout(
+    data: &[u8],
+    base_offset: u64,
+    max_offset: u64,
+    mut screen: &mut Screen,
+) -> u64 {
 
     let max_cpi = screen.width * screen.height;
 
@@ -710,11 +715,12 @@ pub fn build_screen_layout(data: &[u8],
 
 
 
-fn decode_slice_to_vec(data: &[u8],
-                       base_offset: u64,
-                       max_offset: u64,
-                       max_cpi: usize)
-                       -> (Vec<CodepointInfo>, u64) {
+fn decode_slice_to_vec(
+    data: &[u8],
+    base_offset: u64,
+    max_offset: u64,
+    max_cpi: usize,
+) -> (Vec<CodepointInfo>, u64) {
 
     let mut vec = Vec::with_capacity(max_cpi);
 
@@ -734,30 +740,47 @@ fn decode_slice_to_vec(data: &[u8],
     // eof handling
     if last_off == max_offset {
         vec.push(CodepointInfo {
-                     cp: ' ',
-                     displayed_cp: '$',
-                     offset: last_off,
-                     is_selected: !false,
-                 });
+            cp: ' ',
+            displayed_cp: '$',
+            offset: last_off,
+            is_selected: !false,
+        });
     }
 
     (vec, off)
 }
 
 //
-fn raw_slice_to_hex_vec(data: &[u8],
-                        base_offset: u64,
-                        max_offset: u64,
-                        max_cpi: usize)
-                        -> (Vec<CodepointInfo>, u64) {
+fn raw_slice_to_hex_vec(
+    data: &[u8],
+    base_offset: u64,
+    max_offset: u64,
+    max_cpi: usize,
+) -> (Vec<CodepointInfo>, u64) {
 
     let mut vec = Vec::with_capacity(max_cpi);
 
     let mut off: u64 = base_offset;
     let last_off = data.len() as u64;
 
-    let hexchars: [char; 16] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c',
-                                'd', 'e', 'f'];
+    let hexchars: [char; 16] = [
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+        'f',
+    ];
 
     while off < last_off {
 
@@ -809,11 +832,11 @@ fn raw_slice_to_hex_vec(data: &[u8],
     // eof handling
     if last_off == max_offset {
         vec.push(CodepointInfo {
-                     cp: ' ',
-                     displayed_cp: '$',
-                     offset: last_off,
-                     is_selected: !false,
-                 });
+            cp: ' ',
+            displayed_cp: '$',
+            offset: last_off,
+            is_selected: !false,
+        });
     }
 
     (vec, off)

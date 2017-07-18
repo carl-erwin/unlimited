@@ -210,10 +210,11 @@ impl Screen {
     }
 
 
-    pub fn get_used_cpinfo_clipped(&mut self,
-                                   x: usize,
-                                   y: usize)
-                                   -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
+    pub fn get_used_cpinfo_clipped(
+        &mut self,
+        x: usize,
+        y: usize,
+    ) -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
 
         match self.get_used_line_clipped(y) {
             (None, li) => (None, x, li),

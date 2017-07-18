@@ -118,14 +118,16 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
 
     //                 cp    size   offset
-    let mut cp_info: [(char, usize, u64); 8] = [('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0),
-                                                ('\0', 0, 0)];
+    let mut cp_info: [(char, usize, u64); 8] = [
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+        ('\0', 0, 0),
+    ];
     let mut nr_cpinfo = 0;
 
     // rewind up to 4 bytes
@@ -237,9 +239,35 @@ fn test_codec_decode() {
 #[test]
 fn test2_codec_decode() {
 
-    let data: [u8; 27] = [0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61, 0x0a, 0x82, 0xac, 0xe2, 0x82, 0x61,
-                          0x0a, 0xac, 0xe2, 0x82, 0x61, 0x0a, 0xe2, 0x82, 0x61, 0x0a, 0x82, 0x61,
-                          0x0a, 0x61, 0x0a];
+    let data: [u8; 27] = [
+        0xe2,
+        0x82,
+        0xac,
+        0xe2,
+        0x82,
+        0x61,
+        0x0a,
+        0x82,
+        0xac,
+        0xe2,
+        0x82,
+        0x61,
+        0x0a,
+        0xac,
+        0xe2,
+        0x82,
+        0x61,
+        0x0a,
+        0xe2,
+        0x82,
+        0x61,
+        0x0a,
+        0x82,
+        0x61,
+        0x0a,
+        0x61,
+        0x0a,
+    ];
 
     let mut state: u32 = 0;
     let mut codep: u32 = 0;
