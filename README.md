@@ -1,8 +1,6 @@
 # unlimitED!
 
 
-NOTE: THIS PROJECT JUST STARTED
-
 **unlimitED!** is an experimental editor, and an excuse for me to learn the **Rust** language :-)<br/>
 It is based on previous ideas/implementation done in one of my previous c++ project.<br/>
 
@@ -10,20 +8,21 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 ### Compiling
 
-On a working Rust (stable >= 1.17.0) environment
+minimal requirement : rust stable (>= 1.17.0)
 
 ```
 git clone https://github.com/carl-erwin/unlimited
 cd unlimited
-cargo build
+cargo install
 ```
 
 ------
 
 ### Running
 
+by default cargo install puts the compiled program in **${HOME}/.cargo/bin**
 ```
-cargo run -- [FILE1] .. [FILEn]
+unlimited [FILE1] .. [FILEn]
 ```
 
 
@@ -56,48 +55,48 @@ The Design will evolve at will. Suggestions are welcome.
 
 ### Editor primitives
 
-- **File**<br/>
-A regular on disk file
-
-- **Buffer**<br/>
-A **Buffer** represents a memory snapshot of a given **File**.<br/>
-**Buffer**(s) can be loaded from a file.<br/>
-**Buffer**(s) can be saved to a file.<br/>
-**Buffer**(s) can be dettached from file.<br/>
-**Buffer**(s) can be created whitout any file.<br/>
-
-- **BufferId** aka **_bid_**<br/>
-An unsigned 64 bits integer that represent a given **Buffer** instance<br/>
-
 - **Document**<br/>
 A **Document** represents a **Buffer** PLUS it's configuration.<br/>
 There is one and only one **Document** per **Buffer**.<br/>
-An **Document** is always bound to a **Buffer**.
+A **Document** is always bound to a **Buffer**.<br/>
+A **Document** encapsulates:
+  - a **Buffer**<br/>
+  - the **View**(s)
+  - the "shared" **Marks** (the cursor is a mark)
+  - the font configuration (will be moved in the ui)
+  - the selections
+  - the internal regions
 
- It encapsulates:<br/>
-A **Buffer**<br/>
-the **View**(s)<br/>
-the "shared" **Marks** (the cursor is a mark)<br/>
-the font configuration<br/> (will be moved in the ui)
-the selections<br/>
-the internal regions<br/>
+
+
+- **Buffer**<br/>
+A **Buffer** represents a memory snapshot of a given **File**.<br/>
+a **Buffer** can be loaded from a file.<br/>
+a **Buffer** can be saved to a file.<br/>
+a **Buffer** can be dettached from file.<br/>
+a **Buffer** can be created whitout any file.<br/>
+
+- **BufferId** <br/>
+An unsigned 64 bits integer that represents a given **Buffer** instance<br/>
+
+- **File**<br/>
+A regular on disk file
 
 - **View**<br/>
-a View contains:<br/>
-
- bid (BufferId)<br/>
- ViewId<br/>
- Codec<br/>
- CodecCtx<br/>
- InputMap<br/>
- local Marks<br/>
+a View contains:
+   - BufferId
+   - ViewId
+   - Codec
+   - CodecCtx
+   - InputMap
+   - local Marks
 
 - **Event**<br/>
 Messages sent between the ui and the core
 
 
 - **Codec**<br/>
-The codec is responible of the Buffer interpretation
+The codec is responsible of the Buffer interpretation
 
 TextCodec emits codepoints
 
@@ -117,7 +116,7 @@ Marks can be "local" to a given View  (wich is attached to a **Document**)<br/>
 Marks can be "shared" by Document(s)<br/>
 
 - **Selection**<br/>
-there are 2 kinds of selection:<br/>
+There are 2 kinds of selection:<br/>
  * range selection : from one Mark to an other Mark
  * block selection (visual selection) : represents a rectangular selection depending on the displayed screen
 
@@ -149,6 +148,6 @@ I want the Ui (the view) to pilot the Core (model/controller):<br/>
 - setup modules/extensions<br/>
 - start/run select ui main loop (in the main thread)<br/>
 
- **Ui main loop**
-    - the ui(s) request the list of opened Documents
-    - and from there the ui can request layout for a given Document
+ **Ui main loop**<br>
+ - the ui(s) request the list of opened Documents
+ - and from there the ui can request layout for a given Document
