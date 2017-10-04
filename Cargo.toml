@@ -16,3 +16,8 @@ serde_json = "*"
 futures = "0.1.13"
 tokio-core = "0.1.6"
 tokio-io = "0.1.1"
+
+[profile.release]
+lto = true
+debug = true
+opt-level = 3

@@ -212,7 +212,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
 
 fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
 
-    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+    write!(stdout, "{}", termion::cursor::Hide).unwrap();
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
     // stdout.flush().unwrap();
@@ -228,11 +228,16 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
             let cpi = line.get_cpi(c).unwrap();
 
             if cpi.is_selected {
-                write!(stdout, "{}", termion::style::Invert).unwrap();
+                write!(
+                    stdout,
+                    "{}{}{}",
+                    termion::style::Invert,
+                    cpi.displayed_cp,
+                    termion::style::Reset
+                ).unwrap();
+            } else {
+                write!(stdout, "{}", cpi.displayed_cp).unwrap();
             }
-
-            write!(stdout, "{}", cpi.displayed_cp).unwrap();
-            write!(stdout, "{}", termion::style::Reset).unwrap();
         }
 
         /*
