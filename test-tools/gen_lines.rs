@@ -1,4 +1,6 @@
 use std::env;
+use std::io::BufWriter;
+use std::io::{self, Write};
 
 fn main() {
     let os_args = env::args();
@@ -19,8 +21,11 @@ fn main() {
 fn gen_lines(start: u64, stop: u64, linewidth: u64) -> () {
     let string = gen_line(linewidth);
 
+
+    let stdout = io::stdout();
+    let mut buff = BufWriter::new(stdout);
     for x in start..start + stop + 1 {
-        print!("{:012} {}", x, string);
+        buff.write_fmt(format_args!("{:012} {}", x, string)).unwrap();
     }
 }
 
