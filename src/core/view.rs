@@ -87,7 +87,7 @@ impl View {
                     scroll_needed = true;
                 }
 
-                doc.buffer.write(m.offset, data_size, data);
+                doc.buffer.insert(m.offset, data_size, data);
                 m.offset += data_size as u64;
             }
         }
