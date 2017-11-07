@@ -55,7 +55,7 @@ impl UiState {
     }
 }
 
-pub fn main_loop(mut editor: &mut Editor) {
+pub fn main_loop(editor: &mut Editor) {
 
     let mut ui_state = UiState::new();
 
@@ -151,8 +151,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
 
 
-
-fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
+fn fill_screen(ui_state: &mut UiState, view: &mut View) {
 
     if let Some(ref buf) = view.document {
 
@@ -164,9 +163,9 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
         if 0 == 1 {
             let s = " unlimitED! v0.0.1\n\n";
             screen_putstr(&mut screen, s);
-            let mut line = screen.get_mut_line(0).unwrap();
+            let line = screen.get_mut_line(0).unwrap();
             for c in 0..line.width {
-                let mut cpi = line.get_mut_cpi(c).unwrap();
+                let cpi = line.get_mut_cpi(c).unwrap();
                 cpi.is_selected = true;
             }
         }
@@ -191,7 +190,7 @@ fn fill_screen(mut ui_state: &mut UiState, mut view: &mut View) {
                 for l in 0..screen.height {
                     let line = screen.get_mut_line(l).unwrap();
                     for c in 0..line.nb_cells {
-                        let mut cpi = line.get_mut_cpi(c).unwrap();
+                        let cpi = line.get_mut_cpi(c).unwrap();
 
                         //if cpi.offset > m.offset {
                         //break;
@@ -263,13 +262,13 @@ fn draw_view(mut ui_state: &mut UiState, mut view: &mut View, mut stdout: &mut S
     draw_screen(&mut view.screen, &mut stdout);
 }
 
-fn terminal_clear_current_line(mut stdout: &mut Stdout, line_width: u16) {
+fn terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
     for _ in 0..line_width {
         write!(stdout, " ").unwrap();
     }
 }
 
-fn terminal_cursor_to(mut stdout: &mut Stdout, x: u16, y: u16) {
+fn terminal_cursor_to(stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
 }
 
@@ -558,7 +557,7 @@ fn get_input_event(
     v
 }
 
-fn process_input_events(ui_state: &mut UiState, mut view: &mut View, ev: &InputEvent) {
+fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent) {
 
     if *ev == ::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)

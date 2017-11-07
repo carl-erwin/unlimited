@@ -186,7 +186,7 @@ impl View {
     pub fn move_marks_to_beginning_of_line(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
-        for mut m in &mut self.moving_marks.borrow_mut().iter_mut() {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
         }
     }
@@ -195,7 +195,7 @@ impl View {
     pub fn move_marks_to_end_of_line(&mut self) {
 
         let doc = self.document.as_mut().unwrap().borrow_mut();
-        for mut m in &mut self.moving_marks.borrow_mut().iter_mut() {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
         }
     }
@@ -676,7 +676,7 @@ pub fn build_screen_layout(
     data: &[u8],
     base_offset: u64,
     max_offset: u64,
-    mut screen: &mut Screen,
+    screen: &mut Screen,
 ) -> u64 {
 
     let max_cpi = screen.width * screen.height;
@@ -879,7 +879,7 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 }
 
 
-pub fn screen_putchar(mut screen: &mut Screen, c: char, offset: u64) -> bool {
+pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64) -> bool {
     let (ok, _) = screen.push(filter_codepoint(c, offset));
     ok
 }
