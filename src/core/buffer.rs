@@ -23,11 +23,11 @@ pub enum OpenMode {
 pub struct Buffer {
     pub id: Id,
     pub file_name: String,
-    pub size: usize, // proxy to underlying structs
+    pub size: usize,
     pub nr_changes: u64, // number of changes since last save
-    pub file: File, //
-    mode: OpenMode, //
-    pub data: Vec<u8>, // file bytes
+    pub file: File,
+    mode: OpenMode,
+    pub data: Vec<u8>,
 }
 
 

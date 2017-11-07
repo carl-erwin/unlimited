@@ -1,5 +1,6 @@
 
-// CodepointInfo contains displayed char attributes
+/// contains displayed character attributes
+/// The displayed screen is composed of CodepointInfo
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CodepointInfo {
     pub cp: char,

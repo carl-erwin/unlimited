@@ -151,6 +151,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
 
 
+/// Fills the screen using the view start offset
 fn fill_screen(ui_state: &mut UiState, view: &mut View) {
 
     if let Some(ref buf) = view.document {
