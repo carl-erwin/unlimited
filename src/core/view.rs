@@ -751,7 +751,7 @@ fn decode_slice_to_vec(
 }
 
 //
-fn raw_slice_to_hex_vec(
+fn _raw_slice_to_hex_vec(
     data: &[u8],
     base_offset: u64,
     max_offset: u64,
