@@ -13,12 +13,6 @@ pub mod server;
 
 
 
-// TODO: move to better module : core::utils ?
-pub struct OffsetRange {
-    pub start: u64,
-    pub end: u64,
-}
-
 // start core thread
 pub fn start() {
     server::start()
