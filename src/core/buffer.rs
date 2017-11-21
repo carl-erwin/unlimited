@@ -176,6 +176,18 @@ impl Buffer {
         (0, self.size)
     }
 */
+
+    pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
+        use std::fs;
+        use std::fs::File;
+        use std::io::prelude::*;
+
+        let mut f = File::create(&tmp_file_name)?;
+
+        f.write_all(&self.data)?;
+        f.sync_all()?;
+        fs::rename(&tmp_file_name, &self.file_name)
+    }
 }
 
 
