@@ -32,18 +32,17 @@ static UTF8D: &'static [u8] = &[
     state other => intermediate states need more inputs
 */
 #[inline]
-pub fn decode_byte(state: &mut u32, byte: u8, codep: &mut u32) -> u32 {
+pub fn decode_byte(state: u32, byte: u8, codep: &mut u32) -> u32 {
 
     let cp_type = UTF8D[byte as usize] as u32;
 
-    *codep = if *state != UTF8_ACCEPT {
+    *codep = if state != UTF8_ACCEPT {
         (byte & 0x3f) as u32 | (*codep << 6)
     } else {
         (0xff >> cp_type) as u32 & (byte as u32)
     };
 
-    *state = UTF8D[256 + (*state * 16) as usize + cp_type as usize] as u32;
-    *state
+    UTF8D[256 + (state * 16) as usize + cp_type as usize] as u32
 }
 
 
@@ -164,7 +163,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     for b in data.iter().skip(from_offset as usize) {
 
         size += 1;
-        state = decode_byte(&mut state, *b, &mut codep);
+        state = decode_byte(state, *b, &mut codep);
         match state {
             0 => {
                 break;
