@@ -1,6 +1,9 @@
 //
 use std::fs::File;
 use std::io::prelude::*;
+
+use core::bufferlog::BufferLog;
+
 //
 pub type Id = u64;
 pub type Offset = u64;
@@ -28,6 +31,7 @@ pub struct Buffer {
     pub file: File,
     mode: OpenMode,
     pub data: Vec<u8>,
+    pub buffer_log: BufferLog,
 }
 
 
@@ -72,6 +76,7 @@ impl Buffer {
             nr_changes: 0,
             file,
             data,
+            buffer_log: BufferLog::new(),
         })
     }
 

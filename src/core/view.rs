@@ -70,6 +70,31 @@ impl View {
         }
     }
 
+    pub fn undo(&mut self) {
+        // hack no multicursor for now
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+
+        if let Some(off) = doc.undo() {
+
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                m.offset = off;
+                break;
+            }
+        }
+    }
+
+    pub fn redo(&mut self) {
+        // hack no multicursor for now
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+
+        if let Some(off) = doc.redo() {
+
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                m.offset = off;
+                break;
+            }
+        }
+    }
 
     pub fn insert_codepoint(&mut self, codepoint: char) {
 
@@ -87,7 +112,7 @@ impl View {
                     scroll_needed = true;
                 }
 
-                doc.buffer.insert(m.offset, data_size, data);
+                doc.insert(m.offset, data_size, data);
                 m.offset += data_size as u64;
             }
         }
@@ -103,7 +128,7 @@ impl View {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-            doc.buffer.remove(m.offset, size, None);
+            doc.remove(m.offset, size, None);
         }
     }
 
@@ -122,7 +147,7 @@ impl View {
 
                 m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
                 let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-                doc.buffer.remove(m.offset, size, None);
+                doc.remove(m.offset, size, None);
 
                 if m.offset < self.start_offset {
                     scroll_needed = true;

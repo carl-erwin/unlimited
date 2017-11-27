@@ -599,6 +599,24 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             ctrl: true,
             alt: false,
             shift: false,
+            key: Key::UNICODE('u'),
+        } => {
+            view.undo();
+        }
+
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('r'),
+        } => {
+            view.redo();
+        }
+
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
             key: Key::UNICODE('x'),
         } => {
             clear_keys = false;

@@ -5,6 +5,7 @@ pub mod screen;
 pub mod codepointinfo;
 pub mod document;
 pub mod buffer;
+pub mod bufferlog;
 pub mod event;
 pub mod view;
 pub mod mark;
