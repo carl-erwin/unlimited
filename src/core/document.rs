@@ -80,7 +80,7 @@ pub struct Document {
 impl Document {
     pub fn sync_to_disk(&self) -> ::std::io::Result<()> {
 
-        let tmp_file_ext = "ulimited.bk"; // TODO: move to global config
+        let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
         self.buffer.sync_to_disk(&tmp_file_name)
     }
