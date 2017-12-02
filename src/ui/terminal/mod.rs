@@ -675,6 +675,26 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             view.save_document();
         }
 
+        // ctrl+k
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('k'),
+        } => {
+            view.cut_to_end_of_line();
+        }
+
+        // ctrl+y
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('y'),
+        } => {
+            view.paste();
+        }
+
         // ctrl+?
         InputEvent::KeyPress {
             ctrl: true,

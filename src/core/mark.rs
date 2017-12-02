@@ -3,7 +3,7 @@ use core::buffer::Buffer;
 
 
 //
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mark {
     pub offset: u64,
 }

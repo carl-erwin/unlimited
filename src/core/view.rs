@@ -42,6 +42,8 @@ pub struct View {
     // TODO: in future version marks will be stored in buffer meta data
     pub moving_marks: Rc<RefCell<Vec<Mark>>>,
     pub fixed_marks: Rc<RefCell<Vec<Mark>>>,
+    // use for cut and paste
+    pub last_cut_log_index: Option<usize>,
 }
 
 
@@ -67,6 +69,7 @@ impl View {
             screen,
             moving_marks,
             fixed_marks: Rc::new(RefCell::new(Vec::new())),
+            last_cut_log_index: None,
         }
     }
 
@@ -561,6 +564,47 @@ impl View {
             Ok(_) => true,
         }
     }
+
+    pub fn cut_to_end_of_line(&mut self) -> bool {
+
+        {
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                let mut end = m.clone();
+                end.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
+                doc.remove(m.offset, (end.offset - m.offset) as usize, None);
+                break;
+            }
+
+            // save buffer log idx
+            assert!(doc.buffer_log.pos > 0);
+            self.last_cut_log_index = Some(doc.buffer_log.pos - 1);
+        }
+        true
+    }
+
+    pub fn paste(&mut self) -> bool {
+
+        if let Some(idx) = self.last_cut_log_index {
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+            let tr = doc.buffer_log.data[idx].clone();
+
+            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                let mut end = m.clone();
+                end.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
+                doc.insert(m.offset, tr.data.len(), tr.data.as_slice());
+                m.offset += tr.data.len() as u64;
+                break;
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
+
 
 
     // TODO: move to core/view/layout.rs
