@@ -574,25 +574,9 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('c'),
+            key: Key::UNICODE('q'),
         } => {
-            if ui_state.keys.len() > 1 {
-
-                let prev_ev = &ui_state.keys[ui_state.keys.len() - 2];
-                if let InputEvent::KeyPress {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                    key: Key::UNICODE('x'),
-                } = *prev_ev
-                {
-                    ui_state.quit = true;
-                    clear_keys = false;
-                }
-
-            } else {
-                clear_keys = true;
-            }
+            ui_state.quit = true;
         }
 
         InputEvent::KeyPress {
