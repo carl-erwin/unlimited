@@ -213,7 +213,7 @@ fn test_codec_decode() {
     let sequence: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
     for b in &sequence {
         println!("decode byte '{:x}'", *b);
-        state = decode_byte(&mut state, *b, &mut codep);
+        state = decode_byte(state, *b, &mut codep);
         match state {
             UTF8_ACCEPT => {
                 break;
@@ -273,7 +273,7 @@ fn test2_codec_decode() {
 
     for b in &data {
         println!("decode byte '{:x}'", *b);
-        state = decode_byte(&mut state, *b, &mut codep);
+        state = decode_byte(state, *b, &mut codep);
         println!("state  '{}'", state);
         match state {
             UTF8_ACCEPT => {
@@ -285,7 +285,7 @@ fn test2_codec_decode() {
                 println!("invalid utf8 sequence, restart");
                 state = 0;
                 codep = 0;
-                state = decode_byte(&mut state, *b, &mut codep);
+                state = decode_byte(state, *b, &mut codep);
                 match state {
                     UTF8_ACCEPT => {
                         println!("decoded cp = '{:?}'", codep);

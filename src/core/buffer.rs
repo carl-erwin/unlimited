@@ -202,7 +202,7 @@ fn test_buffer() {
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-    bb.write(0, 10, &data);
+    bb.insert(0, 10, &data);
     assert_eq!(bb.data, data);
     assert_eq!(data.len(), bb.size());
 

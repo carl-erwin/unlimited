@@ -135,7 +135,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
-        bb.write(0, 6, &data);
+        bb.insert(0, 6, &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
@@ -159,7 +159,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
-        bb.write(0, data.len(), &data);
+        bb.insert(0, data.len(), &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
@@ -175,7 +175,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
-        bb.write(0, data.len(), &data);
+        bb.insert(0, data.len(), &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
@@ -192,7 +192,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0x61];
-        bb.write(0, data.len(), &data);
+        bb.insert(0, data.len(), &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
@@ -208,7 +208,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x61];
-        bb.write(0, data.len(), &data);
+        bb.insert(0, data.len(), &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
@@ -224,7 +224,7 @@ fn test_marks() {
     {
         let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0x61];
-        bb.write(0, data.len(), &data);
+        bb.insert(0, data.len(), &data);
         assert_eq!(bb.data, data);
         assert_eq!(data.len(), bb.size());
 
