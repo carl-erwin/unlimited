@@ -11,7 +11,6 @@ pub enum Event {
     }, // CloseEvent{ view: u32 } ??
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InputEvent {
     InvalidInputEvent,
@@ -45,15 +44,23 @@ pub enum InputEvent {
         alt: bool,
         shift: bool,
     },
-    WheelUp { ctrl: bool, alt: bool, shift: bool },
-    WheelDown { ctrl: bool, alt: bool, shift: bool },
+    WheelUp {
+        ctrl: bool,
+        alt: bool,
+        shift: bool,
+    },
+    WheelDown {
+        ctrl: bool,
+        alt: bool,
+        shift: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
     NUL,
     UNICODE(char), // unicode val
-    Tab, /* '\t' move to unicode ? */
+    Tab,           /* '\t' move to unicode ? */
     Linefeed,
     Clear,
     Return, // '\n' ?

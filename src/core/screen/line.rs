@@ -1,6 +1,5 @@
 use core::codepointinfo::CodepointInfo;
 
-
 pub type LineCellIndex = usize;
 
 // a cell contains codepoint informations
@@ -30,7 +29,6 @@ pub struct Line {
 
 impl Line {
     pub fn new(width: LineCellIndex) -> Line {
-
         assert_eq!(width > 0, true);
 
         let mut cells = Vec::with_capacity(width);
@@ -54,7 +52,6 @@ impl Line {
     }
 
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
-
         if self.nb_cells < self.width && !self.read_only {
             self.cells[self.nb_cells].cpi = cpi;
             self.cells[self.nb_cells].is_used = true;
@@ -103,7 +100,6 @@ impl Line {
         }
     }
 
-
     pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
         if index < self.width {
             Some(&mut self.cells[index].cpi)
@@ -132,7 +128,6 @@ impl Line {
         &self,
         index: LineCellIndex,
     ) -> (Option<&CodepointInfo>, LineCellIndex) {
-
         if self.nb_cells == 0 {
             return (None, 0);
         }

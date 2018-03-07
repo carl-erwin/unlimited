@@ -11,7 +11,6 @@
   the user modifies the buffer
 */
 
-
 //
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -23,12 +22,9 @@ use core::screen::Screen;
 use core::mark::Mark;
 use core::codepointinfo::CodepointInfo;
 
-
 use core::codec::text::utf8;
 
-
 pub type Id = u64;
-
 
 // TODO: add the main mark as a ref
 #[derive(Debug)]
@@ -46,7 +42,6 @@ pub struct View {
     pub last_cut_log_index: Option<usize>,
 }
 
-
 impl View {
     pub fn new(
         id: Id,
@@ -55,7 +50,6 @@ impl View {
         height: usize,
         document: Option<Rc<RefCell<Document>>>,
     ) -> View {
-
         let screen = Box::new(Screen::new(width, height));
 
         // TODO: in future version will be stored in buffer meta data
@@ -78,7 +72,6 @@ impl View {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
         if let Some(off) = doc.undo() {
-
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                 m.offset = off;
                 break;
@@ -91,7 +84,6 @@ impl View {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
         if let Some(off) = doc.redo() {
-
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                 m.offset = off;
                 break;
@@ -100,7 +92,6 @@ impl View {
     }
 
     pub fn insert_codepoint(&mut self, codepoint: char) {
-
         let mut scroll_needed = false;
 
         {
@@ -108,7 +99,6 @@ impl View {
             let data_size = utf8::encode(codepoint as u32, &mut data);
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
                 // TODO: add main mark check
                 let (_, _, y) = self.screen.find_cpi_by_offset(m.offset);
                 if y == self.screen.height - 1 && codepoint == '\n' {
@@ -125,9 +115,7 @@ impl View {
         }
     }
 
-
     pub fn remove_codepoint(&mut self) {
-
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
@@ -135,15 +123,12 @@ impl View {
         }
     }
 
-
     pub fn remove_previous_codepoint(&mut self) {
-
         let mut scroll_needed = false;
 
         {
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
                 if m.offset == 0 {
                     continue;
                 }
@@ -165,14 +150,12 @@ impl View {
 
     // TODO: maintain main mark Option<(x,y)>
     pub fn move_marks_backward(&mut self) {
-
         let mut scroll_needed = false;
 
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
 
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
                 // TODO: add main mark check
                 if m.offset <= self.start_offset {
                     scroll_needed = true;
@@ -187,15 +170,12 @@ impl View {
         }
     }
 
-
     pub fn move_marks_forward(&mut self) {
-
         let mut scroll_needed = false;
 
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
                 // TODO: add main mark check
                 if m.offset >= self.end_offset {
                     scroll_needed = true;
@@ -210,27 +190,21 @@ impl View {
         }
     }
 
-
     pub fn move_marks_to_beginning_of_line(&mut self) {
-
         let doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
         }
     }
 
-
     pub fn move_marks_to_end_of_line(&mut self) {
-
         let doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
         }
     }
 
-
     pub fn move_marks_to_previous_line(&mut self) {
-
         let mut scroll_needed = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
@@ -244,7 +218,6 @@ impl View {
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                 m.offset = cpi.offset;
             } else {
-
                 if self.screen.contains_offset(m.offset) {
                     scroll_needed = true;
                 }
@@ -270,9 +243,10 @@ impl View {
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
                 // find "previous" line index
-                let index = match lines.iter().position(
-                    |e| e.0 <= end_offset && end_offset <= e.1,
-                ) {
+                let index = match lines
+                    .iter()
+                    .position(|e| e.0 <= end_offset && end_offset <= e.1)
+                {
                     None | Some(0) => continue,
                     Some(i) => i - 1,
                 };
@@ -288,7 +262,6 @@ impl View {
                     let e = Mark::new(lines[index + 1].1);
                     let mut count = 0;
                     while s.offset != e.offset {
-
                         if s.offset == m.offset {
                             break;
                         }
@@ -317,12 +290,9 @@ impl View {
         if scroll_needed {
             self.scroll_up(1);
         }
-
     }
 
-
     pub fn move_marks_to_next_line(&mut self) {
-
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
             doc.buffer.data.len() as u64
@@ -331,7 +301,6 @@ impl View {
         let mut scroll_needed = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-
             if m.offset == max_offset {
                 continue;
             }
@@ -342,7 +311,6 @@ impl View {
                 // yes get coordinates
                 let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
                 if y < self.screen.height - 1 {
-
                     is_offscreen = false;
 
                     let new_y = y + 1;
@@ -358,7 +326,6 @@ impl View {
             }
 
             if is_offscreen {
-
                 // mark is offscren
                 let screen_width = self.screen.width;
                 let screen_height = self.screen.height;
@@ -380,9 +347,10 @@ impl View {
                     self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
                 // find the cursor index
-                let index = match lines.iter().position(
-                    |e| e.0 <= m.offset && m.offset <= e.1,
-                ) {
+                let index = match lines
+                    .iter()
+                    .position(|e| e.0 <= m.offset && m.offset <= e.1)
+                {
                     None => continue,
                     Some(i) => {
                         if i == lines.len() - 1 {
@@ -400,7 +368,6 @@ impl View {
                     let e = Mark::new(lines[index].1);
                     let mut count = 0;
                     while s.offset < e.offset {
-
                         if s.offset == m.offset {
                             break;
                         }
@@ -438,7 +405,6 @@ impl View {
         if scroll_needed {
             self.scroll_down(1);
         }
-
     }
 
     pub fn scroll_to_previous_screen(&mut self) {
@@ -447,7 +413,6 @@ impl View {
     }
 
     pub fn scroll_up(&mut self, nb_lines: usize) {
-
         if self.start_offset == 0 {
             return;
         }
@@ -480,9 +445,10 @@ impl View {
         let lines = self.get_lines_offsets(m.offset, offset_to_find, width, height);
 
         // find line index
-        let index = match lines.iter().position(|e| {
-            e.0 <= offset_to_find && offset_to_find <= e.1
-        }) {
+        let index = match lines
+            .iter()
+            .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1)
+        {
             None => 0,
             Some(i) => {
                 if i >= nb_lines {
@@ -496,14 +462,12 @@ impl View {
         self.start_offset = lines[index].0;
     }
 
-
     pub fn scroll_to_next_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_down(nb);
     }
 
     pub fn scroll_down(&mut self, nb_lines: usize) {
-
         if nb_lines == 0 {
             return;
         }
@@ -529,23 +493,21 @@ impl View {
                 self.get_lines_offsets(start_offset, end_offset, screen_width, screen_height);
 
             // find line index and take lines[(index + nb_lines)].0 as new start of view
-            let index = match lines.iter().position(
-                |e| e.0 <= start_offset && start_offset <= e.1,
-            ) {
+            let index = match lines
+                .iter()
+                .position(|e| e.0 <= start_offset && start_offset <= e.1)
+            {
                 None => 0,
                 Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
             };
 
             self.start_offset = lines[index].0;
-
         } else {
-
             if self.screen.contains_offset(max_offset) {
                 return;
             }
 
             // just read the current screen
-
 
             // get last used line , if contains eof return
             if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
@@ -566,7 +528,6 @@ impl View {
     }
 
     pub fn cut_to_end_of_line(&mut self) -> bool {
-
         {
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
@@ -585,7 +546,6 @@ impl View {
     }
 
     pub fn paste(&mut self) -> bool {
-
         if let Some(idx) = self.last_cut_log_index {
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
             let tr = doc.buffer_log.data[idx].clone();
@@ -604,9 +564,6 @@ impl View {
         }
     }
 
-
-
-
     // TODO: move to core/view/layout.rs
     fn get_lines_offsets(
         &self,
@@ -615,7 +572,6 @@ impl View {
         screen_width: usize,
         screen_height: usize,
     ) -> Vec<(u64, u64)> {
-
         let mut v = Vec::<(u64, u64)>::new();
 
         let mut m = Mark::new(start_offset);
@@ -624,7 +580,6 @@ impl View {
 
         let screen_width = ::std::cmp::max(1, screen_width);
         let screen_height = ::std::cmp::max(4, screen_height);
-
 
         // get beginning of the line @offset
         m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
@@ -642,7 +597,6 @@ impl View {
             // push lines offsets
             // FIXME: find a better way to iterate over the used lines
             for i in 0..screen.current_line_index {
-
                 let s = screen.line[i].get_first_cpi().unwrap().offset;
                 let e = screen.line[i].get_last_cpi().unwrap().offset;
 
@@ -697,9 +651,7 @@ impl View {
         }
     }
 
-
     pub fn button_press(&mut self, button: u32, x: i32, y: i32) {
-
         match button {
             0 => {}
             _ => {
@@ -734,8 +686,6 @@ impl View {
     }
 }
 
-
-
 //////////////////////////////////
 // This function will run the configured filters
 // until the screen is full or eof is reached
@@ -747,7 +697,6 @@ pub fn build_screen_layout(
     max_offset: u64,
     screen: &mut Screen,
 ) -> u64 {
-
     let max_cpi = screen.width * screen.height;
 
     // utf8
@@ -759,7 +708,6 @@ pub fn build_screen_layout(
     let mut last_pushed_offset = base_offset;
     let mut prev_cp = ' ';
     for cpi in &vec {
-
         let (ok, _) = match (prev_cp, cpi.cp) {
             // TODO: handle \r\n
             /*
@@ -782,22 +730,18 @@ pub fn build_screen_layout(
     last_pushed_offset
 }
 
-
-
 fn decode_slice_to_vec(
     data: &[u8],
     base_offset: u64,
     max_offset: u64,
     max_cpi: usize,
 ) -> (Vec<CodepointInfo>, u64) {
-
     let mut vec = Vec::with_capacity(max_cpi);
 
     let mut off: u64 = base_offset;
     let last_off = data.len() as u64;
 
     while off != last_off {
-
         let (cp, _, size) = utf8::get_codepoint(data, off);
         vec.push(filter_codepoint(cp, off));
         off += size as u64;
@@ -826,40 +770,21 @@ fn _raw_slice_to_hex_vec(
     max_offset: u64,
     max_cpi: usize,
 ) -> (Vec<CodepointInfo>, u64) {
-
     let mut vec = Vec::with_capacity(max_cpi);
 
     let mut off: u64 = base_offset;
     let last_off = data.len() as u64;
 
     let hexchars: [char; 16] = [
-        '0',
-        '1',
-        '2',
-        '3',
-        '4',
-        '5',
-        '6',
-        '7',
-        '8',
-        '9',
-        'a',
-        'b',
-        'c',
-        'd',
-        'e',
-        'f',
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
     ];
 
     while off < last_off {
-
         let mut width = 0;
         for i in 0..16 {
-
             if off + i >= last_off {
                 break;
             }
-
 
             let hi: usize = (data[(off + i) as usize] >> 4) as usize;
             let low: usize = (data[(off + i) as usize] & 0x0f) as usize;
@@ -881,7 +806,6 @@ fn _raw_slice_to_hex_vec(
             vec.push(filter_codepoint(' ', off + width));
 
             for i in 0..16 {
-
                 if off + i >= last_off {
                     break;
                 }
@@ -911,10 +835,8 @@ fn _raw_slice_to_hex_vec(
     (vec, off)
 }
 
-
 // TODO return array of CodePointInfo  0x7f -> <ESC>
 pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
-
     let displayed_cp: char = match c {
         '\r' | '\n' | '\t' => ' ',
 
@@ -933,9 +855,7 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
     }
 }
 
-
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
-
     let v: Vec<char> = s.chars().collect();
     for c in &v {
         let ok = screen_putchar(&mut screen, *c, 0xffffffffffffffff);
@@ -947,14 +867,10 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     true
 }
 
-
 pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64) -> bool {
     let (ok, _) = screen.push(filter_codepoint(c, offset));
     ok
 }
-
-
-
 
 #[test]
 fn test_view() {}

@@ -12,13 +12,11 @@ pub mod mark;
 pub mod codec;
 pub mod server;
 
-
 /// This function starts the core thread.<br/>
 /// This thread will be the "❤" of unlimited.
 pub fn start() {
     server::start()
 }
-
 
 /// This function stops the core thread.
 // TODO: return a status , ex waiting for job to finsh etc

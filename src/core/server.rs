@@ -9,10 +9,8 @@ use self::tokio_io::{io, AsyncRead};
 use self::tokio_core::net::TcpListener;
 use self::tokio_core::reactor::Core;
 
-
 // start core thread
 pub fn start() {
-
     // Create the event loop that will drive this server
     let mut core = Core::new().unwrap();
     let handle = core.handle();

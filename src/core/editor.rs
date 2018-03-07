@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::thread;
 
-
 //
 use core;
 use ui;
@@ -16,8 +15,6 @@ use core::document;
 
 use core::view::View;
 use core::view;
-
-
 
 //
 pub type Id = u64;
@@ -45,7 +42,6 @@ pub struct Editor {
     pub view_map: HashMap<view::Id, Rc<RefCell<View>>>,
 }
 
-
 impl Editor {
     ///
     pub fn new(config: Config) -> Editor {
@@ -58,7 +54,6 @@ impl Editor {
 
     /// load files/buffers/etc ...
     pub fn run(&mut self) {
-
         if 0 == 1 {
             self.setup_default_buffers();
         }
@@ -82,7 +77,6 @@ impl Editor {
 
     ///
     pub fn setup_default_buffers(&mut self) {
-
         let b = DocumentBuilder::new()
             .document_name("debug-message")
             .file_name("/dev/null")
@@ -102,11 +96,9 @@ impl Editor {
 
     ///
     pub fn load_files(&mut self) {
-
         let mut id: u64 = 2;
 
         for f in &self.config.files_list {
-
             let b = DocumentBuilder::new()
                 .document_name(f)
                 .file_name(f)
@@ -121,7 +113,6 @@ impl Editor {
 
         // default buffer ?
         if self.document_map.is_empty() {
-
             // edit.get_untitled_count() -> 1
 
             let b = DocumentBuilder::new()

@@ -1,4 +1,3 @@
-
 /// contains displayed character attributes
 /// The displayed screen is composed of CodepointInfo
 #[derive(Default, Debug, Clone, Copy)]
@@ -8,7 +7,6 @@ pub struct CodepointInfo {
     pub offset: u64,
     pub is_selected: bool,
 }
-
 
 impl CodepointInfo {
     pub fn new() -> CodepointInfo {

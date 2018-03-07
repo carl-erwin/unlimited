@@ -34,7 +34,6 @@ impl Screen {
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
-
         self.line.resize(height, Line::new(width));
         for i in 0..height {
             self.line[i].resize(width);
@@ -45,10 +44,8 @@ impl Screen {
         self.nb_push = 0;
     }
 
-
     /// append
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
-
         if self.current_line_index == self.height {
             return (false, self.current_line_index);
         }
@@ -60,7 +57,6 @@ impl Screen {
         if self.current_line_index == self.height {
             return (false, self.current_line_index);
         }
-
 
         let cp = cpi.cp;
         let line = &mut self.line[self.current_line_index];
@@ -166,14 +162,12 @@ impl Screen {
         }
     }
 
-
     pub fn get_mut_first_cpinfo(&mut self) -> (Option<&mut CodepointInfo>, usize, usize) {
         match self.get_mut_used_line(0) {
             None => (None, 0, 0),
             Some(l) => (l.get_mut_used_cpi(0), 0, 0),
         }
     }
-
 
     pub fn get_mut_last_cpinfo(&mut self) -> (Option<&mut CodepointInfo>, usize, usize) {
         let y = self.current_line_index;
@@ -193,7 +187,6 @@ impl Screen {
         }
     }
 
-
     pub fn get_last_cpinfo(&self) -> (Option<&CodepointInfo>, usize, usize) {
         let y = self.current_line_index;
         match self.get_used_line(y) {
@@ -209,24 +202,18 @@ impl Screen {
         }
     }
 
-
     pub fn get_used_cpinfo_clipped(
         &mut self,
         x: usize,
         y: usize,
     ) -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
-
         match self.get_used_line_clipped(y) {
             (None, li) => (None, x, li),
-            (Some(l), li) => {
-                match l.get_used_cpi_clipped(x) {
-                    (optcpi, lci) => (optcpi, lci, li),
-                }
-            }
+            (Some(l), li) => match l.get_used_cpi_clipped(x) {
+                (optcpi, lci) => (optcpi, lci, li),
+            },
         }
     }
-
-
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
@@ -246,7 +233,6 @@ impl Screen {
         (None, 0, 0)
     }
 
-
     pub fn contains_offset(&self, offset: u64) -> bool {
         //TODO: cache first/las_ offset as self.members
         let (cpi, _, _) = self.find_cpi_by_offset(offset);
@@ -257,11 +243,8 @@ impl Screen {
     }
 }
 
-
-
 #[test]
 fn test_screen() {
-
     let mut scr = Screen::new(640, 480);
     assert_eq!(640, scr.width);
     assert_eq!(480, scr.height);
@@ -273,7 +256,6 @@ fn test_screen() {
     assert_eq!(600, scr.height);
     assert_eq!(scr.height, scr.line.len());
     assert_eq!(scr.width, scr.line[0].cells.len());
-
 
     scr.resize(1024, 768);
     assert_eq!(1024, scr.width);

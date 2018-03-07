@@ -16,8 +16,6 @@ pub enum OpenMode {
     ReadWrite = 1,
 }
 
-
-
 /// The **Buffer** represent a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
 /// The editor **Modes** use this api to read/modify the content
@@ -34,7 +32,6 @@ pub struct Buffer {
     pub buffer_log: BufferLog,
 }
 
-
 impl Buffer {
     /// Creates a new `Buffer`.
     ///
@@ -47,7 +44,6 @@ impl Buffer {
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
     pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer> {
-
         // TODO: check permission
         let mut file = match File::open(file_name) {
             Ok(f) => f,
@@ -125,7 +121,6 @@ impl Buffer {
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
-
         let index = offset as usize;
         for (n, b) in data.iter().enumerate().take(nr_bytes) {
             self.data.insert(index + n, *b);
@@ -146,7 +141,6 @@ impl Buffer {
         nr_bytes: usize,
         removed_data: Option<&mut Vec<u8>>,
     ) -> usize {
-
         let start_offset = ::std::cmp::min(offset as usize, self.size);
         let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
         let nr_bytes_removed = (end_offset - start_offset) as usize;
@@ -162,7 +156,6 @@ impl Buffer {
 
         nr_bytes_removed
     }
-
 
     /// can be used to know the number of blocks that compose the buffer,
     /// api to be used by indexer etc...
@@ -194,7 +187,6 @@ impl Buffer {
         fs::rename(&tmp_file_name, &self.file_name)
     }
 }
-
 
 #[test]
 fn test_buffer() {

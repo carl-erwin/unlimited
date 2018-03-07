@@ -1,13 +1,11 @@
 use std::vec::Vec;
 
-
 /// The **BufferLog** holds all modifications applied to a given buffer
 #[derive(Debug, Clone)]
 pub struct BufferLog {
     pub data: Vec<BufferOperation>,
     pub pos: usize,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct BufferOperation {
@@ -16,17 +14,14 @@ pub struct BufferOperation {
     pub offset: u64,
 }
 
-
 #[derive(Debug, Clone)]
 pub enum BufferOperationType {
     Insert,
     Remove,
 }
 
-
 impl BufferLog {
     pub fn new() -> BufferLog {
-
         BufferLog {
             data: Vec::new(),
             pos: 0,
@@ -34,7 +29,6 @@ impl BufferLog {
     }
 
     pub fn add(&mut self, offset: u64, op: BufferOperationType, data: Vec<u8>) -> usize {
-
         let op = BufferOperation { op, data, offset };
 
         if self.pos < self.data.len() {
@@ -51,7 +45,6 @@ impl BufferLog {
     }
 
     pub fn get_reverse_ops(&mut self, from_pos: usize) -> Option<Vec<BufferOperation>> {
-
         let len = self.data.len();
         let capacity = len - from_pos;
         let mut v = Vec::with_capacity(capacity);
@@ -60,13 +53,16 @@ impl BufferLog {
             v.push(self.data[len - i - 1].invert());
         }
 
-        if v.len() > 0 { Some(v) } else { None }
+        if v.len() > 0 {
+            Some(v)
+        } else {
+            None
+        }
     }
 }
 
 impl BufferOperation {
     pub fn invert(&self) -> BufferOperation {
-
         let op = match self.op {
             BufferOperationType::Insert => BufferOperationType::Remove,
             BufferOperationType::Remove => BufferOperationType::Insert,

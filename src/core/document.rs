@@ -11,7 +11,6 @@ use core::bufferlog::BufferLog;
 use core::bufferlog::BufferOperationType;
 use core::bufferlog::BufferOperation;
 
-
 //
 pub type Id = u64;
 
@@ -54,10 +53,8 @@ impl DocumentBuilder {
         self
     }
 
-
     ///
     pub fn finalize(&self) -> Option<Rc<RefCell<Document>>> {
-
         let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
         let buffer = match buffer {
             Some(bb) => bb,
@@ -74,8 +71,6 @@ impl DocumentBuilder {
     }
 }
 
-
-
 #[derive(Debug)]
 pub struct Document {
     pub id: Id,
@@ -87,12 +82,10 @@ pub struct Document {
 
 impl Document {
     pub fn sync_to_disk(&self) -> ::std::io::Result<()> {
-
         let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
         self.buffer.sync_to_disk(&tmp_file_name)
     }
-
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
@@ -104,16 +97,12 @@ impl Document {
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
-
         // log insert op
         let mut ins_data = Vec::with_capacity(nr_bytes);
         ins_data.extend(&data[..nr_bytes]);
 
-        self.buffer_log.add(
-            offset,
-            BufferOperationType::Insert,
-            ins_data,
-        );
+        self.buffer_log
+            .add(offset, BufferOperationType::Insert, ins_data);
 
         self.buffer.insert(offset, nr_bytes, data)
     }
@@ -127,7 +116,6 @@ impl Document {
         nr_bytes: usize,
         removed_data: Option<&mut Vec<u8>>,
     ) -> usize {
-
         let mut rm_data = Vec::with_capacity(nr_bytes);
 
         let nr_bytes_removed = self.buffer.remove(offset, nr_bytes, Some(&mut rm_data));
@@ -136,11 +124,8 @@ impl Document {
             v.extend(rm_data.clone());
         }
 
-        self.buffer_log.add(
-            offset,
-            BufferOperationType::Remove,
-            rm_data,
-        );
+        self.buffer_log
+            .add(offset, BufferOperationType::Remove, rm_data);
 
         nr_bytes_removed
     }
