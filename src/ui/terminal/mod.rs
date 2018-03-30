@@ -141,7 +141,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
 /// Fills the screen using the view start offset
 fn fill_screen(ui_state: &mut UiState, view: &mut View) {
-    if let Some(ref buf) = view.document {
+    if let Some(ref _buf) = view.document {
         let mut screen = &mut view.screen;
 
         screen.clear();
@@ -157,12 +157,14 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
             }
         }
 
-        let data = &buf.borrow().buffer.data;
-        let len = data.len();
-        let max_offset = buf.borrow().buffer.size as u64;
+        let mut data = vec![];
+        let max_size = (screen.width * screen.height * 4) as usize;
+        let doc = view.document.as_ref().unwrap().borrow_mut();
+        doc.read(view.start_offset, max_size, &mut data);
 
-        view.end_offset =
-            build_screen_layout(&data[0..len], view.start_offset, max_offset, &mut screen);
+        let max_offset = doc.buffer.size as u64;
+
+        view.end_offset = build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
 
         ui_state.last_offset = view.end_offset;
 

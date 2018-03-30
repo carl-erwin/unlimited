@@ -29,10 +29,15 @@ impl Mark {
         buffer: &Buffer,
         get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
     ) {
-        self.offset = get_next_codepoint_start(&buffer.data, self.offset);
+        let mut data = Vec::with_capacity(4);
+        buffer.read(self.offset, data.capacity(), &mut data);
+
+        let size = get_next_codepoint_start(&data, 0);
+        self.offset += size;
         // TODO: if '\r\n' must move + 1
     }
 
+    // TODO: check multi-byte utf8 sequence
     pub fn move_backward(
         &mut self,
         buffer: &Buffer,
@@ -42,8 +47,16 @@ impl Mark {
             return;
         }
 
+        let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
+        let relative_offset = self.offset - base_offset;
+
+        let mut data = Vec::with_capacity(4);
+        let _ = buffer.read(base_offset, data.capacity(), &mut data) as u64;
+
         // TODO: if '\r\n' must move - 1
-        self.offset = get_previous_codepoint_start(&buffer.data, self.offset);
+        let off = get_previous_codepoint_start(&data, relative_offset);
+        let delta = relative_offset - off;
+        self.offset -= delta as u64;
     }
 
     pub fn move_to_beginning_of_line(
@@ -55,33 +68,43 @@ impl Mark {
             return;
         }
 
+        let mut prev_cp = 0 as char;
+        let mut prev_cp_size = 0 as usize;
         let mut prev_offset = self.offset;
         loop {
-            let (cp, offset, _) = get_prev_codepoint(&buffer.data, prev_offset);
-            if offset == 0 {
-                self.offset = 0;
+            let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
+            let relative_offset = self.offset - base_offset;
+
+            let mut data = Vec::with_capacity(4);
+            buffer.read(base_offset, data.capacity(), &mut data);
+
+            let (cp, off, size) = get_prev_codepoint(&data, relative_offset);
+            let delta = relative_offset - off;
+            self.offset -= delta as u64;
+            if self.offset == 0 {
                 break;
             }
 
             match cp {
                 '\n' => {
-                    self.offset = offset + 1;
-
-                    if prev_offset > 0 {
-                        if let ('\r', offset, _) = get_prev_codepoint(&buffer.data, prev_offset) {
-                            self.offset = offset;
-                        }
-                    }
+                    self.offset += size as u64;
                     break;
                 }
 
                 '\r' => {
-                    self.offset = offset + 1;
+                    if prev_cp == '\n' {
+                        self.offset += (size + prev_cp_size) as u64;
+                    } else {
+                        self.offset += size as u64;
+                    }
                     break;
                 }
 
-                _ => prev_offset = offset,
+                _ => {}
             }
+
+            prev_cp = cp;
+            prev_cp_size = size;
         }
     }
 
@@ -90,12 +113,14 @@ impl Mark {
         buffer: &Buffer,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) {
-        let max_offset = buffer.data.len() as u64;
+        let max_offset = buffer.size as u64;
 
         let mut prev_offset = self.offset;
 
         loop {
-            let (cp, offset, size) = get_codepoint(&buffer.data, prev_offset);
+            let mut data = Vec::with_capacity(4);
+            buffer.read(prev_offset, data.capacity(), &mut data);
+            let (cp, offset, size) = get_codepoint(&data, 0);
             if prev_offset == max_offset {
                 break;
             }
@@ -107,7 +132,7 @@ impl Mark {
 
                 _ => {}
             }
-            prev_offset = offset + size as u64;
+            prev_offset += size as u64;
         }
         self.offset = prev_offset;
     }
@@ -123,11 +148,14 @@ fn test_marks() {
     println!("\n**************** test marks *****************");
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, 6, &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 5 };
 
@@ -145,11 +173,14 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 4 };
 
@@ -160,11 +191,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 3 };
 
@@ -175,11 +210,14 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 2 };
 
@@ -190,11 +228,14 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x61];
         bb.insert(0, data.len(), &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 0 };
 
@@ -205,11 +246,14 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0x61];
         bb.insert(0, data.len(), &data);
-        assert_eq!(bb.data, data);
-        assert_eq!(data.len(), bb.size());
+        let mut rdata = vec![];
+        bb.read(0, data.len(), &mut rdata);
+        assert_eq!(rdata, data);
+        assert_eq!(rdata.len(), data.len());
+        assert_eq!(rdata.len(), bb.size());
 
         let mut m = Mark { offset: 1 };
 

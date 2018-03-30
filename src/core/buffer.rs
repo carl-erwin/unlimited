@@ -1,8 +1,12 @@
 //
-use std::fs::File;
-use std::io::prelude::*;
+//use std::fs::File;
+//use std::io::prelude::*;
 
 use core::bufferlog::BufferLog;
+
+use core::mapped_file::MappedFile;
+//use core::mapped_file::MappedFileIterator;
+use core::mapped_file::FileHandle;
 
 //
 pub type Id = u64;
@@ -21,18 +25,18 @@ pub enum OpenMode {
 /// The editor **Modes** use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
-pub struct Buffer {
+pub struct Buffer<'a> {
     pub id: Id,
     pub file_name: String,
     pub size: usize,
     pub nr_changes: u64, // number of changes since last save
-    pub file: File,
     mode: OpenMode,
-    pub data: Vec<u8>,
+    pub data: FileHandle<'a>,
     pub buffer_log: BufferLog,
+    // phantom: PhantomData<&'a u8>,
 }
 
-impl Buffer {
+impl<'a> Buffer<'a> {
     /// Creates a new `Buffer`.
     ///
     /// file_name param[in] path to the file we want to load in the buffer,
@@ -43,35 +47,31 @@ impl Buffer {
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
-    pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer> {
+    pub fn new(file_name: String, mode: OpenMode) -> Option<Buffer<'a>> {
         // TODO: check permission
-        let mut file = match File::open(file_name) {
-            Ok(f) => f,
-            Err(e) => {
-                println!("cannot open '{}' : {}", file_name, e);
+        // TODO: check file's type => ignore directory (for now)
+        println!("-- mapping file {}", file_name);
+
+        let page_size = 4096 * 256 * 2;
+        let file = match MappedFile::new(file_name.clone(), page_size) {
+            Some(file) => file,
+            None => {
+                eprintln!("cannot map file '{}'", file_name);
                 return None;
             }
         };
 
-        // TODO: check file's type => ignore directory (for now)
+        let size = file.as_ref().borrow().size() as usize;
 
-        let mut data = Vec::new();
-        let size = file.read_to_end(&mut data).unwrap_or(0);
+        println!("'{}' opened size '{}'", file_name, size);
 
-        println!("'{}' opened mode '{:?}' size '{}'", file_name, mode, size);
-        /*
-            for c in &data {
-                println!("c {} char '{}' ", *c, *c as char);
-            }
-        */
         Some(Buffer {
             id: 0,
-            file_name: file_name.to_owned(),
+            file_name: file_name.clone(),
             mode,
             size,
             nr_changes: 0,
-            file,
-            data,
+            data: file,
             buffer_log: BufferLog::new(),
         })
     }
@@ -107,24 +107,16 @@ impl Buffer {
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
-    pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
-        let start_offset = ::std::cmp::min(offset as usize, self.size);
-        let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
-        let nr_copied = (end_offset - start_offset) as usize;
-        data.reserve(nr_copied);
-        for b in &self.data[start_offset..end_offset] {
-            data.push(*b);
-        }
-        nr_copied
+    pub fn read(&self, offset: u64, nr_bytes: usize, mut data: &mut Vec<u8>) -> usize {
+        let mut it = MappedFile::iter_from(&self.data, offset);
+        MappedFile::read(&mut it, nr_bytes, &mut data)
     }
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
-        let index = offset as usize;
-        for (n, b) in data.iter().enumerate().take(nr_bytes) {
-            self.data.insert(index + n, *b);
-        }
+        let mut it = MappedFile::iter_from(&self.data, offset);
+        MappedFile::insert(&mut it, &data);
 
         self.size += nr_bytes;
         self.nr_changes += 1;
@@ -150,7 +142,9 @@ impl Buffer {
             self.read(offset, nr_bytes_removed, v);
         }
 
-        self.data.drain(start_offset..end_offset);
+        let mut it = MappedFile::iter_from(&self.data, start_offset as u64);
+        MappedFile::remove(&mut it, nr_bytes_removed);
+
         self.size -= nr_bytes_removed;
         self.nr_changes += 1;
 
@@ -175,42 +169,46 @@ impl Buffer {
     }
 */
 
-    pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
-        use std::fs;
-        use std::fs::File;
-        use std::io::prelude::*;
+    pub fn sync_to_disk(&self, _tmp_file_name: &str) -> ::std::io::Result<()> {
+        panic!("TODO: do not save now, the editor is broken");
 
-        let mut f = File::create(&tmp_file_name)?;
+        // use std::fs;
+        // use std::fs::File;
+        // use std::io::prelude::*;
 
-        f.write_all(&self.data)?;
-        f.sync_all()?;
-        fs::rename(&tmp_file_name, &self.file_name)
+        // let mut f = File::create(&tmp_file_name)?;
+
+        // f.write_all(&self.data)?;
+
+        // f.sync_all()?;
+        // fs::rename(&tmp_file_name, &self.file_name)
     }
 }
 
 #[test]
 fn test_buffer() {
-    let mut bb = Buffer::new(&"/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+    let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     bb.insert(0, 10, &data);
-    assert_eq!(bb.data, data);
-    assert_eq!(data.len(), bb.size());
-
     let mut rdata = Vec::new();
-
     let nread = bb.read(0, bb.size(), &mut rdata);
     assert_eq!(rdata, data);
     assert_eq!(nread, bb.size());
 
     let data = vec![0, 1, 2, 6, 7, 8, 9];
+    let rm_expect = vec![3, 4, 5];
+
     let mut rm = vec![];
     let n = bb.remove(3, 3, Some(&mut rm));
     assert_eq!(n, 3);
-    assert_eq!(bb.data, data);
-    let rm_expect = vec![3, 4, 5];
     assert_eq!(rm, rm_expect);
+
+    rdata.clear();
+    let nread = bb.read(0, bb.size(), &mut rdata);
+    assert_eq!(rdata, data);
+
     println!("rm {:?}", rm);
     println!("rm_expect {:?}", rm_expect);
 }

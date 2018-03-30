@@ -36,15 +36,15 @@ pub type Id = u64;
         (vid, bid)
 
 */
-pub struct Editor {
+pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: HashMap<document::Id, Rc<RefCell<Document>>>,
-    pub view_map: HashMap<view::Id, Rc<RefCell<View>>>,
+    pub document_map: HashMap<document::Id, Rc<RefCell<Document<'a>>>>,
+    pub view_map: HashMap<view::Id, Rc<RefCell<View<'a>>>>,
 }
 
-impl Editor {
+impl<'a> Editor<'a> {
     ///
-    pub fn new(config: Config) -> Editor {
+    pub fn new(config: Config) -> Editor<'a> {
         Editor {
             config: config,
             document_map: HashMap::new(),
@@ -77,21 +77,27 @@ impl Editor {
 
     ///
     pub fn setup_default_buffers(&mut self) {
-        let b = DocumentBuilder::new()
+        let builder = DocumentBuilder::new()
             .document_name("debug-message")
             .file_name("/dev/null")
-            .internal(true)
-            .finalize();
+            .internal(true);
 
-        self.document_map.insert(0, b.unwrap());
+        let b = builder.finalize();
 
-        let b = DocumentBuilder::new()
+        if let Some(b) = b {
+            self.document_map.insert(0, b);
+        }
+
+        let builder = DocumentBuilder::new()
             .document_name("scratch")
             .file_name("/dev/null")
-            .internal(true)
-            .finalize();
+            .internal(true);
 
-        self.document_map.insert(1, b.unwrap());
+        let b = builder.finalize();
+
+        if let Some(b) = b {
+            self.document_map.insert(1, b);
+        }
     }
 
     ///
@@ -120,8 +126,9 @@ impl Editor {
                 .file_name("/dev/null")
                 .internal(false)
                 .finalize();
-
-            self.document_map.insert(id, b.unwrap());
+            if let Some(b) = b {
+                self.document_map.insert(id, b);
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ pub mod codepointinfo;
 pub mod document;
 pub mod buffer;
 pub mod bufferlog;
+pub mod mapped_file;
 pub mod event;
 pub mod view;
 pub mod mark;
