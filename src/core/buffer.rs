@@ -169,19 +169,27 @@ impl<'a> Buffer<'a> {
     }
 */
 
-    pub fn sync_to_disk(&self, _tmp_file_name: &str) -> ::std::io::Result<()> {
-        panic!("TODO: do not save now, the editor is broken");
+    pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
 
-        // use std::fs;
-        // use std::fs::File;
+        use std::fs;
+        use std::fs::File;
         // use std::io::prelude::*;
+        use std::io::Write;
 
-        // let mut f = File::create(&tmp_file_name)?;
+        let mut f = File::create(&tmp_file_name)?;
 
-        // f.write_all(&self.data)?;
+        let mut offset : u64 = 0;
+        while offset != self.size as u64 {
 
-        // f.sync_all()?;
-        // fs::rename(&tmp_file_name, &self.file_name)
+            let nr_bytes= 4096*32;
+            let mut data = Vec::with_capacity(nr_bytes);
+            let read_size = self.read(offset, nr_bytes, &mut data);
+            f.write(&data)?;
+            offset += read_size as u64;
+        }
+        f.sync_all()?;
+        fs::rename(&tmp_file_name, &self.file_name);
+        Ok(())
     }
 }
 
