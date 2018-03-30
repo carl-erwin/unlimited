@@ -261,3 +261,29 @@ fn test2_codec_decode() {
         }
     }
 }
+
+#[test]
+fn test_backward_decode() {
+    let data: [u8; 24] = [
+        0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac,
+        0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac,
+    ];
+
+    let mut start_offset: u64 = 6;
+    println!(
+        "start_offset {} byte is '{:x}'",
+        start_offset, data[start_offset as usize] as u32
+    );
+
+    let off = get_previous_codepoint_start(&data, start_offset as u64);
+    println!(
+        "start_offset({}) - off({}) = {}",
+        start_offset,
+        off,
+        start_offset - off
+    );
+    let delta = start_offset - off;
+    start_offset -= delta;
+
+    println!("new start_offset({})", start_offset);
+}
