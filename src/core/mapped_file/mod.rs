@@ -1282,7 +1282,7 @@ impl<'a> MappedFile<'a> {
             if node_size > 0 {
                 leaves.push(idx);
             } else {
-                MappedFile::mark_node_to_release(&mut pool, &mut to_delete, Some(idx));
+                // MappedFile::mark_node_to_release(&mut pool, &mut to_delete, Some(idx));
             }
             return Some(idx); // no change
         }
