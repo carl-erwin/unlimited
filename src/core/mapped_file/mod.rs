@@ -1312,7 +1312,7 @@ impl<'a> MappedFile<'a> {
 
         let mut candidate = None;
 
-        if left_size == 0 && right_size > 0 {
+        if left_size == 0 && right_size != 0 {
             let r_idx = pool[idx].right;
             let best = MappedFile::get_best_child(&mut leaves, &mut to_delete, &mut pool, r_idx);
             if let Some(del) = pool[idx].left {
