@@ -186,7 +186,7 @@ impl<'a> Buffer<'a> {
             offset += read_size as u64;
         }
         f.sync_all()?;
-        fs::rename(&tmp_file_name, &self.file_name);
+        fs::rename(&tmp_file_name, &self.file_name)?;
         Ok(())
     }
 }

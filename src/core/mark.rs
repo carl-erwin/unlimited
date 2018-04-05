@@ -70,7 +70,7 @@ impl Mark {
 
         let mut prev_cp = 0 as char;
         let mut prev_cp_size = 0 as usize;
-        let mut prev_offset = self.offset;
+
         loop {
             let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
             let relative_offset = self.offset - base_offset;
@@ -120,7 +120,7 @@ impl Mark {
         loop {
             let mut data = Vec::with_capacity(4);
             buffer.read(prev_offset, data.capacity(), &mut data);
-            let (cp, offset, size) = get_codepoint(&data, 0);
+            let (cp, _, size) = get_codepoint(&data, 0);
             if prev_offset == max_offset {
                 break;
             }

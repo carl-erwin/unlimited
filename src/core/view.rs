@@ -598,7 +598,7 @@ impl<'a> View<'a> {
         loop {
             // fill screen
             let mut data = vec![];
-            let read_size = doc.buffer.read(m.offset, max_size, &mut data);
+            doc.buffer.read(m.offset, max_size, &mut data);
 
             let _ = build_screen_layout(&data, m.offset, max_offset, &mut screen);
 
