@@ -157,13 +157,13 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 5 };
-
-        println!("** mark @ {} **", m.offset);
-        m.move_backward(&bb, get_previous_codepoint_start);
-        println!("** mark @ {} **", m.offset);
-        assert_eq!(m.offset, 4);
-
+        for i in 4..6 {
+            let mut m = Mark { offset: i };
+            println!("** mark @ {} **", m.offset);
+            m.move_backward(&bb, get_previous_codepoint_start);
+            println!("** mark @ {} **", m.offset);
+            assert_eq!(m.offset, 3);
+        }
         let mut m = Mark { offset: 3 };
 
         println!("** mark @ {} **", m.offset);
@@ -187,7 +187,7 @@ fn test_marks() {
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, get_previous_codepoint_start);
         println!("** mark @ {} **", m.offset);
-        assert_eq!(m.offset, 3);
+        assert_eq!(m.offset, 2);
     }
 
     {
