@@ -20,16 +20,19 @@ pub enum OpenMode {
     ReadWrite = 1,
 }
 
-/// The **Buffer** represent a linear array of bytes.<br/>
+/// The **Buffer** represents a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
-/// The editor **Modes** use this api to read/modify the content
+/// The editor will **Modes** use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
 pub struct Buffer<'a> {
     pub id: Id,
+    /// the name of the file where the data will be synced
     pub file_name: String,
+    /// the current size of the buffer
     pub size: usize,
-    pub nr_changes: u64, // number of changes since last save
+    /// the number of changes (since last save TODO)
+    pub nr_changes: u64,
     mode: OpenMode,
     pub data: FileHandle<'a>,
     pub buffer_log: BufferLog,
