@@ -69,8 +69,9 @@ impl<'a> Buffer<'a> {
         })
     }
 
-    /// close a previously opened buffer see buffer_open
+    /// not implemented: close a previously opened buffer see buffer_open
     pub fn close(&mut self) -> bool {
+        unimplemented!();
         false
     }
 
@@ -169,7 +170,6 @@ impl<'a> Buffer<'a> {
     pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
         use std::fs;
         use std::fs::File;
-        // use std::io::prelude::*;
         use std::io::Write;
 
         let mut f = File::create(&tmp_file_name)?;
