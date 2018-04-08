@@ -2,7 +2,6 @@
 //use std::fs::File;
 //use std::io::prelude::*;
 
-use core::bufferlog::BufferLog;
 
 use core::mapped_file::MappedFile;
 //use core::mapped_file::MappedFileIterator;
@@ -35,7 +34,6 @@ pub struct Buffer<'a> {
     pub nr_changes: u64,
     mode: OpenMode,
     pub data: FileHandle<'a>,
-    pub buffer_log: BufferLog,
     // phantom: PhantomData<&'a u8>,
 }
 
@@ -75,7 +73,6 @@ impl<'a> Buffer<'a> {
             size,
             nr_changes: 0,
             data: file,
-            buffer_log: BufferLog::new(),
         })
     }
 
