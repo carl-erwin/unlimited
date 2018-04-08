@@ -1,10 +1,4 @@
-//
-//use std::fs::File;
-//use std::io::prelude::*;
-
-
 use core::mapped_file::MappedFile;
-//use core::mapped_file::MappedFileIterator;
 use core::mapped_file::FileHandle;
 
 //
@@ -34,7 +28,6 @@ pub struct Buffer<'a> {
     pub nr_changes: u64,
     mode: OpenMode,
     pub data: FileHandle<'a>,
-    // phantom: PhantomData<&'a u8>,
 }
 
 impl<'a> Buffer<'a> {
