@@ -3,8 +3,8 @@
 //   Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 //   See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
-pub const UTF8_ACCEPT: u32 = 0;
-pub const UTF8_REJECT: u32 = 1;
+const UTF8_ACCEPT: u32 = 0;
+const UTF8_REJECT: u32 = 1;
 
 static UTF8D: &'static [u8] = &[
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 00..1f
@@ -151,10 +151,11 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
         size += 1;
         state = decode_byte(state, *b, &mut codep);
         match state {
-            0 => {
+            UTF8_ACCEPT => {
                 break;
             }
-            1 => {
+
+            UTF8_REJECT => {
                 // decode error : invalid sequence
                 codep = 0xfffd;
                 size = 1; // force restart @ next byte
