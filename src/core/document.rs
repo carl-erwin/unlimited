@@ -103,7 +103,7 @@ impl<'a> Document<'a> {
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
-    /// return XXX on error (use ioresult)
+    /// return XXX on error (TODO: use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         self.buffer.read(offset, nr_bytes, data)
     }
