@@ -1559,7 +1559,6 @@ mod tests {
         let mut nodepool = FreeListAllocator::new();
         let file_size = 1024 * 1024 * 1024 * 1024 * 8; // x Tib
         let page_size = 4096 * 256 * 4; // 4 Mib
-        let cow_subpage_size = 4096 * 256; // 1 Mib
 
         let root_node = Node {
             used: true,
@@ -1576,7 +1575,6 @@ mod tests {
         };
 
         let id = nodepool.allocate(root_node);
-        let root_index = Some(id);
 
         let mut leaves = Vec::new();
         MappedFile::build_tree(
@@ -1620,7 +1618,6 @@ mod tests {
     #[test]
     fn test_remove() {
         use super::*;
-        use std::rc::Weak;
 
         let file_size = 4096 * 16;
         let page_size = 4096;
@@ -1666,24 +1663,6 @@ mod tests {
         MappedFile::remove(&mut it, nr_remove);
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
-
-        return;
-        println!("-- print data {{");
-        let mut count: u64 = 0;
-        for i in MappedFile::iter(&file) {
-            print!("{}", *i as char);
-            count += 1;
-        }
-        println!("}}");
-        println!(" count = {}", count);
-
-        use std::io;
-
-        if !true {
-            println!("Hit [Enter] to stop");
-            let mut stop = String::new();
-            io::stdin().read_line(&mut stop).expect("something");
-        }
     }
 
 }

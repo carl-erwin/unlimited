@@ -211,6 +211,7 @@ fn test_buffer() {
     rdata.clear();
     let nread = bb.read(0, bb.size(), &mut rdata);
     assert_eq!(rdata, data);
+    assert_eq!(nread, bb.size());
 
     println!("rm {:?}", rm);
     println!("rm_expect {:?}", rm_expect);
