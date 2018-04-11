@@ -1665,4 +1665,33 @@ mod tests {
         println!("-- file.size() {}", file.as_ref().borrow().size());
     }
 
+    #[test]
+    fn test_1M_insert() {
+        use super::*;
+
+        let page_size = 4096 * 256;
+
+        use std::fs::File;
+        use std::io::prelude::*;
+
+        let filename = "/tmp/playground_insert_test".to_owned();
+        let mut file = File::create(&filename).unwrap();
+
+        println!("-- mapping the test file");
+        let file = match MappedFile::new(filename, page_size) {
+            Some(file) => file,
+            None => panic!("cannot map file"),
+        };
+
+        file.as_ref().borrow_mut().cow_subpage_size = 4096 * 4;
+        file.as_ref().borrow_mut().cow_subpage_reserve = 1024;
+
+        for _ in 0..1_000_000 {
+            let mut it = MappedFile::iter_from(&file, 0);
+            MappedFile::insert(&mut it, &['A' as u8]);
+        }
+
+        println!("-- file.size() {}", file.as_ref().borrow().size());
+    }
+
 }
