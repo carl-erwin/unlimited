@@ -763,7 +763,7 @@ fn decode_slice_to_vec(
         vec.push(CodepointInfo {
             cp: ' ',
             displayed_cp: '$',
-            offset: last_off,
+            offset: base_offset + last_off,
             is_selected: !false,
         });
     }
