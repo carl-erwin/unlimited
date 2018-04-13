@@ -1463,7 +1463,6 @@ impl<'a> MappedFile<'a> {
         rename_file_name: &str,
     ) -> ::std::io::Result<()> {
 
-        use std::io::{Error, ErrorKind};
         use std::fs;
 
         let path = CString::new(tmp_file_name).unwrap();
@@ -1732,16 +1731,15 @@ mod tests {
     }
 
     #[test]
-    fn test_1M_insert() {
+    fn test_1m_insert() {
         use super::*;
 
         let page_size = 4096 * 256;
 
         use std::fs::File;
-        use std::io::prelude::*;
 
         let filename = "/tmp/playground_insert_test".to_owned();
-        let mut file = File::create(&filename).unwrap();
+        File::create(&filename).unwrap();
 
         println!("-- mapping the test file");
         let file = match MappedFile::new(filename, page_size) {
