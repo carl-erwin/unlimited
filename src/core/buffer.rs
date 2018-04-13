@@ -168,23 +168,11 @@ impl<'a> Buffer<'a> {
     //
     //
     pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
-        use std::fs;
-        use std::fs::File;
-        use std::io::Write;
-
-        let mut f = File::create(&tmp_file_name)?;
-
-        let mut offset: u64 = 0;
-        while offset != self.size as u64 {
-            let nr_bytes = 4096 * 32;
-            let mut data = Vec::with_capacity(nr_bytes);
-            let read_size = self.read(offset, nr_bytes, &mut data);
-            f.write(&data)?;
-            offset += read_size as u64;
-        }
-        f.sync_all()?;
-        fs::rename(&tmp_file_name, &self.file_name)?;
-        Ok(())
+        MappedFile::sync_to_disk(
+            &mut self.data.as_ref().borrow_mut(),
+            &tmp_file_name,
+            &self.file_name,
+        )
     }
 }
 

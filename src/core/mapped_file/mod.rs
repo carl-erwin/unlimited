@@ -18,12 +18,19 @@ use self::libc::{c_int,
                  fstat,
                  mmap,
                  munmap,
+                 unlink,
                  open,
+                 write,
                  posix_fadvise, // posix_madvise,
                  size_t,
                  MAP_FAILED,
                  MAP_PRIVATE,
+                 O_CREAT,
                  O_RDONLY,
+                 O_RDWR,
+                 O_TRUNC,
+                 S_IRUSR,
+                 S_IWUSR,
                  PROT_READ};
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1448,6 +1455,65 @@ impl<'a> MappedFile<'a> {
                 panic!("invalid tree, broken next link");
             }
         }
+    }
+
+    pub fn sync_to_disk(
+        file: &mut MappedFile,
+        tmp_file_name: &str,
+        rename_file_name: &str,
+    ) -> ::std::io::Result<()> {
+
+        use std::io::{Error, ErrorKind};
+        use std::fs;
+
+        let path = CString::new(tmp_file_name).unwrap();
+        unsafe { unlink(path.as_ptr()) };
+        let fd = unsafe { open(path.as_ptr(), O_CREAT|O_RDWR|O_TRUNC, S_IRUSR|S_IWUSR) };
+        if fd < 0 {
+            return  Ok(());
+        }
+
+        let mut offset = 0;
+        let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
+        while n.is_some()
+        {
+            let idx = n.unwrap();
+
+            let node_size = file.nodepool[idx].size;
+            // map
+            let page = file.nodepool[idx].map().unwrap();
+            let slice = page.as_ref().borrow().as_slice().unwrap();
+
+            // copy
+            let nw = unsafe { write(fd, slice.as_ptr() as *mut c_void, slice.len()) };
+            if nw != slice.len() as isize {
+                panic!("write error");
+            }
+
+            offset += node_size;
+            n = file.nodepool[idx].next;
+        }
+
+        // patch on_disk_offset, and file descriptor
+        let mut offset = 0;
+        let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
+        while n.is_some()
+        {
+            let idx = n.unwrap();
+            let node_size = file.nodepool[idx].size;
+            file.nodepool[idx].on_disk_offset = offset;
+            offset += node_size;
+            n = file.nodepool[idx].next;
+            file.nodepool[idx].fd = fd;
+        }
+
+        fs::rename(&tmp_file_name, &rename_file_name)?;
+
+        let old_fd = file.fd;
+        unsafe { close (old_fd) };
+        file.fd = fd;
+
+        Ok(())
     }
 }
 
