@@ -18,27 +18,27 @@ use self::libc::{c_int,
                  fstat,
                  mmap,
                  munmap,
-                 unlink,
                  open,
-                 write,
                  posix_fadvise, // posix_madvise,
                  size_t,
+                 unlink,
+                 write,
                  MAP_FAILED,
                  MAP_PRIVATE,
                  O_CREAT,
                  O_RDONLY,
                  O_RDWR,
                  O_TRUNC,
+                 PROT_READ,
                  S_IRUSR,
-                 S_IWUSR,
-                 PROT_READ};
+                 S_IWUSR};
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 enum Page {
-    OnDisk(*const u8, size_t, c_int), // base, len, fd
-    InRam(*const u8, usize, usize),   // base, len, capacity
+    OnDisk(*const u8, size_t, size_t, c_int), // base, len, skip, fd
+    InRam(*const u8, usize, usize),           // base, len, capacity
 }
 
 impl Page {
@@ -54,9 +54,10 @@ impl Page {
 impl Drop for Page {
     fn drop(&mut self) {
         match *self {
-            Page::OnDisk(base, len, ..) => {
+            Page::OnDisk(base, len, skip, ..) => {
                 // println!("munmap {:?}", base);
-                let _base = unsafe { munmap(base as *mut c_void, len) };
+                let _base =
+                    unsafe { munmap(base.offset(-(skip as isize)) as *mut c_void, len + skip) };
             }
 
             Page::InRam(base, len, capacity) => {
@@ -107,6 +108,7 @@ struct Node {
     // data
     size: u64,
     on_disk_offset: u64,
+    skip: u64,
 
     page: Weak<RefCell<Page>>,
     cow: Option<Rc<RefCell<Page>>>,
@@ -124,6 +126,7 @@ impl Node {
         self.next = None;
         self.size = 0;
         self.on_disk_offset = 0xffffffffffffffff as u64;
+        self.skip = 0;
         self.page = Weak::new();
         self.cow = None;
     }
@@ -143,7 +146,7 @@ impl Node {
         let ptr = unsafe {
             mmap(
                 ptr::null_mut(),
-                self.size as usize,
+                (self.size + self.skip) as usize,
                 PROT_READ,
                 MAP_PRIVATE,
                 self.fd,
@@ -160,8 +163,9 @@ impl Node {
         }
 
         let page = Rc::new(RefCell::new(Page::OnDisk(
-            ptr as *const u8,
+            unsafe { ptr.offset(self.skip as isize) as *const u8 },
             self.size as usize,
+            self.skip as usize,
             self.fd,
         )));
 
@@ -348,6 +352,7 @@ impl<'a> MappedFile<'a> {
             page: Weak::new(),
             cow: None,
             on_disk_offset: 0,
+            skip: 0,
         };
 
         let id = file.nodepool.allocate(root_node);
@@ -519,6 +524,7 @@ impl<'a> MappedFile<'a> {
             page: Weak::new(),
             cow: None,
             on_disk_offset: base_offset,
+            skip: 0,
         };
         let l = nodepool.allocate(left_node);
 
@@ -536,6 +542,7 @@ impl<'a> MappedFile<'a> {
             page: Weak::new(),
             cow: None,
             on_disk_offset: base_offset + l_sz,
+            skip: 0,
         };
         let r = nodepool.allocate(right_node);
 
@@ -941,6 +948,7 @@ impl<'a> MappedFile<'a> {
             page: Weak::new(),
             cow: None,
             on_disk_offset: base_offset,
+            skip: 0,
         };
 
         let subroot_idx = file.nodepool.allocate(subroot_node);
@@ -1462,20 +1470,18 @@ impl<'a> MappedFile<'a> {
         tmp_file_name: &str,
         rename_file_name: &str,
     ) -> ::std::io::Result<()> {
-
         use std::fs;
 
         let path = CString::new(tmp_file_name).unwrap();
         unsafe { unlink(path.as_ptr()) };
-        let fd = unsafe { open(path.as_ptr(), O_CREAT|O_RDWR|O_TRUNC, S_IRUSR|S_IWUSR) };
+        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
         if fd < 0 {
-            return  Ok(());
+            return Ok(());
         }
 
         let mut offset = 0;
         let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
-        while n.is_some()
-        {
+        while n.is_some() {
             let idx = n.unwrap();
 
             let node_size = file.nodepool[idx].size;
@@ -1494,22 +1500,46 @@ impl<'a> MappedFile<'a> {
         }
 
         // patch on_disk_offset, and file descriptor
+        let mut count: u64 = 0;
         let mut offset = 0;
         let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
-        while n.is_some()
-        {
+        while n.is_some() {
             let idx = n.unwrap();
             let node_size = file.nodepool[idx].size;
-            file.nodepool[idx].on_disk_offset = offset;
+
+            // node on disk ?
+            if file.nodepool[idx].cow.is_none() {
+                let align_offset = 4096 * (offset / 4096);
+                let skip = offset % 4096;
+
+                file.nodepool[idx].on_disk_offset = align_offset;
+                file.nodepool[idx].skip = skip;
+            } else {
+                file.nodepool[idx].on_disk_offset = 0xffffffffffffffff;
+                file.nodepool[idx].skip = 0;
+            }
+
+            if !false {
+                println!(
+                    "offset {}, page {}, size {} disk_offset {}, skip {}",
+                    offset,
+                    count,
+                    file.nodepool[idx].size,
+                    file.nodepool[idx].on_disk_offset,
+                    file.nodepool[idx].skip,
+                );
+            }
+
             offset += node_size;
             n = file.nodepool[idx].next;
             file.nodepool[idx].fd = fd;
+            count += 1;
         }
 
         fs::rename(&tmp_file_name, &rename_file_name)?;
 
         let old_fd = file.fd;
-        unsafe { close (old_fd) };
+        unsafe { close(old_fd) };
         file.fd = fd;
 
         Ok(())
@@ -1637,6 +1667,7 @@ mod tests {
             page: Weak::new(),
             cow: None,
             on_disk_offset: 0,
+            skip: 0,
         };
 
         let id = nodepool.allocate(root_node);
@@ -1736,10 +1767,7 @@ mod tests {
 
         let page_size = 4096 * 256;
 
-        use std::fs::File;
-
         let filename = "/tmp/playground_insert_test".to_owned();
-        File::create(&filename).unwrap();
 
         println!("-- mapping the test file");
         let file = match MappedFile::new(filename, page_size) {
@@ -1754,6 +1782,64 @@ mod tests {
             let mut it = MappedFile::iter_from(&file, 0);
             MappedFile::insert(&mut it, &['A' as u8]);
         }
+
+        println!("-- file.size() {}", file.as_ref().borrow().size());
+    }
+
+    #[test]
+    fn test_1b_insert() {
+        use super::*;
+
+        let page_size = 4096;
+
+        use std::fs::File;
+        use std::io::prelude::*;
+
+        let filename = "/tmp/playground_insert_test".to_owned();
+        {
+            let mut file = File::create(&filename).unwrap();
+
+            // prepare file content
+            println!("-- generating test file");
+            let file_size = 4096 * 10;
+            let mut slc = Vec::with_capacity(file_size);
+            for i in 0..file_size {
+                if (i % (1024 * 1024 * 256)) == 0 {
+                    println!("-- @ bytes {}", i);
+                }
+
+                let val = if i % 100 == 0 {
+                    '\n' as u8
+                } else {
+                    (('0' as i32) + (i as i32 % 10)) as u8
+                };
+                slc.push(val);
+            }
+            file.write_all(slc.as_slice()).unwrap();
+            file.sync_all().unwrap();
+            drop(slc);
+        }
+
+        println!("-- mapping the test file");
+        let file = match MappedFile::new(filename, page_size) {
+            Some(file) => file,
+            None => panic!("cannot map file"),
+        };
+
+        file.as_ref().borrow_mut().cow_subpage_size = 4096;
+        file.as_ref().borrow_mut().cow_subpage_reserve = 10;
+
+        for i in 0..5 {
+            let i = i * 2;
+            let mut it = MappedFile::iter_from(&file, i + i * 4096);
+            MappedFile::insert(&mut it, &['A' as u8]);
+        }
+
+        MappedFile::sync_to_disk(
+            &mut file.as_ref().borrow_mut(),
+            &"/tmp/sync_test",
+            &"/tmp/sync_test.result",
+        );
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
     }
