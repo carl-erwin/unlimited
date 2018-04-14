@@ -1,7 +1,7 @@
 # unlimitED!
 
 
-**unlimitED!** is an experimental editor, and an excuse to learn the **Rust** language :-)<br/>
+**unlimitED!** is an experimental editor, and an excuse to learn the **Rust** language.<br/>
 It is based on previous ideas/implementation done in one of my previous c++ project.<br/>
 
 ---
@@ -10,8 +10,10 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 * the program is currently monothreaded
 * basic utf-8 support
-* Version 0.0.2 got unlimited undo/redo at the byte level, ie: every inserted character is added to the document's buffer log.<br/>
-This is the base api that will be used to implement other undo schemes (word, sentence, paragraph).
+* Version 0.0.2 got unlimited undo/redo at the byte level, ie: every inserted character is added to the document's buffer log.
+  This is the base api that will be used to implement other undo schemes (word, sentence, paragraph).<br/>
+* Version 0.0.3 adds large file support<br/>
+
 
 ---
 
