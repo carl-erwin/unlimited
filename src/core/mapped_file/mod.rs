@@ -1,3 +1,8 @@
+//
+// MappedFile is binary tree that provides on-demand data mapping, and keeps only the modified areas in memory.
+// the leaves are linked to allow fast sequential traversal.
+//
+
 extern crate libc;
 
 use std::ffi::CString;
