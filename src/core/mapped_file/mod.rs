@@ -331,7 +331,7 @@ impl<'a> MappedFile<'a> {
             root_index: None,
             phantom: PhantomData,
             page_size,
-            cow_subpage_size: 4096 * 256 * 4, // 2 mib
+            cow_subpage_size: 4096 * 256 * 2, // 2 mib
             cow_subpage_reserve: 64,          //
         };
 
