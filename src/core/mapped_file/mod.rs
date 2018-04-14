@@ -1720,10 +1720,12 @@ mod tests {
         let nr_remove = page_size * 14;
         let offset = page_size as u64;
 
-        use std::fs::File;
         use std::io::prelude::*;
+        use std::fs::File;
+        use std::fs;
 
-        let filename = "/tmp/playground_insert_test".to_owned();
+
+        let filename = "/tmp/playground_remove_test".to_owned();
         let mut file = File::create(&filename).unwrap();
 
         // prepare file content
@@ -1759,15 +1761,19 @@ mod tests {
         MappedFile::remove(&mut it, nr_remove);
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
+        let _ = fs::remove_file("/tmp/playground_remove_test");
     }
 
     #[test]
     fn test_1m_insert() {
         use super::*;
+        use std::fs::File;
+        use std::fs;
 
         let page_size = 4096 * 256;
 
         let filename = "/tmp/playground_insert_test".to_owned();
+        File::create(&filename).unwrap();
 
         println!("-- mapping the test file");
         let file = match MappedFile::new(filename, page_size) {
@@ -1784,6 +1790,7 @@ mod tests {
         }
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
+        let _ = fs::remove_file("/tmp/playground_insert_test");
     }
 
     #[test]
@@ -1792,8 +1799,9 @@ mod tests {
 
         let page_size = 4096;
 
-        use std::fs::File;
         use std::io::prelude::*;
+        use std::fs::File;
+        use std::fs;
 
         let filename = "/tmp/playground_insert_test".to_owned();
         {
@@ -1837,11 +1845,14 @@ mod tests {
 
         MappedFile::sync_to_disk(
             &mut file.as_ref().borrow_mut(),
-            &"/tmp/sync_test",
-            &"/tmp/sync_test.result",
-        );
+            &"/tmp/mapped_file.sync_test",
+            &"/tmp/mapped_file.sync_test.result",
+        ).unwrap();
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
+
+        let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
+        let _ = fs::remove_file("/tmp/playground_insert_test");
     }
 
 }
