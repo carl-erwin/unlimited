@@ -1,0 +1,69 @@
+ digraph mapped_file {
+
+ 	node [shape=circle]
+	edge [color=red]
+
+	// parents -> child
+	Root -> n1 [label=left]
+	
+	Root -> n2 [label=right]
+
+
+	n1 -> n3    // [label=left]
+	n1 -> n4    // [label=right]
+	n3 -> n5    // [label=left] 
+	n3 -> n6    // [label=right] 
+	n4 -> n7    // [label=left]
+	n4 -> n8    // [label=right]
+	n2 -> n9    // [label=left] 
+	n2 -> n10   // [label=right] 
+	n9 -> n11   // [label=left]  
+	n9 -> n12   // [label=right]  
+	n10 -> n13  // [label=left]   
+	n10 -> n14  // [label=right]   
+
+	// children -> parent
+	edge [color=black]
+
+	{n1, n2} -> Root  [label=parent]
+	{n3 n4} -> n1	 // [label=parent]
+	{n5, n6} -> n3   // [label=parent]
+	{n7 n8} -> n4    // [label=parent]
+	{n9 n10} -> n2   // [label=parent]
+	{n11, n12} -> n9 // [label=parent] 
+	{n13 n14} -> n10 // [label=parent]
+
+	// leaf <-> leaf ... <-> leaf 
+	edge [color=blue]
+
+	n6 -> n5 [constraint=false label=prev]
+	n5 -> n6 [constraint=false label=next]
+
+	n7-> n6 [constraint=false]
+	n6 -> n7 [constraint=false]
+
+	n8 -> n7 [constraint=false]
+	n7 -> n8 [constraint=false]
+
+	n11 -> n8 [constraint=false]
+	n8 -> n11 [constraint=false]
+
+	n12 -> n11 [constraint=false]	
+	n11 -> n12 [constraint=false]
+
+	n13 -> n12 [constraint=false]
+	n12 -> n13 [constraint=false]
+
+	n14 -> n13 [constraint=false]
+	n13 -> n14 [constraint=false]
+
+ 	node [shape=rect] [color=green]
+	n5  -> page0 [color=green]
+	n6  -> page1 [color=green]
+	n7  -> page2 [color=green]
+	n8  -> page3 [color=green]
+	n11 -> page4 [color=green]
+	n12 -> page5 [color=green]
+	n13 -> page6 [color=green]
+	n14 -> page7 [color=green]
+}

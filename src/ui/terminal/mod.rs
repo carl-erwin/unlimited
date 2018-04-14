@@ -34,6 +34,8 @@ struct UiState {
     last_offset: u64,
     mark_offset: u64,
     input_wait_time_ms: u64,
+    terminal_width: u16,
+    terminal_height: u16,
 }
 
 impl UiState {
@@ -49,6 +51,8 @@ impl UiState {
             last_offset: 0,
             mark_offset: 0,
             input_wait_time_ms: 20,
+            terminal_width: 0,
+            terminal_height: 0,
         }
     }
 }
@@ -62,6 +66,9 @@ pub fn main_loop(editor: &mut Editor) {
     } else {
         terminal_size().unwrap()
     };
+
+    ui_state.terminal_width = width;
+    ui_state.terminal_height = height;
 
     setup_views(editor, width as usize, height as usize);
 
@@ -77,6 +84,19 @@ pub fn main_loop(editor: &mut Editor) {
     while !ui_state.quit {
         ui_state.nb_view = editor.view_map.len();
         let mut view = editor.view_map.get_mut(&ui_state.vid);
+
+        // check screen size
+        {
+            let mut view = view.as_mut().unwrap().borrow_mut();
+            if view.screen.width != ui_state.terminal_width as usize
+                || view.screen.height != ui_state.terminal_height as usize
+            {
+                view.screen = Box::new(Screen::new(
+                    ui_state.terminal_width as usize,
+                    ui_state.terminal_height as usize,
+                ));
+            }
+        }
 
         let status_line_y = height + 1;
 
@@ -141,7 +161,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
 
 /// Fills the screen using the view start offset
 fn fill_screen(ui_state: &mut UiState, view: &mut View) {
-    if let Some(ref buf) = view.document {
+    if let Some(ref _buf) = view.document {
         let mut screen = &mut view.screen;
 
         screen.clear();
@@ -157,12 +177,14 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
             }
         }
 
-        let data = &buf.borrow().buffer.data;
-        let len = data.len();
-        let max_offset = buf.borrow().buffer.size as u64;
+        let mut data = vec![];
+        let max_size = (screen.width * screen.height * 4) as usize;
+        let doc = view.document.as_ref().unwrap().borrow_mut();
+        doc.read(view.start_offset, max_size, &mut data);
 
-        view.end_offset =
-            build_screen_layout(&data[0..len], view.start_offset, max_offset, &mut screen);
+        let max_offset = doc.buffer.size as u64;
+
+        view.end_offset = build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
 
         ui_state.last_offset = view.end_offset;
 
@@ -505,6 +527,20 @@ fn get_input_event(
                 }
             }
         } else {
+            // check terminal size
+            {
+                let (width, height) = terminal_size().unwrap();
+                if ui_state.terminal_width != width || ui_state.terminal_height != height {
+                    ui_state.terminal_width = width;
+                    ui_state.terminal_height = height;
+
+                    ui_state.input_wait_time_ms = 0; // Warning: to handle resize batch
+
+                    // TODO: push resize event to remove size checks in main loop
+                    break;
+                }
+            }
+
             if !v.is_empty() {
                 break;
             }
