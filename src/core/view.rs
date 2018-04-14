@@ -28,11 +28,11 @@ pub type Id = u64;
 
 // TODO: add the main mark as a ref
 #[derive(Debug)]
-pub struct View {
+pub struct View<'a> {
     pub id: Id,
     pub start_offset: u64,
     pub end_offset: u64,
-    pub document: Option<Rc<RefCell<Document>>>,
+    pub document: Option<Rc<RefCell<Document<'a>>>>,
     pub screen: Box<Screen>,
 
     // TODO: in future version marks will be stored in buffer meta data
@@ -42,7 +42,7 @@ pub struct View {
     pub last_cut_log_index: Option<usize>,
 }
 
-impl View {
+impl<'a> View<'a> {
     pub fn new(
         id: Id,
         start_offset: u64,
@@ -118,8 +118,10 @@ impl View {
     pub fn remove_codepoint(&mut self) {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
-            doc.remove(m.offset, size, None);
+            let mut data = Vec::with_capacity(4);
+            doc.buffer.read(m.offset, data.capacity(), &mut data);
+            let (_, _, size) = utf8::get_codepoint(&data, 0);
+            doc.remove(m.offset, size as usize, None);
         }
     }
 
@@ -134,7 +136,10 @@ impl View {
                 }
 
                 m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
-                let (_, _, size) = utf8::get_codepoint(&doc.buffer.data, m.offset);
+
+                let mut data = vec![];
+                doc.buffer.read(m.offset, 4, &mut data);
+                let (_, _, size) = utf8::get_codepoint(&data, 0);
                 doc.remove(m.offset, size, None);
 
                 if m.offset < self.start_offset {
@@ -295,7 +300,7 @@ impl View {
     pub fn move_marks_to_next_line(&mut self) {
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            doc.buffer.data.len() as u64
+            doc.buffer.size as u64
         };
 
         let mut scroll_needed = false;
@@ -474,7 +479,7 @@ impl View {
 
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            doc.buffer.data.len() as u64
+            doc.buffer.size as u64
         };
 
         if nb_lines >= self.screen.height {
@@ -587,12 +592,15 @@ impl View {
         // and build tmp screens until end_offset if found
         let mut screen = Screen::new(screen_width, screen_height);
 
-        // fill screen
-        let data = &doc.buffer.data;
-        let len = data.len();
-        let max_offset = len as u64;
+        let max_offset = doc.buffer.size as u64;
+        let max_size = (screen_width * screen_height * 4) as usize;
+
         loop {
-            let _ = build_screen_layout(&data[0 as usize..len], m.offset, max_offset, &mut screen);
+            // fill screen
+            let mut data = vec![];
+            doc.buffer.read(m.offset, max_size, &mut data);
+
+            let _ = build_screen_layout(&data, m.offset, max_offset, &mut screen);
 
             // push lines offsets
             // FIXME: find a better way to iterate over the used lines
@@ -738,12 +746,12 @@ fn decode_slice_to_vec(
 ) -> (Vec<CodepointInfo>, u64) {
     let mut vec = Vec::with_capacity(max_cpi);
 
-    let mut off: u64 = base_offset;
+    let mut off: u64 = 0;
     let last_off = data.len() as u64;
 
     while off != last_off {
         let (cp, _, size) = utf8::get_codepoint(data, off);
-        vec.push(filter_codepoint(cp, off));
+        vec.push(filter_codepoint(cp, base_offset + off));
         off += size as u64;
         if vec.len() == max_cpi {
             break;
@@ -751,16 +759,16 @@ fn decode_slice_to_vec(
     }
 
     // eof handling
-    if last_off == max_offset {
+    if base_offset + last_off == max_offset {
         vec.push(CodepointInfo {
             cp: ' ',
             displayed_cp: '$',
-            offset: last_off,
+            offset: base_offset + last_off,
             is_selected: !false,
         });
     }
 
-    (vec, off)
+    (vec, base_offset + off)
 }
 
 //

@@ -25,8 +25,8 @@ pub struct DocumentBuilder {
 ///
 impl DocumentBuilder {
     ///
-    pub fn new() -> DocumentBuilder {
-        DocumentBuilder {
+    pub fn new() -> Self {
+        Self {
             internal: false,
             document_name: String::new(),
             file_name: String::new(),
@@ -34,28 +34,42 @@ impl DocumentBuilder {
     }
 
     ///
-    pub fn internal(&mut self, flag: bool) -> &mut DocumentBuilder {
-        self.internal = flag;
-        self
+    pub fn internal(&self, flag: bool) -> Self {
+        Self {
+            internal: flag,
+            document_name: self.document_name.clone(),
+            file_name: self.file_name.clone(),
+        }
     }
 
     ///
-    pub fn document_name<'a>(&'a mut self, name: &str) -> &'a mut DocumentBuilder {
-        self.document_name.clear();
-        self.document_name.push_str(name);
-        self
+    pub fn document_name(&self, name: &str) -> Self {
+        let mut s = String::new();
+        s.push_str(name);
+
+        Self {
+            internal: self.internal,
+            document_name: s,
+            file_name: self.file_name.clone(),
+        }
     }
 
     ///
-    pub fn file_name<'a>(&'a mut self, name: &str) -> &'a mut DocumentBuilder {
-        self.file_name.clear();
-        self.file_name.push_str(name);
-        self
+    pub fn file_name(&self, name: &str) -> Self {
+        let mut s = String::new();
+        s.push_str(name);
+
+        Self {
+            internal: self.internal,
+            document_name: self.document_name.clone(),
+            file_name: s,
+        }
     }
 
     ///
-    pub fn finalize(&self) -> Option<Rc<RefCell<Document>>> {
-        let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
+    pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
+        let file_name = self.file_name.to_owned();
+        let buffer = Buffer::new(file_name, OpenMode::ReadWrite);
         let buffer = match buffer {
             Some(bb) => bb,
             None => return None,
@@ -72,15 +86,15 @@ impl DocumentBuilder {
 }
 
 #[derive(Debug)]
-pub struct Document {
+pub struct Document<'a> {
     pub id: Id,
     pub name: String,
-    pub buffer: Buffer,
+    pub buffer: Buffer<'a>,
     pub buffer_log: BufferLog,
     pub changed: bool,
 }
 
-impl Document {
+impl<'a> Document<'a> {
     pub fn sync_to_disk(&self) -> ::std::io::Result<()> {
         let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
@@ -89,7 +103,7 @@ impl Document {
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
-    /// return XXX on error (use ioresult)
+    /// return XXX on error (TODO: use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         self.buffer.read(offset, nr_bytes, data)
     }
@@ -104,7 +118,7 @@ impl Document {
         self.buffer_log
             .add(offset, BufferOperationType::Insert, ins_data);
 
-        self.buffer.insert(offset, nr_bytes, data)
+        self.buffer.insert(offset, nr_bytes, &data[..nr_bytes])
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
