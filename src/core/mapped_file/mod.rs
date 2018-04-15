@@ -1524,7 +1524,7 @@ impl<'a> MappedFile<'a> {
                 file.nodepool[idx].skip = 0;
             }
 
-            if !false {
+            if false {
                 println!(
                     "offset {}, page {}, size {} disk_offset {}, skip {}",
                     offset,
