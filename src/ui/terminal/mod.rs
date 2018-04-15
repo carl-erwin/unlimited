@@ -16,7 +16,7 @@ use self::termion::async_stdin;
 use self::termion::event::parse_event;
 
 //
-use core::view::{build_screen_layout, screen_putstr, View};
+use core::view::{build_screen_layout, View};
 use core::screen::Screen;
 use core::event::InputEvent;
 use core::event::Key;
@@ -36,6 +36,7 @@ struct UiState {
     input_wait_time_ms: u64,
     terminal_width: u16,
     terminal_height: u16,
+    view_start_line: usize,
 }
 
 impl UiState {
@@ -44,7 +45,7 @@ impl UiState {
             keys: Vec::new(),
             quit: false,
             status: String::new(),
-            display_status: !true,
+            display_status: true,
             display_view: true,
             vid: 0,
             nb_view: 0,
@@ -53,6 +54,7 @@ impl UiState {
             input_wait_time_ms: 20,
             terminal_width: 0,
             terminal_height: 0,
+            view_start_line: 0,
         }
     }
 }
@@ -60,15 +62,18 @@ impl UiState {
 pub fn main_loop(editor: &mut Editor) {
     let mut ui_state = UiState::new();
 
-    let (width, height) = if ui_state.display_status {
+    let (width, height, start_line) = if ui_state.display_status {
         let (width, height) = terminal_size().unwrap();
-        (width, height - 1)
+        (width, height - 2, 2)
     } else {
-        terminal_size().unwrap()
+        let dim = terminal_size().unwrap();
+        (dim.0, dim.1, 1)
     };
 
     ui_state.terminal_width = width;
     ui_state.terminal_height = height;
+    ui_state.view_start_line = start_line;
+
 
     setup_views(editor, width as usize, height as usize);
 
@@ -98,7 +103,6 @@ pub fn main_loop(editor: &mut Editor) {
             }
         }
 
-        let status_line_y = height + 1;
 
         if ui_state.display_view {
             draw_view(
@@ -108,12 +112,16 @@ pub fn main_loop(editor: &mut Editor) {
             );
         }
 
+
         if ui_state.display_status {
+
+            let status_line_y = 1;
+
             display_status_line(
                 &ui_state,
                 &view.as_mut().unwrap().borrow_mut(),
                 status_line_y,
-                width,
+                ui_state.terminal_width,
                 &mut stdout,
             );
         }
@@ -166,17 +174,6 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
 
         screen.clear();
 
-        // render first screen line
-        if 0 == 1 {
-            let s = " unlimitED! v0.0.1\n\n";
-            screen_putstr(&mut screen, s);
-            let line = screen.get_mut_line(0).unwrap();
-            for c in 0..line.width {
-                let cpi = line.get_mut_cpi(c).unwrap();
-                cpi.is_selected = true;
-            }
-        }
-
         let mut data = vec![];
         let max_size = (screen.width * screen.height * 4) as usize;
         let doc = view.document.as_ref().unwrap().borrow_mut();
@@ -214,14 +211,15 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
     }
 }
 
-fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
+fn draw_screen(screen: &mut Screen, start_line : usize, mut stdout: &mut Stdout) {
+
     write!(stdout, "{}", termion::cursor::Hide).unwrap();
-    write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
+    write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
     // stdout.flush().unwrap();
 
     for l in 0..screen.height {
-        terminal_cursor_to(&mut stdout, 1, (l + 1) as u16);
+        terminal_cursor_to(&mut stdout, 1, (start_line + l + 1) as u16);
 
         let line = screen.get_line(l).unwrap();
 
@@ -258,11 +256,12 @@ fn draw_screen(screen: &mut Screen, mut stdout: &mut Stdout) {
     3 : use idomatic    func()? style
 */
 fn draw_view(mut ui_state: &mut UiState, mut view: &mut View, mut stdout: &mut Stdout) {
+    let start_line = ui_state.view_start_line;
     fill_screen(&mut ui_state, &mut view);
-    draw_screen(&mut view.screen, &mut stdout);
+    draw_screen(&mut view.screen, start_line, &mut stdout);
 }
 
-fn terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
+fn _terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
     for _ in 0..line_width {
         write!(stdout, " ").unwrap();
     }
@@ -529,10 +528,18 @@ fn get_input_event(
         } else {
             // check terminal size
             {
-                let (width, height) = terminal_size().unwrap();
+                let (width, height, start_line) = if ui_state.display_status {
+                    let (width, height) = terminal_size().unwrap();
+                    (width, height - 2, 2)
+                } else {
+                    let dim = terminal_size().unwrap();
+                    (dim.0, dim.1, 1)
+                };
+
                 if ui_state.terminal_width != width || ui_state.terminal_height != height {
                     ui_state.terminal_width = width;
                     ui_state.terminal_height = height;
+                    ui_state.view_start_line = start_line;
 
                     ui_state.input_wait_time_ms = 0; // Warning: to handle resize batch
 
@@ -839,26 +846,36 @@ fn display_status_line(
 
     // select/clear last line
     terminal_cursor_to(&mut stdout, 1, line);
-    terminal_clear_current_line(&mut stdout, width);
+    for _ in 0..width {
+        write!(stdout, "{} ", termion::style::Invert).unwrap();
+    }
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let (_, ex, ey) = view.screen.find_cpi_by_offset(view.end_offset);
-    let (cpi, x, y) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
+    terminal_cursor_to(&mut stdout, 1, line+1);
+    for _ in 0..width {
+        write!(stdout, "{} ", termion::style::Reset).unwrap();
+    }
+    terminal_cursor_to(&mut stdout, 1, line);
+
+    let (cpi, _, _) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
 
     let mcp = match cpi {
         Some(cpi) => cpi.cp as u32,
         _ => 0xffd,
     };
 
-    let status_str = format!(
-        "doc_name[{}] \
-         , file[{}], \
-         eos(({},{})@{}) \
-         m(({},{})@{}:'{:08x}') \
-         ev[{}] ",
-        name, file_name, ex, ey, view.end_offset, x, y, ui_state.mark_offset, mcp, ui_state.status
-    );
+    let mut status_str = format!(" unlimitED! 0.0.3        doc[{}] file[{}], m(@{}):'{:08x}'",
+        name, file_name, ui_state.mark_offset, mcp);
 
-    print!("{}", status_str);
+    status_str.truncate(width as usize);
+
+    write!(
+        stdout,
+        "{}{}{}",
+        termion::style::Invert,
+        status_str,
+        termion::style::Reset
+    ).unwrap();
+
     stdout.flush().unwrap();
 }
