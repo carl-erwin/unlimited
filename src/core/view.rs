@@ -467,6 +467,34 @@ impl<'a> View<'a> {
         self.start_offset = lines[index].0;
     }
 
+
+    pub fn move_mark_to_beginning_of_file(&mut self)
+    {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            m.offset = 0;
+            break;
+        }
+
+        self.start_offset = 0;
+    }
+
+    pub fn move_mark_to_end_of_file(&mut self)
+    {
+        let size = {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
+            doc.buffer.size
+        };
+
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            m.offset = size as u64;
+            break;
+        }
+
+        self.start_offset = size as u64;
+        let h = self.screen.height / 2;
+        self.scroll_up(h);
+    }
+
     pub fn scroll_to_next_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_down(nb);

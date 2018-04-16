@@ -756,6 +756,29 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             ui_state.status = "<page_down>".to_owned();
         }
 
+        // alt+< goto beginning of file
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: true,
+            shift: false,
+            key: Key::UNICODE('<'),
+        } => {
+            view.move_mark_to_beginning_of_file();
+            ui_state.status = "<move to beginning of file>".to_owned();
+        }
+
+        // alt+> goto end of file
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: true,
+            shift: false,
+            key: Key::UNICODE('>'),
+        } => {
+            view.move_mark_to_end_of_file();
+            ui_state.status = "<move to end of file>".to_owned();
+        }
+
+
         // delete
         InputEvent::KeyPress {
             ctrl: false,
