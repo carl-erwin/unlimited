@@ -74,7 +74,6 @@ pub fn main_loop(editor: &mut Editor) {
     ui_state.terminal_height = height;
     ui_state.view_start_line = start_line;
 
-
     setup_views(editor, width as usize, height as usize);
 
     //
@@ -103,7 +102,6 @@ pub fn main_loop(editor: &mut Editor) {
             }
         }
 
-
         if ui_state.display_view {
             draw_view(
                 &mut ui_state,
@@ -112,9 +110,7 @@ pub fn main_loop(editor: &mut Editor) {
             );
         }
 
-
         if ui_state.display_status {
-
             let status_line_y = 1;
 
             display_status_line(
@@ -211,8 +207,7 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
     }
 }
 
-fn draw_screen(screen: &mut Screen, start_line : usize, mut stdout: &mut Stdout) {
-
+fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Hide).unwrap();
     write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
@@ -851,7 +846,7 @@ fn display_status_line(
     }
     terminal_cursor_to(&mut stdout, 1, line);
 
-    terminal_cursor_to(&mut stdout, 1, line+1);
+    terminal_cursor_to(&mut stdout, 1, line + 1);
     for _ in 0..width {
         write!(stdout, "{} ", termion::style::Reset).unwrap();
     }
@@ -864,8 +859,10 @@ fn display_status_line(
         _ => 0xffd,
     };
 
-    let mut status_str = format!(" unlimitED! 0.0.3        doc[{}] file[{}], m(@{}):'{:08x}'",
-        name, file_name, ui_state.mark_offset, mcp);
+    let mut status_str = format!(
+        " unlimitED! 0.0.3        doc[{}] file[{}], m(@{}):'{:08x}'",
+        name, file_name, ui_state.mark_offset, mcp
+    );
 
     status_str.truncate(width as usize);
 
