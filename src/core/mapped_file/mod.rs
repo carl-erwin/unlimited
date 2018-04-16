@@ -1729,7 +1729,6 @@ mod tests {
         use std::fs::File;
         use std::fs;
 
-
         let filename = "/tmp/playground_remove_test".to_owned();
         let mut file = File::create(&filename).unwrap();
 
