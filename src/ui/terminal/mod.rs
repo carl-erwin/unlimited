@@ -676,6 +676,17 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             view.paste();
         }
 
+
+        // ctrl+l
+        InputEvent::KeyPress {
+            ctrl: true,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE('l'),
+        } => {
+            view.center_arround_mark();
+        }
+
         // ctrl+?
         InputEvent::KeyPress {
             ctrl: true,

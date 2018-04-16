@@ -478,6 +478,17 @@ impl<'a> View<'a> {
         self.start_offset = 0;
     }
 
+    pub fn center_arround_mark(&mut self)
+    {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            self.start_offset = m.offset;
+            break;
+        }
+
+        let h = self.screen.height / 2;
+        self.scroll_up(h);
+    }
+
     pub fn move_mark_to_end_of_file(&mut self)
     {
         let size = {
@@ -494,6 +505,7 @@ impl<'a> View<'a> {
         let h = self.screen.height / 2;
         self.scroll_up(h);
     }
+
 
     pub fn scroll_to_next_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
