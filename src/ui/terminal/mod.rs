@@ -833,8 +833,23 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             y,
             button,
         } => {
-            view.button_press(button, x, y);
-            ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+
+            match button {
+                0 | 1 => {
+                    view.button_press(button, x, y);
+                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                }
+                3 => {
+                    view.scroll_up(3);
+                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                }
+                4 => {
+                    view.scroll_down(3);
+                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                }
+
+                _ => {}
+            }
         }
 
         // mouse button released
