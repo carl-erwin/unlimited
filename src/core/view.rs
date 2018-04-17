@@ -68,26 +68,46 @@ impl<'a> View<'a> {
     }
 
     pub fn undo(&mut self) {
-        // hack no multicursor for now
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
-        if let Some(off) = doc.undo() {
-            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                m.offset = off;
-                break;
-            }
+        let mut sync_view = false;
+
+        // hack no multicursor for now
+        {
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+               if let Some(off) = doc.undo() {
+                   for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                       m.offset = off;
+                       break;
+                   }
+
+                    sync_view = self.screen.contains_offset(off) == false;
+               }
+        }
+
+        if sync_view {
+            self.center_arround_mark();
         }
     }
 
     pub fn redo(&mut self) {
-        // hack no multicursor for now
-        let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
-        if let Some(off) = doc.redo() {
-            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                m.offset = off;
-                break;
-            }
+        let mut sync_view = false;
+
+        // hack no multicursor for now
+        {
+              let mut doc = self.document.as_mut().unwrap().borrow_mut();
+              if let Some(off) = doc.redo() {
+                  for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                      m.offset = off;
+                      break;
+                  }
+
+                    sync_view = self.screen.contains_offset(off) == false;
+              }
+        }
+
+        if sync_view {
+            self.center_arround_mark();
         }
     }
 
