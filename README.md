@@ -44,7 +44,7 @@ unlimited [FILE1] .. [FILEn]
   * **Undo**: ctrl-u
   * **Redo**: ctrl-r
   * **Delete previous character**: backspace
-  * **Delete next character**: ctrl-d
+  * **Delete current character**: ctrl-d
   * **Delete current character**: suppr
   * **Cut current line**: ctrl-k (from cursor to end of line)
   * **Paste previous killed line**: ctrl-y
@@ -54,7 +54,10 @@ unlimited [FILE1] .. [FILEn]
   * **Goto end of line**: ctrl-e
   * **Page Up**: scroll up on screen at time
   * **Page Down**: scroll down on screen at time
+  * **Goto beginning of file**: ctrl+<
+  * **Goto end of file**: ctrl+>
   * **Mouse left button**: move cursor to clicked area
+  * **Center arround mark/cursor**: ctrl+l
 
 ---
 
