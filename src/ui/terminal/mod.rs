@@ -908,10 +908,17 @@ fn display_status_line(
         _ => 0xffd,
     };
 
-    let mut status_str = format!(
-        " unlimitED! 0.0.3        doc[{}] file[{}], m(@{}):'{:08x}'",
-        name, file_name, ui_state.mark_offset, mcp
-    );
+    let mut status_str = if name != file_name {
+        format!(" unlimitED! 0.0.3    doc[{}] file[{}], m(@{}):'{:08x}' {}",
+            name, file_name, ui_state.mark_offset, mcp, ui_state.status
+        )
+    } else {
+        format!(
+            " unlimitED! 0.0.3    doc[{}], m(@{}):'{:08x}' {}",
+            name, ui_state.mark_offset, mcp, ui_state.status
+        )
+    };
+
 
     status_str.truncate(width as usize);
 
