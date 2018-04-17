@@ -676,7 +676,6 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             view.paste();
         }
 
-
         // ctrl+l
         InputEvent::KeyPress {
             ctrl: true,
@@ -789,7 +788,6 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             ui_state.status = "<move to end of file>".to_owned();
         }
 
-
         // delete
         InputEvent::KeyPress {
             ctrl: false,
@@ -832,25 +830,22 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             x,
             y,
             button,
-        } => {
-
-            match button {
-                0 | 1 => {
-                    view.button_press(button, x, y);
-                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
-                }
-                3 => {
-                    view.scroll_up(3);
-                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
-                }
-                4 => {
-                    view.scroll_down(3);
-                    ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
-                }
-
-                _ => {}
+        } => match button {
+            0 | 1 => {
+                view.button_press(button, x, y);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
             }
-        }
+            3 => {
+                view.scroll_up(3);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+            }
+            4 => {
+                view.scroll_down(3);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+            }
+
+            _ => {}
+        },
 
         // mouse button released
         InputEvent::ButtonRelease {
@@ -909,7 +904,8 @@ fn display_status_line(
     };
 
     let mut status_str = if name != file_name {
-        format!(" unlimitED! 0.0.3    doc[{}] file[{}], m(@{}):'{:08x}' {}",
+        format!(
+            " unlimitED! 0.0.3    doc[{}] file[{}], m(@{}):'{:08x}' {}",
             name, file_name, ui_state.mark_offset, mcp, ui_state.status
         )
     } else {
@@ -918,7 +914,6 @@ fn display_status_line(
             name, ui_state.mark_offset, mcp, ui_state.status
         )
     };
-
 
     status_str.truncate(width as usize);
 

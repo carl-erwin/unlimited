@@ -68,20 +68,19 @@ impl<'a> View<'a> {
     }
 
     pub fn undo(&mut self) {
-
         let mut sync_view = false;
 
         // hack no multicursor for now
         {
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
-               if let Some(off) = doc.undo() {
-                   for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                       m.offset = off;
-                       break;
-                   }
+            if let Some(off) = doc.undo() {
+                for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                    m.offset = off;
+                    break;
+                }
 
-                    sync_view = self.screen.contains_offset(off) == false;
-               }
+                sync_view = self.screen.contains_offset(off) == false;
+            }
         }
 
         if sync_view {
@@ -90,20 +89,19 @@ impl<'a> View<'a> {
     }
 
     pub fn redo(&mut self) {
-
         let mut sync_view = false;
 
         // hack no multicursor for now
         {
-              let mut doc = self.document.as_mut().unwrap().borrow_mut();
-              if let Some(off) = doc.redo() {
-                  for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                      m.offset = off;
-                      break;
-                  }
+            let mut doc = self.document.as_mut().unwrap().borrow_mut();
+            if let Some(off) = doc.redo() {
+                for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                    m.offset = off;
+                    break;
+                }
 
-                    sync_view = self.screen.contains_offset(off) == false;
-              }
+                sync_view = self.screen.contains_offset(off) == false;
+            }
         }
 
         if sync_view {
@@ -487,9 +485,7 @@ impl<'a> View<'a> {
         self.start_offset = lines[index].0;
     }
 
-
-    pub fn move_mark_to_beginning_of_file(&mut self)
-    {
+    pub fn move_mark_to_beginning_of_file(&mut self) {
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             m.offset = 0;
             break;
@@ -498,8 +494,7 @@ impl<'a> View<'a> {
         self.start_offset = 0;
     }
 
-    pub fn center_arround_mark(&mut self)
-    {
+    pub fn center_arround_mark(&mut self) {
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             self.start_offset = m.offset;
             break;
@@ -509,8 +504,7 @@ impl<'a> View<'a> {
         self.scroll_up(h);
     }
 
-    pub fn move_mark_to_end_of_file(&mut self)
-    {
+    pub fn move_mark_to_end_of_file(&mut self) {
         let size = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
             doc.buffer.size
@@ -525,7 +519,6 @@ impl<'a> View<'a> {
         let h = self.screen.height / 2;
         self.scroll_up(h);
     }
-
 
     pub fn scroll_to_next_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
