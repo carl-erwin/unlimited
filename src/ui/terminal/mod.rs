@@ -832,16 +832,16 @@ fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent
             button,
         } => match button {
             0 | 1 => {
-                view.button_press(button, x, y);
-                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                view.button_press(button, x, y - 2);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
             }
             3 => {
                 view.scroll_up(3);
-                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
             }
             4 => {
                 view.scroll_down(3);
-                ui_state.status = format!("<click({},@({},{}))]>", button, x, y);
+                ui_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
             }
 
             _ => {}
