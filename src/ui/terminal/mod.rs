@@ -64,10 +64,10 @@ pub fn main_loop(editor: &mut Editor) {
 
     let (width, height, start_line) = if ui_state.display_status {
         let (width, height) = terminal_size().unwrap();
-        (width, height - 2, 2)
+        (width - 2, height - 2, 2)
     } else {
         let dim = terminal_size().unwrap();
-        (dim.0, dim.1, 1)
+        (dim.0 - 2, dim.1, 1)
     };
 
     ui_state.terminal_width = width;
@@ -112,12 +112,17 @@ pub fn main_loop(editor: &mut Editor) {
 
         if ui_state.display_status {
             let status_line_y = 1;
+            let height = {
+                let view = view.as_mut().unwrap().borrow_mut();
+                view.screen.height as u16
+            };
 
             display_status_line(
                 &ui_state,
                 &view.as_mut().unwrap().borrow_mut(),
                 status_line_y,
                 ui_state.terminal_width,
+                height,
                 &mut stdout,
             );
         }
@@ -525,10 +530,10 @@ fn get_input_event(
             {
                 let (width, height, start_line) = if ui_state.display_status {
                     let (width, height) = terminal_size().unwrap();
-                    (width, height - 2, 2)
+                    (width - 2, height - 2, 2)
                 } else {
                     let dim = terminal_size().unwrap();
-                    (dim.0, dim.1, 1)
+                    (dim.0 - 2, dim.1, 1)
                 };
 
                 if ui_state.terminal_width != width || ui_state.terminal_height != height {
@@ -873,6 +878,7 @@ fn display_status_line(
     view: &View,
     line: u16,
     width: u16,
+    height: u16,
     mut stdout: &mut Stdout,
 ) {
     let doc = match view.document {
@@ -885,13 +891,13 @@ fn display_status_line(
 
     // select/clear last line
     terminal_cursor_to(&mut stdout, 1, line);
-    for _ in 0..width {
+    for _ in 0..width + 2 {
         write!(stdout, "{} ", termion::style::Invert).unwrap();
     }
     terminal_cursor_to(&mut stdout, 1, line);
 
     terminal_cursor_to(&mut stdout, 1, line + 1);
-    for _ in 0..width {
+    for _ in 0..width + 2 {
         write!(stdout, "{} ", termion::style::Reset).unwrap();
     }
     terminal_cursor_to(&mut stdout, 1, line);
@@ -915,13 +921,37 @@ fn display_status_line(
         )
     };
 
-    status_str.truncate(width as usize);
+    status_str.truncate((width + 2) as usize);
 
     write!(
         stdout,
         "{}{}{}",
         termion::style::Invert,
         status_str,
+        termion::style::Reset
+    ).unwrap();
+
+    // scroolbar
+    for h in 0..height + 1 {
+        terminal_cursor_to(&mut stdout, width + 2, h + 3);
+        write!(
+            stdout,
+            "{} ",
+            termion::color::Bg(termion::color::Rgb(0x00, 0x00, 0xff))
+        ).unwrap();
+    }
+
+    let off = view.start_offset as f64;
+    let max_size = view.document.as_ref().unwrap().borrow().buffer.size as f64;
+
+    let pos = ((off / max_size) * height as f64) as u16;
+
+    terminal_cursor_to(&mut stdout, width + 2, 3 + pos);
+    write!(
+        stdout,
+        "{}{} {}",
+        termion::color::Bg(termion::color::Rgb(0xff, 0x00, 0x00)),
+        termion::style::Invert,
         termion::style::Reset
     ).unwrap();
 
