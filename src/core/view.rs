@@ -311,7 +311,8 @@ impl<'a> View<'a> {
         }
 
         if scroll_needed {
-            self.scroll_up(1);
+            let n = self.screen.height / 2;
+            self.scroll_up(n);
         }
     }
 
@@ -426,7 +427,8 @@ impl<'a> View<'a> {
 
         // only if main mark
         if scroll_needed {
-            self.scroll_down(1);
+            let n = self.screen.height / 2;
+            self.scroll_down(n);
         }
     }
 
