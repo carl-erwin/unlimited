@@ -163,10 +163,6 @@ impl<'a> Buffer<'a> {
     }
 */
 
-    //
-    // TODO: This is currently broken, because fd swapping is not implemented yet in mapped_file
-    //
-    //
     pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
         let metadata = ::std::fs::metadata(&self.file_name).unwrap();
         let perms = metadata.permissions();
