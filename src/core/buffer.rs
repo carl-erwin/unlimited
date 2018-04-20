@@ -168,11 +168,19 @@ impl<'a> Buffer<'a> {
     //
     //
     pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
-        MappedFile::sync_to_disk(
+        let metadata = ::std::fs::metadata(&self.file_name).unwrap();
+        let perms = metadata.permissions();
+
+        let res = MappedFile::sync_to_disk(
             &mut self.data.as_ref().borrow_mut(),
             &tmp_file_name,
             &self.file_name,
-        )
+        );
+
+        // TODO: check result, handle io results properly
+        ::std::fs::set_permissions(&self.file_name, perms).unwrap();
+
+        res
     }
 }
 
