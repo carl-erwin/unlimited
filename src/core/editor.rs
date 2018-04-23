@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::thread;
 
+
 //
 use core;
 use ui;
@@ -39,7 +40,7 @@ pub type Id = u64;
 pub struct Editor<'a> {
     pub config: Config,
     pub document_map: HashMap<document::Id, Rc<RefCell<Document<'a>>>>,
-    pub view_map: HashMap<view::Id, Rc<RefCell<View<'a>>>>,
+    pub view_map: Vec< (view::Id, Rc<RefCell<View<'a>>>) >,
 }
 
 impl<'a> Editor<'a> {
@@ -48,7 +49,7 @@ impl<'a> Editor<'a> {
         Editor {
             config: config,
             document_map: HashMap::new(),
-            view_map: HashMap::new(),
+            view_map: Vec::new(),
         }
     }
 
@@ -84,8 +85,11 @@ impl<'a> Editor<'a> {
 
         let b = builder.finalize();
 
+
+
         if let Some(b) = b {
-            self.document_map.insert(0, b);
+            let id = self.document_map.len() as u64;
+            self.document_map.insert(id, b);
         }
 
         let builder = DocumentBuilder::new()
@@ -96,13 +100,14 @@ impl<'a> Editor<'a> {
         let b = builder.finalize();
 
         if let Some(b) = b {
-            self.document_map.insert(1, b);
+            let id = self.document_map.len() as u64;
+            self.document_map.insert(id, b);
         }
     }
 
     ///
     pub fn load_files(&mut self) {
-        let mut id: u64 = 2;
+        let mut id = self.document_map.len() as u64;
 
         for f in &self.config.files_list {
             let b = DocumentBuilder::new()
@@ -130,5 +135,8 @@ impl<'a> Editor<'a> {
                 self.document_map.insert(id, b);
             }
         }
+
+        println!("nb docs = {}", self.document_map.len());
+
     }
 }

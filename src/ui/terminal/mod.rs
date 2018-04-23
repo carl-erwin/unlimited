@@ -22,6 +22,7 @@ use core::event::InputEvent;
 use core::event::Key;
 use core::editor::Editor;
 
+
 //
 struct UiState {
     keys: Vec<InputEvent>,
@@ -85,9 +86,10 @@ pub fn main_loop(editor: &mut Editor) {
 
     let mut stdin = async_stdin().bytes();
 
+
     while !ui_state.quit {
         ui_state.nb_view = editor.view_map.len();
-        let mut view = editor.view_map.get_mut(&ui_state.vid);
+        let mut view = Some(&editor.view_map[ui_state.vid as usize].1);
 
         // check screen size
         {
@@ -164,7 +166,7 @@ fn setup_views(editor: &mut Editor, width: usize, height: usize) {
     }
 
     for view in views {
-        editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
+        editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
     }
 }
 
