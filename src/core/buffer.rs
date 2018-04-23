@@ -44,7 +44,7 @@ impl<'a> Buffer<'a> {
     pub fn new(file_name: String, mode: OpenMode) -> Option<Buffer<'a>> {
         // TODO: check permission
         // TODO: check file's type => ignore directory (for now)
-        println!("-- mapping file {}", file_name);
+        // println!("-- mapping file {}", file_name);
 
         let page_size = 4096 * 256 * 2;
         let file = match MappedFile::new(file_name.clone(), page_size) {
@@ -57,7 +57,7 @@ impl<'a> Buffer<'a> {
 
         let size = file.as_ref().borrow().size() as usize;
 
-        println!("'{}' opened size '{}'", file_name, size);
+        // println!("'{}' opened size '{}'", file_name, size);
 
         Some(Buffer {
             id: 0,
