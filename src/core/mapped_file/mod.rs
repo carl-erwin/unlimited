@@ -309,8 +309,6 @@ impl<'a> Drop for MappedFile<'a> {
 
 impl<'a> MappedFile<'a> {
     pub fn new(path: String, page_size: usize) -> Option<FileHandle<'a>> {
-        println!("filename = {}", path);
-
         let path = CString::new(path).unwrap();
 
         let fd = unsafe { open(path.as_ptr(), O_RDONLY) };
