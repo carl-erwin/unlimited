@@ -11,18 +11,27 @@ pub fn main_loop(editor: &mut Editor) {
     /* Start ncurses. */
     initscr();
 
-    /* Print to the back buffer. */
-    printw("Hello, world!");
 
-    /* Print some unicode(Chinese) string. */
-    // printw("Great Firewall dislike VPN protocol.\nGFW 不喜欢 VPN 协议。");
+    loop {
+        /* Get the screen bounds. */
+        let mut width = 0;
+        let mut height = 0;
+        getmaxyx(stdscr(), &mut height, &mut width);
+        let msg = format!("width = {}, height = {}\n", width, height);
 
-    /* Update the screen. */
-    refresh();
+        clear();
+        printw("Hello, world!\n");
+        printw(&msg);
 
-    /* Wait for a key press. */
-    getch();
+        /* Update the screen. */
+        refresh();
 
+        /* Wait for a key press. */
+        let key = getch();
+        if key == 'q' as i32 {
+            break;
+        }
+    }
     /* Terminate ncurses. */
     endwin();
 }
