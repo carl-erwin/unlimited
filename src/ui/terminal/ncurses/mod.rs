@@ -341,6 +341,7 @@ fn get_input_event(ui_state: &mut UiState) -> Vec<InputEvent> {
     v
 }
 
+// TODO: move to ui/mods.rs
 fn process_input_events(ui_state: &mut UiState, view: &mut View, ev: &InputEvent) {
     if *ev == ::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
