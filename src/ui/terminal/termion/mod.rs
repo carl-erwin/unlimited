@@ -22,7 +22,6 @@ use core::event::InputEvent;
 use core::event::Key;
 use core::editor::Editor;
 
-
 //
 struct UiState {
     keys: Vec<InputEvent>,
@@ -85,7 +84,6 @@ pub fn main_loop(editor: &mut Editor) {
     stdout.flush().unwrap();
 
     let mut stdin = async_stdin().bytes();
-
 
     while !ui_state.quit {
         ui_state.nb_view = editor.view_map.len();
