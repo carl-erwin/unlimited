@@ -278,13 +278,64 @@ fn get_input_event(ui_state: &mut UiState) -> Vec<InputEvent> {
             });
         }
 
-        _ => {
-            /* TODO */
-
-            if keycode == 'q' as i32 {
-                ui_state.quit = true;
-            }
+        KEY_PPAGE => {
+            v.push(InputEvent::KeyPress {
+                ctrl: false,
+                alt: false,
+                shift: false,
+                key: Key::PageUp,
+            });
         }
+
+        KEY_NPAGE => {
+            v.push(InputEvent::KeyPress {
+                ctrl: false,
+                alt: false,
+                shift: false,
+                key: Key::PageDown,
+            });
+        }
+
+        0...26 => {
+            let mut ctrl = false;
+            let mut c = ' ';
+
+            let k = unsafe { ::std::char::from_u32_unchecked(keycode as u32 + ('a' as u32) - 1) };
+            match k {
+                'j' => {
+                    c = '\n';
+                }
+
+                'i' => {
+                    c = '\t';
+                }
+
+                _ => {
+                    c = unsafe { ::std::char::from_u32_unchecked(k as u32) };
+                    ctrl = true;
+                }
+            }
+
+            v.push(InputEvent::KeyPress {
+                ctrl: ctrl,
+                alt: false,
+                shift: false,
+                key: Key::UNICODE(c),
+            });
+        }
+
+        27...127 => {
+            /* TODO */
+            let k = unsafe { ::std::char::from_u32_unchecked(keycode as u32) };
+            v.push(InputEvent::KeyPress {
+                ctrl: false,
+                alt: false,
+                shift: false,
+                key: Key::UNICODE(k),
+            });
+        }
+
+        _ => {}
     } // ! switch(keycode)
 
     v
