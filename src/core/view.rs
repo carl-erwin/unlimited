@@ -111,6 +111,7 @@ impl<'a> View<'a> {
 
     pub fn insert_codepoint(&mut self, codepoint: char) {
         let mut scroll_needed = false;
+        let mut sync_view = false;
 
         {
             let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
@@ -125,11 +126,15 @@ impl<'a> View<'a> {
 
                 doc.insert(m.offset, data_size, data);
                 m.offset += data_size as u64;
+
+                sync_view = self.screen.contains_offset(m.offset) == false;
             }
         }
 
         if scroll_needed {
             self.scroll_down(1);
+        } else if sync_view {
+            self.center_arround_mark();
         }
     }
 
