@@ -1,5 +1,4 @@
 //
-use std::thread;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -65,7 +64,14 @@ pub fn main_loop(mut editor: &mut Editor) {
     clear();
     noecho();
     raw();
-    halfdelay(1); // 20ms
+
+    if ui_state.input_wait_time_ms != 0 {
+        halfdelay(1); // 20ms
+    }
+
+    if ui_state.display_status {
+        // TODO
+    }
 
     /* Get the screen bounds. */
     let mut width = 0;
@@ -191,7 +197,7 @@ fn fill_screen(ui_state: &mut UiState, view: &mut View) {
     }
 }
 
-fn draw_screen(screen: &mut Screen, start_line: usize) {
+fn draw_screen(screen: &mut Screen, _start_line: usize) {
     clear();
 
     for li in 0..screen.height {
@@ -240,7 +246,7 @@ fn get_input_event(ui_state: &mut UiState) -> Vec<InputEvent> {
 
     ui_state.status = format!(" keycode = {}", keycode);
 
-    let name = keyname(keycode);
+    let _name = keyname(keycode);
 
     match keycode {
         KEY_UP => {
@@ -298,7 +304,7 @@ fn get_input_event(ui_state: &mut UiState) -> Vec<InputEvent> {
 
         0...26 => {
             let mut ctrl = false;
-            let mut c = ' ';
+            let mut c;
 
             let k = unsafe { ::std::char::from_u32_unchecked(keycode as u32 + ('a' as u32) - 1) };
             match k {
