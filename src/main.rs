@@ -32,8 +32,6 @@ fn parse_command_line() -> Config {
         )
         .get_matches();
 
-    println!("matches = {:?}", matches);
-
     let mut ui_frontend = String::new();
     if matches.is_present("ui") {
         let v: Vec<&str> = matches.values_of("ui").unwrap().collect();
