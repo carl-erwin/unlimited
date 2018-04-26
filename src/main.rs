@@ -23,6 +23,7 @@ fn parse_command_line() -> Config {
                 .long("start-core"),
         )
         .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
+        .args_from_usage("--ui, --ui=[termion|ncurses] 'select user interface fronted'")
         .arg(
             Arg::with_name("FILES")
                 .help("list of the files to open")
@@ -30,6 +31,12 @@ fn parse_command_line() -> Config {
                 .multiple(true),
         )
         .get_matches();
+
+    let mut ui_frontend = String::new();
+    if matches.is_present("ui") {
+        let v: Vec<&str> = matches.values_of("ui").unwrap().collect();
+        ui_frontend = v[0].to_owned();
+    }
 
     let mut files_list = Vec::new();
     if matches.is_present("FILES") {
@@ -41,5 +48,6 @@ fn parse_command_line() -> Config {
         start_ui: !matches.is_present("NO_UI"),
         start_core: matches.is_present("START_CORE"),
         files_list,
+        ui_frontend,
     }
 }
