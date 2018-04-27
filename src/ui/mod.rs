@@ -1,24 +1,28 @@
 mod terminal;
 
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
+
 use std::convert::AsRef;
 use std::rc::Rc;
 use std::cell::RefCell;
 
 use core::editor::Editor;
+use core::event::Event;
 use core::event::InputEvent;
 use core::view::{build_screen_layout, View};
 use core::event::Key;
 
-pub fn main_loop(editor: &mut Editor) {
+pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     // TODO: switch ui here
     let ui = editor.config.ui_frontend.clone();
     match ui.as_ref() {
         "ncurses" => {
-            terminal::ncurses::main_loop(editor);
+            terminal::ncurses::main_loop(editor, ui_rx, core_tx);
         }
 
         "termion" | _ => {
-            terminal::termion::main_loop(editor);
+            terminal::termion::main_loop(editor, ui_rx, core_tx);
         }
     }
 

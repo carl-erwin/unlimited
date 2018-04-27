@@ -1,4 +1,7 @@
 //
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
+
 pub mod editor;
 pub mod config;
 pub mod screen;
@@ -13,10 +16,12 @@ pub mod mark;
 pub mod codec;
 pub mod server;
 
+use core::event::Event;
+
 /// not implemented : This function starts the core thread.<br/>
 /// This thread will be the "❤" of unlimited.
-pub fn start() {
-    server::start()
+pub fn start(core_rx: Receiver<Event>, ui_tx: Sender<Event>) {
+    server::start(core_rx, ui_tx)
 }
 
 /// not implemented : This function stops the core thread.
