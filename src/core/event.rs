@@ -18,6 +18,7 @@ pub enum Event {
         width: usize,
         height: usize,
     }, // CloseEvent{ view: u32 } ??
+    ApplicationQuitEvent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
