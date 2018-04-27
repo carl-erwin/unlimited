@@ -1,4 +1,9 @@
 //
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
+
+//
 extern crate ncurses;
 
 use self::ncurses::*;
@@ -6,6 +11,7 @@ use self::ncurses::*;
 //
 use core::view::View;
 use core::screen::Screen;
+use core::event::Event;
 use core::event::InputEvent;
 use core::event::Key;
 use core::editor::Editor;
@@ -15,7 +21,7 @@ use ui::setup_views;
 use ui::fill_screen;
 use ui::process_input_events;
 
-pub fn main_loop(mut editor: &mut Editor) {
+pub fn main_loop(mut editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     let mut ui_state = UiState::new();
 
     /* If your locale env is unicode, you should use `setlocale`. */

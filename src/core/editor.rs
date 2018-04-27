@@ -2,7 +2,12 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+
+//
 use std::thread;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
 
 //
 use core;
@@ -15,6 +20,8 @@ use core::document;
 
 use core::view::View;
 use core::view;
+
+use core::event::Event;
 
 //
 pub type Id = u64;
@@ -60,14 +67,18 @@ impl<'a> Editor<'a> {
 
         self.load_files();
 
+        // Create a simple streaming channel
+        let (ui_tx, ui_rx) = channel();
+        let (core_tx, core_rx) = channel();
+
         let core_th = if self.config.start_core {
-            Some(thread::spawn(move || core::start()))
+            Some(thread::spawn(move || core::start(core_rx, ui_tx)))
         } else {
             None
         };
 
         if self.config.start_ui {
-            ui::main_loop(self);
+            ui::main_loop(self, ui_rx, core_tx);
         }
 
         if let Some(core_handle) = core_th {
