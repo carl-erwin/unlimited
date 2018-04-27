@@ -246,6 +246,7 @@ impl<'a> View<'a> {
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
                 m.offset = cpi.offset;
             } else {
+                // mark was on first line or offscreen
                 if self.screen.contains_offset(m.offset) {
                     scroll_needed = true;
                 }
@@ -773,6 +774,7 @@ pub fn build_screen_layout(
     // hexa
     //let (vec, _) = raw_slice_to_hex_vec(data, base_offset, max_offset, max_cpi);
 
+    screen.first_offset = base_offset;
     let mut last_pushed_offset = base_offset;
     let mut prev_cp = ' ';
     for cpi in &vec {
@@ -795,6 +797,7 @@ pub fn build_screen_layout(
         last_pushed_offset = cpi.offset;
     }
 
+    screen.last_offset = last_pushed_offset;
     last_pushed_offset
 }
 
