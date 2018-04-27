@@ -21,6 +21,7 @@ use core::view::View;
 use core::screen::Screen;
 use core::event::Event;
 use core::event::InputEvent;
+
 use core::event::Key;
 use core::editor::Editor;
 
@@ -31,6 +32,30 @@ use ui::fill_screen;
 use ui::process_input_events;
 
 pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
+    let ev = Event::ApplicationQuitEvent;
+    core_tx.send(ev);
+
+    loop {
+        println!("ui : waiting for event");
+        match ui_rx.recv() {
+            Ok(evt) => {
+                println!("ui : recv event : {:?}", evt);
+
+                match evt {
+                    ApplicationQuitEvent => {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                println!("ui : recv error");
+            }
+        }
+    }
+
+    return;
+
     let mut ui_state = UiState::new();
 
     let (width, height, start_line) = if ui_state.display_status {

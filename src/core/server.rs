@@ -9,12 +9,21 @@ pub fn start(core_rx: Receiver<Event>, ui_tx: Sender<Event>) {
         match core_rx.recv() {
             Ok(evt) => {
                 println!("core : recv event : {:?}", evt);
+
+                match evt {
+                    ApplicationQuitEvent => {
+                        let ev = Event::ApplicationQuitEvent;
+                        ui_tx.send(ev);
+
+                        break;
+                    }
+                    _ => {}
+                }
             }
             _ => {
                 println!("core : recv error");
             }
         }
-        panic!("");
     }
 }
 
