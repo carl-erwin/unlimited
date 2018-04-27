@@ -20,9 +20,9 @@ fn parse_command_line() -> Config {
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
         .arg(
-            Arg::with_name("START_CORE")
-                .help("enable core")
-                .long("start-core"),
+            Arg::with_name("NO_CORE")
+                .help("disable core")
+                .long("no-core"),
         )
         .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
         .args_from_usage("--ui, --ui=[termion|ncurses] 'select user interface fronted'")
@@ -48,7 +48,7 @@ fn parse_command_line() -> Config {
 
     Config {
         start_ui: !matches.is_present("NO_UI"),
-        start_core: matches.is_present("START_CORE"),
+        start_core: !matches.is_present("NO_CORE"),
         files_list,
         ui_frontend,
     }
