@@ -3,7 +3,7 @@ use core::codepointinfo::CodepointInfo;
 pub type LineCellIndex = usize;
 
 // a cell contains codepoint informations
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct LineCell {
     pub cpi: CodepointInfo,
     pub is_used: bool,
@@ -19,7 +19,7 @@ impl LineCell {
 }
 
 // a line is composed of cells
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Line {
     pub cells: Vec<LineCell>,
     pub nb_cells: usize,

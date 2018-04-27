@@ -8,7 +8,7 @@ use self::line::LineCellIndex;
 pub type LineIndex = usize;
 
 // the screen is composed of lines
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Screen {
     pub line: Vec<Line>,
     pub current_line_index: LineCellIndex,
