@@ -1,7 +1,16 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+use core::screen::Screen;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     InputEvent,
-    LayoutEvent,
+    RequestLayoutEvent {
+        view: u32,
+        screen: Box<Screen>,
+    },
+    BuildLayoutEvent {
+        view: u32,
+        screen: Box<Screen>,
+    },
     SystemEvent,
     ApplicationEvent,
     ResizeEvent {
@@ -11,7 +20,7 @@ pub enum Event {
     }, // CloseEvent{ view: u32 } ??
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputEvent {
     InvalidInputEvent,
     NoInputEvent,
