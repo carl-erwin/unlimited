@@ -9,7 +9,6 @@ use core::event::InputEvent;
 use core::view::{build_screen_layout, View};
 use core::event::Key;
 
-
 pub fn main_loop(editor: &mut Editor) {
     // TODO: switch ui here
     let ui = editor.config.ui_frontend.clone();
@@ -26,8 +25,6 @@ pub fn main_loop(editor: &mut Editor) {
     // gtk::main_loop();
     // webui::main_loop();
 }
-
-
 
 struct UiState {
     keys: Vec<InputEvent>,

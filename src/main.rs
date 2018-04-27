@@ -15,7 +15,6 @@ fn main() {
 }
 
 fn parse_command_line() -> Config {
-
     let matches = App::new("unlimited")
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")

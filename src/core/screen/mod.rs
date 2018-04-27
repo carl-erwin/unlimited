@@ -15,6 +15,8 @@ pub struct Screen {
     pub width: usize,
     pub height: usize,
     pub nb_push: usize,
+    pub first_offset: u64,
+    pub last_offset: u64,
 }
 
 impl Screen {
@@ -30,6 +32,8 @@ impl Screen {
             width: width,
             height: height,
             nb_push: 0,
+            first_offset: 0,
+            last_offset: 0,
         }
     }
 
@@ -42,6 +46,8 @@ impl Screen {
         self.height = height;
         self.current_line_index = 0;
         self.nb_push = 0;
+        self.first_offset = 0;
+        self.last_offset = 0;
     }
 
     /// append
@@ -77,6 +83,8 @@ impl Screen {
         }
         self.current_line_index = 0;
         self.nb_push = 0;
+        self.first_offset = 0;
+        self.last_offset = 0;
     }
 
     pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
@@ -217,6 +225,11 @@ impl Screen {
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
+
+        if offset < self.first_offset || offset > self.last_offset {
+            return (None, 0, 0);
+        }
+
         for y in 0..self.height {
             let l = self.get_line(y).unwrap();
             if l.nb_cells == 0 {
@@ -234,7 +247,10 @@ impl Screen {
     }
 
     pub fn contains_offset(&self, offset: u64) -> bool {
-        //TODO: cache first/las_ offset as self.members
+        if offset < self.first_offset || offset > self.last_offset {
+            return false;
+        }
+
         let (cpi, _, _) = self.find_cpi_by_offset(offset);
         match cpi {
             Some(_) => true,
