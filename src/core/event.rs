@@ -1,7 +1,14 @@
 use core::screen::Screen;
+use core::document;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
+
+    RequestDocumentList,
+    DocumentList {
+        buffer: Vec<(document::Id, String)>,
+    },
+
     InputEvent,
     RequestLayoutEvent {
         view: u32,

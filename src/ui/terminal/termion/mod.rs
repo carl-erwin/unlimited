@@ -21,6 +21,7 @@ use core::view::View;
 use core::screen::Screen;
 use core::event::Event;
 use core::event::InputEvent;
+use core::event::Event::*;
 
 use core::event::Key;
 use core::editor::Editor;
@@ -42,7 +43,7 @@ pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Ev
                 println!("ui : recv event : {:?}", evt);
 
                 match evt {
-                    ApplicationQuitEvent => {
+                    Event::ApplicationQuitEvent => {
                         break;
                     }
                     _ => {}
