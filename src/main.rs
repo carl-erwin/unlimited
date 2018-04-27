@@ -6,6 +6,8 @@ use clap::{App, Arg};
 use unlimited::core::config::Config;
 use unlimited::core::editor::Editor;
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 fn main() {
     let config = parse_command_line();
     let mut editor = Editor::new(config);
@@ -13,8 +15,9 @@ fn main() {
 }
 
 fn parse_command_line() -> Config {
+
     let matches = App::new("unlimited")
-        .version("0.0.3")
+        .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
         .arg(
