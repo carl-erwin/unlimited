@@ -72,50 +72,70 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
         }
 
         // recv
-        match ui_rx.recv_timeout(Duration::from_millis(1)) {
-            Ok(evt) => {
-                println!("ui : recv event : {:?}\r", evt);
-                match evt {
-                    Event::ApplicationQuitEvent => {
-                        ui_state.quit = true;
-                        let ev = Event::ApplicationQuitEvent;
-                        core_tx.send(ev);
-                        break;
-                    }
+        match ui_rx.recv_timeout(Duration::from_millis(10)) {
+            Ok(mut evt) => match evt {
+                Event::ApplicationQuitEvent => {
+                    ui_state.quit = true;
+                    let ev = Event::ApplicationQuitEvent;
+                    core_tx.send(ev);
+                    break;
+                }
 
-                    Event::DocumentList { ref list } => {
-                        doc_list = list.clone();
-                        doc_list.sort_by(|a, b| a.0.cmp(&b.0));
-                        println!("ui : recv doc list {:?}\r", doc_list);
-                        if doc_list.len() > 0 {
-                            doc_id = doc_list[0].0;
+                Event::DocumentList { ref list } => {
+                    doc_list = list.clone();
+                    doc_list.sort_by(|a, b| a.0.cmp(&b.0));
 
-                            let ev = Event::createView {
-                                width: ui_state.terminal_width as usize,
-                                height: ui_state.terminal_height as usize,
-                                doc_id,
-                            };
-                            core_tx.send(ev);
-                        }
-                    }
+                    if doc_list.len() > 0 {
+                        doc_id = doc_list[0].0;
 
-                    Event::viewCreated {
-                        width,
-                        height,
-                        doc_id,
-                        view_id,
-                    } => {
-                        let ev = Event::RequestLayoutEvent {
-                            view_id: 0,
+                        let ev = Event::createView {
+                            width: ui_state.terminal_width as usize,
+                            height: ui_state.terminal_height as usize,
                             doc_id,
-                            screen: screen.clone(),
                         };
                         core_tx.send(ev);
                     }
-
-                    _ => {}
                 }
-            }
+
+                Event::viewCreated {
+                    width,
+                    height,
+                    doc_id,
+                    view_id,
+                } => {
+                    let ev = Event::RequestLayoutEvent {
+                        view_id,
+                        doc_id,
+                        screen: screen.clone(),
+                    };
+                    core_tx.send(ev);
+                }
+
+                BuildLayoutEvent {
+                    view_id,
+                    doc_id,
+                    mut screen,
+                } => {
+                    if ui_state.display_status {
+                        let status_line_y = 1;
+
+                        display_status_line(
+                            &ui_state,
+                            &mut screen,
+                            status_line_y,
+                            ui_state.terminal_width,
+                            ui_state.terminal_height,
+                            &mut stdout,
+                        );
+                    }
+
+                    if ui_state.display_view {
+                        draw_view(&mut ui_state, &mut screen, &mut stdout);
+                    }
+                }
+
+                _ => {}
+            },
 
             _ => {
                 // TODO: handle timeout
@@ -243,9 +263,9 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(mut ui_state: &mut UiState, mut view: &mut View, mut stdout: &mut Stdout) {
+fn draw_view(mut ui_state: &mut UiState, mut screen: &mut Screen, mut stdout: &mut Stdout) {
     let start_line = ui_state.view_start_line;
-    draw_screen(&mut view.screen, start_line, &mut stdout);
+    draw_screen(&mut screen, start_line, &mut stdout);
 }
 
 fn _terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
@@ -534,7 +554,7 @@ fn get_input_event(
             // TODO: use last input event time
             ui_state.status = " async no event".to_owned();
             ui_state.input_wait_time_ms += 10;
-            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 20);
+            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 10);
             thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
         }
     }
@@ -544,19 +564,14 @@ fn get_input_event(
 
 fn display_status_line(
     ui_state: &UiState,
-    view: &View,
+    screen: &Screen,
     line: u16,
     width: u16,
     height: u16,
     mut stdout: &mut Stdout,
 ) {
-    let doc = match view.document {
-        Some(ref d) => d.borrow(),
-        None => return,
-    };
-
-    let name = doc.name.as_str();
-    let file_name = doc.buffer.file_name.as_str();
+    let name = ""; // TODO: from doc list
+    let file_name = ""; // TODO: from doc list
 
     // select/clear last line
     terminal_cursor_to(&mut stdout, 1, line);
@@ -571,7 +586,7 @@ fn display_status_line(
     }
     terminal_cursor_to(&mut stdout, 1, line);
 
-    let (cpi, _, _) = view.screen.find_cpi_by_offset(ui_state.mark_offset);
+    let (cpi, _, _) = screen.find_cpi_by_offset(ui_state.mark_offset);
 
     let mcp = match cpi {
         Some(cpi) => cpi.cp as u32,
@@ -610,8 +625,9 @@ fn display_status_line(
         ).unwrap();
     }
 
-    let off = view.start_offset as f64;
-    let max_size = view.document.as_ref().unwrap().borrow().buffer.size as f64;
+    let off = screen.first_offset as f64;
+    let max_size = 1 as f64; // TODO: add screen.doc_max_offset
+                             // view.document.as_ref().unwrap().borrow().buffer.size as f64;
 
     let pos = ((off / max_size) * height as f64) as u16;
 

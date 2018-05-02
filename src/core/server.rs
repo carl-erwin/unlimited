@@ -12,7 +12,7 @@ use core::event::Key;
 use core::editor::Editor;
 use core::document;
 
-use core::view::{build_screen_layout, View};
+use core::view::{build_screen_layout, Id, View};
 
 struct CoreState {
     keys: Vec<InputEvent>,
@@ -36,8 +36,6 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
     while !core_state.quit {
         match core_rx.recv() {
             Ok(evt) => {
-                println!("core : recv event : {:?}\r", evt);
-
                 match evt {
                     Event::ApplicationQuitEvent => {
                         break;
@@ -65,6 +63,14 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                                 View::new(vid as u64, 0 as u64, width, height, Some(doc.clone()));
 
                             editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
+
+                            let ev = Event::viewCreated {
+                                width,
+                                height,
+                                doc_id,
+                                view_id: vid as Id,
+                            };
+                            ui_tx.send(ev);
                         }
                     }
 
@@ -79,11 +85,24 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                         -> viewDestroyed : view id, w, h, doc::id
                     */
                     Event::RequestLayoutEvent {
-                        view_id: 0,
+                        view_id,
                         doc_id,
                         // start_offset
                         ref screen, // previous screen
                     } => {
+                        let view_id = view_id as usize;
+                        if view_id < editor.view_map.len() {
+                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                            fill_screen(&mut core_state, &mut view);
+
+                            let ev = BuildLayoutEvent {
+                                view_id: view_id as u64,
+                                doc_id,
+                                screen: view.screen.clone(),
+                            };
+                            ui_tx.send(ev);
+                        }
+
                         // is there a view/screen ?
                         // with the correct size ?
                         // alloc/resize screen
@@ -91,8 +110,18 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
 
                     Event::InputEvent { ev } => {
                         if editor.view_map.len() > 0 {
-                            let mut view = editor.view_map[0].1.as_ref().borrow_mut();
+                            let view_id = 0 as usize;
+                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+
                             process_input_events(&mut core_state, &mut view, &mut ui_tx, &ev);
+
+                            fill_screen(&mut core_state, &mut view);
+                            let ev = BuildLayoutEvent {
+                                view_id: view_id as u64,
+                                doc_id: 0,
+                                screen: view.screen.clone(),
+                            };
+                            ui_tx.send(ev);
                         }
                     }
 
