@@ -118,7 +118,5 @@ impl<'a> Editor<'a> {
                 self.document_map.insert(id, b);
             }
         }
-
-        println!("nb docs = {}", self.document_map.len());
     }
 }
