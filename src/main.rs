@@ -1,17 +1,34 @@
 extern crate clap;
 extern crate unlimited;
 
+//
+use std::thread;
+use std::sync::mpsc::channel;
+
 use clap::{App, Arg};
 
+use unlimited::core;
 use unlimited::core::config::Config;
-use unlimited::core::editor::Editor;
+
+use unlimited::ui;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let config = parse_command_line();
-    let mut editor = Editor::new(config);
-    editor.run();
+
+    let (ui_tx, ui_rx) = channel();
+    let (core_tx, core_rx) = channel();
+
+    let ui_name = config.ui_frontend.clone();
+
+    let core_th = { Some(thread::spawn(move || core::start(config, core_rx, ui_tx))) };
+
+    ui::main_loop(ui_name.as_ref(), ui_rx, core_tx);
+
+    if let Some(core_handle) = core_th {
+        core_handle.join().unwrap()
+    }
 }
 
 fn parse_command_line() -> Config {
@@ -19,12 +36,6 @@ fn parse_command_line() -> Config {
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .arg(
-            Arg::with_name("NO_CORE")
-                .help("disable core")
-                .long("no-core"),
-        )
-        .arg(Arg::with_name("NO_UI").help("disable ui").long("no-ui"))
         .args_from_usage("--ui, --ui=[termion|ncurses] 'select user interface fronted'")
         .arg(
             Arg::with_name("FILES")
@@ -47,8 +58,6 @@ fn parse_command_line() -> Config {
     }
 
     Config {
-        start_ui: !matches.is_present("NO_UI"),
-        start_core: !matches.is_present("NO_CORE"),
         files_list,
         ui_frontend,
     }

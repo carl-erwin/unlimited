@@ -1,30 +1,60 @@
 use core::screen::Screen;
 use core::document;
+use core::view;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-
     RequestDocumentList,
     DocumentList {
-        buffer: Vec<(document::Id, String)>,
+        list: Vec<(document::Id, String)>,
     },
 
-    InputEvent,
+    createView {
+        width: usize,
+        height: usize,
+        doc_id: document::Id,
+    },
+    viewCreated {
+        width: usize,
+        height: usize,
+        doc_id: document::Id,
+        view_id: view::Id,
+    },
+
+    destroyView {
+        width: usize,
+        height: usize,
+        doc_id: document::Id,
+        view_id: view::Id,
+    },
+    viewDestroyed {
+        width: usize,
+        height: usize,
+        doc_id: document::Id,
+        view_id: view::Id,
+    },
+
+    InputEvent {
+        ev: self::InputEvent,
+    },
+
     RequestLayoutEvent {
-        view: u32,
+        view_id: view::Id,
+        doc_id: document::Id,
         screen: Box<Screen>,
     },
     BuildLayoutEvent {
-        view: u32,
+        view_id: view::Id,
+        doc_id: document::Id,
         screen: Box<Screen>,
     },
     SystemEvent,
     ApplicationEvent,
     ResizeEvent {
-        view: u32,
+        view_id: view::Id,
         width: usize,
         height: usize,
-    }, // CloseEvent{ view: u32 } ??
+    },
     ApplicationQuitEvent,
 }
 

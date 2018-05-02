@@ -3,6 +3,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use std::convert::AsRef;
+
 //
 use std::thread;
 use std::sync::mpsc::channel;
@@ -56,33 +58,6 @@ impl<'a> Editor<'a> {
             config: config,
             document_map: HashMap::new(),
             view_map: Vec::new(),
-        }
-    }
-
-    /// load files/buffers/etc ...
-    pub fn run(&mut self) {
-        if 0 == 1 {
-            self.setup_default_buffers();
-        }
-
-        self.load_files();
-
-        // Create a simple streaming channel
-        let (ui_tx, ui_rx) = channel();
-        let (core_tx, core_rx) = channel();
-
-        let core_th = if self.config.start_core {
-            Some(thread::spawn(move || core::start(core_rx, ui_tx)))
-        } else {
-            None
-        };
-
-        if self.config.start_ui {
-            ui::main_loop(self, ui_rx, core_tx);
-        }
-
-        if let Some(core_handle) = core_th {
-            core_handle.join().unwrap()
         }
     }
 

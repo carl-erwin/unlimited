@@ -21,7 +21,7 @@ use ui::setup_views;
 use ui::fill_screen;
 use ui::process_input_events;
 
-pub fn main_loop(mut editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
+pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     let mut ui_state = UiState::new();
 
     /* If your locale env is unicode, you should use `setlocale`. */
@@ -53,10 +53,10 @@ pub fn main_loop(mut editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sende
     ui_state.terminal_height = height as u16;
     ui_state.view_start_line = 0;
 
-    setup_views(&mut editor, width as usize, height as usize);
+    // setup_views(&mut editor, width as usize, height as usize);
 
     while !ui_state.quit {
-        ui_state.nb_view = editor.view_map.len();
+        ui_state.nb_view = 0; // editor.view_map.len();
         let mut view = Some(&editor.view_map[ui_state.vid as usize].1);
         getmaxyx(stdscr(), &mut height, &mut width);
 
