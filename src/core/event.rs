@@ -3,19 +3,23 @@ use core::document;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-
     RequestDocumentList,
     DocumentList {
-        buffer: Vec<(document::Id, String)>,
+        list: Vec<(document::Id, String)>,
     },
 
-    InputEvent,
+    InputEvent {
+        ev: self::InputEvent,
+    },
+
     RequestLayoutEvent {
         view: u32,
+        doc_id: document::Id,
         screen: Box<Screen>,
     },
     BuildLayoutEvent {
         view: u32,
+        doc_id: document::Id,
         screen: Box<Screen>,
     },
     SystemEvent,

@@ -16,16 +16,15 @@ pub mod mark;
 pub mod codec;
 pub mod server;
 
+use core::config::Config;
+use core::editor::Editor;
 use core::event::Event;
 
 /// not implemented : This function starts the core thread.<br/>
 /// This thread will be the "❤" of unlimited.
-pub fn start(core_rx: Receiver<Event>, ui_tx: Sender<Event>) {
-    server::start(core_rx, ui_tx)
-}
-
-/// not implemented : This function stops the core thread.
-// not implemented : TODO: return a status , ex waiting for job to finsh etc
-pub fn stop() {
-    server::stop()
+pub fn start(config: Config, core_rx: Receiver<Event>, ui_tx: Sender<Event>) {
+    let mut editor = Editor::new(config);
+    // editor.setup_default_buffers(); // scratch , debug
+    editor.load_files();
+    server::start(&mut editor, core_rx, ui_tx)
 }

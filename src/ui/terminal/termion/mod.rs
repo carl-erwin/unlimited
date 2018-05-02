@@ -17,6 +17,7 @@ use self::termion::async_stdin;
 use self::termion::event::parse_event;
 
 //
+use core::document;
 use core::view::View;
 use core::screen::Screen;
 use core::event::Event;
@@ -28,37 +29,12 @@ use core::editor::Editor;
 
 //
 use ui::UiState;
-use ui::setup_views;
-use ui::fill_screen;
-use ui::process_input_events;
 
-pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
-    let ev = Event::ApplicationQuitEvent;
-    core_tx.send(ev);
-
-    loop {
-        println!("ui : waiting for event");
-        match ui_rx.recv() {
-            Ok(evt) => {
-                println!("ui : recv event : {:?}", evt);
-
-                match evt {
-                    Event::ApplicationQuitEvent => {
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-            _ => {
-                println!("ui : recv error");
-            }
-        }
-    }
-
-    return;
-
+pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
+    // ui state
     let mut ui_state = UiState::new();
 
+    // ui setup
     let (width, height, start_line) = if ui_state.display_status {
         let (width, height) = terminal_size().unwrap();
         (width - 2, height - 2, 2)
@@ -71,6 +47,76 @@ pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Ev
     ui_state.terminal_height = height;
     ui_state.view_start_line = start_line;
 
+    //
+    let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
+    let mut stdout = AlternateScreen::from(stdout);
+    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+    stdout.flush().unwrap();
+    let mut stdin = async_stdin().bytes();
+
+    // send first event
+    let ev = Event::RequestDocumentList;
+    core_tx.send(ev);
+
+    let mut doc_list = vec![];
+    let mut doc_id = 0;
+
+    let mut screen = Box::new(Screen::new(width as usize, height as usize));
+
+    while !ui_state.quit {
+        // send
+        let vec_evt = get_input_event(&mut stdin, &mut ui_state);
+        for ev in vec_evt {
+            let ev = Event::InputEvent { ev };
+            core_tx.send(ev);
+        }
+
+        // recv
+        match ui_rx.recv_timeout(Duration::from_millis(1)) {
+            Ok(evt) => {
+                println!("ui : recv event : {:?}\r", evt);
+                match evt {
+                    Event::ApplicationQuitEvent => {
+                        ui_state.quit = true;
+                        let ev = Event::ApplicationQuitEvent;
+                        core_tx.send(ev);
+                        break;
+                    }
+
+                    Event::DocumentList { ref list } => {
+                        doc_list = list.clone();
+                        doc_list.sort_by(|a, b| a.0.cmp(&b.0));
+                        println!("ui : recv doc list {:?}\r", doc_list);
+                        if doc_list.len() > 0 {
+                            doc_id = doc_list[0].0;
+
+                            let ev = RequestLayoutEvent {
+                                view: 0,
+                                doc_id,
+                                screen : screen.clone(),
+                            };
+                            core_tx.send(ev);
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+
+            _ => {
+                // TODO: handle timeout
+            }
+        }
+    }
+
+    // quit
+    // clear, restore cursor
+    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
+    write!(stdout, "{}{}", ToMainScreen, termion::cursor::Show).unwrap();
+    stdout.flush().unwrap();
+    return;
+
+    /*
     setup_views(editor, width as usize, height as usize);
 
     //
@@ -137,13 +183,7 @@ pub fn main_loop(editor: &mut Editor, ui_rx: Receiver<Event>, core_tx: Sender<Ev
             fill_screen(&mut ui_state, &mut view.as_mut().unwrap().borrow_mut());
         }
     }
-
-    // quit
-    // clear, restore cursor
-    write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
-    write!(stdout, "{}{}", ToMainScreen, termion::cursor::Show).unwrap();
-
-    stdout.flush().unwrap();
+    */
 }
 
 fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) {
@@ -191,7 +231,6 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
 */
 fn draw_view(mut ui_state: &mut UiState, mut view: &mut View, mut stdout: &mut Stdout) {
     let start_line = ui_state.view_start_line;
-    fill_screen(&mut ui_state, &mut view);
     draw_screen(&mut view.screen, start_line, &mut stdout);
 }
 
@@ -448,8 +487,8 @@ fn get_input_event(
 ) -> Vec<InputEvent> {
     let mut v = Vec::<InputEvent>::new();
 
-    // prepare async read
-    loop {
+    // println!("get input {}\r",  ui_state.input_wait_time_ms);
+    {
         let b = stdin.next();
         if let Some(b) = b {
             if let Ok(val) = b {
@@ -461,7 +500,7 @@ fn get_input_event(
             }
         } else {
             // check terminal size
-            {
+            if true {
                 let (width, height, start_line) = if ui_state.display_status {
                     let (width, height) = terminal_size().unwrap();
                     (width - 2, height - 2, 2)
@@ -474,16 +513,8 @@ fn get_input_event(
                     ui_state.terminal_width = width;
                     ui_state.terminal_height = height;
                     ui_state.view_start_line = start_line;
-
                     ui_state.input_wait_time_ms = 0; // Warning: to handle resize batch
-
-                    // TODO: push resize event to remove size checks in main loop
-                    break;
                 }
-            }
-
-            if !v.is_empty() {
-                break;
             }
 
             // TODO: use last input event time
