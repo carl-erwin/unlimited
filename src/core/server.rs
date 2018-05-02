@@ -4,7 +4,6 @@ use std::sync::mpsc::Receiver;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-
 use core::event;
 use core::event::Event::*;
 use core::event::Event;
@@ -31,17 +30,13 @@ impl CoreState {
     }
 }
 
-
 pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sender<Event>) {
-
     let mut core_state = CoreState::new();
 
-    setup_views(&mut editor);
-
     while !core_state.quit {
-
         match core_rx.recv() {
             Ok(evt) => {
+                println!("core : recv event : {:?}\r", evt);
 
                 match evt {
                     Event::ApplicationQuitEvent => {
@@ -58,6 +53,21 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                         ui_tx.send(ev);
                     }
 
+                    Event::createView {
+                        width,
+                        height,
+                        doc_id,
+                    } => {
+                        let vid = editor.view_map.len();
+                        let doc = editor.document_map.get(&doc_id);
+                        if let Some(doc) = doc {
+                            let view =
+                                View::new(vid as u64, 0 as u64, width, height, Some(doc.clone()));
+
+                            editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
+                        }
+                    }
+
                     /*
                         <- createView : w, h , doc::id
                         -> viewCreate : view id, w, h, doc::id
@@ -68,10 +78,8 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                         <- destroyView : w, h , doc::id
                         -> viewDestroyed : view id, w, h, doc::id
                     */
-
-
                     Event::RequestLayoutEvent {
-                        view: 0,
+                        view_id: 0,
                         doc_id,
                         // start_offset
                         ref screen, // previous screen
@@ -79,12 +87,13 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                         // is there a view/screen ?
                         // with the correct size ?
                         // alloc/resize screen
-                    },
+                    }
 
                     Event::InputEvent { ev } => {
-
-                        let mut view = editor.view_map[0].1.as_ref().borrow_mut();
-                        process_input_events(&mut core_state, &mut view, &mut ui_tx, &ev);
+                        if editor.view_map.len() > 0 {
+                            let mut view = editor.view_map[0].1.as_ref().borrow_mut();
+                            process_input_events(&mut core_state, &mut view, &mut ui_tx, &ev);
+                        }
                     }
 
                     _ => {}
@@ -97,26 +106,6 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
     let ev = Event::ApplicationQuitEvent;
     ui_tx.send(ev);
 }
-
-fn setup_views(editor: &mut Editor) {
-    let mut views = Vec::new();
-
-    for (vid, b) in editor.document_map.iter().enumerate() {
-        let view = View::new(
-            vid as u64,
-            0 as u64,
-            0 as usize,
-            0 as usize,
-            Some(b.1.clone()),
-        );
-        views.push(view);
-    }
-
-    for view in views {
-        editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
-    }
-}
-
 
 fn fill_screen(core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
@@ -161,8 +150,12 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
     }
 }
 
-
-fn process_input_events(core_state: &mut CoreState, view: &mut View, ui_tx: &mut Sender<Event>, ev: &InputEvent) {
+fn process_input_events(
+    core_state: &mut CoreState,
+    view: &mut View,
+    ui_tx: &mut Sender<Event>,
+    ev: &InputEvent,
+) {
     if *ev == ::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
         return;

@@ -90,13 +90,27 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                         if doc_list.len() > 0 {
                             doc_id = doc_list[0].0;
 
-                            let ev = RequestLayoutEvent {
-                                view: 0,
+                            let ev = Event::createView {
+                                width: ui_state.terminal_width as usize,
+                                height: ui_state.terminal_height as usize,
                                 doc_id,
-                                screen : screen.clone(),
                             };
                             core_tx.send(ev);
                         }
+                    }
+
+                    Event::viewCreated {
+                        width,
+                        height,
+                        doc_id,
+                        view_id,
+                    } => {
+                        let ev = Event::RequestLayoutEvent {
+                            view_id: 0,
+                            doc_id,
+                            screen: screen.clone(),
+                        };
+                        core_tx.send(ev);
                     }
 
                     _ => {}
