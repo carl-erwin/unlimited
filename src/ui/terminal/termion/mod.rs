@@ -459,7 +459,7 @@ fn get_input_event(
             // TODO: use last input event time
             ui_state.status = " async no event".to_owned();
             ui_state.input_wait_time_ms += 10;
-            ui_state.input_wait_time_ms = ::std::cmp::max(ui_state.input_wait_time_ms, 20);
+            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 20);
             thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
         }
     }
