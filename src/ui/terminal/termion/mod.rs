@@ -33,26 +33,16 @@ use ui::UiState;
 pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     // ui state
     let mut ui_state = UiState::new();
+    ui_state.view_start_line = if ui_state.display_status { 2 } else { 1 };
 
-    // ui setup
-    let (width, height, start_line) = if ui_state.display_status {
-        let (width, height) = terminal_size().unwrap();
-        (width - 2, height - 2, 2)
-    } else {
-        let dim = terminal_size().unwrap();
-        (dim.0 - 2, dim.1, 1)
-    };
-
-    ui_state.terminal_width = width;
-    ui_state.terminal_height = height;
-    ui_state.view_start_line = start_line;
-
-    //
+    // init termion
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
     let mut stdout = AlternateScreen::from(stdout);
+    let mut stdin = async_stdin().bytes();
+
+    // clear screen
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
     stdout.flush().unwrap();
-    let mut stdin = async_stdin().bytes();
 
     // send first event
     let ev = Event::RequestDocumentList;
@@ -62,12 +52,12 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     let mut doc_list = vec![];
     let mut doc_id = 0;
     let mut view_id = 0;
-    let mut screen = Box::new(Screen::new(width as usize, height as usize));
+    let mut screen = Box::new(Screen::new(0, 0));
 
     while !ui_state.quit {
-        // send
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for ev in vec_evt {
+            // send translated input evnts to core
             let ev = Event::InputEvent { ev };
             core_tx.send(ev);
         }
@@ -78,7 +68,6 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                 ui_state.terminal_width as usize,
                 ui_state.terminal_height as usize,
             ));
-            ui_state.resize_flag = false;
             let ev = Event::RequestLayoutEvent {
                 view_id,
                 doc_id,
@@ -87,7 +76,7 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
             core_tx.send(ev);
         }
 
-        // recv
+        // recv evt from core ?
         match ui_rx.recv_timeout(Duration::from_millis(10)) {
             Ok(mut evt) => match evt {
                 Event::ApplicationQuitEvent => {
@@ -132,6 +121,14 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     doc_id,
                     mut screen,
                 } => {
+                    if ui_state.resize_flag {
+                        // clear screen
+                        write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+                        stdout.flush().unwrap();
+
+                        ui_state.resize_flag = false;
+                    }
+
                     if ui_state.display_status {
                         let status_line_y = 1;
 
@@ -467,7 +464,6 @@ fn get_input_event(
 ) -> Vec<InputEvent> {
     let mut v = Vec::<InputEvent>::new();
 
-    // println!("get input {}\r",  ui_state.input_wait_time_ms);
     {
         let b = stdin.next();
         if let Some(b) = b {
@@ -479,29 +475,30 @@ fn get_input_event(
                 }
             }
         } else {
-            // check terminal size
-            if true {
-                let (width, height, start_line) = if ui_state.display_status {
-                    let (width, height) = terminal_size().unwrap();
-                    (width - 2, height - 2, 2)
-                } else {
-                    let dim = terminal_size().unwrap();
-                    (dim.0 - 2, dim.1, 1)
-                };
-
-                if ui_state.terminal_width != width || ui_state.terminal_height != height {
-                    ui_state.terminal_width = width;
-                    ui_state.terminal_height = height;
-                    ui_state.view_start_line = start_line;
-                    ui_state.input_wait_time_ms = 0; // Warning: to handle resize batch
-                    ui_state.resize_flag = true;
-                }
-            }
-
             // TODO: use last input event time
             ui_state.status = " async no event".to_owned();
             ui_state.input_wait_time_ms += 10;
             ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 10);
+        }
+
+        // check terminal size
+        let (width, height, start_line) = if ui_state.display_status {
+            let (width, height) = terminal_size().unwrap();
+            (width - 2, height - 2, 2)
+        } else {
+            let dim = terminal_size().unwrap();
+            (dim.0 - 2, dim.1, 1)
+        };
+
+        if ui_state.terminal_width != width || ui_state.terminal_height != height {
+            ui_state.terminal_width = width;
+            ui_state.terminal_height = height;
+            ui_state.view_start_line = start_line;
+            ui_state.input_wait_time_ms = 0;
+            ui_state.resize_flag = true;
+        }
+
+        if ui_state.input_wait_time_ms > 0 {
             thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
         }
     }
