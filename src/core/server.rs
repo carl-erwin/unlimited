@@ -93,6 +93,14 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                         let view_id = view_id as usize;
                         if view_id < editor.view_map.len() {
                             let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+
+                            // resize ?
+                            if screen.width != view.screen.width
+                                || screen.height != view.screen.height
+                            {
+                                view.screen = screen.clone();
+                            }
+
                             fill_screen(&mut core_state, &mut view);
 
                             let ev = BuildLayoutEvent {

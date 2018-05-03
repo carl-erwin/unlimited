@@ -43,6 +43,7 @@ struct UiState {
     terminal_width: u16,
     terminal_height: u16,
     view_start_line: usize,
+    resize_flag: bool,
 }
 
 impl UiState {
@@ -61,6 +62,7 @@ impl UiState {
             terminal_width: 0,
             terminal_height: 0,
             view_start_line: 0,
+            resize_flag: false,
         }
     }
 }
