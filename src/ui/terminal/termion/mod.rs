@@ -58,9 +58,10 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
     let ev = Event::RequestDocumentList;
     core_tx.send(ev);
 
+    // ui ctx
     let mut doc_list = vec![];
     let mut doc_id = 0;
-
+    let mut view_id = 0;
     let mut screen = Box::new(Screen::new(width as usize, height as usize));
 
     while !ui_state.quit {
@@ -68,6 +69,21 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for ev in vec_evt {
             let ev = Event::InputEvent { ev };
+            core_tx.send(ev);
+        }
+
+        // resize ?
+        if ui_state.resize_flag {
+            screen = Box::new(Screen::new(
+                ui_state.terminal_width as usize,
+                ui_state.terminal_height as usize,
+            ));
+            ui_state.resize_flag = false;
+            let ev = Event::RequestLayoutEvent {
+                view_id,
+                doc_id,
+                screen: screen.clone(),
+            };
             core_tx.send(ev);
         }
 
@@ -478,6 +494,7 @@ fn get_input_event(
                     ui_state.terminal_height = height;
                     ui_state.view_start_line = start_line;
                     ui_state.input_wait_time_ms = 0; // Warning: to handle resize batch
+                    ui_state.resize_flag = true;
                 }
             }
 
