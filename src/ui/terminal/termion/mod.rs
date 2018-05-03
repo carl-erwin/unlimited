@@ -556,8 +556,7 @@ fn display_status_line(
     }
 
     let off = screen.first_offset as f64;
-    let max_size = 1 as f64; // TODO: add screen.doc_max_offset
-                             // view.document.as_ref().unwrap().borrow().buffer.size as f64;
+    let max_size = screen.doc_max_offset as f64;
 
     let pos = ((off / max_size) * height as f64) as u16;
 

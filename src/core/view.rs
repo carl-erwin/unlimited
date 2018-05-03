@@ -797,6 +797,7 @@ pub fn build_screen_layout(
         last_pushed_offset = cpi.offset;
     }
 
+    screen.doc_max_offset = max_offset;
     screen.last_offset = last_pushed_offset;
     last_pushed_offset
 }
