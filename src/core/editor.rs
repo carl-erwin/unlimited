@@ -3,17 +3,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use std::convert::AsRef;
-
 //
-use std::thread;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
-use std::sync::mpsc::Receiver;
-
-//
-use core;
-use ui;
 use core::config::Config;
 
 use core::document::DocumentBuilder;
@@ -23,7 +13,6 @@ use core::document;
 use core::view::View;
 use core::view;
 
-use core::event::Event;
 
 //
 pub type Id = u64;
@@ -88,7 +77,8 @@ impl<'a> Editor<'a> {
         }
     }
 
-    ///
+    /// TODO: replace this by load/unload doc functions
+    /// the ui will open the docuents on demand
     pub fn load_files(&mut self) {
         let mut id = self.document_map.len() as u64;
 

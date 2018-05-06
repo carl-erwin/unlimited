@@ -9,25 +9,25 @@ pub enum Event {
         list: Vec<(document::Id, String)>,
     },
 
-    createView {
+    CreateView {
         width: usize,
         height: usize,
         doc_id: document::Id,
     },
-    viewCreated {
+    ViewCreated {
         width: usize,
         height: usize,
         doc_id: document::Id,
         view_id: view::Id,
     },
 
-    destroyView {
+    DestroyView {
         width: usize,
         height: usize,
         doc_id: document::Id,
         view_id: view::Id,
     },
-    viewDestroyed {
+    ViewDestroyed {
         width: usize,
         height: usize,
         doc_id: document::Id,

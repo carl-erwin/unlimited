@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Duration;
 use std::io::{self, Read, Stdout, Write};
 
-use std::sync::mpsc::channel;
+use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
 //
@@ -17,15 +17,12 @@ use self::termion::async_stdin;
 use self::termion::event::parse_event;
 
 //
-use core::document;
-use core::view::View;
 use core::screen::Screen;
 use core::event::Event;
 use core::event::InputEvent;
 use core::event::Event::*;
 
 use core::event::Key;
-use core::editor::Editor;
 
 //
 use ui::UiState;
@@ -46,20 +43,21 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
 
     // send first event
     let ev = Event::RequestDocumentList;
-    core_tx.send(ev);
+    core_tx.send(ev).unwrap_or(());
 
     // ui ctx
-    let mut doc_list = vec![];
-    let mut doc_id = 0;
-    let mut view_id = 0;
+    let mut doc_list;
+    let mut current_doc_id = 0;
+    let mut current_view_id = 0;
     let mut screen = Box::new(Screen::new(0, 0));
+    let mut view_doc_map = HashMap::new();
 
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for ev in vec_evt {
             // send translated input evnts to core
             let ev = Event::InputEvent { ev };
-            core_tx.send(ev);
+            core_tx.send(ev).unwrap_or(());
         }
 
         // resize ?
@@ -69,51 +67,58 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                 ui_state.terminal_height as usize,
             ));
             let ev = Event::RequestLayoutEvent {
-                view_id,
-                doc_id,
+                view_id: current_view_id,
+                doc_id: current_doc_id,
                 screen: screen.clone(),
             };
-            core_tx.send(ev);
+            core_tx.send(ev).unwrap_or(());
         }
 
-        // recv evt from core ?
+        // evt from core ?
         match ui_rx.recv_timeout(Duration::from_millis(10)) {
-            Ok(mut evt) => match evt {
+            Ok(evt) => match evt {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
                     let ev = Event::ApplicationQuitEvent;
-                    core_tx.send(ev);
+                    core_tx.send(ev).unwrap_or(());
                     break;
                 }
+
+                // TODO: add Event::OpenDocument / Event::CloseDocument
 
                 Event::DocumentList { ref list } => {
                     doc_list = list.clone();
                     doc_list.sort_by(|a, b| a.0.cmp(&b.0));
 
                     if doc_list.len() > 0 {
-                        doc_id = doc_list[0].0;
+                        // open first document
+                        current_doc_id = doc_list[0].0;
 
-                        let ev = Event::createView {
+                        let ev = Event::CreateView {
                             width: ui_state.terminal_width as usize,
                             height: ui_state.terminal_height as usize,
-                            doc_id,
+                            doc_id: current_doc_id,
                         };
-                        core_tx.send(ev);
+                        core_tx.send(ev).unwrap_or(());
                     }
                 }
 
-                Event::viewCreated {
-                    width,
-                    height,
+                Event::ViewCreated {
+                    width: _,
+                    height: _,
                     doc_id,
                     view_id,
                 } => {
+                    // save mapping between doc_id and view
+                    // remember a document can have multiple view
+                    view_doc_map.insert(view_id, doc_id);
+
                     let ev = Event::RequestLayoutEvent {
                         view_id,
                         doc_id,
                         screen: screen.clone(),
                     };
-                    core_tx.send(ev);
+                    core_tx.send(ev).unwrap_or(());
                 }
 
                 BuildLayoutEvent {
@@ -121,6 +126,11 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     doc_id,
                     mut screen,
                 } => {
+
+                    // pending request ? save view_id
+                    current_doc_id = doc_id;
+                    current_view_id = view_id;
+
                     if ui_state.resize_flag {
                         // clear screen
                         write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
@@ -206,7 +216,7 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(mut ui_state: &mut UiState, mut screen: &mut Screen, mut stdout: &mut Stdout) {
+fn draw_view(ui_state: &mut UiState, mut screen: &mut Screen, mut stdout: &mut Stdout) {
     let start_line = ui_state.view_start_line;
     draw_screen(&mut screen, start_line, &mut stdout);
 }

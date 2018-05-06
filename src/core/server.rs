@@ -4,7 +4,6 @@ use std::sync::mpsc::Receiver;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use core::event;
 use core::event::Event::*;
 use core::event::Event;
 use core::event::InputEvent;
@@ -30,7 +29,7 @@ impl CoreState {
     }
 }
 
-pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sender<Event>) {
+pub fn start(editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sender<Event>) {
     let mut core_state = CoreState::new();
 
     while !core_state.quit {
@@ -48,10 +47,10 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                             list.push((*e.0, name.to_string()));
                         }
                         let ev = Event::DocumentList { list };
-                        ui_tx.send(ev);
+                        ui_tx.send(ev).unwrap_or(());
                     }
 
-                    Event::createView {
+                    Event::CreateView {
                         width,
                         height,
                         doc_id,
@@ -64,13 +63,13 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
 
                             editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
 
-                            let ev = Event::viewCreated {
+                            let ev = Event::ViewCreated {
                                 width,
                                 height,
                                 doc_id,
                                 view_id: vid as Id,
                             };
-                            ui_tx.send(ev);
+                            ui_tx.send(ev).unwrap_or(());
                         }
                     }
 
@@ -108,7 +107,7 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                                 doc_id,
                                 screen: view.screen.clone(),
                             };
-                            ui_tx.send(ev);
+                            ui_tx.send(ev).unwrap_or(());
                         }
 
                         // is there a view/screen ?
@@ -129,7 +128,7 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
                                 doc_id: 0,
                                 screen: view.screen.clone(),
                             };
-                            ui_tx.send(ev);
+                            ui_tx.send(ev).unwrap_or(());
                         }
                     }
 
@@ -141,10 +140,10 @@ pub fn start(mut editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sende
     }
 
     let ev = Event::ApplicationQuitEvent;
-    ui_tx.send(ev);
+    ui_tx.send(ev).unwrap_or(());
 }
 
-fn fill_screen(core_state: &mut CoreState, view: &mut View) {
+fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
         let mut screen = &mut view.screen;
 
@@ -190,7 +189,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 fn process_input_events(
     core_state: &mut CoreState,
     view: &mut View,
-    ui_tx: &mut Sender<Event>,
+    _ui_tx: &mut Sender<Event>,
     ev: &InputEvent,
 ) {
     if *ev == ::core::event::InputEvent::NoInputEvent {
