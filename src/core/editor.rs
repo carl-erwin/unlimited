@@ -13,7 +13,6 @@ use core::document;
 use core::view::View;
 use core::view;
 
-
 //
 pub type Id = u64;
 

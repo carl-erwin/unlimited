@@ -28,24 +28,21 @@ use core::event::Key;
 use ui::UiState;
 
 pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
-    // ui state
-    let mut ui_state = UiState::new();
-    ui_state.view_start_line = if ui_state.display_status { 2 } else { 1 };
-
+    // front-end init code {----
     // init termion
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
     let mut stdout = AlternateScreen::from(stdout);
     let mut stdin = async_stdin().bytes();
 
-    // clear screen
-    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-    stdout.flush().unwrap();
+    // ui state
+    let mut ui_state = UiState::new();
+    ui_state.view_start_line = if ui_state.display_status { 2 } else { 1 };
 
     // send first event
     let ev = Event::RequestDocumentList;
     core_tx.send(ev).unwrap_or(());
 
-    // ui ctx
+    // ui ctx : TODO move to struct UiCtx
     let mut doc_list;
     let mut current_doc_id = 0;
     let mut current_view_id = 0;
@@ -85,7 +82,6 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                 }
 
                 // TODO: add Event::OpenDocument / Event::CloseDocument
-
                 Event::DocumentList { ref list } => {
                     doc_list = list.clone();
                     doc_list.sort_by(|a, b| a.0.cmp(&b.0));
@@ -126,7 +122,6 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     doc_id,
                     mut screen,
                 } => {
-
                     // pending request ? save view_id
                     current_doc_id = doc_id;
                     current_view_id = view_id;
@@ -134,8 +129,6 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     if ui_state.resize_flag {
                         // clear screen
                         write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
-                        stdout.flush().unwrap();
-
                         ui_state.resize_flag = false;
                     }
 
@@ -155,6 +148,8 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     if ui_state.display_view {
                         draw_view(&mut ui_state, &mut screen, &mut stdout);
                     }
+
+                    stdout.flush().unwrap();
                 }
 
                 _ => {}
@@ -166,18 +161,18 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
         }
     }
 
-    // quit
-    // clear, restore cursor
+    // front-end quit code {----
+    // on quit, clear, restore cursor
     write!(stdout, "{}{}", termion::clear::All, termion::cursor::Show).unwrap();
     write!(stdout, "{}{}", ToMainScreen, termion::cursor::Show).unwrap();
     stdout.flush().unwrap();
+    // ----}
 }
 
 fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Hide).unwrap();
     write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
-    // stdout.flush().unwrap();
 
     for l in 0..screen.height {
         terminal_cursor_to(&mut stdout, 1, (start_line + l + 1) as u16);
@@ -207,7 +202,6 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
         */
     }
 
-    stdout.flush().unwrap();
 }
 
 /*
@@ -592,6 +586,4 @@ fn display_status_line(
         termion::style::Invert,
         termion::style::Reset
     ).unwrap();
-
-    stdout.flush().unwrap();
 }
