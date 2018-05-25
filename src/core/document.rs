@@ -1,6 +1,6 @@
 //
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 //
 use core::buffer::Buffer;
@@ -8,8 +8,8 @@ use core::buffer::OpenMode;
 
 //
 use core::bufferlog::BufferLog;
-use core::bufferlog::BufferOperationType;
 use core::bufferlog::BufferOperation;
+use core::bufferlog::BufferOperationType;
 
 //
 pub type Id = u64;

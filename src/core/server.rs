@@ -1,15 +1,15 @@
-use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
-use core::event::Event::*;
+use core::document;
+use core::editor::Editor;
 use core::event::Event;
+use core::event::Event::*;
 use core::event::InputEvent;
 use core::event::Key;
-use core::editor::Editor;
-use core::document;
 
 use core::view::{build_screen_layout, Id, View};
 
