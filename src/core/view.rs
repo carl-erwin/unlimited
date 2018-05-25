@@ -12,15 +12,15 @@
 */
 
 //
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 //
 use core::document::Document;
 use core::screen::Screen;
 
-use core::mark::Mark;
 use core::codepointinfo::CodepointInfo;
+use core::mark::Mark;
 
 use core::codec::text::utf8;
 

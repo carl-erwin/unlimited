@@ -5,17 +5,17 @@
 
 extern crate libc;
 
-use std::ffi::CString;
-use std::mem;
-use std::ptr;
-use std::slice;
-use std::rc::Rc;
-use std::rc::Weak;
 use std::cell::RefCell;
+use std::ffi::CString;
+use std::marker::PhantomData;
+use std::mem;
+use std::ops::Deref;
 use std::ops::Index;
 use std::ops::IndexMut;
-use std::ops::Deref;
-use std::marker::PhantomData;
+use std::ptr;
+use std::rc::Rc;
+use std::rc::Weak;
+use std::slice;
 
 use self::libc::{c_int,
                  c_void,
@@ -1723,9 +1723,9 @@ mod tests {
         let nr_remove = page_size * 14;
         let offset = page_size as u64;
 
-        use std::io::prelude::*;
-        use std::fs::File;
         use std::fs;
+        use std::fs::File;
+        use std::io::prelude::*;
 
         let filename = "/tmp/playground_remove_test".to_owned();
         let mut file = File::create(&filename).unwrap();
@@ -1769,8 +1769,8 @@ mod tests {
     #[test]
     fn test_1m_insert() {
         use super::*;
-        use std::fs::File;
         use std::fs;
+        use std::fs::File;
 
         let page_size = 4096 * 256;
 
@@ -1801,9 +1801,9 @@ mod tests {
 
         let page_size = 4096;
 
-        use std::io::prelude::*;
-        use std::fs::File;
         use std::fs;
+        use std::fs::File;
+        use std::io::prelude::*;
 
         let filename = "/tmp/playground_insert_test".to_owned();
         {

@@ -1,5 +1,5 @@
-use core::screen::Screen;
 use core::document;
+use core::screen::Screen;
 use core::view;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

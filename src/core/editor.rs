@@ -1,17 +1,17 @@
 //
-use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 //
 use core::config::Config;
 
-use core::document::DocumentBuilder;
-use core::document::Document;
 use core::document;
+use core::document::Document;
+use core::document::DocumentBuilder;
 
-use core::view::View;
 use core::view;
+use core::view::View;
 
 //
 pub type Id = u64;

@@ -1,26 +1,26 @@
 //
+use std::io::{self, Read, Stdout, Write};
 use std::thread;
 use std::time::Duration;
-use std::io::{self, Read, Stdout, Write};
 
 use std::collections::HashMap;
-use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 //
 extern crate termion;
 
-use self::termion::screen::{AlternateScreen, ToMainScreen};
-use self::termion::input::MouseTerminal;
-use self::termion::raw::IntoRawMode;
-use self::termion::terminal_size;
 use self::termion::async_stdin;
 use self::termion::event::parse_event;
+use self::termion::input::MouseTerminal;
+use self::termion::raw::IntoRawMode;
+use self::termion::screen::{AlternateScreen, ToMainScreen};
+use self::termion::terminal_size;
 
 //
-use core::screen::Screen;
 use core::event::Event;
-use core::event::InputEvent;
 use core::event::Event::*;
+use core::event::InputEvent;
+use core::screen::Screen;
 
 use core::event::Key;
 
@@ -201,7 +201,6 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
         }
         */
     }
-
 }
 
 /*

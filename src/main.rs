@@ -2,8 +2,8 @@ extern crate clap;
 extern crate unlimited;
 
 //
-use std::thread;
 use std::sync::mpsc::channel;
+use std::thread;
 
 use clap::{App, Arg};
 

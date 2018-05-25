@@ -1,5 +1,5 @@
-use core::mapped_file::MappedFile;
 use core::mapped_file::FileHandle;
+use core::mapped_file::MappedFile;
 
 //
 pub type Id = u64;

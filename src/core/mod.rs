@@ -1,20 +1,20 @@
 //
-use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 
-pub mod editor;
-pub mod config;
-pub mod screen;
-pub mod codepointinfo;
-pub mod document;
 pub mod buffer;
 pub mod bufferlog;
-pub mod mapped_file;
-pub mod event;
-pub mod view;
-pub mod mark;
 pub mod codec;
+pub mod codepointinfo;
+pub mod config;
+pub mod document;
+pub mod editor;
+pub mod event;
+pub mod mapped_file;
+pub mod mark;
+pub mod screen;
 pub mod server;
+pub mod view;
 
 use core::config::Config;
 use core::editor::Editor;
