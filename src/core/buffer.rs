@@ -174,7 +174,8 @@ impl<'a> Buffer<'a> {
         );
 
         // TODO: check result, handle io results properly
-        ::std::fs::set_permissions(&self.file_name, perms).unwrap();
+        // set buffer status to : permission denied etc
+        let _ = ::std::fs::set_permissions(&self.file_name, perms);
 
         res
     }
