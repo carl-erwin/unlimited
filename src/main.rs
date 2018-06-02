@@ -47,14 +47,16 @@ fn parse_command_line() -> Config {
 
     let mut ui_frontend = String::new();
     if matches.is_present("ui") {
-        let v: Vec<&str> = matches.values_of("ui").unwrap().collect();
-        ui_frontend = v[0].to_owned();
+        ui_frontend = matches.values_of("ui").unwrap().collect::<String>();
     }
 
     let mut files_list = Vec::new();
     if matches.is_present("FILES") {
-        let strs: Vec<&str> = matches.values_of("FILES").unwrap().collect();
-        files_list = strs.into_iter().map(|x| x.to_owned()).collect()
+        files_list = matches
+            .values_of("FILES")
+            .unwrap()
+            .map(|x| x.to_owned())
+            .collect();
     }
 
     Config {
