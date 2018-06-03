@@ -6,13 +6,12 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 ---
 
-### Status
+### Features
 
 * basic utf-8 support
-* Version 0.0.2 got unlimited undo/redo at the byte level, ie: every inserted character is added to the document's buffer log.
-  This is the base api that will be used to implement other undo schemes (word, sentence, paragraph).<br/>
-* Version 0.0.3 adds large file support<br/>
-* Version 0.0.4 splits the editor in 2 threads, will be used for async work<br/>
+* unlimited undo/redo at the byte level, ie: every inserted character is added to the document's buffer log.
+  This will be used to implement other undo schemes (word, sentence, paragraph).<br/>
+* large file support<br/>
 
 ---
 
