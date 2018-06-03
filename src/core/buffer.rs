@@ -50,7 +50,8 @@ impl<'a> Buffer<'a> {
         let file = match MappedFile::new(file_name.clone(), page_size) {
             Some(file) => file,
             None => {
-                eprintln!("cannot map file '{}'", file_name);
+                // TODO: return Result
+                // eprintln!("cannot map file '{}'", file_name);
                 return None;
             }
         };

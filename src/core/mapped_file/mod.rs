@@ -35,6 +35,7 @@ use self::libc::{c_int,
                  O_RDWR,
                  O_TRUNC,
                  PROT_READ,
+                 S_IFDIR,
                  S_IRUSR,
                  S_IWUSR};
 
@@ -316,13 +317,18 @@ impl<'a> MappedFile<'a> {
             return None;
         }
 
-        let file_size: u64 = unsafe {
-            let mut stbuff: libc::stat = ::std::mem::zeroed();
+        let mut stbuff: libc::stat = unsafe { ::std::mem::zeroed() };
+        unsafe {
             if fstat(fd, &mut stbuff) != 0 {
-                panic!("cannot open file");
+                panic!("cannot get file informations");
             }
-            stbuff.st_size as u64
-        };
+        }
+
+        if S_IFDIR & stbuff.st_mode != 0 {
+            return None;
+        }
+
+        let file_size = stbuff.st_size as u64;
 
         unsafe {
             posix_fadvise(fd, 0, 0, 2 /*POSIX_FADV_SEQUENTIAL*/);
