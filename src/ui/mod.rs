@@ -9,7 +9,7 @@ pub fn main_loop(ui_name: &str, ui_rx: Receiver<Event>, core_tx: Sender<Event>) 
     // TODO: switch ui here
     match ui_name {
         "ncurses" => {
-            // terminal::ncurses::main_loop(ui_rx, core_tx);
+            terminal::ncurses::main_loop(ui_rx, core_tx);
         }
 
         "termion" | _ => {
