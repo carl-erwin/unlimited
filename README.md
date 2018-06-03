@@ -17,7 +17,7 @@ It is based on previous ideas/implementation done in one of my previous c++ proj
 
 ### Compiling
 
-minimal requirement : rust stable (>= 1.17.0)
+minimum requirement : rust stable (get it at https://www.rust-lang.org)
 
 ```
 git clone https://github.com/carl-erwin/unlimited
