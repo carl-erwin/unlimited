@@ -12,7 +12,7 @@ use unlimited::core::config::Config;
 
 use unlimited::ui;
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+use unlimited::core::VERSION;
 
 fn main() {
     let config = parse_command_line();

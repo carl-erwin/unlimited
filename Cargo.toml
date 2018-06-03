@@ -1,6 +1,6 @@
 [package]
 name = "unlimited"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
 
 

@@ -24,6 +24,8 @@ use core::screen::Screen;
 
 use core::event::Key;
 
+use core::VERSION;
+
 //
 use ui::UiState;
 
@@ -542,13 +544,13 @@ fn display_status_line(
 
     let mut status_str = if name != file_name {
         format!(
-            " unlimitED! 0.0.3    doc[{}] file[{}], m(@{}):'{:08x}' {}",
-            name, file_name, ui_state.mark_offset, mcp, ui_state.status
+            " unlimitED! {}    doc[{}] file[{}], m(@{}):'{:08x}' {}",
+            VERSION, name, file_name, ui_state.mark_offset, mcp, ui_state.status
         )
     } else {
         format!(
-            " unlimitED! 0.0.3    doc[{}], m(@{}):'{:08x}' {}",
-            name, ui_state.mark_offset, mcp, ui_state.status
+            " unlimitED! {}    doc[{}], m(@{}):'{:08x}' {}",
+            VERSION, name, ui_state.mark_offset, mcp, ui_state.status
         )
     };
 

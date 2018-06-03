@@ -20,8 +20,9 @@ use core::config::Config;
 use core::editor::Editor;
 use core::event::Event;
 
-/// not implemented : This function starts the core thread.<br/>
-/// This thread will be the "❤" of unlimited.
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+/// This thread is the "❤" of unlimited.
 pub fn start(config: Config, core_rx: Receiver<Event>, ui_tx: Sender<Event>) {
     let mut editor = Editor::new(config);
     // editor.setup_default_buffers(); // scratch , debug
