@@ -77,7 +77,7 @@ impl<'a> Editor<'a> {
     }
 
     /// TODO: replace this by load/unload doc functions
-    /// the ui will open the docuents on demand
+    /// the ui will open the documents on demand
     pub fn load_files(&mut self) {
         let mut id = self.document_map.len() as u64;
 
