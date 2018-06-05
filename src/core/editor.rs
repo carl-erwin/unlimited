@@ -20,10 +20,12 @@ pub type Id = u64;
 /* Hierarchy Reminder
 
     core
-        Editor
+        editor
             config
-            document_map<Rc<buffer>>
-            view_map
+            document_map<doc_id, Rc<Document>>
+            view_map<view_id, Rc<View>>
+
+    TODO:
             Option<&view>
                 &buffer
                 list<mode>
@@ -31,6 +33,38 @@ pub type Id = u64;
 
     ui
         (vid, bid)
+
+*/
+
+/* TODO:
+    parse argument to extract line,colinfo,offset
+    file@1246
+    file:10
+    file:10,5
+    +l file
+    +l,c file
+    @offset file
+
+    document_list: Vec<
+        struct DocumentInfo {
+            FileType: { directory, regular, internal }
+            relative_path,: String  test,        *debug-message*
+            real_path: String : /home/user/test, /dev/null
+            id,
+            special_file : bool,
+            internal_document : bool,
+            start_line: usize
+            start_column: usize
+            start_offset
+        }
+    >
+
+
+    keep user argument order, push new files,
+    this list is never cleared
+    before insertion the realpath is checked to avoid double open
+
+    document_index: HashMap<String, document::Id>,  document::Id is the position in document_list
 
 */
 pub struct Editor<'a> {
