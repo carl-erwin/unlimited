@@ -21,6 +21,9 @@ minimum requirement : rust stable (get it at https://www.rust-lang.org)
 
 ```
 git clone https://github.com/carl-erwin/unlimited
+ or
+git clone https://gitlab.com/carl-erwin/unlimited
+
 cd unlimited
 cargo install
 ```
