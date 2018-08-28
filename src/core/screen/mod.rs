@@ -7,16 +7,24 @@ use self::line::LineCellIndex;
 
 pub type LineIndex = usize;
 
-// the screen is composed of lines
+/// A Screen is composed of Line(s).<br/>
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Screen {
+    /// the underlying lines storage
     pub line: Vec<Line>,
+    /// the index of the line filled with the puhs method
     pub current_line_index: LineCellIndex,
+    /// maximum number of elements the screen line can hold
     pub width: usize,
+    /// maximum number of lines the screen can hold
     pub height: usize,
+    /// the number of elements pushed in the screen
     pub nb_push: usize,
+    /// placeholder to record the offset of the first pushed CodepointInfo (used by View)
     pub first_offset: u64,
+    /// placeholder to record the offset of the last pushed CodepointInfo (used by View)
     pub last_offset: u64,
+    /// placeholder to record the maximum offset of the document (eof)
     pub doc_max_offset: u64,
 }
 

@@ -1,5 +1,5 @@
-/// contains displayed character attributes
-/// The displayed screen is composed of CodepointInfo
+/// A CodepointInfo contains displayed character attributes.<br/>
+/// The displayed screen is composed of LineCell(s), that contain CodepointInfo(s).
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
     pub cp: char,

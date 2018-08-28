@@ -2,7 +2,8 @@ use core::codepointinfo::CodepointInfo;
 
 pub type LineCellIndex = usize;
 
-// a cell contains codepoint informations
+/// A LineCell encapsulates code point information (CodepoinInfo).<br/>
+/// The displayed Lines are composed of LineCell
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct LineCell {
     pub cpi: CodepointInfo,
@@ -18,7 +19,8 @@ impl LineCell {
     }
 }
 
-// a line is composed of cells
+/// A Line is an array of LineCell and some metadata.<br/>
+/// A Screen is composed of Line(s)
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Line {
     pub cells: Vec<LineCell>,
