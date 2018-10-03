@@ -68,8 +68,8 @@ impl DocumentBuilder {
 
     ///
     pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
-        let file_name = self.file_name.to_owned();
-        let buffer = Buffer::new(file_name, OpenMode::ReadWrite);
+
+        let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
         let buffer = match buffer {
             Some(bb) => bb,
             None => return None,
@@ -78,7 +78,7 @@ impl DocumentBuilder {
         Some(Rc::new(RefCell::new(Document {
             id: 0,
             name: self.document_name.clone(),
-            buffer: buffer,
+            buffer,
             buffer_log: BufferLog::new(),
             changed: false,
         })))

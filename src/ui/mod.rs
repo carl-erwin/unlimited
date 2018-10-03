@@ -5,15 +5,15 @@ use std::sync::mpsc::Sender;
 
 use core::event::Event;
 
-pub fn main_loop(ui_name: &str, ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
+pub fn main_loop(ui_name: &str, ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
     // TODO: switch ui here
     match ui_name {
         "ncurses" => {
-            terminal::ncurses::main_loop(ui_rx, core_tx);
+            terminal::ncurses::main_loop(&ui_rx, &core_tx);
         }
 
         "termion" | _ => {
-            terminal::termion::main_loop(ui_rx, core_tx);
+            terminal::termion::main_loop(&ui_rx, &core_tx);
         }
     }
 

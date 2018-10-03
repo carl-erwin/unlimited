@@ -30,15 +30,15 @@ static UTF8D: &'static [u8] = &[
 */
 #[inline]
 pub fn decode_byte(state: u32, byte: u8, codep: &mut u32) -> u32 {
-    let cp_type = UTF8D[byte as usize] as u32;
+    let cp_type = u32::from(UTF8D[byte as usize]);
 
     *codep = if state != UTF8_ACCEPT {
-        (byte & 0x3f) as u32 | (*codep << 6)
+        u32::from(byte & 0x3f) | (*codep << 6)
     } else {
-        (0xff >> cp_type) as u32 & (byte as u32)
+        (0xff >> cp_type) & u32::from(byte)
     };
 
-    UTF8D[256 + (state * 16) as usize + cp_type as usize] as u32
+    u32::from(UTF8D[256 + (state * 16) as usize + cp_type as usize])
 }
 
 // }
@@ -92,7 +92,7 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
         return 3;
     }
 
-    if codepoint < 0x10FFFF {
+    if codepoint < 0x0010_FFFF {
         out[0] = 0xF0 | (codepoint >> 18) as u8;
         out[1] = 0x80 | (codepoint >> 12) as u8;
         out[2] = 0x80 | (codepoint >> 6) as u8;

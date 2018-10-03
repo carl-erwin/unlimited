@@ -29,7 +29,7 @@ impl CoreState {
     }
 }
 
-pub fn start(editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sender<Event>) {
+pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Event>) {
     let mut core_state = CoreState::new();
 
     while !core_state.quit {
@@ -116,11 +116,11 @@ pub fn start(editor: &mut Editor, core_rx: Receiver<Event>, mut ui_tx: Sender<Ev
                     }
 
                     Event::InputEvent { ev } => {
-                        if editor.view_map.len() > 0 {
+                        if !editor.view_map.is_empty() {
                             let view_id = 0 as usize;
                             let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
 
-                            process_input_events(&mut core_state, &mut view, &mut ui_tx, &ev);
+                            process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
 
                             fill_screen(&mut core_state, &mut view);
                             let ev = BuildLayoutEvent {
@@ -189,7 +189,7 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
 fn process_input_events(
     core_state: &mut CoreState,
     view: &mut View,
-    _ui_tx: &mut Sender<Event>,
+    _ui_tx: &Sender<Event>,
     ev: &InputEvent,
 ) {
     if *ev == ::core::event::InputEvent::NoInputEvent {

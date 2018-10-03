@@ -36,10 +36,10 @@ impl Screen {
         }
 
         Screen {
-            line: line,
+            line,
             current_line_index: 0,
-            width: width,
-            height: height,
+            width,
+            height,
             nb_push: 0,
             first_offset: 0,
             last_offset: 0,

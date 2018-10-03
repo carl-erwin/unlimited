@@ -49,10 +49,10 @@ enum Page {
 
 impl Page {
     fn as_slice<'a>(&self) -> Option<&'a [u8]> {
-        Some(match &*self {
-            &Page::OnDisk(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
+        Some(match *self {
+            Page::OnDisk(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
 
-            &Page::InRam(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
+            Page::InRam(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
         })
     }
 }
@@ -124,20 +124,20 @@ impl Node {
     fn clear(&mut self) {
         self.used = false;
         self.fd = -1;
-        // self.idx = 0xffffffffffffffff as NodeIndex;
+        // self.idx = 0xffff_ffff_ffff_ffff as NodeIndex;
         self.parent = None;
         self.left = None;
         self.right = None;
         self.prev = None;
         self.next = None;
         self.size = 0;
-        self.on_disk_offset = 0xffffffffffffffff as u64;
+        self.on_disk_offset = 0xffff_ffff_ffff_ffff as u64;
         self.skip = 0;
         self.page = Weak::new();
         self.cow = None;
     }
 
-    fn map<'a>(&mut self) -> Option<Rc<RefCell<Page>>> {
+    fn map(&mut self) -> Option<Rc<RefCell<Page>>> {
         // ram ?
         if let Some(ref page) = self.cow {
             return Some(Rc::clone(page));
@@ -203,20 +203,23 @@ impl Node {
 
     // will clear p
     fn _page_to_vec(p: &mut Page) -> Vec<u8> {
-        match p {
-            &mut Page::OnDisk(..) => {
-                panic!("cannot be used on Ondisk page");
-            }
+        match *p {
 
-            &mut Page::InRam(ref mut base, ref mut len, ref mut capacity) => {
+            ::core::mapped_file::Page::InRam(ref mut base, ref mut len, ref mut capacity) => {
                 let v = unsafe { Vec::from_raw_parts(*base as *mut u8, *len, *capacity) };
 
-                *base = 0 as *mut u8;
+                *base = ptr::null_mut();
                 *len = 0;
                 *capacity = 0;
 
                 v
             }
+
+            _ => {
+                panic!("cannot be used on Ondisk page");
+            }
+
+
         }
     }
 
@@ -350,7 +353,7 @@ impl<'a> MappedFile<'a> {
 
         let root_node = Node {
             used: true,
-            fd: fd,
+            fd,
             //idx: 0,
             size: file_size,
             parent: None,
@@ -384,12 +387,14 @@ impl<'a> MappedFile<'a> {
             prev_idx = Some(idx);
 
             // TODO: add hints to map all nodes
-            if false && file_size <= page_size as u64 {
+            /*
+            if file_size <= page_size as u64 {
                 let p = file.nodepool[idx as usize].move_to_ram();
                 let rc = Rc::new(RefCell::new(p));
                 file.nodepool[idx as usize].page = Rc::downgrade(&rc);
                 file.nodepool[idx as usize].cow = Some(rc);
             }
+            */
         }
 
         Some(Rc::new(RefCell::new(file)))
@@ -423,7 +428,7 @@ impl<'a> MappedFile<'a> {
         nodepool: &mut FreeListAllocator<Node>,
         parent_idx: Option<NodeIndex>,
         child_idx: Option<NodeIndex>,
-        relation: NodeRelation,
+        relation: &NodeRelation,
     ) {
         let debug = false;
 
@@ -438,7 +443,7 @@ impl<'a> MappedFile<'a> {
         }
 
         if let Some(parent_idx) = parent_idx {
-            if relation == NodeRelation::Left {
+            if relation == &NodeRelation::Left {
                 nodepool[parent_idx].left = child_idx;
                 if debug {
                     println!(
@@ -448,7 +453,7 @@ impl<'a> MappedFile<'a> {
                 }
             }
 
-            if relation == NodeRelation::Right {
+            if relation == &NodeRelation::Right {
                 nodepool[parent_idx].right = child_idx;
                 if debug {
                     println!(
@@ -483,7 +488,7 @@ impl<'a> MappedFile<'a> {
     ) -> () {
         // is leaf ?
         if node_size <= pg_size {
-            if !true {
+            if false {
                 println!(
                     "node_size <= pg_size : \
                      leaf_node({}), pg_size({}), node_size({}), base_offset({})",
@@ -522,10 +527,10 @@ impl<'a> MappedFile<'a> {
         // TODO: None::new(fd, parent, size, on_diskoffset)
         let left_node = Node {
             used: true,
-            fd: fd,
+            fd,
             //            idx: 0,
             size: l_sz,
-            parent: parent,
+            parent,
             left: None,
             right: None,
             prev: None,
@@ -540,10 +545,10 @@ impl<'a> MappedFile<'a> {
         // TODO: None::new(fd, parent, size, on_diskoffset)
         let right_node = Node {
             used: true,
-            fd: fd,
+            fd,
             //          idx: 0,
             size: r_sz,
-            parent: parent,
+            parent,
             left: None,
             right: None,
             prev: None,
@@ -585,7 +590,7 @@ impl<'a> MappedFile<'a> {
         n: NodeIndex,
         offset: u64,
     ) -> (Option<NodeIndex>, NodeSize, NodeLocalOffset) {
-        let debug = !true;
+        let debug = false;
 
         if debug {
             println!("find_subnode_by_offset Ndi({}) off({})", n, offset);
@@ -685,10 +690,8 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn copy_to_slice(it_: &mut FileIterator<'a>, nr_to_read: usize, vec: &mut [u8]) -> usize {
-        match &*it_ {
-            &MappedFileIterator::End(..) => return 0,
-            _ => {}
-        };
+
+        if let MappedFileIterator::End(..) = *it_ { return 0 }
 
         let mut nr_read: usize = 0;
         let mut nr_to_read = nr_to_read;
@@ -731,10 +734,8 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn read(it_: &mut FileIterator<'a>, nr_to_read: usize, vec: &mut Vec<u8>) -> usize {
-        match &*it_ {
-            &MappedFileIterator::End(..) => return 0,
-            _ => {}
-        };
+
+        if let MappedFileIterator::End(..) = *it_ { return 0 }
 
         let mut nr_read = 0;
         let mut nr_to_read = nr_to_read;
@@ -769,10 +770,10 @@ impl<'a> MappedFile<'a> {
     fn update_hierarchy(
         nodepool: &mut FreeListAllocator<Node>,
         parent_idx: Option<NodeIndex>,
-        op: UpdateHierarchyOp,
+        op: &UpdateHierarchyOp,
         value: u64,
     ) {
-        let debug = !true;
+        let debug = false;
 
         let mut p_idx = parent_idx;
         while p_idx != None {
@@ -799,27 +800,27 @@ impl<'a> MappedFile<'a> {
 
     fn check_free_space(it_: &mut MappedFileIterator) -> u64 {
         match &*it_ {
-            &MappedFileIterator::End(..) => return 0,
-            &MappedFileIterator::Real(ref it) => {
+            MappedFileIterator::End(..) => 0,
+            MappedFileIterator::Real(ref it) => {
                 match &it.page {
                     ref rc => match *rc.as_ref().borrow_mut() {
                         Page::OnDisk { .. } => {
-                            return 0;
-                        }
+                            0
+                        },
 
                         Page::InRam(_, ref mut len, capacity) => {
-                            return (capacity - *len) as u64;
+                            (capacity - *len) as u64
                         }
                     },
-                };
+                }
             }
         }
     }
 
     fn insert_in_place(it_: &mut FileIterator<'a>, data: &[u8]) {
         match &*it_ {
-            &MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
-            &MappedFileIterator::Real(ref it) => match &it.page {
+            MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
+            MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.as_ref().borrow_mut() {
                     Page::OnDisk { .. } => {
                         panic!("trying to write on read only memory");
@@ -851,7 +852,7 @@ impl<'a> MappedFile<'a> {
     // 6 - update hierachy
     // 7 - TODO: update iterator internal using find + local_offset on the allocated subtree
     pub fn insert(it_: &mut FileIterator<'a>, data: &[u8]) -> usize {
-        let debug = !true;
+        let debug = false;
 
         let data_len = data.len() as u64;
         if data_len == 0 {
@@ -859,7 +860,7 @@ impl<'a> MappedFile<'a> {
         }
 
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
-            &MappedFileIterator::End(ref rcfile) => {
+            MappedFileIterator::End(ref rcfile) => {
                 let mut file = rcfile.as_ref().borrow_mut();
                 let file_size = file.size();
                 if file_size > 0 {
@@ -871,7 +872,7 @@ impl<'a> MappedFile<'a> {
                 }
             }
 
-            &MappedFileIterator::Real(ref it) => (
+            MappedFileIterator::Real(ref it) => (
                 Some(it.node_idx),
                 it.page_size,
                 it.local_offset,
@@ -900,7 +901,7 @@ impl<'a> MappedFile<'a> {
             MappedFile::update_hierarchy(
                 &mut file.nodepool,
                 node_to_split,
-                UpdateHierarchyOp::Add,
+                &UpdateHierarchyOp::Add,
                 data_len,
             );
             MappedFile::check_leaves(&file);
@@ -946,7 +947,7 @@ impl<'a> MappedFile<'a> {
 
         let subroot_node = Node {
             used: true,
-            fd: fd,
+            fd,
             //            idx: 0,
             size: new_size as u64,
             parent: gparent_idx,
@@ -992,7 +993,7 @@ impl<'a> MappedFile<'a> {
         let mut input_slc = Vec::new();
 
         // before it
-        if let &Some(ref page) = &it_page {
+        if let Some(ref page) = &it_page {
             if local_offset > 0 {
                 let slc = page.as_ref().borrow().as_slice().unwrap();
                 input_slc.push(&slc[0..local_offset as usize]);
@@ -1003,7 +1004,7 @@ impl<'a> MappedFile<'a> {
         input_slc.push(data);
 
         // after it
-        if let &Some(ref page) = &it_page {
+        if let Some(ref page) = &it_page {
             if node_size > 0 {
                 let slc = page.as_ref().borrow().as_slice().unwrap();
                 input_slc.push(&slc[local_offset as usize..node_size as usize]);
@@ -1097,7 +1098,7 @@ impl<'a> MappedFile<'a> {
         MappedFile::update_hierarchy(
             &mut file.nodepool,
             p_idx,
-            UpdateHierarchyOp::Add,
+            &UpdateHierarchyOp::Add,
             data.len() as u64,
         );
 
@@ -1128,15 +1129,15 @@ impl<'a> MappedFile<'a> {
             return 0;
         }
 
-        let debug = !true;
+        let debug = false;
 
         let mut remain = nr;
         let mut nr_removed = 0;
 
         let (mut file, start_idx, mut local_offset) = match &mut *it_ {
-            &mut MappedFileIterator::End(..) => return 0,
+            MappedFileIterator::End(..) => return 0,
 
-            &mut MappedFileIterator::Real(ref it) => {
+            MappedFileIterator::Real(ref it) => {
                 (it.file.as_ref().borrow_mut(), it.node_idx, it.local_offset)
             }
         };
@@ -1168,18 +1169,18 @@ impl<'a> MappedFile<'a> {
                 println!("local_offset {}", local_offset);
             }
 
-            match &mut *file.nodepool[idx]
+            match *file.nodepool[idx]
                 .cow
                 .as_ref()
                 .unwrap()
                 .as_ref()
                 .borrow_mut()
             {
-                &mut Page::OnDisk { .. } => {
+                Page::OnDisk { .. } => {
                     panic!("trying to write on read only memory");
                 }
 
-                &mut Page::InRam(base, ref mut len, capacity) => {
+                Page::InRam(base, ref mut len, capacity) => {
                     let mut v = unsafe { Vec::from_raw_parts(base as *mut u8, *len, capacity) };
                     let index = local_offset as usize;
                     v.drain(index..index + to_rm);
@@ -1196,7 +1197,7 @@ impl<'a> MappedFile<'a> {
             MappedFile::update_hierarchy(
                 &mut file.nodepool,
                 Some(idx),
-                UpdateHierarchyOp::Sub,
+                &UpdateHierarchyOp::Sub,
                 to_rm as u64,
             );
 
@@ -1245,7 +1246,7 @@ impl<'a> MappedFile<'a> {
             }
         }
 
-        return NodeRelation::NoRelation;
+        NodeRelation::NoRelation
     }
 
     fn mark_node_to_release(
@@ -1283,9 +1284,9 @@ impl<'a> MappedFile<'a> {
         mut pool: &mut FreeListAllocator<Node>,
         node_idx: Option<NodeIndex>,
     ) -> Option<NodeIndex> {
-        if node_idx.is_none() {
-            return None;
-        }
+
+        node_idx?;
+
         let idx = node_idx.unwrap();
 
         let debug = false;
@@ -1390,11 +1391,11 @@ impl<'a> MappedFile<'a> {
             match relation {
                 NodeRelation::Left => {
                     to_delete.push(pool[parent].left.unwrap());
-                    MappedFile::link_parent_child(&mut pool, Some(parent), candidate, relation);
+                    MappedFile::link_parent_child(&mut pool, Some(parent), candidate, &relation);
                 }
                 NodeRelation::Right => {
                     to_delete.push(pool[parent].right.unwrap());
-                    MappedFile::link_parent_child(&mut pool, Some(parent), candidate, relation);
+                    MappedFile::link_parent_child(&mut pool, Some(parent), candidate, &relation);
                 }
                 _ => {}
             }
@@ -1423,7 +1424,7 @@ impl<'a> MappedFile<'a> {
             nodepool.release(n);
         }
 
-        if leaves.len() > 0 {
+        if !leaves.is_empty() {
             // println!("leaves: {:?}", leaves);
             let mut prev_idx = nodepool[leaves[0]].prev;
             for idx in leaves {
@@ -1436,7 +1437,7 @@ impl<'a> MappedFile<'a> {
     }
 
     fn check_leaves(file: &MappedFile) {
-        let debug = !true;
+        let debug = false;
 
         let (idx, _, _) = file.find_node_by_offset(0);
         if idx.is_none() {
@@ -1524,7 +1525,7 @@ impl<'a> MappedFile<'a> {
                 file.nodepool[idx].on_disk_offset = align_offset;
                 file.nodepool[idx].skip = skip;
             } else {
-                file.nodepool[idx].on_disk_offset = 0xffffffffffffffff;
+                file.nodepool[idx].on_disk_offset = 0xffff_ffff_ffff_ffff;
                 file.nodepool[idx].skip = 0;
             }
 
@@ -1564,16 +1565,16 @@ pub enum MappedFileIterator<'a> {
 
 impl<'a> MappedFileIterator<'a> {
     fn get_mut_repr(&mut self) -> Option<&mut IteratorInstance<'a>> {
-        match &mut *self {
-            &mut MappedFileIterator::End(..) => None,
-            &mut MappedFileIterator::Real(ref mut it) => Some(it),
+        match *self {
+            MappedFileIterator::End(..) => None,
+            MappedFileIterator::Real(ref mut it) => Some(it),
         }
     }
 
     fn get_file(&mut self) -> FileHandle<'a> {
-        match &mut *self {
-            &mut MappedFileIterator::End(ref file) => Rc::clone(file),
-            &mut MappedFileIterator::Real(ref mut it) => Rc::clone(&it.file),
+        match *self {
+            MappedFileIterator::End(ref file) => Rc::clone(file),
+            MappedFileIterator::Real(ref mut it) => Rc::clone(&it.file),
         }
     }
 }
@@ -1592,9 +1593,9 @@ pub struct IteratorInstance<'a> {
 impl<'a> Deref for MappedFileIterator<'a> {
     type Target = u8;
     fn deref(&self) -> &u8 {
-        match &*self {
-            &MappedFileIterator::End(..) => panic!("invalid iterator"),
-            &MappedFileIterator::Real(ref it) => &it.base[it.local_offset as usize],
+        match *self {
+            MappedFileIterator::End(..) => panic!("invalid iterator"),
+            MappedFileIterator::Real(ref it) => &it.base[it.local_offset as usize],
         }
     }
 }
@@ -1603,10 +1604,10 @@ impl<'a> Iterator for MappedFileIterator<'a> {
     type Item = Self;
 
     fn next(&mut self) -> Option<Self> {
-        match &mut *self {
-            &mut MappedFileIterator::End(..) => None,
+        match *self {
+            MappedFileIterator::End(..) => None,
 
-            &mut MappedFileIterator::Real(ref mut it) => {
+            MappedFileIterator::Real(ref mut it) => {
                 if it.local_offset == it.page_size {
                     let mut file = it.file.borrow_mut();
 
@@ -1713,7 +1714,7 @@ mod tests {
 
         use std::io;
 
-        if !true {
+        if false {
             println!("Hit [Enter] to stop");
             let mut stop = String::new();
             io::stdin().read_line(&mut stop).expect("something");

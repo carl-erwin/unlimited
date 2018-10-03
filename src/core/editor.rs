@@ -77,7 +77,7 @@ impl<'a> Editor<'a> {
     ///
     pub fn new(config: Config) -> Editor<'a> {
         Editor {
-            config: config,
+            config,
             document_map: HashMap::new(),
             view_map: Vec::new(),
         }

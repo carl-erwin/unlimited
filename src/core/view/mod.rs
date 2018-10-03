@@ -79,7 +79,7 @@ impl<'a> View<'a> {
                     break;
                 }
 
-                sync_view = self.screen.contains_offset(off) == false;
+                sync_view = !self.screen.contains_offset(off);
             }
         }
 
@@ -100,7 +100,7 @@ impl<'a> View<'a> {
                     break;
                 }
 
-                sync_view = self.screen.contains_offset(off) == false;
+                sync_view = !self.screen.contains_offset(off);
             }
         }
 
@@ -127,7 +127,7 @@ impl<'a> View<'a> {
                 doc.insert(m.offset, data_size, data);
                 m.offset += data_size as u64;
 
-                sync_view = self.screen.contains_offset(m.offset) == false;
+                sync_view = !self.screen.contains_offset(m.offset);
             }
         }
 
@@ -828,7 +828,7 @@ fn decode_slice_to_vec(
             cp: ' ',
             displayed_cp: '$',
             offset: base_offset + last_off,
-            is_selected: !false,
+            is_selected: true,
         });
     }
 
@@ -900,7 +900,7 @@ fn _raw_slice_to_hex_vec(
             cp: ' ',
             displayed_cp: '$',
             offset: last_off,
-            is_selected: !false,
+            is_selected: true,
         });
     }
 
@@ -921,8 +921,8 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 
     CodepointInfo {
         cp: c,
-        displayed_cp: displayed_cp,
-        offset: offset,
+        displayed_cp,
+        offset,
         is_selected: false,
     }
 }
@@ -930,7 +930,7 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     let v: Vec<char> = s.chars().collect();
     for c in &v {
-        let ok = screen_putchar(&mut screen, *c, 0xffffffffffffffff);
+        let ok = screen_putchar(&mut screen, *c, 0xffff_ffff_ffff_ffff);
         if !ok {
             return false;
         }

@@ -1,7 +1,7 @@
 use std::vec::Vec;
 
 /// The **BufferLog** holds all modifications applied to a given buffer
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct BufferLog {
     pub data: Vec<BufferOperation>,
     pub pos: usize,
@@ -22,10 +22,7 @@ pub enum BufferOperationType {
 
 impl BufferLog {
     pub fn new() -> BufferLog {
-        BufferLog {
-            data: Vec::new(),
-            pos: 0,
-        }
+        Default::default()
     }
 
     pub fn add(&mut self, offset: u64, op: BufferOperationType, data: Vec<u8>) -> usize {
@@ -53,7 +50,7 @@ impl BufferLog {
             v.push(self.data[len - i - 1].invert());
         }
 
-        if v.len() > 0 {
+        if !v.is_empty() {
             Some(v)
         } else {
             None

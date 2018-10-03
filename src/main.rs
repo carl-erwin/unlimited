@@ -22,9 +22,9 @@ fn main() {
 
     let ui_name = config.ui_frontend.clone();
 
-    let core_th = { Some(thread::spawn(move || core::start(config, core_rx, ui_tx))) };
+    let core_th = { Some(thread::spawn(move || core::start(config, &core_rx, &ui_tx))) };
 
-    ui::main_loop(ui_name.as_ref(), ui_rx, core_tx);
+    ui::main_loop(ui_name.as_ref(), &ui_rx, &core_tx);
 
     if let Some(core_handle) = core_th {
         core_handle.join().unwrap()

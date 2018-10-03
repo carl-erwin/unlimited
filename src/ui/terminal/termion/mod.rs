@@ -29,7 +29,7 @@ use core::VERSION;
 //
 use ui::UiState;
 
-pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
+pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
     // front-end init code {----
     // init termion
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
@@ -74,8 +74,7 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
         }
 
         // evt from core ?
-        match ui_rx.recv_timeout(Duration::from_millis(10)) {
-            Ok(evt) => match evt {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) { match evt {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
                     let ev = Event::ApplicationQuitEvent;
@@ -88,7 +87,7 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                     doc_list = list.clone();
                     doc_list.sort_by(|a, b| a.0.cmp(&b.0));
 
-                    if doc_list.len() > 0 {
+                    if !doc_list.is_empty() {
                         // open first document
                         current_doc_id = doc_list[0].0;
 
@@ -102,8 +101,8 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                 }
 
                 Event::ViewCreated {
-                    width: _,
-                    height: _,
+                    width: 0,
+                    height: 0,
                     doc_id,
                     view_id,
                 } => {
@@ -139,7 +138,7 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
 
                         display_status_line(
                             &ui_state,
-                            &mut screen,
+                            &screen,
                             status_line_y,
                             ui_state.terminal_width,
                             ui_state.terminal_height,
@@ -155,11 +154,9 @@ pub fn main_loop(ui_rx: Receiver<Event>, core_tx: Sender<Event>) {
                 }
 
                 _ => {}
-            },
-
-            _ => {
-                // TODO: handle timeout
             }
+        } else {
+            // TODO: handle timeout
         }
     }
 
@@ -430,8 +427,8 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                         ctrl: false,
                         alt: false,
                         shift: false,
-                        x: (x - 1) as i32,
-                        y: (y - 1) as i32,
+                        x: i32::from(x - 1),
+                        y: i32::from(y - 1),
                         button,
                     };
                 }
@@ -443,8 +440,8 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                         ctrl: false,
                         alt: false,
                         shift: false,
-                        x: (x - 1) as i32,
-                        y: (y - 1) as i32,
+                        x: i32::from(x - 1),
+                        y: i32::from(y - 1),
                         button: 0xff,
                     };
                 }
@@ -577,7 +574,7 @@ fn display_status_line(
     let off = screen.first_offset as f64;
     let max_size = screen.doc_max_offset as f64;
 
-    let pos = ((off / max_size) * height as f64) as u16;
+    let pos = ((off / max_size) * f64::from(height)) as u16;
 
     terminal_cursor_to(&mut stdout, width + 2, 3 + pos);
     write!(

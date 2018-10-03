@@ -41,13 +41,13 @@ impl<'a> Buffer<'a> {
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successfull open operation
-    pub fn new(file_name: String, mode: OpenMode) -> Option<Buffer<'a>> {
+    pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer<'a>> {
         // TODO: check permission
         // TODO: check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
         let page_size = 4096 * 256 * 2;
-        let file = match MappedFile::new(file_name.clone(), page_size) {
+        let file = match MappedFile::new(file_name.to_owned(), page_size) {
             Some(file) => file,
             None => {
                 // TODO: return Result
@@ -62,7 +62,7 @@ impl<'a> Buffer<'a> {
 
         Some(Buffer {
             id: 0,
-            file_name: file_name.clone(),
+            file_name: file_name.to_owned(),
             mode,
             size,
             nr_changes: 0,
