@@ -20,7 +20,7 @@ use core::config::Config;
 use core::editor::Editor;
 use core::event::Event;
 
-pub const VERSION : &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// This thread is the "❤" of unlimited.
 pub fn start(config: Config, core_rx: &Receiver<Event>, ui_tx: &Sender<Event>) {

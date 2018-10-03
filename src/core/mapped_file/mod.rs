@@ -17,27 +17,29 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::slice;
 
-use self::libc::{c_int,
-                 c_void,
-                 close,
-                 fstat,
-                 mmap,
-                 munmap,
-                 open,
-                 posix_fadvise, // posix_madvise,
-                 size_t,
-                 unlink,
-                 write,
-                 MAP_FAILED,
-                 MAP_PRIVATE,
-                 O_CREAT,
-                 O_RDONLY,
-                 O_RDWR,
-                 O_TRUNC,
-                 PROT_READ,
-                 S_IFDIR,
-                 S_IRUSR,
-                 S_IWUSR};
+use self::libc::{
+    c_int,
+    c_void,
+    close,
+    fstat,
+    mmap,
+    munmap,
+    open,
+    posix_fadvise, // posix_madvise,
+    size_t,
+    unlink,
+    write,
+    MAP_FAILED,
+    MAP_PRIVATE,
+    O_CREAT,
+    O_RDONLY,
+    O_RDWR,
+    O_TRUNC,
+    PROT_READ,
+    S_IFDIR,
+    S_IRUSR,
+    S_IWUSR,
+};
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -193,9 +195,7 @@ impl Node {
         // 5 - build "new" page
         Page::InRam(
             // from a Vec<u8> raw parts
-            base,
-            len,
-            capacity,
+            base, len, capacity,
         )
 
         // 6 - restore page iterators base pointer
@@ -204,7 +204,6 @@ impl Node {
     // will clear p
     fn _page_to_vec(p: &mut Page) -> Vec<u8> {
         match *p {
-
             ::core::mapped_file::Page::InRam(ref mut base, ref mut len, ref mut capacity) => {
                 let v = unsafe { Vec::from_raw_parts(*base as *mut u8, *len, *capacity) };
 
@@ -218,8 +217,6 @@ impl Node {
             _ => {
                 panic!("cannot be used on Ondisk page");
             }
-
-
         }
     }
 
@@ -394,8 +391,7 @@ impl<'a> MappedFile<'a> {
                 file.nodepool[idx as usize].page = Rc::downgrade(&rc);
                 file.nodepool[idx as usize].cow = Some(rc);
             }
-            */
-        }
+            */        }
 
         Some(Rc::new(RefCell::new(file)))
     }
@@ -690,8 +686,9 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn copy_to_slice(it_: &mut FileIterator<'a>, nr_to_read: usize, vec: &mut [u8]) -> usize {
-
-        if let MappedFileIterator::End(..) = *it_ { return 0 }
+        if let MappedFileIterator::End(..) = *it_ {
+            return 0;
+        }
 
         let mut nr_read: usize = 0;
         let mut nr_to_read = nr_to_read;
@@ -734,8 +731,9 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn read(it_: &mut FileIterator<'a>, nr_to_read: usize, vec: &mut Vec<u8>) -> usize {
-
-        if let MappedFileIterator::End(..) = *it_ { return 0 }
+        if let MappedFileIterator::End(..) = *it_ {
+            return 0;
+        }
 
         let mut nr_read = 0;
         let mut nr_to_read = nr_to_read;
@@ -801,19 +799,13 @@ impl<'a> MappedFile<'a> {
     fn check_free_space(it_: &mut MappedFileIterator) -> u64 {
         match &*it_ {
             MappedFileIterator::End(..) => 0,
-            MappedFileIterator::Real(ref it) => {
-                match &it.page {
-                    ref rc => match *rc.as_ref().borrow_mut() {
-                        Page::OnDisk { .. } => {
-                            0
-                        },
+            MappedFileIterator::Real(ref it) => match &it.page {
+                ref rc => match *rc.as_ref().borrow_mut() {
+                    Page::OnDisk { .. } => 0,
 
-                        Page::InRam(_, ref mut len, capacity) => {
-                            (capacity - *len) as u64
-                        }
-                    },
-                }
-            }
+                    Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
+                },
+            },
         }
     }
 
@@ -1284,7 +1276,6 @@ impl<'a> MappedFile<'a> {
         mut pool: &mut FreeListAllocator<Node>,
         node_idx: Option<NodeIndex>,
     ) -> Option<NodeIndex> {
-
         node_idx?;
 
         let idx = node_idx.unwrap();

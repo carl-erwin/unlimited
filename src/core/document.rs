@@ -68,7 +68,6 @@ impl DocumentBuilder {
 
     ///
     pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
-
         let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
         let buffer = match buffer {
             Some(bb) => bb,

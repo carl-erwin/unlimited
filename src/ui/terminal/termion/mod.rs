@@ -74,7 +74,8 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
         }
 
         // evt from core ?
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) { match evt {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) {
+            match evt {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
                     let ev = Event::ApplicationQuitEvent;

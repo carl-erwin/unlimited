@@ -42,8 +42,7 @@ fn parse_command_line() -> Config {
                 .help("list of the files to open")
                 .required(false)
                 .multiple(true),
-        )
-        .get_matches();
+        ).get_matches();
 
     let mut ui_frontend = String::new();
     if matches.is_present("ui") {
