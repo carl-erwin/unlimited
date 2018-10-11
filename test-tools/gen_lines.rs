@@ -41,5 +41,5 @@ fn gen_line(linewidth: u64) -> String {
     }
     string.push('\n');
 
-    return string;
+    string
 }
