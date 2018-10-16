@@ -18,12 +18,12 @@ pub mod view;
 
 use core::config::Config;
 use core::editor::Editor;
-use core::event::Event;
+use core::event::EventMessage;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// This thread is the "❤" of unlimited.
-pub fn start(config: Config, core_rx: &Receiver<Event>, ui_tx: &Sender<Event>) {
+pub fn start(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
     let mut editor = Editor::new(config);
     // editor.setup_default_buffers(); // scratch , debug
     editor.load_files();

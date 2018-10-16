@@ -3,6 +3,18 @@ use core::screen::Screen;
 use core::view;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventMessage {
+    pub seq: usize,
+    pub event: Event,
+}
+
+impl EventMessage {
+    pub fn new(seq: usize, event: Event) -> EventMessage {
+        EventMessage { seq, event }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     RequestDocumentList,
     DocumentList {

@@ -19,6 +19,7 @@ use self::termion::terminal_size;
 //
 use core::event::Event;
 use core::event::Event::*;
+use core::event::EventMessage;
 use core::event::InputEvent;
 use core::screen::Screen;
 
@@ -29,7 +30,14 @@ use core::VERSION;
 //
 use ui::UiState;
 
-pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
+pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
+    let mut seq: usize = 0;
+
+    fn get_next_seq(seq: &mut usize) -> usize {
+        *seq = *seq + 1;
+        *seq
+    }
+
     // front-end init code {----
     // init termion
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
@@ -41,8 +49,8 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
     ui_state.view_start_line = if ui_state.display_status { 2 } else { 1 };
 
     // send first event
-    let ev = Event::RequestDocumentList;
-    core_tx.send(ev).unwrap_or(());
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::RequestDocumentList);
+    core_tx.send(msg).unwrap_or(());
 
     // ui ctx : TODO move to struct UiCtx
     let mut doc_list;
@@ -55,8 +63,8 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
         for ev in vec_evt {
             // send translated input evnts to core
-            let ev = Event::InputEvent { ev };
-            core_tx.send(ev).unwrap_or(());
+            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
+            core_tx.send(msg).unwrap_or(());
         }
 
         // resize ?
@@ -65,21 +73,24 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
                 ui_state.terminal_width as usize,
                 ui_state.terminal_height as usize,
             ));
-            let ev = Event::RequestLayoutEvent {
-                view_id: current_view_id,
-                doc_id: current_doc_id,
-                screen: screen.clone(),
-            };
-            core_tx.send(ev).unwrap_or(());
+            let msg = EventMessage::new(
+                get_next_seq(&mut seq),
+                Event::RequestLayoutEvent {
+                    view_id: current_view_id,
+                    doc_id: current_doc_id,
+                    screen: screen.clone(),
+                },
+            );
+            core_tx.send(msg).unwrap_or(());
         }
 
         // evt from core ?
         if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) {
-            match evt {
+            match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
-                    let ev = Event::ApplicationQuitEvent;
-                    core_tx.send(ev).unwrap_or(());
+                    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+                    core_tx.send(msg).unwrap_or(());
                     break;
                 }
 
@@ -92,12 +103,15 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
                         // open first document
                         current_doc_id = doc_list[0].0;
 
-                        let ev = Event::CreateView {
-                            width: ui_state.terminal_width as usize,
-                            height: ui_state.terminal_height as usize,
-                            doc_id: current_doc_id,
-                        };
-                        core_tx.send(ev).unwrap_or(());
+                        let msg = EventMessage::new(
+                            get_next_seq(&mut seq),
+                            Event::CreateView {
+                                width: ui_state.terminal_width as usize,
+                                height: ui_state.terminal_height as usize,
+                                doc_id: current_doc_id,
+                            },
+                        );
+                        core_tx.send(msg).unwrap_or(());
                     }
                 }
 
@@ -111,12 +125,15 @@ pub fn main_loop(ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
                     // remember a document can have multiple view
                     view_doc_map.insert(view_id, doc_id);
 
-                    let ev = Event::RequestLayoutEvent {
-                        view_id,
-                        doc_id,
-                        screen: screen.clone(),
-                    };
-                    core_tx.send(ev).unwrap_or(());
+                    let msg = EventMessage::new(
+                        get_next_seq(&mut seq),
+                        Event::RequestLayoutEvent {
+                            view_id,
+                            doc_id,
+                            screen: screen.clone(),
+                        },
+                    );
+                    core_tx.send(msg).unwrap_or(());
                 }
 
                 BuildLayoutEvent {

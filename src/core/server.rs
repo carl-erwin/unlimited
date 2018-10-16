@@ -8,6 +8,7 @@ use core::document;
 use core::editor::Editor;
 use core::event::Event;
 use core::event::Event::*;
+use core::event::EventMessage;
 use core::event::InputEvent;
 use core::event::Key;
 
@@ -29,13 +30,20 @@ impl CoreState {
     }
 }
 
-pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Event>) {
+pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
     let mut core_state = CoreState::new();
+
+    let mut seq: usize = 0;
+
+    fn get_next_seq(seq: &mut usize) -> usize {
+        *seq = *seq + 1;
+        *seq
+    }
 
     while !core_state.quit {
         match core_rx.recv() {
             Ok(evt) => {
-                match evt {
+                match evt.event {
                     Event::ApplicationQuitEvent => {
                         break;
                     }
@@ -46,8 +54,9 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Even
                             let name = &e.1.as_ref().borrow().name;
                             list.push((*e.0, name.to_string()));
                         }
-                        let ev = Event::DocumentList { list };
-                        ui_tx.send(ev).unwrap_or(());
+                        let msg =
+                            EventMessage::new(get_next_seq(&mut seq), Event::DocumentList { list });
+                        ui_tx.send(msg).unwrap_or(());
                     }
 
                     Event::CreateView {
@@ -63,13 +72,16 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Even
 
                             editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
 
-                            let ev = Event::ViewCreated {
-                                width,
-                                height,
-                                doc_id,
-                                view_id: vid as Id,
-                            };
-                            ui_tx.send(ev).unwrap_or(());
+                            let msg = EventMessage::new(
+                                get_next_seq(&mut seq),
+                                Event::ViewCreated {
+                                    width,
+                                    height,
+                                    doc_id,
+                                    view_id: vid as Id,
+                                },
+                            );
+                            ui_tx.send(msg).unwrap_or(());
                         }
                     }
 
@@ -102,12 +114,15 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Even
 
                             fill_screen(&mut core_state, &mut view);
 
-                            let ev = BuildLayoutEvent {
-                                view_id: view_id as u64,
-                                doc_id,
-                                screen: view.screen.clone(),
-                            };
-                            ui_tx.send(ev).unwrap_or(());
+                            let msg = EventMessage::new(
+                                get_next_seq(&mut seq),
+                                BuildLayoutEvent {
+                                    view_id: view_id as u64,
+                                    doc_id,
+                                    screen: view.screen.clone(),
+                                },
+                            );
+                            ui_tx.send(msg).unwrap_or(());
                         }
 
                         // is there a view/screen ?
@@ -123,12 +138,15 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Even
                             process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
 
                             fill_screen(&mut core_state, &mut view);
-                            let ev = BuildLayoutEvent {
-                                view_id: view_id as u64,
-                                doc_id: 0,
-                                screen: view.screen.clone(),
-                            };
-                            ui_tx.send(ev).unwrap_or(());
+                            let msg = EventMessage::new(
+                                get_next_seq(&mut seq),
+                                BuildLayoutEvent {
+                                    view_id: view_id as u64,
+                                    doc_id: 0,
+                                    screen: view.screen.clone(),
+                                },
+                            );
+                            ui_tx.send(msg).unwrap_or(());
                         }
                     }
 
@@ -139,8 +157,8 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<Event>, ui_tx: &Sender<Even
         }
     }
 
-    let ev = Event::ApplicationQuitEvent;
-    ui_tx.send(ev).unwrap_or(());
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+    ui_tx.send(msg).unwrap_or(());
 }
 
 fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
@@ -189,7 +207,7 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
 fn process_input_events(
     core_state: &mut CoreState,
     view: &mut View,
-    _ui_tx: &Sender<Event>,
+    _ui_tx: &Sender<EventMessage>,
     ev: &InputEvent,
 ) {
     if *ev == ::core::event::InputEvent::NoInputEvent {

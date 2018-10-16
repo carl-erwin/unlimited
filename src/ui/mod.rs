@@ -3,9 +3,9 @@ mod terminal;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
-use core::event::Event;
+use core::event::EventMessage;
 
-pub fn main_loop(ui_name: &str, ui_rx: &Receiver<Event>, core_tx: &Sender<Event>) {
+pub fn main_loop(ui_name: &str, ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
     // TODO: switch ui here
     match ui_name {
         "ncurses" => {
