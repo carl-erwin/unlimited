@@ -8,10 +8,6 @@ use core::event::EventMessage;
 pub fn main_loop(ui_name: &str, ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
     // TODO: switch ui here
     match ui_name {
-        "ncurses" => {
-            terminal::ncurses::main_loop(&ui_rx, &core_tx);
-        }
-
         "termion" | _ => {
             terminal::termion::main_loop(&ui_rx, &core_tx);
         }
