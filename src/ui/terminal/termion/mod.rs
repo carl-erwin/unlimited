@@ -89,7 +89,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
-                    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+                    let msg =
+                        EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
                     core_tx.send(msg).unwrap_or(());
                     break;
                 }
