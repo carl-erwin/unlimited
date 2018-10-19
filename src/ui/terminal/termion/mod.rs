@@ -67,6 +67,18 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
             core_tx.send(msg).unwrap_or(());
         }
 
+        // hack to send multiple page down
+        for _ in 0..0 {
+            let ev = InputEvent::KeyPress {
+                key: Key::PageDown,
+                ctrl: false,
+                alt: false,
+                shift: false,
+            };
+            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
+            core_tx.send(msg).unwrap_or(());
+        }
+
         // resize ?
         if ui_state.resize_flag {
             screen = Box::new(Screen::new(
