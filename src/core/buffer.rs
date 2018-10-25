@@ -184,7 +184,7 @@ impl<'a> Buffer<'a> {
 
 #[test]
 fn test_buffer() {
-    let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+    let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 

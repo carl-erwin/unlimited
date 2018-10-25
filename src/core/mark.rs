@@ -148,7 +148,7 @@ fn test_marks() {
     println!("\n**************** test marks *****************");
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, 6, &data);
         let mut rdata = vec![];
@@ -173,7 +173,7 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -191,7 +191,7 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
 
@@ -210,7 +210,7 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -228,7 +228,7 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -246,7 +246,7 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null".to_owned(), OpenMode::ReadWrite).unwrap();
+        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
         let data = vec![0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
