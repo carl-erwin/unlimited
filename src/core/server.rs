@@ -21,7 +21,7 @@ struct CoreState {
 }
 
 impl CoreState {
-    fn new() -> CoreState {
+    fn new() -> Self {
         CoreState {
             keys: Vec::new(),
             quit: false,

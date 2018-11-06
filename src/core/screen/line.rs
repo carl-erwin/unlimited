@@ -11,7 +11,7 @@ pub struct LineCell {
 }
 
 impl LineCell {
-    pub fn new() -> LineCell {
+    pub fn new() -> Self {
         LineCell {
             cpi: CodepointInfo::new(),
             is_used: false,
@@ -30,7 +30,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(width: LineCellIndex) -> Line {
+    pub fn new(width: LineCellIndex) -> Self {
         assert_eq!(width > 0, true);
 
         let mut cells = Vec::with_capacity(width);

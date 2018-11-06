@@ -21,7 +21,7 @@ pub enum BufferOperationType {
 }
 
 impl BufferLog {
-    pub fn new() -> BufferLog {
+    pub fn new() -> Self {
         Default::default()
     }
 

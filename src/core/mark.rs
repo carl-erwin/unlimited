@@ -20,7 +20,7 @@ impl Mark {
     }
    */
 
-    pub fn new(offset: u64) -> Mark {
+    pub fn new(offset: u64) -> Self {
         Mark { offset }
     }
 

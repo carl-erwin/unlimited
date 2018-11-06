@@ -9,7 +9,7 @@ pub struct CodepointInfo {
 }
 
 impl CodepointInfo {
-    pub fn new() -> CodepointInfo {
+    pub fn new() -> Self {
         CodepointInfo {
             cp: ' ',
             displayed_cp: ' ',

@@ -9,7 +9,7 @@ pub struct EventMessage {
 }
 
 impl EventMessage {
-    pub fn new(seq: usize, event: Event) -> EventMessage {
+    pub fn new(seq: usize, event: Event) -> Self {
         EventMessage { seq, event }
     }
 }

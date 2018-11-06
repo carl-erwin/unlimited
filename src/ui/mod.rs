@@ -33,7 +33,7 @@ struct UiState {
 }
 
 impl UiState {
-    fn new() -> UiState {
+    fn new() -> Self {
         UiState {
             quit: false,
             status: String::new(),

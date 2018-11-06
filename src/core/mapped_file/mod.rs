@@ -248,7 +248,7 @@ struct FreeListAllocator<T> {
 }
 
 impl<T> FreeListAllocator<T> {
-    fn new() -> FreeListAllocator<T> {
+    fn new() -> Self {
         FreeListAllocator {
             slot: vec![],
             free_indexes: vec![],
