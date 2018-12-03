@@ -9,23 +9,29 @@ use clap::{App, Arg};
 
 use unlimited::core;
 use unlimited::core::config::Config;
-
+use unlimited::core::VERSION;
 use unlimited::ui;
 
-use unlimited::core::VERSION;
-
+/// program entry point
+/// It parses the command line to build the configuration.
+/// Creates the core thread.
+/// Nb: the ui is kept in the main thread
 fn main() {
+    // parse user command line
     let config = parse_command_line();
 
+    // build core/ui communication channels
     let (ui_tx, ui_rx) = channel();
     let (core_tx, core_rx) = channel();
-
     let ui_name = config.ui_frontend.clone();
 
+    // create core thread
     let core_th = { Some(thread::spawn(move || core::start(config, &core_rx, &ui_tx))) };
 
+    // run the ui loop in the main thread
     ui::main_loop(ui_name.as_ref(), &ui_rx, &core_tx);
 
+    // wait for core thread
     if let Some(core_handle) = core_th {
         core_handle.join().unwrap()
     }

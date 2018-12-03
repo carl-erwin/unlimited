@@ -15,7 +15,7 @@ pub enum OpenMode {
 
 /// The **Buffer** represents a linear array of bytes.<br/>
 /// it can be in memory only or backed by an on disk file.<br/>
-/// The editor will **Modes** use this api to read/modify the content
+/// The editor **Modes** will use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
 pub struct Buffer<'a> {

@@ -2,9 +2,12 @@ use core::document;
 use core::screen::Screen;
 use core::view;
 
+/// Message sent between core and ui threads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventMessage {
+    /// sequence number. should be reused in corresponding answer.
     pub seq: usize,
+    /// underlying event.
     pub event: Event,
 }
 
@@ -14,18 +17,24 @@ impl EventMessage {
     }
 }
 
+/// Events sent between core and ui threads via EventMesssage encapsulation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
+    /// Sent by ui thread. Request the list of opened documents.
     RequestDocumentList,
+    /// Sent by core thread. The list of opened documents.
     DocumentList {
         list: Vec<(document::Id, String)>,
     },
 
+    /// Sent by ui thread. Request a view creation that maps the document referenced by doc_id.
     CreateView {
         width: usize,
         height: usize,
         doc_id: document::Id,
     },
+    /// Sent by core thread. Answer to CreateView request.<br/>
+    /// contains a unique view_id that MUST be reused with  other operations (DestroyView, ...).
     ViewCreated {
         width: usize,
         height: usize,
@@ -33,35 +42,43 @@ pub enum Event {
         view_id: view::Id,
     },
 
+    /// Sent by ui thread. Request the destruction of a specific view referenced by view_id.
     DestroyView {
         width: usize,
         height: usize,
         doc_id: document::Id,
         view_id: view::Id,
     },
+    /// Sent by core thread. Answer to DestroyView request.<br/>
     ViewDestroyed {
         width: usize,
         height: usize,
         doc_id: document::Id,
         view_id: view::Id,
     },
-
+    /// Sent by ui thread. contains user input information.
     InputEvent {
         ev: self::InputEvent,
     },
-
+    /// Sent by ui thread. Request the rendering of a given view.
     RequestLayoutEvent {
         view_id: view::Id,
         doc_id: document::Id,
         screen: Box<Screen>,
     },
+    /// Sent by core thread. Contains the rendered screen that maps view_id.
     BuildLayoutEvent {
         view_id: view::Id,
         doc_id: document::Id,
         screen: Box<Screen>,
     },
+    /// for future version, will map operating system events.
     SystemEvent,
+
+    /// for future version, will map operating system ui events (minimize, close, ...).
     ApplicationEvent,
+
+    /// Sent by ui thread. Request to resize a given view referenced by view_id.
     ResizeEvent {
         view_id: view::Id,
         width: usize,
@@ -70,6 +87,7 @@ pub enum Event {
     ApplicationQuitEvent,
 }
 
+/// Supported input events
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputEvent {
     InvalidInputEvent,
@@ -115,6 +133,7 @@ pub enum InputEvent {
     },
 }
 
+/// List of supported keyboard keys
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
     NUL,
