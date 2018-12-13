@@ -159,19 +159,7 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Send
                         if !editor.view_map.is_empty() {
                             let view_id = 0 as usize;
                             let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-
                             process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
-
-                            fill_screen(&mut core_state, &mut view);
-                            let msg = EventMessage::new(
-                                get_next_seq(&mut seq),
-                                BuildLayoutEvent {
-                                    view_id: view_id as u64,
-                                    doc_id: 0,
-                                    screen: view.screen.clone(),
-                                },
-                            );
-                            ui_tx.send(msg).unwrap_or(());
                         }
                     }
 
