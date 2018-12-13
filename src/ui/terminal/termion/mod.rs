@@ -86,6 +86,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
 
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
+
+        let mut request_layout = vec_evt.len() > 0;
         for ev in vec_evt {
             // send translated input evnts to core
             let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
@@ -110,6 +112,12 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                 ui_state.terminal_width as usize,
                 ui_state.terminal_height as usize,
             ));
+
+            request_layout = true;
+        }
+
+        // need layout ?
+        if request_layout {
             let msg = EventMessage::new(
                 get_next_seq(&mut seq),
                 Event::RequestLayoutEvent {
