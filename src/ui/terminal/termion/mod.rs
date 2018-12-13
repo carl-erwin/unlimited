@@ -252,7 +252,8 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
                     termion::style::Invert,
                     cpi.displayed_cp,
                     termion::style::Reset
-                ).unwrap();
+                )
+                .unwrap();
             } else {
                 write!(stdout, "{}", cpi.displayed_cp).unwrap();
             }
@@ -623,7 +624,8 @@ fn display_status_line(
         termion::style::Invert,
         status_str,
         termion::style::Reset
-    ).unwrap();
+    )
+    .unwrap();
 
     // scroolbar
     for h in 0..height + 1 {
@@ -632,7 +634,8 @@ fn display_status_line(
             stdout,
             "{} ",
             termion::color::Bg(termion::color::Rgb(0x00, 0x00, 0xff))
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     let off = screen.first_offset as f64;
@@ -647,5 +650,6 @@ fn display_status_line(
         termion::color::Bg(termion::color::Rgb(0xff, 0x00, 0x00)),
         termion::style::Invert,
         termion::style::Reset
-    ).unwrap();
+    )
+    .unwrap();
 }

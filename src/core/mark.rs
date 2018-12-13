@@ -34,16 +34,16 @@ pub struct Mark {
 
 impl Mark {
     /* TODO: add TextCodec trait
-    TextCodec {
-        fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64)
-        fn get_next_codepoint_start(data: &[u8], from_offset: u64) -> u64)
+     TextCodec {
+         fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64)
+         fn get_next_codepoint_start(data: &[u8], from_offset: u64) -> u64)
 
-        fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
-        fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
+         fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
+         fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
 
-        fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize;
-    }
-   */
+         fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize;
+     }
+    */
 
     pub fn new(offset: u64) -> Self {
         Mark { offset }

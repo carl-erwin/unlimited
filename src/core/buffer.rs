@@ -178,16 +178,16 @@ impl<'a> Buffer<'a> {
     }
 
     /*
-    /// returns the position and size of a given page
-    pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
-        // if page_index > 0 {
-        //    (0, self.size)
-        // } else {
-        //    (0, self.size)
-        // }
-        (0, self.size)
-    }
-*/
+        /// returns the position and size of a given page
+        pub fn get_page_info(&self, page_index: u64) -> (Offset, PageSize) {
+            // if page_index > 0 {
+            //    (0, self.size)
+            // } else {
+            //    (0, self.size)
+            // }
+            (0, self.size)
+        }
+    */
 
     pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
         let metadata = ::std::fs::metadata(&self.file_name).unwrap();

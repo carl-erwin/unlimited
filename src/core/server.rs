@@ -114,8 +114,6 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Send
                         <- createView : w, h , doc::id
                         -> viewCreate : view id, w, h, doc::id
                     */
-
-
                     /*
                         <- destroyView : w, h , doc::id
                         -> viewDestroyed : view id, w, h, doc::id

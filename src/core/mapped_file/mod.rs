@@ -416,7 +416,8 @@ impl<'a> MappedFile<'a> {
                 file.nodepool[idx as usize].page = Rc::downgrade(&rc);
                 file.nodepool[idx as usize].cow = Some(rc);
             }
-            */        }
+            */
+        }
 
         Some(Rc::new(RefCell::new(file)))
     }
@@ -1872,7 +1873,8 @@ mod tests {
             &mut file.as_ref().borrow_mut(),
             &"/tmp/mapped_file.sync_test",
             &"/tmp/mapped_file.sync_test.result",
-        ).unwrap();
+        )
+        .unwrap();
 
         println!("-- file.size() {}", file.as_ref().borrow().size());
 
