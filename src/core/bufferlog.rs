@@ -65,7 +65,7 @@ impl BufferLog {
         self.pos
     }
 
-    pub fn get_reverse_ops(&mut self, from_pos: usize) -> Option<Vec<BufferOperation>> {
+    fn get_reverse_ops(&mut self, from_pos: usize) -> Option<Vec<BufferOperation>> {
         let len = self.data.len();
         let capacity = len - from_pos;
         let mut v = Vec::with_capacity(capacity);
