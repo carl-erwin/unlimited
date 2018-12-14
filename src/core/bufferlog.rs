@@ -58,12 +58,11 @@ impl BufferLog {
             let pos = self.pos;
             let v = self.get_reverse_ops(pos).unwrap();
             self.data.extend(v);
-            self.pos = self.data.len();
         }
 
         self.data.push(op);
         self.pos = self.data.len();
-        self.data.len()
+        self.pos
     }
 
     pub fn get_reverse_ops(&mut self, from_pos: usize) -> Option<Vec<BufferOperation>> {
