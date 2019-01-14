@@ -67,7 +67,7 @@ pub fn decode_byte(state: u32, byte: u8, codep: &mut u32) -> u32 {
     u32::from(UTF8D[256 + (state * 16) as usize + cp_type as usize])
 }
 
-// }
+// } end-of-derived code
 
 #[inline]
 pub fn is_codepoint_start(byte: u8) -> bool {
