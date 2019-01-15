@@ -811,6 +811,18 @@ pub fn build_screen_layout(
                     (true, 0 as usize)
                 }
             */
+            (_, '\t') => {
+                prev_cp = cpi.cp;
+                let mut filtered_cp = *cpi;
+                filtered_cp.displayed_cp = ' ';
+
+                let mut last = (false, 0);
+                for _ in 0..8 {
+                    last = screen.push(filtered_cp);
+                }
+                last
+            }
+
             _ => {
                 prev_cp = cpi.cp;
                 screen.push(*cpi)
