@@ -965,9 +965,8 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
 }
 
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
-    let v: Vec<char> = s.chars().collect();
-    for c in &v {
-        let ok = screen_putchar(&mut screen, *c, 0xffff_ffff_ffff_ffff);
+    for c in s.chars() {
+        let ok = screen_putchar(&mut screen, c, 0xffff_ffff_ffff_ffff);
         if !ok {
             return false;
         }
