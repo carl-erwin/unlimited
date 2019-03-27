@@ -5,22 +5,22 @@
 
 	// parents -> child
 	Root -> n1 [label=left]
-	
+
 	Root -> n2 [label=right]
 
 
 	n1 -> n3    // [label=left]
 	n1 -> n4    // [label=right]
-	n3 -> n5    // [label=left] 
-	n3 -> n6    // [label=right] 
+	n3 -> n5    // [label=left]
+	n3 -> n6    // [label=right]
 	n4 -> n7    // [label=left]
 	n4 -> n8    // [label=right]
-	n2 -> n9    // [label=left] 
-	n2 -> n10   // [label=right] 
-	n9 -> n11   // [label=left]  
-	n9 -> n12   // [label=right]  
-	n10 -> n13  // [label=left]   
-	n10 -> n14  // [label=right]   
+	n2 -> n9    // [label=left]
+	n2 -> n10   // [label=right]
+	n9 -> n11   // [label=left]
+	n9 -> n12   // [label=right]
+	n10 -> n13  // [label=left]
+	n10 -> n14  // [label=right]
 
 	// children -> parent
 	edge [color=black]
@@ -30,10 +30,10 @@
 	{n5, n6} -> n3   // [label=parent]
 	{n7 n8} -> n4    // [label=parent]
 	{n9 n10} -> n2   // [label=parent]
-	{n11, n12} -> n9 // [label=parent] 
+	{n11, n12} -> n9 // [label=parent]
 	{n13 n14} -> n10 // [label=parent]
 
-	// leaf <-> leaf ... <-> leaf 
+	// leaf <-> leaf ... <-> leaf
 	edge [color=blue]
 
 	n6 -> n5 [constraint=false label=prev]
@@ -48,7 +48,7 @@
 	n11 -> n8 [constraint=false]
 	n8 -> n11 [constraint=false]
 
-	n12 -> n11 [constraint=false]	
+	n12 -> n11 [constraint=false]
 	n11 -> n12 [constraint=false]
 
 	n13 -> n12 [constraint=false]
