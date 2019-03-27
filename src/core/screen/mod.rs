@@ -37,7 +37,7 @@ pub type LineIndex = usize;
 pub struct Screen {
     /// the underlying lines storage
     pub line: Vec<Line>,
-    /// the index of the line filled with the puhs method
+    /// the index of the line filled with the push method
     pub current_line_index: LineCellIndex,
     /// maximum number of elements the screen line can hold
     pub width: usize,
