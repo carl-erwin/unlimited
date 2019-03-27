@@ -691,13 +691,14 @@ impl<'a> View<'a> {
             // push lines offsets
             // FIXME: find a better way to iterate over the used lines
             for i in 0..screen.current_line_index {
-                let s = screen.line[i].get_first_cpi().unwrap().offset;
-                let e = screen.line[i].get_last_cpi().unwrap().offset;
 
                 if !v.is_empty() && i == 0 {
                     // do not push line range twice
                     continue;
                 }
+
+                let s = screen.line[i].get_first_cpi().unwrap().offset;
+                let e = screen.line[i].get_last_cpi().unwrap().offset;
 
                 v.push((s, e));
 
