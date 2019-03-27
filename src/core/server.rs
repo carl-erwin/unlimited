@@ -37,7 +37,8 @@ use core::event::EventMessage;
 use core::event::InputEvent;
 use core::event::Key;
 
-use core::view::{build_screen_layout, Id, View};
+use core::view::layout::build_screen_layout;
+use core::view::{Id, View};
 
 struct CoreState {
     keys: Vec<InputEvent>,
