@@ -25,7 +25,7 @@ git clone https://github.com/carl-erwin/unlimited
 git clone https://gitlab.com/carl-erwin/unlimited
 
 cd unlimited
-cargo install
+cargo install --path .
 ```
 
 ---
