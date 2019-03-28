@@ -29,16 +29,16 @@ use std::sync::mpsc::Sender;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use core::document;
-use core::editor::Editor;
-use core::event::Event;
-use core::event::Event::*;
-use core::event::EventMessage;
-use core::event::InputEvent;
-use core::event::Key;
+use crate::core::document;
+use crate::core::editor::Editor;
+use crate::core::event::Event;
+use crate::core::event::Event::*;
+use crate::core::event::EventMessage;
+use crate::core::event::InputEvent;
+use crate::core::event::Key;
 
-use core::view::layout::build_screen_layout;
-use core::view::{Id, View};
+use crate::core::view::layout::build_screen_layout;
+use crate::core::view::{Id, View};
 
 struct CoreState {
     keys: Vec<InputEvent>,
@@ -222,7 +222,7 @@ fn process_input_events(
     _ui_tx: &Sender<EventMessage>,
     ev: &InputEvent,
 ) {
-    if *ev == ::core::event::InputEvent::NoInputEvent {
+    if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
         return;
     }

@@ -1,8 +1,8 @@
-use core::codec::text::utf8;
-use core::codepointinfo::CodepointInfo;
-use core::mark::Mark;
-use core::screen::Screen;
-use core::view::View;
+use crate::core::codec::text::utf8;
+use crate::core::codepointinfo::CodepointInfo;
+use crate::core::mark::Mark;
+use crate::core::screen::Screen;
+use crate::core::view::View;
 
 // TODO: move to core/view/layout.rs
 pub fn get_lines_offsets<'a>(

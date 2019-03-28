@@ -28,13 +28,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 //
-use core::buffer::Buffer;
-use core::buffer::OpenMode;
+use crate::core::buffer::Buffer;
+use crate::core::buffer::OpenMode;
 
 //
-use core::bufferlog::BufferLog;
-use core::bufferlog::BufferOperation;
-use core::bufferlog::BufferOperationType;
+use crate::core::bufferlog::BufferLog;
+use crate::core::bufferlog::BufferOperation;
+use crate::core::bufferlog::BufferOperationType;
 
 //
 pub type Id = u64;

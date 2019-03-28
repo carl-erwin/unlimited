@@ -25,7 +25,7 @@
 
 pub mod line;
 
-use core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::CodepointInfo;
 
 use self::line::Line;
 use self::line::LineCellIndex;

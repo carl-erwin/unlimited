@@ -23,9 +23,9 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
-use core::document;
-use core::screen::Screen;
-use core::view;
+use crate::core::document;
+use crate::core::screen::Screen;
+use crate::core::view;
 
 /// Message sent between core and ui threads.
 #[derive(Debug, Clone, PartialEq, Eq)]

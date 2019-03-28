@@ -23,8 +23,8 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
-use core::mapped_file::FileHandle;
-use core::mapped_file::MappedFile;
+use crate::core::mapped_file::FileHandle;
+use crate::core::mapped_file::MappedFile;
 
 //
 pub type Id = u64;

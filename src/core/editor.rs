@@ -29,14 +29,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 //
-use core::config::Config;
+use crate::core::config::Config;
 
-use core::document;
-use core::document::Document;
-use core::document::DocumentBuilder;
+use crate::core::document;
+use crate::core::document::Document;
+use crate::core::document::DocumentBuilder;
 
-use core::view;
-use core::view::View;
+use crate::core::view;
+use crate::core::view::View;
 
 //
 pub type Id = u64;

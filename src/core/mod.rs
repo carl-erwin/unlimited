@@ -41,9 +41,9 @@ pub mod screen;
 pub mod server;
 pub mod view;
 
-use core::config::Config;
-use core::editor::Editor;
-use core::event::EventMessage;
+use crate::core::config::Config;
+use crate::core::editor::Editor;
+use crate::core::event::EventMessage;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

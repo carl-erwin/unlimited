@@ -192,7 +192,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     }
 
     // TODO return Result<(char, usize), status> -> state != 1|0 -> need mode data
-    (::core::codec::text::u32_to_char(codep), from_offset, size)
+    (crate::core::codec::text::u32_to_char(codep), from_offset, size)
 }
 
 pub fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
@@ -212,7 +212,7 @@ fn test_codec_encode() {
 
 #[test]
 fn test_codec_decode() {
-    use core::codec::text::u32_to_char;
+    use crate::core::codec::text::u32_to_char;
 
     let mut state: u32 = 0;
     let mut codep: u32 = 0;

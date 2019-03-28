@@ -41,12 +41,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 //
-use core::document::Document;
-use core::screen::Screen;
+use crate::core::document::Document;
+use crate::core::screen::Screen;
 
-use core::mark::Mark;
+use crate::core::mark::Mark;
 
-use core::codec::text::utf8;
+use crate::core::codec::text::utf8;
 
 pub type Id = u64;
 

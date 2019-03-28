@@ -42,18 +42,18 @@ use self::termion::screen::{AlternateScreen, ToMainScreen};
 use self::termion::terminal_size;
 
 //
-use core::event::Event;
-use core::event::Event::*;
-use core::event::EventMessage;
-use core::event::InputEvent;
-use core::screen::Screen;
+use crate::core::event::Event;
+use crate::core::event::Event::*;
+use crate::core::event::EventMessage;
+use crate::core::event::InputEvent;
+use crate::core::screen::Screen;
 
-use core::event::Key;
+use crate::core::event::Key;
 
-use core::VERSION;
+use crate::core::VERSION;
 
 //
-use ui::UiState;
+use crate::ui::UiState;
 
 pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
     let mut seq: usize = 0;
@@ -522,7 +522,7 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
         }
     }
 
-    ::core::event::InputEvent::NoInputEvent
+    crate::core::event::InputEvent::NoInputEvent
 }
 
 fn get_input_event(

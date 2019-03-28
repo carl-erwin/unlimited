@@ -24,7 +24,7 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 //
-use core::buffer::Buffer;
+use crate::core::buffer::Buffer;
 
 //
 #[derive(Debug, Clone)]
@@ -165,8 +165,8 @@ impl Mark {
 
 #[test]
 fn test_marks() {
-    use core::buffer::OpenMode;
-    use core::codec::text::utf8::get_previous_codepoint_start;
+    use crate::core::buffer::OpenMode;
+    use crate::core::codec::text::utf8::get_previous_codepoint_start;
 
     // TODO: move to utf8 tests
 

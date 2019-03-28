@@ -229,7 +229,7 @@ impl Node {
     // will clear p
     fn _page_to_vec(p: &mut Page) -> Vec<u8> {
         match *p {
-            ::core::mapped_file::Page::InRam(ref mut base, ref mut len, ref mut capacity) => {
+            crate::core::mapped_file::Page::InRam(ref mut base, ref mut len, ref mut capacity) => {
                 let v = unsafe { Vec::from_raw_parts(*base as *mut u8, *len, *capacity) };
 
                 *base = ptr::null_mut();
