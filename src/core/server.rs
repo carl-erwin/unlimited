@@ -484,6 +484,16 @@ fn process_input_events(
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
         }
 
+        // alt+d
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: true,
+            shift: false,
+            key: Key::UNICODE('d'),
+        } => {
+            view.remove_until_end_of_word();
+        }
+
         // mouse button pressed
         InputEvent::ButtonPress {
             ctrl: false,

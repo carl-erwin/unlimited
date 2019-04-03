@@ -174,6 +174,64 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn remove_until_end_of_word(&mut self) {
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
+
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            let start = m.clone();
+
+            let mut data = Vec::with_capacity(4);
+
+            // skip blanks until any char or end-of-line
+            loop {
+                data.clear();
+                doc.buffer.read(m.offset, data.capacity(), &mut data);
+                let (cp, _, size) = utf8::get_codepoint(&data, 0);
+
+                if size == 0 {
+                    break;
+                }
+
+                match cp {
+                    ' ' | '\t' => {
+                        m.offset += size as u64;
+                        continue;
+                    }
+
+                    _ => break,
+                }
+            }
+
+            // skip until blank or end-of-line
+            loop {
+                data.clear();
+                doc.buffer.read(m.offset, data.capacity(), &mut data);
+                let (cp, _, size) = utf8::get_codepoint(&data, 0);
+
+                if size == 0 {
+                    break;
+                }
+
+                match cp {
+                    ' ' | '\t' | '\r' | '\n' => {
+                        break;
+                    }
+
+                    _ => {
+                        m.offset += size as u64;
+                        continue;
+                    }
+                }
+            }
+
+            // remove [start, m[
+            doc.remove(start.offset, (m.offset - start.offset) as usize, None);
+
+            m.offset = start.offset;
+            break; // no multicursor
+        }
+    }
+
     pub fn remove_previous_codepoint(&mut self) {
         let mut scroll_needed = false;
 
