@@ -36,9 +36,9 @@ fn main() {
         return;
     }
 
-    let start_num = args[1].trim_right().parse::<u64>().unwrap_or(0);
-    let stop_num = args[2].trim_right().parse::<u64>().unwrap_or(0);
-    let width_num = args[3].trim_right().parse::<u64>().unwrap_or(0);
+    let start_num = args[1].trim_end().parse::<u64>().unwrap_or(0);
+    let stop_num = args[2].trim_end().parse::<u64>().unwrap_or(0);
+    let width_num = args[3].trim_end().parse::<u64>().unwrap_or(0);
 
     gen_lines(start_num, stop_num, width_num);
 }
