@@ -29,7 +29,6 @@ use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 use crate::core::view::View;
 
-// TODO: move to core/view/layout.rs
 pub fn get_lines_offsets<'a>(
     view: &View<'a>,
     start_offset: u64,
@@ -141,35 +140,43 @@ pub fn build_screen_layout(
     screen.first_offset = base_offset;
     let mut last_pushed_offset = base_offset;
     let mut prev_cp = ' ';
+    let mut column_count = 0;
     for cpi in &vec {
+        if prev_cp == '\r' || prev_cp == '\n' {
+            column_count = 0;
+        }
+
         let (ok, _) = match (prev_cp, cpi.cp) {
             // TODO: handle \r\n
-            /*
-                ('\r', '\n') => {
-                    prev_cp = ' ';
-                    (true, 0 as usize)
-                }
-            */
             (_, '\t') => {
                 prev_cp = cpi.cp;
                 let mut filtered_cp = *cpi;
                 filtered_cp.displayed_cp = ' ';
 
                 let mut last = (false, 0);
-                for _ in 0..8 {
+
+                let tab_size = 8;
+
+                let padding = tab_size - (column_count % tab_size);
+
+                for _ in 0..padding {
                     last = screen.push(filtered_cp);
+                    column_count += 1;
                 }
                 last
             }
 
             _ => {
                 prev_cp = cpi.cp;
+                column_count += 1;
                 screen.push(*cpi)
             }
         };
+
         if !ok {
             break;
         }
+
         last_pushed_offset = cpi.offset;
     }
 
