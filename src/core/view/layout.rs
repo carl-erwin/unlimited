@@ -161,6 +161,7 @@ pub fn build_screen_layout(
 
                 for _ in 0..padding {
                     last = screen.push(filtered_cp);
+                    // TODO: how to handle errors ?
                     column_count += 1;
                 }
                 last
@@ -168,8 +169,11 @@ pub fn build_screen_layout(
 
             _ => {
                 prev_cp = cpi.cp;
+
+                let last = screen.push(*cpi);
+                // TODO: how to handle errors ?
                 column_count += 1;
-                screen.push(*cpi)
+                last
             }
         };
 
