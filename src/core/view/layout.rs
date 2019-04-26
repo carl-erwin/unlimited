@@ -29,6 +29,46 @@ use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 use crate::core::view::View;
 
+pub struct Filter {}
+
+pub struct FilterContext {}
+
+// content_type == unicode
+pub enum FilterData {
+    Byte {
+        val: u8,
+    },
+
+    Unicode {
+        cp: u32,
+        real_cp: u32,
+        cp_index: u64, // be carefull used const u64 invalid_cp_index
+        fragment_flag: bool,
+        fragment_count: u32,
+    },
+
+    // codec_change
+    CodecInfo {
+        codec_id: u32,
+        codec_context_id: u64, //
+    },
+}
+
+pub struct FilterIoData {
+    // general info
+    is_valid: bool,
+    end_of_pipe: bool, // skip
+    quit: bool,        // close pipeline
+    is_selected: bool,
+    offset: u64,
+
+    data: FilterData,
+    // TODO: add style infos ?
+}
+
+/// This function computes start/end of lines between start_offset end_offset.<br/>
+/// It (will) run the configured filters/plugins.<br/>
+/// using the build_screen_layout function until end_offset is reached.<br/>
 pub fn get_lines_offsets<'a>(
     view: &View<'a>,
     start_offset: u64,
@@ -118,11 +158,20 @@ pub fn get_lines_offsets<'a>(
     }
 }
 
-//////////////////////////////////
-// This function will run the configured filters
-// until the screen is full or eof is reached
-// the filters will be configured per view to allow multiple interpretation of the same document
-// data will be replaced by a "FileMMap"
+// Trait filter context
+fn utf8_filter(
+    ctx: &mut FilterContext,
+    filters_in: &mut Vec<FilterIoData>,
+    filters_out: &mut Vec<FilterIoData>,
+) -> u32 {
+    0
+}
+
+/// This function can be considered as the core of the editor.<br/>
+/// It will run the configured filters until the screen is filled or eof is reached.<br/>
+/// TODO: pass list of filter function to be applied
+/// 1 - utf8 || hexa
+/// 2 - tabulation
 pub fn build_screen_layout(
     data: &[u8],
     base_offset: u64,
@@ -130,6 +179,26 @@ pub fn build_screen_layout(
     screen: &mut Screen,
 ) -> u64 {
     let max_cpi = screen.width * screen.height;
+
+    let mut filters_in: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>;
+    let mut filter_out: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>,
+
+    // always equal to number of filter ran
+    let mut filter_ctx: Vec<FilterContext> = vec![]; // &mut Vec<FilterIoData>,
+
+    // first internal pass : convert raw bytes to vec of FilterIoData::FilterData::Byte
+    for (count, b) in data.iter().enumerate() {
+        filters_in.push(FilterIoData {
+            is_valid: true,
+            end_of_pipe: false, // skip
+            quit: false,        // close pipeline
+            is_selected: false,
+            offset: base_offset + count as u64,
+            data: FilterData::Byte { val: *b },
+        });
+    }
+
+    // init all filters with start_offset
 
     // utf8
     let (vec, _) = decode_slice_to_vec(data, base_offset, max_offset, max_cpi);
