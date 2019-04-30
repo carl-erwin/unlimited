@@ -606,13 +606,13 @@ fn display_status_line(
 
     let mut status_str = if name != file_name {
         format!(
-            " unlimitED! {}    doc[{}] file[{}], m(@{}):'{:08x}' {}",
-            VERSION, name, file_name, ui_state.mark_offset, mcp, ui_state.status
+            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {}",
+            VERSION, name, file_name, screen.first_offset, mcp, ui_state.status
         )
     } else {
         format!(
-            " unlimitED! {}    doc[{}], m(@{}):'{:08x}' {}",
-            VERSION, name, ui_state.mark_offset, mcp, ui_state.status
+            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {}",
+            VERSION, name, screen.first_offset, mcp, ui_state.status
         )
     };
 
