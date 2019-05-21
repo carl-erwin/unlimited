@@ -532,9 +532,28 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn move_mark_to_screen_start(&mut self) {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            // TODO: add main mark check
+            if m.offset < self.start_offset || m.offset > self.end_offset {
+                m.offset = self.start_offset;
+            }
+        }
+    }
+
+    pub fn move_mark_to_screen_end(&mut self) {
+        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+            // TODO: add main mark check
+            if m.offset < self.start_offset || m.offset > self.end_offset {
+                m.offset = self.end_offset;
+            }
+        }
+    }
+
     pub fn scroll_to_previous_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_up(nb);
+        self.move_mark_to_screen_end();
     }
 
     pub fn scroll_up(&mut self, nb_lines: usize) {
@@ -625,6 +644,7 @@ impl<'a> View<'a> {
     pub fn scroll_to_next_screen(&mut self) {
         let nb = ::std::cmp::max(self.screen.height - 1, 1);
         self.scroll_down(nb);
+        self.move_mark_to_screen_start();
     }
 
     pub fn scroll_down(&mut self, nb_lines: usize) {
