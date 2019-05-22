@@ -28,6 +28,7 @@ use std::sync::mpsc::Sender;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use crate::core::document;
 use crate::core::editor::Editor;
@@ -136,14 +137,19 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Send
                                 view.screen = screen.clone();
                             }
 
+                            let start = Instant::now();
                             fill_screen(&mut core_state, &mut view);
+                            let end = Instant::now();
+
+                            let mut new_screen = view.screen.clone();
+                            new_screen.time_to_build = end.duration_since(start);
 
                             let msg = EventMessage::new(
                                 get_next_seq(&mut seq),
                                 BuildLayoutEvent {
                                     view_id: view_id as u64,
                                     doc_id,
-                                    screen: view.screen.clone(),
+                                    screen: new_screen,
                                 },
                             );
                             ui_tx.send(msg).unwrap_or(());

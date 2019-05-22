@@ -180,24 +180,25 @@ pub fn build_screen_layout(
 ) -> u64 {
     let max_cpi = screen.width * screen.height;
 
-    let mut filters_in: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>;
-    let mut filter_out: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>,
+    if false {
+        let mut filters_in: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>;
+        let mut filter_out: Vec<FilterIoData> = vec![]; // &mut Vec<FilterIoData>,
 
-    // always equal to number of filter ran
-    let mut filter_ctx: Vec<FilterContext> = vec![]; // &mut Vec<FilterIoData>,
+        // always equal to number of filter ran
+        let mut filter_ctx: Vec<FilterContext> = vec![]; // &mut Vec<FilterIoData>,
 
-    // first internal pass : convert raw bytes to vec of FilterIoData::FilterData::Byte
-    for (count, b) in data.iter().enumerate() {
-        filters_in.push(FilterIoData {
-            is_valid: true,
-            end_of_pipe: false, // skip
-            quit: false,        // close pipeline
-            is_selected: false,
-            offset: base_offset + count as u64,
-            data: FilterData::Byte { val: *b },
-        });
+        // first internal pass : convert raw bytes to vec of FilterIoData::FilterData::Byte
+        for (count, b) in data.iter().enumerate() {
+            filters_in.push(FilterIoData {
+                is_valid: true,
+                end_of_pipe: false, // skip
+                quit: false,        // close pipeline
+                is_selected: false,
+                offset: base_offset + count as u64,
+                data: FilterData::Byte { val: *b },
+            });
+        }
     }
-
     // init all filters with start_offset
 
     // utf8

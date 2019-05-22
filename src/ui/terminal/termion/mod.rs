@@ -27,6 +27,7 @@
 use std::io::{self, Read, Stdout, Write};
 use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 
 use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
@@ -83,6 +84,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     let mut current_view_id = 0;
     let mut screen = Box::new(Screen::new(0, 0));
     let mut view_doc_map = HashMap::new();
+    let mut prev_screen_rdr_time = Duration::new(0, 0);
 
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
@@ -191,6 +193,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     current_doc_id = doc_id;
                     current_view_id = view_id;
 
+                    let start = Instant::now();
+
                     if ui_state.resize_flag {
                         // clear screen
                         write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
@@ -206,6 +210,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                             status_line_y,
                             ui_state.terminal_width,
                             ui_state.terminal_height,
+                            &prev_screen_rdr_time,
                             &mut stdout,
                         );
                     }
@@ -215,6 +220,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     }
 
                     stdout.flush().unwrap();
+                    let end = Instant::now();
+                    prev_screen_rdr_time = end.duration_since(start);
                 }
 
                 _ => {}
@@ -579,6 +586,7 @@ fn display_status_line(
     line: u16,
     width: u16,
     height: u16,
+    prev_screen_rdr_time: &Duration,
     mut stdout: &mut Stdout,
 ) {
     let name = ""; // TODO: from doc list
@@ -606,13 +614,17 @@ fn display_status_line(
 
     let mut status_str = if name != file_name {
         format!(
-            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {}",
-            VERSION, name, file_name, screen.first_offset, mcp, ui_state.status
+            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {}",
+            VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
+            screen.time_to_build.as_micros(),
+            prev_screen_rdr_time.as_micros()
         )
     } else {
         format!(
-            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {}",
-            VERSION, name, screen.first_offset, mcp, ui_state.status
+            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {}",
+            VERSION, name, screen.first_offset, mcp, ui_state.status,
+            screen.time_to_build.as_micros(),
+            prev_screen_rdr_time.as_micros()
         )
     };
 

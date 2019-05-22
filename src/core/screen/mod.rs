@@ -24,8 +24,8 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 pub mod line;
-
 use crate::core::codepointinfo::CodepointInfo;
+use std::time::Duration;
 
 use self::line::Line;
 use self::line::LineCellIndex;
@@ -51,6 +51,8 @@ pub struct Screen {
     pub last_offset: u64,
     /// placeholder to record the maximum offset of the document (eof)
     pub doc_max_offset: u64,
+    /// time spent to generate the screen content
+    pub time_to_build: Duration,
 }
 
 impl Screen {
@@ -69,6 +71,7 @@ impl Screen {
             first_offset: 0,
             last_offset: 0,
             doc_max_offset: 0,
+            time_to_build: Duration::new(0, 0),
         }
     }
 
