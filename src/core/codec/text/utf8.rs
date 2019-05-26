@@ -28,8 +28,8 @@
 //   Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 //   See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
-const UTF8_ACCEPT: u32 = 0;
-const UTF8_REJECT: u32 = 12;
+pub const UTF8_ACCEPT: u32 = 0;
+pub const UTF8_REJECT: u32 = 12;
 
 #[rustfmt::skip]
 static UTF8D: &'static [u8] = &[
