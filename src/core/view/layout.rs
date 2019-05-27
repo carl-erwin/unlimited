@@ -37,7 +37,11 @@ pub struct FilterContext {}
 
 // content_type == unicode
 #[derive(Debug, Clone)]
-pub enum FilterData {
+pub enum FilterData<'a> {
+    ByteArray {
+        val: &'a [u8],
+    },
+
     Byte {
         val: u8,
     },
@@ -58,7 +62,7 @@ pub enum FilterData {
 }
 
 #[derive(Debug, Clone)]
-pub struct FilterIoData {
+pub struct FilterIoData<'a> {
     // general info
     is_valid: bool,
     end_of_pipe: bool, // skip
@@ -68,7 +72,7 @@ pub struct FilterIoData {
     offset: u64,
     size: usize,
 
-    data: FilterData,
+    data: FilterData<'a>,
     // TODO: add style infos ?
 }
 
@@ -184,13 +188,13 @@ struct _LayoutPlugin {
 }
 
 // first internal pass : convert raw bytes to vec of FilterIoData::FilterData::Byte
-fn layout_filter_prepare_raw_data(
+fn layout_filter_prepare_raw_data<'a>(
     screen: &Screen,
-    data: &[u8],
+    data: &'a [u8],
     base_offset: u64,
     max_offset: u64,
-) -> Vec<FilterIoData> {
-    let mut data_vec: Vec<FilterIoData> = Vec::with_capacity(screen.width * screen.height);
+) -> Vec<FilterIoData<'a>> {
+    let mut data_vec: Vec<FilterIoData<'a>> = Vec::with_capacity(screen.width * screen.height);
 
     for (count, b) in data.iter().enumerate() {
         data_vec.push(FilterIoData {
@@ -230,7 +234,6 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<Filte
 
     // start offset
     let mut from_offset = filter_in[0].offset;
-    let last_off = filter_in[in_len - 1].offset;
 
     let mut state = 0;
     let mut codep = 0;
@@ -308,9 +311,9 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<Filte
     true
 }
 
-fn layout_filter_tabulation(
-    filter_in: &Vec<FilterIoData>,
-    filter_out: &mut Vec<FilterIoData>,
+fn layout_filter_tabulation<'a>(
+    filter_in: &Vec<FilterIoData<'a>>,
+    filter_out: &mut Vec<FilterIoData<'a>>,
 ) -> bool {
     for i in filter_in.iter() {
         filter_out.push(i.clone());
@@ -391,8 +394,6 @@ pub fn build_screen_layout(
 
     screen.last_offset
 }
-
-
 
 //
 fn _raw_slice_to_hex_vec(
