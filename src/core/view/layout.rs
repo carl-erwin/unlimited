@@ -39,7 +39,7 @@ pub struct FilterContext {}
 #[derive(Debug, Clone)]
 pub enum FilterData<'a> {
     ByteArray {
-        val: &'a [u8],
+        array: &'a [u8],
     },
 
     Byte {
@@ -74,6 +74,48 @@ pub struct FilterIoData<'a> {
 
     data: FilterData<'a>,
     // TODO: add style infos ?
+}
+
+impl<'a> FilterIoData<'a> {
+    pub fn replace_codepoint(io: &FilterIoData<'a>, new_cp: char) -> FilterIoData<'a> {
+        if let &FilterIoData {
+            // general info
+            is_valid,
+            end_of_pipe, // skip
+            quit,        // close pipeline
+            is_selected,
+            offset: from_offset,
+            size: cp_size,
+            data:
+                FilterData::Unicode {
+                    real_cp,
+                    cp_index, // be carefull used const u64 invalid_cp_index
+                    fragment_flag,
+                    fragment_count,
+                    ..
+                },
+        } = io
+        {
+            return FilterIoData {
+                // general info
+                is_valid,
+                end_of_pipe, // skip
+                quit,        // close pipeline
+                is_selected,
+                offset: from_offset,
+                size: cp_size,
+                data: FilterData::Unicode {
+                    cp: new_cp as u32,
+                    real_cp,
+                    cp_index, // be carefull used const u64 invalid_cp_index
+                    fragment_flag,
+                    fragment_count,
+                },
+            };
+        }
+
+        io.clone()
+    }
 }
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>
@@ -176,7 +218,7 @@ pub fn get_lines_offsets<'a>(
 fn _utf8_filter(
     ctx: &mut FilterContext,
     filter_in: &mut Vec<FilterIoData>,
-    filters_out: &mut Vec<FilterIoData>,
+    filter_out: &mut Vec<FilterIoData>,
 ) -> u32 {
     0
 }
@@ -187,7 +229,7 @@ struct _LayoutPlugin {
     context_id: u32,
 }
 
-// first internal pass : convert raw bytes to vec of FilterIoData::FilterData::Byte
+// first internal pass : convert raw bytes to vec of FilterIoData::FilterData::ByteArray / Byte
 fn layout_filter_prepare_raw_data<'a>(
     screen: &Screen,
     data: &'a [u8],
@@ -196,17 +238,30 @@ fn layout_filter_prepare_raw_data<'a>(
 ) -> Vec<FilterIoData<'a>> {
     let mut data_vec: Vec<FilterIoData<'a>> = Vec::with_capacity(screen.width * screen.height);
 
-    for (count, b) in data.iter().enumerate() {
-        data_vec.push(FilterIoData {
-            is_valid: true,
-            end_of_pipe: false, // skip
-            quit: false,        // close pipeline
-            is_selected: false,
-            offset: base_offset + count as u64,
-            size: 1,
-            data: FilterData::Byte { val: *b },
-        });
-    }
+    data_vec.push(FilterIoData {
+        is_valid: true,
+        end_of_pipe: false, // skip
+        quit: false,        // close pipeline
+        is_selected: false,
+        offset: base_offset,
+        size: 1,
+        data: FilterData::ByteArray { array: data },
+    });
+
+    /*
+     as byte
+        for (count, b) in data.iter().enumerate() {
+            data_vec.push(FilterIoData {
+                is_valid: true,
+                end_of_pipe: false, // skip
+                quit: false,        // close pipeline
+                is_selected: false,
+                offset: base_offset + count as u64,
+                size: 1,
+                data: FilterData::Byte { val: *b },
+            });
+        }
+    */
 
     // eof handling
     if base_offset + data.len() as u64 == max_offset {
@@ -224,13 +279,11 @@ fn layout_filter_prepare_raw_data<'a>(
     data_vec
 }
 
-fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<FilterIoData>) -> bool {
+fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<FilterIoData>) -> bool {
     if filter_in.is_empty() {
-        *filters_out = vec![];
+        *filter_out = vec![];
         return true;
     }
-
-    let in_len = filter_in.len();
 
     // start offset
     let mut from_offset = filter_in[0].offset;
@@ -242,6 +295,70 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<Filte
 
     for d in filter_in {
         match d.data {
+            FilterData::ByteArray { array } => {
+                for val in array {
+                    cp_size += 1;
+                    state = utf8::decode_byte(state, *val, &mut codep);
+                    match state {
+                        utf8::UTF8_ACCEPT => {
+                            let io = FilterIoData {
+                                // general info
+                                is_valid: true,
+                                end_of_pipe: false, // skip
+                                quit: false,        // close pipeline
+                                is_selected: false,
+                                offset: from_offset,
+                                size: cp_size,
+                                data: FilterData::Unicode {
+                                    cp: codep,
+                                    real_cp: codep,
+                                    cp_index, // be carefull used const u64 invalid_cp_index
+                                    fragment_flag: false,
+                                    fragment_count: 0,
+                                },
+                            };
+
+                            filter_out.push(io);
+
+                            cp_index += 1;
+                            from_offset += cp_size as u64;
+
+                            codep = 0;
+                            cp_size = 0;
+                        }
+
+                        utf8::UTF8_REJECT => {
+                            // decode error : invalid sequence
+                            let io = FilterIoData {
+                                // general info
+                                is_valid: true,
+                                end_of_pipe: false, // skip
+                                quit: false,        // close pipeline
+                                is_selected: false,
+                                offset: from_offset,
+                                size: 1,
+                                data: FilterData::Unicode {
+                                    cp: 0xfffd,
+                                    real_cp: 0xfffd,
+                                    cp_index, // be carefull used const u64 invalid_cp_index
+                                    fragment_flag: false,
+                                    fragment_count: 0,
+                                },
+                            };
+                            filter_out.push(io);
+
+                            // restart @ next byte
+                            cp_index += 1;
+                            from_offset += 1 as u64;
+
+                            codep = 0;
+                            cp_size = 0;
+                        }
+                        _ => { /* need more data */ }
+                    }
+                }
+            }
+
             FilterData::Byte { val } => {
                 cp_size += 1;
                 state = utf8::decode_byte(state, val, &mut codep);
@@ -264,7 +381,7 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<Filte
                             },
                         };
 
-                        filters_out.push(io);
+                        filter_out.push(io);
 
                         cp_index += 1;
                         from_offset += cp_size as u64;
@@ -291,7 +408,7 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filters_out: &mut Vec<Filte
                                 fragment_count: 0,
                             },
                         };
-                        filters_out.push(io);
+                        filter_out.push(io);
 
                         // restart @ next byte
                         cp_index += 1;
@@ -315,8 +432,42 @@ fn layout_filter_tabulation<'a>(
     filter_in: &Vec<FilterIoData<'a>>,
     filter_out: &mut Vec<FilterIoData<'a>>,
 ) -> bool {
-    for i in filter_in.iter() {
-        filter_out.push(i.clone());
+    let mut prev_cp = ' ';
+    let mut column_count = 0;
+
+    for io in filter_in.iter() {
+        match &*io {
+            FilterIoData {
+                data: FilterData::Unicode { cp, .. },
+                ..
+            } => {
+                if prev_cp == '\r' || prev_cp == '\n' {
+                    column_count = 0;
+                }
+
+                match (prev_cp, u32_to_char(*cp)) {
+                    (_, '\t') => {
+                        prev_cp = u32_to_char(*cp);
+
+                        let tab_size = 8;
+                        let padding = tab_size - (column_count % tab_size);
+
+                        for _ in 0..padding {
+                            let new_io = FilterIoData::replace_codepoint(io, ' ' as char);
+                            filter_out.push(new_io);
+                            column_count += 1;
+                        }
+                    }
+
+                    _ => {
+                        prev_cp = u32_to_char(*cp);
+                        filter_out.push(io.clone());
+                        column_count += 1;
+                    }
+                }
+            }
+            _ => { /* unexpected */ }
+        }
     }
 
     true
@@ -354,7 +505,11 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
                         fragment_count,
                     },
             } => {
-                let _ = screen.push(filter_codepoint(u32_to_char(*cp), *offset));
+                let (ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset));
+                if ok == false {
+                    break;
+                }
+
                 last_pushed_offset = *offset;
             }
             _ => {}
