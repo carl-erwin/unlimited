@@ -447,7 +447,7 @@ fn layout_filter_tabulation<'a>(
 
                 match (prev_cp, u32_to_char(*cp)) {
                     (_, '\t') => {
-                        prev_cp = u32_to_char(*cp);
+                        prev_cp = '\t';
 
                         let tab_size = 8;
                         let padding = tab_size - (column_count % tab_size);
@@ -459,8 +459,8 @@ fn layout_filter_tabulation<'a>(
                         }
                     }
 
-                    _ => {
-                        prev_cp = u32_to_char(*cp);
+                    (_, codepoint) => {
+                        prev_cp = codepoint;
                         filter_out.push(io.clone());
                         column_count += 1;
                     }
@@ -478,11 +478,8 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
         return false;
     }
 
-    let in_len = filter_in.len();
-
     // start offset
     let base_offset = filter_in[0].offset;
-    let last_off = filter_in[in_len - 1].offset;
 
     screen.first_offset = base_offset;
     let mut last_pushed_offset = base_offset;
@@ -490,23 +487,12 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
     for io in filter_in.iter() {
         match &*io {
             FilterIoData {
-                is_valid,
-                end_of_pipe,
-                quit,
-                is_selected,
                 offset,
-                size,
-                data:
-                    FilterData::Unicode {
-                        cp,
-                        real_cp,
-                        cp_index,
-                        fragment_flag,
-                        fragment_count,
-                    },
+                data: FilterData::Unicode { cp, .. },
+                ..
             } => {
-                let (ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset));
-                if ok == false {
+                let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset));
+                if push_ok == false {
                     break;
                 }
 
