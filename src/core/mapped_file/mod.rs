@@ -696,11 +696,25 @@ impl<'a> MappedFile<'a> {
     // creates an iterator over an arbitrary node index
     // always start @ local_offset 0
     pub fn iter_from_node_index(file_: &FileHandle<'a>, node_idx: NodeIndex) -> FileIterator<'a> {
-        let file = file_.borrow_mut();
+        let mut file = file_.borrow_mut();
         match node_idx {
             _ => {
                 let page = file.pool[node_idx as usize].page.upgrade().unwrap();
                 let slice = page.as_ref().borrow_mut().as_slice().unwrap();
+
+                // prefetch prev page
+                let prev_page = if let Some(prev_index) = file.nodepool[node_idx as usize].prev {
+                    file.nodepool[prev_index as usize].map()
+                } else{
+                    None
+                };
+
+                // prefetch next page
+                let next_page = if let Some(next_index) = file.nodepool[node_idx as usize].next {
+                    file.nodepool[next_index as usize].map()
+                } else{
+                    None
+                };
 
                 MappedFileIterator::Real(IteratorInstance {
                     file: Rc::clone(file_),
@@ -709,6 +723,8 @@ impl<'a> MappedFile<'a> {
                     page_size: file.pool[node_idx as usize].size,
                     node_idx,
                     page,
+                    prev_page,
+                    next_page,
                     base: slice,
                 })
             }
@@ -723,6 +739,21 @@ impl<'a> MappedFile<'a> {
                 let page = file.pool[node_idx as usize].map().unwrap();
                 let slice = page.as_ref().borrow_mut().as_slice().unwrap();
 
+                // prefetch prev page
+                let prev_page = if let Some(prev_index) = file.nodepool[node_idx as usize].prev {
+                    file.nodepool[prev_index as usize].map()
+                } else{
+                    None
+                };
+
+                // prefetch next page
+                let next_page = if let Some(next_index) = file.nodepool[node_idx as usize].next {
+                    file.nodepool[next_index as usize].map()
+                } else{
+                    None
+                };
+
+
                 MappedFileIterator::Real(IteratorInstance {
                     file: Rc::clone(file_),
                     file_size: file.size(),
@@ -730,6 +761,8 @@ impl<'a> MappedFile<'a> {
                     page_size: node_size,
                     node_idx,
                     page,
+                    prev_page,
+                    next_page,
                     base: slice,
                 })
             }
@@ -1851,6 +1884,10 @@ pub struct IteratorInstance<'a> {
     page_size: u64,
     node_idx: NodeIndex,
     page: Rc<RefCell<Page>>,
+
+    prev_page: Option<Rc<RefCell<Page>>>,
+    next_page: Option<Rc<RefCell<Page>>>,
+
     base: &'a [u8],
 }
 
@@ -1900,6 +1937,22 @@ impl<'a> Iterator for MappedFileIterator<'a> {
 
                 it.local_offset += 1;
 
+
+                let mut file = it.file.borrow_mut();
+                // prefetch prev page
+                let prev_page = if let Some(prev_index) = file.nodepool[it.node_idx as usize].prev {
+                    file.nodepool[prev_index as usize].map()
+                } else{
+                    None
+                };
+
+                // prefetch next page
+                let next_page = if let Some(next_index) = file.nodepool[it.node_idx as usize].next {
+                    file.nodepool[next_index as usize].map()
+                } else{
+                    None
+                };
+
                 Some(MappedFileIterator::Real(IteratorInstance {
                     file: Rc::clone(&it.file),
                     file_size: it.file_size,
@@ -1907,6 +1960,8 @@ impl<'a> Iterator for MappedFileIterator<'a> {
                     local_offset: it.local_offset - 1,
                     page: Rc::clone(&it.page),
                     page_size: it.page_size,
+                    prev_page,
+                    next_page,
                     base: it.base,
                 }))
             }
