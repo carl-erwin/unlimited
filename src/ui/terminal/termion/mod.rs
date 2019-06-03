@@ -53,6 +53,8 @@ use crate::core::event::Key;
 
 use crate::core::VERSION;
 
+use crate::core::codepointinfo::CodepointInfo;
+
 //
 use crate::ui::UiState;
 
@@ -239,10 +241,45 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     // ----}
 }
 
+/*
+
+derive_csi_sequence!("Reset SGR parameters.", Reset, "m");
+derive_csi_sequence!("Bold text.", Bold, "1m");
+derive_csi_sequence!("Fainted text (not widely supported).", Faint, "2m");
+derive_csi_sequence!("Italic text.", Italic, "3m");
+derive_csi_sequence!("Underlined text.", Underline, "4m");
+derive_csi_sequence!("Blinking text (not widely supported).", Blink, "5m");
+derive_csi_sequence!("Inverted colors (negative mode).", Invert, "7m");
+derive_csi_sequence!("Crossed out text (not widely supported).", CrossedOut, "9m");
+derive_csi_sequence!("Undo bold text.", NoBold, "21m");
+derive_csi_sequence!("Undo fainted text (not widely supported).", NoFaint, "22m");
+derive_csi_sequence!("Undo italic text.", NoItalic, "23m");
+derive_csi_sequence!("Undo underlined text.", NoUnderline, "24m");
+derive_csi_sequence!("Undo blinking text (not widely supported).", NoBlink, "25m");
+derive_csi_sequence!("Undo inverted colors (negative mode).", NoInvert, "27m");
+derive_csi_sequence!("Undo crossed out text (not widely supported).", NoCrossedOut, "29m");
+derive_csi_sequence!("Framed text (not widely supported).", Framed, "51m");
+
+*/
+
 fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Hide).unwrap();
     write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
+
+    let mut prev_cpi = CodepointInfo::new();
+
+    // default color
+    write!(
+        stdout,
+        "{}",
+        termion::color::Fg(termion::color::Rgb(
+            prev_cpi.color.0,
+            prev_cpi.color.1,
+            prev_cpi.color.2
+        ))
+    )
+    .unwrap();
 
     for l in 0..screen.height {
         terminal_cursor_to(&mut stdout, 1, (start_line + l + 1) as u16);
@@ -252,25 +289,28 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
         for c in 0..line.width {
             let cpi = line.get_cpi(c).unwrap();
 
-            if cpi.is_selected {
+            if prev_cpi.is_selected != cpi.is_selected {
+                if cpi.is_selected {
+                    write!(stdout, "{}", termion::style::Invert).unwrap();
+                } else {
+                    write!(stdout, "{}", termion::style::NoInvert).unwrap();
+                }
+            }
+
+            // detect change
+            if prev_cpi.color != cpi.color {
                 write!(
                     stdout,
-                    "{}{}{}",
-                    termion::style::Invert,
-                    cpi.displayed_cp,
-                    termion::style::Reset
+                    "{}",
+                    termion::color::Fg(termion::color::Rgb(cpi.color.0, cpi.color.1, cpi.color.2))
                 )
                 .unwrap();
-            } else {
-                write!(stdout, "{}", cpi.displayed_cp).unwrap();
             }
-        }
 
-        /*
-        for _ in line.nb_cells..line.width {
-            write!(stdout, " ").unwrap();
+            write!(stdout, "{}", cpi.displayed_cp).unwrap();
+
+            prev_cpi = *cpi;
         }
-        */
     }
 }
 

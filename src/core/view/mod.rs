@@ -47,6 +47,7 @@ use crate::core::screen::Screen;
 use crate::core::mark::Mark;
 
 use crate::core::codec::text::utf8;
+use crate::core::codepointinfo;
 
 pub type Id = u64;
 
@@ -796,7 +797,11 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 }
 
 pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64) -> bool {
-    let (ok, _) = screen.push(layout::filter_codepoint(c, offset));
+    let (ok, _) = screen.push(layout::filter_codepoint(
+        c,
+        offset,
+        codepointinfo::CodepointInfo::default_color(),
+    ));
     ok
 }
 

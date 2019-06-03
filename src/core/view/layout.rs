@@ -67,7 +67,9 @@ pub struct FilterIoData<'a> {
     is_valid: bool,
     end_of_pipe: bool, // skip
     quit: bool,        // close pipeline
+
     is_selected: bool,
+    color: (u8, u8, u8),
 
     offset: u64,
     size: usize,
@@ -84,15 +86,16 @@ impl<'a> FilterIoData<'a> {
             end_of_pipe, // skip
             quit,        // close pipeline
             is_selected,
+            color,
             offset: from_offset,
             size: cp_size,
             data:
                 FilterData::Unicode {
+                    cp,
                     real_cp,
                     cp_index, // be carefull used const u64 invalid_cp_index
                     fragment_flag,
                     fragment_count,
-                    ..
                 },
         } = io
         {
@@ -103,6 +106,7 @@ impl<'a> FilterIoData<'a> {
                 quit,        // close pipeline
                 is_selected,
                 offset: from_offset,
+                color,
                 size: cp_size,
                 data: FilterData::Unicode {
                     cp: new_cp as u32,
@@ -144,7 +148,7 @@ pub fn get_lines_offsets<'a>(
     let mut screen = Screen::new(screen_width, screen_height);
 
     let max_offset = doc.buffer.size as u64;
-    let max_size = (screen_width * screen_height * 4) as usize;
+    let max_size = (screen_width * screen_height * 2) as usize;
 
     loop {
         // fill screen
@@ -243,6 +247,7 @@ fn layout_filter_prepare_raw_data<'a>(
         end_of_pipe: false, // skip
         quit: false,        // close pipeline
         is_selected: false,
+        color: CodepointInfo::default_color(),
         offset: base_offset,
         size: 1,
         data: FilterData::ByteArray { array: data },
@@ -270,9 +275,10 @@ fn layout_filter_prepare_raw_data<'a>(
             end_of_pipe: true, // skip
             quit: false,       // close pipeline
             is_selected: true,
+            color: CodepointInfo::default_color(),
             offset: base_offset + data.len() as u64,
             size: 1,
-            data: FilterData::Byte { val: b'$' },
+            data: FilterData::Byte { val: b' ' },
         });
     }
 
@@ -307,6 +313,7 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<Filter
                                 end_of_pipe: false, // skip
                                 quit: false,        // close pipeline
                                 is_selected: false,
+                                color: CodepointInfo::default_color(),
                                 offset: from_offset,
                                 size: cp_size,
                                 data: FilterData::Unicode {
@@ -335,6 +342,8 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<Filter
                                 end_of_pipe: false, // skip
                                 quit: false,        // close pipeline
                                 is_selected: false,
+                                color: CodepointInfo::default_color(),
+
                                 offset: from_offset,
                                 size: 1,
                                 data: FilterData::Unicode {
@@ -370,6 +379,7 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<Filter
                             end_of_pipe: false, // skip
                             quit: false,        // close pipeline
                             is_selected: false,
+                            color: CodepointInfo::default_color(),
                             offset: from_offset,
                             size: cp_size,
                             data: FilterData::Unicode {
@@ -398,6 +408,8 @@ fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<Filter
                             end_of_pipe: false, // skip
                             quit: false,        // close pipeline
                             is_selected: false,
+                            color: CodepointInfo::default_color(),
+
                             offset: from_offset,
                             size: 1,
                             data: FilterData::Unicode {
@@ -473,6 +485,108 @@ fn layout_filter_tabulation<'a>(
     true
 }
 
+fn layout_keyword_highlighting<'a>(
+    filter_in: &Vec<FilterIoData<'a>>,
+    filter_out: &mut Vec<FilterIoData<'a>>,
+) -> bool {
+    let mut accum = vec![];
+    let mut utf8_word = vec![];
+
+    for io in filter_in {
+        match &*io {
+            FilterIoData {
+                data: FilterData::Unicode { cp, .. },
+                ..
+            } => {
+                let in_word = match u32_to_char(*cp) {
+                    ' ' | '\n' | '\t' => false,
+                    '(' | ')' => false,
+                    '{' | '}' => false,
+                    '[' | ']' => false,
+                    _ => true,
+                };
+
+                if in_word {
+                    accum.push(io.clone());
+                    let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
+                    let nr_bytes = utf8::encode(*cp, &mut utf8_out);
+                    for i in 0..nr_bytes {
+                        utf8_word.push(utf8_out[i]);
+                    }
+                    continue;
+                }
+
+                let mut new_color = (128, 0, 128);
+
+                let word_found = match String::from_utf8(utf8_word.clone()).unwrap().as_ref() {
+                    // some Rust keywords
+                    "use" | "crate" => {
+                        new_color = (255, 0, 0);
+                        true
+                    }
+
+                    // some Rust keywords
+                    "let" | "mut" | "fn" | "impl" | "trait" => {
+                        new_color = (0, 128, 128);
+                        true
+                    }
+
+                    "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64"
+                    | "i128" | "f32" | "f64" => {
+                        new_color = (0, 128, 128);
+                        true
+                    }
+
+                    // C prepropcessor
+                    "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#define" => {
+                        new_color = (255, 0, 0);
+                        true
+                    }
+
+                    // C keywords
+                    "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
+                    | "default" | "do" | "double" | "else" | "enum" | "extern" | "float"
+                    | "for" | "goto" | "int" | "long" | "register" | "return" | "short"
+                    | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
+                    | "union" | "unsigned" | "void" | "volatile" | "while" => {
+                        new_color = (0, 128, 128);
+                        true
+                    }
+
+                    // C operators
+                    "." | "->" | "=" | "==" | "!=" | "&&" | "||" | "~" | "^" => {
+                        new_color = (0, 128, 0);
+                        true
+                    }
+
+                    _ => false,
+                };
+
+                if word_found {
+                    for mut io in accum.iter_mut() {
+                        io.color = new_color;
+                    }
+                }
+
+                // flush
+                if !accum.is_empty() {
+                    filter_out.append(&mut accum);
+                    utf8_word.clear();
+                }
+
+                filter_out.push(io.clone());
+            }
+
+            _ => {}
+        }
+    }
+
+    // flush
+    filter_out.append(&mut accum);
+
+    true
+}
+
 fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &mut Screen) -> bool {
     if filter_in.is_empty() {
         return false;
@@ -489,9 +603,10 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
             FilterIoData {
                 offset,
                 data: FilterData::Unicode { cp, .. },
+                color,
                 ..
             } => {
-                let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset));
+                let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset, *color));
                 if push_ok == false {
                     break;
                 }
@@ -521,13 +636,19 @@ pub fn build_screen_layout(
     mut screen: &mut Screen,
 ) -> u64 {
     let mut filter_in = layout_filter_prepare_raw_data(&screen, data, base_offset, max_offset);
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
 
+    //
+    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
     let ret = layout_filter_utf8(&filter_in, &mut filter_out);
     filter_in = filter_out;
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
 
+    //
+    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
     let ret = layout_filter_tabulation(&filter_in, &mut filter_out);
+    filter_in = filter_out;
+
+    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
+    let ret = layout_keyword_highlighting(&filter_in, &mut filter_out);
     filter_in = filter_out;
 
     // last pass
@@ -537,7 +658,7 @@ pub fn build_screen_layout(
 }
 
 // TODO return array of CodePointInfo  0x7f -> <ESC>
-pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
+pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointInfo {
     let displayed_cp: char = match c {
         '\r' | '\n' | '\t' => ' ',
 
@@ -553,5 +674,6 @@ pub fn filter_codepoint(c: char, offset: u64) -> CodepointInfo {
         displayed_cp,
         offset,
         is_selected: false,
+        color,
     }
 }
