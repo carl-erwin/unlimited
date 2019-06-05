@@ -559,7 +559,22 @@ fn layout_keyword_highlighting<'a>(
                         true
                     }
 
-                    _ => false,
+                    _ => {
+                        let mut is_digit = true;
+                        for c in utf8_word.iter() {
+                            if c < &b'0' || c > &b'9' {
+                                is_digit = false;
+                                break;
+                            }
+                        }
+
+                        if is_digit {
+                            new_color = (111, 100, 80);
+                            true
+                        } else {
+                            false
+                        }
+                    }
                 };
 
                 if word_found {
