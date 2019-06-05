@@ -41,7 +41,9 @@ use crate::core::event::Key;
 use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
 
-struct CoreState {
+use crate::core::screen::Screen;
+
+pub struct CoreState {
     keys: Vec<InputEvent>,
     quit: bool,
     status: String,
@@ -57,7 +59,38 @@ impl CoreState {
     }
 }
 
-pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
+pub fn build_layout_and_send_event(
+    editor: &mut Editor,
+    mut core_state: &mut CoreState,
+    ui_tx: &Sender<EventMessage>,
+    doc_id: u64,
+    view_id: u64,
+) {
+    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+
+    let start = Instant::now();
+    fill_screen(&mut core_state, &mut view);
+    let end = Instant::now();
+
+    let mut new_screen = view.screen.clone();
+    new_screen.time_to_build = end.duration_since(start);
+
+    let msg = EventMessage::new(
+        0, // get_next_seq(&mut seq), TODO
+        BuildLayoutEvent {
+            view_id: view_id as u64,
+            doc_id,
+            screen: new_screen,
+        },
+    );
+    ui_tx.send(msg).unwrap_or(());
+}
+
+pub fn start(
+    mut editor: &mut Editor,
+    core_rx: &Receiver<EventMessage>,
+    ui_tx: &Sender<EventMessage>,
+) {
     let mut core_state = CoreState::new();
 
     let mut seq: usize = 0;
@@ -123,36 +156,27 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Send
                     Event::RequestLayoutEvent {
                         view_id,
                         doc_id,
-                        // start_offset
-                        ref screen, // previous screen
+                        width,
+                        height,
                     } => {
                         let view_id = view_id as usize;
                         if view_id < editor.view_map.len() {
-                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-
-                            // resize ?
-                            if screen.width != view.screen.width
-                                || screen.height != view.screen.height
                             {
-                                view.screen = screen.clone();
+                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+
+                                // resize ?
+                                if width != view.screen.width || height != view.screen.height {
+                                    view.screen = Box::new(Screen::new(width, height));
+                                }
                             }
 
-                            let start = Instant::now();
-                            fill_screen(&mut core_state, &mut view);
-                            let end = Instant::now();
-
-                            let mut new_screen = view.screen.clone();
-                            new_screen.time_to_build = end.duration_since(start);
-
-                            let msg = EventMessage::new(
-                                get_next_seq(&mut seq),
-                                BuildLayoutEvent {
-                                    view_id: view_id as u64,
-                                    doc_id,
-                                    screen: new_screen,
-                                },
+                            build_layout_and_send_event(
+                                &mut editor,
+                                &mut core_state,
+                                ui_tx,
+                                doc_id,
+                                view_id as u64,
                             );
-                            ui_tx.send(msg).unwrap_or(());
                         }
 
                         // is there a view/screen ?
@@ -162,9 +186,21 @@ pub fn start(editor: &mut Editor, core_rx: &Receiver<EventMessage>, ui_tx: &Send
 
                     Event::InputEvent { ev } => {
                         if !editor.view_map.is_empty() {
-                            let view_id = 0 as usize;
-                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-                            process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                            {
+                                let view_id = 0 as usize;
+                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                                process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                            }
+
+                            if false {
+                                build_layout_and_send_event(
+                                    &mut editor,
+                                    &mut core_state,
+                                    ui_tx,
+                                    0,
+                                    0 as u64,
+                                );
+                            }
                         }
                     }
 

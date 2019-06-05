@@ -89,7 +89,8 @@ pub enum Event {
     RequestLayoutEvent {
         view_id: view::Id,
         doc_id: document::Id,
-        screen: Box<Screen>,
+        width: usize,  // used to detect change
+        height: usize, // used to detect change
     },
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     BuildLayoutEvent {

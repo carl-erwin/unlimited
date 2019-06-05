@@ -84,14 +84,14 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     let mut doc_list;
     let mut current_doc_id = 0;
     let mut current_view_id = 0;
-    let mut screen = Box::new(Screen::new(0, 0));
+    let mut last_screen = Box::new(Screen::new(0, 0)); // last screen ?
     let mut view_doc_map = HashMap::new();
     let mut prev_screen_rdr_time = Duration::new(0, 0);
 
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
 
-        let mut request_layout = vec_evt.len() > 0;
+        let mut request_layout = !vec_evt.is_empty();
         for ev in vec_evt {
             // send translated input evnts to core
             let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
@@ -112,11 +112,6 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
 
         // resize ?
         if ui_state.resize_flag {
-            screen = Box::new(Screen::new(
-                ui_state.terminal_width as usize,
-                ui_state.terminal_height as usize,
-            ));
-
             request_layout = true;
         }
 
@@ -127,7 +122,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                 Event::RequestLayoutEvent {
                     view_id: current_view_id,
                     doc_id: current_doc_id,
-                    screen: screen.clone(),
+                    width: ui_state.terminal_width as usize,
+                    height: ui_state.terminal_height as usize,
                 },
             );
             core_tx.send(msg).unwrap_or(());
@@ -166,8 +162,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                 }
 
                 Event::ViewCreated {
-                    width: 0,
-                    height: 0,
+                    width,
+                    height,
                     doc_id,
                     view_id,
                 } => {
@@ -180,7 +176,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                         Event::RequestLayoutEvent {
                             view_id,
                             doc_id,
-                            screen: screen.clone(),
+                            width,
+                            height,
                         },
                     );
                     core_tx.send(msg).unwrap_or(());
@@ -218,12 +215,13 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     }
 
                     if ui_state.display_view {
-                        draw_view(&mut ui_state, &mut screen, &mut stdout);
+                        draw_view(&mut ui_state, &last_screen, &mut screen, &mut stdout);
                     }
 
                     stdout.flush().unwrap();
                     let end = Instant::now();
                     prev_screen_rdr_time = end.duration_since(start);
+                    last_screen = screen;
                 }
 
                 _ => {}
@@ -262,8 +260,12 @@ derive_csi_sequence!("Framed text (not widely supported).", Framed, "51m");
 
 */
 
-fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) {
-    write!(stdout, "{}", termion::cursor::Hide).unwrap();
+fn draw_screen(
+    last_screen: &Screen,
+    screen: &mut Screen,
+    start_line: usize,
+    mut stdout: &mut Stdout,
+) {
     write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
@@ -320,9 +322,14 @@ fn draw_screen(screen: &mut Screen, start_line: usize, mut stdout: &mut Stdout) 
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(ui_state: &mut UiState, mut screen: &mut Screen, mut stdout: &mut Stdout) {
+fn draw_view(
+    ui_state: &mut UiState,
+    last_screen: &Screen,
+    mut screen: &mut Screen,
+    mut stdout: &mut Stdout,
+) {
     let start_line = ui_state.view_start_line;
-    draw_screen(&mut screen, start_line, &mut stdout);
+    draw_screen(last_screen, &mut screen, start_line, &mut stdout);
 }
 
 fn _terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
