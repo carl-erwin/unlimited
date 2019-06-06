@@ -130,7 +130,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
         }
 
         // evt from core ?
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(7)) {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
@@ -222,6 +222,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     let end = Instant::now();
                     prev_screen_rdr_time = end.duration_since(start);
                     last_screen = screen;
+
+                    thread::sleep(Duration::from_millis(16)); //
                 }
 
                 _ => {}
@@ -585,7 +587,8 @@ fn get_input_event(
 ) -> Vec<InputEvent> {
     let mut v = Vec::<InputEvent>::new();
 
-    {
+    let mut do_loop = true;
+    while do_loop {
         let b = stdin.next();
         if let Some(b) = b {
             if let Ok(val) = b {
@@ -598,8 +601,9 @@ fn get_input_event(
         } else {
             // TODO: use last input event time
             ui_state.status = " async no event".to_owned();
-            ui_state.input_wait_time_ms += 10;
-            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 10);
+            ui_state.input_wait_time_ms += 2;
+            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 16);
+            do_loop = false;
         }
 
         // check terminal size
@@ -687,14 +691,18 @@ fn display_status_line(
     .unwrap();
 
     // scroolbar
+    // color
+    write!(
+        stdout,
+        "{}",
+        termion::color::Bg(termion::color::Rgb(0x00, 0x00, 0xff))
+    )
+    .unwrap();
+
+    // spaces
     for h in 0..height + 1 {
         terminal_cursor_to(&mut stdout, width + 2, h + 3);
-        write!(
-            stdout,
-            "{} ",
-            termion::color::Bg(termion::color::Rgb(0x00, 0x00, 0xff))
-        )
-        .unwrap();
+        write!(stdout, " ",).unwrap();
     }
 
     let off = screen.first_offset as f64;
@@ -703,10 +711,11 @@ fn display_status_line(
     let pos = ((off / max_size) * f64::from(height)) as u16;
 
     terminal_cursor_to(&mut stdout, width + 2, 3 + pos);
+
     write!(
         stdout,
         "{}{} {}",
-        termion::color::Bg(termion::color::Rgb(0xff, 0x00, 0x00)),
+        termion::color::Fg(termion::color::Rgb(0xff, 0xff, 0xff)),
         termion::style::Invert,
         termion::style::Reset
     )
