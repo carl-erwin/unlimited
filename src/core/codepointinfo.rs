@@ -25,7 +25,8 @@
 
 /// A CodepointInfo contains displayed character attributes.<br/>
 /// The displayed screen is composed of LineCell(s), that contain CodepointInfo(s).
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+
+#[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
     pub cp: char,
     pub displayed_cp: char,

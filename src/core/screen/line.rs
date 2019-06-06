@@ -23,13 +23,16 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 use crate::core::codepointinfo::CodepointInfo;
 
 pub type LineCellIndex = usize;
 
 /// A LineCell encapsulates code point information (CodepoinInfo).<br/>
 /// The displayed Lines are composed of LineCell
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Hash, Default, Debug, Clone, Eq, PartialEq)]
 pub struct LineCell {
     pub cpi: CodepointInfo,
     pub is_used: bool,
@@ -52,6 +55,7 @@ pub struct Line {
     pub nb_cells: usize,
     pub width: usize,
     pub read_only: bool,
+    hash_cache: u64,
 }
 
 impl Line {
@@ -68,7 +72,22 @@ impl Line {
             nb_cells: 0,
             width,
             read_only: false,
+            hash_cache: 0,
         }
+    }
+
+    pub fn hash(&mut self) -> u64 {
+        if self.hash_cache != 0 {
+            return self.hash_cache;
+        }
+
+        let mut s = DefaultHasher::new();
+
+        for i in 0..self.nb_cells {
+            self.cells[i].hash(&mut s);
+        }
+        self.hash_cache = s.finish();
+        self.hash_cache
     }
 
     pub fn resize(&mut self, width: LineCellIndex) {
@@ -101,6 +120,7 @@ impl Line {
         }
         self.nb_cells = 0;
         self.read_only = false;
+        self.hash_cache = 0;
     }
 
     pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
