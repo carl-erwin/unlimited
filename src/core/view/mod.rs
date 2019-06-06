@@ -136,7 +136,7 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn insert_codepoint(&mut self, codepoint: char) {
+    pub fn insert_codepoint(&mut self, codepoint: char, nr_pending_events: usize) {
         let mut scroll_needed = false;
         let mut sync_view = false;
 
@@ -156,6 +156,10 @@ impl<'a> View<'a> {
 
                 sync_view = !self.screen.contains_offset(m.offset);
             }
+        }
+
+        if nr_pending_events > 1 {
+            return;
         }
 
         if scroll_needed {

@@ -55,6 +55,8 @@ struct UiState {
     terminal_height: u16,
     view_start_line: usize,
     resize_flag: bool,
+    max_input_events_stat: usize,
+    prev_input_size: usize,
 }
 
 impl UiState {
@@ -72,6 +74,8 @@ impl UiState {
             terminal_height: 0,
             view_start_line: 0,
             resize_flag: false,
+            max_input_events_stat: 0,
+            prev_input_size: 0,
         }
     }
 }

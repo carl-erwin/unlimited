@@ -93,7 +93,12 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
 
+        ui_state.max_input_events_stat =
+            ::std::cmp::max(ui_state.max_input_events_stat, vec_evt.len());
+
         let mut request_layout = !vec_evt.is_empty();
+
+        ui_state.prev_input_size = vec_evt.len();
 
         if !vec_evt.is_empty() {
             let msg = EventMessage::new(
@@ -101,6 +106,10 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                 Event::InputEvent { events: vec_evt },
             );
             core_tx.send(msg).unwrap_or(());
+        }
+
+        if ui_state.prev_input_size >= 255 {
+            // request_layout = false;
         }
 
         // hack to send multiple page down
@@ -232,7 +241,9 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     prev_screen_rdr_time = end.duration_since(start);
                     last_screen = screen;
 
-                    thread::sleep(Duration::from_millis(16)); //
+                    if ui_state.prev_input_size < 16 {
+                        thread::sleep(Duration::from_millis(16)); //
+                    }
                 }
 
                 _ => {}
@@ -637,6 +648,9 @@ fn get_input_event(
                     let evt = translate_termion_event(evt, ui_state);
                     v.push(evt);
                     ui_state.input_wait_time_ms = 0;
+                    if v.len() >= 32000 {
+                        do_loop = false;
+                    }
                 }
             }
         } else {
@@ -665,7 +679,7 @@ fn get_input_event(
         }
 
         if ui_state.input_wait_time_ms > 0 {
-            thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
+            // thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
         }
     }
 
@@ -706,17 +720,20 @@ fn display_status_line(
 
     let mut status_str = if name != file_name {
         format!(
-            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {}",
+            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {} max_ev {}",
             VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
             screen.time_to_build.as_micros(),
-            prev_screen_rdr_time.as_micros()
+            prev_screen_rdr_time.as_micros(),
+            ui_state.max_input_events_stat
         )
     } else {
         format!(
-            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {}",
-            VERSION, name, screen.first_offset, mcp, ui_state.status,
+            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {} max_ev {}",
+            VERSION, file_name, screen.first_offset, mcp, ui_state.status,
             screen.time_to_build.as_micros(),
-            prev_screen_rdr_time.as_micros()
+            prev_screen_rdr_time.as_micros(),
+                        ui_state.max_input_events_stat
+
         )
     };
 

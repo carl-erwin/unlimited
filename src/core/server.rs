@@ -45,6 +45,7 @@ use crate::core::screen::Screen;
 
 pub struct CoreState {
     keys: Vec<InputEvent>,
+    pending_events: usize,
     quit: bool,
     status: String,
 }
@@ -53,6 +54,7 @@ impl CoreState {
     fn new() -> Self {
         CoreState {
             keys: Vec::new(),
+            pending_events: 0,
             quit: false,
             status: String::new(),
         }
@@ -189,8 +191,10 @@ pub fn start(
                             {
                                 let view_id = 0 as usize;
                                 let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                                core_state.pending_events = events.len();
                                 for ev in events {
                                     process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                                    core_state.pending_events -= 1;
                                 }
                             }
 
@@ -524,7 +528,7 @@ fn process_input_events(
             shift: false,
             key: Key::UNICODE(cp),
         } => {
-            view.insert_codepoint(cp);
+            view.insert_codepoint(cp, core_state.pending_events);
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
         }
 
