@@ -92,21 +92,28 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
 
         let mut request_layout = !vec_evt.is_empty();
-        for ev in vec_evt {
-            // send translated input evnts to core
-            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
+
+        if !vec_evt.is_empty() {
+            let msg = EventMessage::new(
+                get_next_seq(&mut seq),
+                Event::InputEvent { events: vec_evt },
+            );
             core_tx.send(msg).unwrap_or(());
         }
 
         // hack to send multiple page down
-        for _ in 0..0 {
-            let ev = InputEvent::KeyPress {
-                key: Key::PageDown,
-                ctrl: false,
-                alt: false,
-                shift: false,
-            };
-            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { ev });
+        {
+            let mut v = vec![];
+            for _ in 0..0 {
+                let ev = InputEvent::KeyPress {
+                    key: Key::PageDown,
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                };
+                v.push(ev)
+            }
+            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { events: v });
             core_tx.send(msg).unwrap_or(());
         }
 
@@ -617,7 +624,7 @@ fn get_input_event(
     mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
     ui_state: &mut UiState,
 ) -> Vec<InputEvent> {
-    let mut v = Vec::<InputEvent>::new();
+    let mut v = Vec::<InputEvent>::with_capacity(4096);
 
     let mut do_loop = true;
     while do_loop {

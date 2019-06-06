@@ -184,12 +184,14 @@ pub fn start(
                         // alloc/resize screen
                     }
 
-                    Event::InputEvent { ev } => {
+                    Event::InputEvent { events } => {
                         if !editor.view_map.is_empty() {
                             {
                                 let view_id = 0 as usize;
                                 let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-                                process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                                for ev in events {
+                                    process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                                }
                             }
 
                             if false {
