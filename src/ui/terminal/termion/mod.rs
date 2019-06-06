@@ -215,7 +215,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     }
 
                     if ui_state.display_view {
-                        draw_view(&mut ui_state, &last_screen, &mut screen, &mut stdout);
+                        draw_view(&mut ui_state, &mut last_screen, &mut screen, &mut stdout);
                     }
 
                     stdout.flush().unwrap();
@@ -263,7 +263,7 @@ derive_csi_sequence!("Framed text (not widely supported).", Framed, "51m");
 */
 
 fn draw_screen(
-    last_screen: &Screen,
+    last_screen: &mut Screen,
     screen: &mut Screen,
     start_line: usize,
     mut stdout: &mut Stdout,
@@ -272,6 +272,8 @@ fn draw_screen(
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
     let mut prev_cpi = CodepointInfo::new();
+
+    let check_hash = last_screen.width == screen.width && last_screen.height == screen.height;
 
     // default color
     write!(
@@ -286,9 +288,39 @@ fn draw_screen(
     .unwrap();
 
     for l in 0..screen.height {
+        let line = screen.get_mut_line(l).unwrap();
+
         terminal_cursor_to(&mut stdout, 1, (start_line + l + 1) as u16);
 
-        let line = screen.get_line(l).unwrap();
+        let mut have_cursor = false;
+        for c in 0..line.width {
+            let cpi = line.get_cpi(c).unwrap();
+
+            if cpi.is_selected {
+                have_cursor = true;
+                break;
+            }
+        }
+
+        if check_hash {
+            // check previous line
+            let prev_line = last_screen.get_line(l).unwrap();
+            for c in 0..prev_line.width {
+                let cpi = prev_line.get_cpi(c).unwrap();
+                if cpi.is_selected {
+                    have_cursor = true;
+                    write!(stdout, "{}", termion::style::NoBold).unwrap();
+                    break;
+                }
+            }
+        }
+
+        if check_hash && !have_cursor {
+            let prev_line = last_screen.get_mut_line(l).unwrap();
+            if prev_line.hash() == line.hash() {
+                continue;
+            }
+        }
 
         for c in 0..line.width {
             let cpi = line.get_cpi(c).unwrap();
@@ -326,7 +358,7 @@ fn draw_screen(
 */
 fn draw_view(
     ui_state: &mut UiState,
-    last_screen: &Screen,
+    last_screen: &mut Screen,
     mut screen: &mut Screen,
     mut stdout: &mut Stdout,
 ) {
