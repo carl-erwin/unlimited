@@ -503,6 +503,8 @@ fn layout_keyword_highlighting<'a>(
                     '(' | ')' => false,
                     '{' | '}' => false,
                     '[' | ']' => false,
+                    ',' | ';' => false,
+
                     _ => true,
                 };
 
@@ -555,6 +557,11 @@ fn layout_keyword_highlighting<'a>(
 
                     // C operators
                     "." | "->" | "=" | "==" | "!=" | "&&" | "||" | "~" | "^" => {
+                        new_color = (0, 128, 0);
+                        true
+                    }
+
+                    "," | ";" => {
                         new_color = (0, 128, 0);
                         true
                     }
