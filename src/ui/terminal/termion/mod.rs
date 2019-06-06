@@ -88,6 +88,8 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     let mut view_doc_map = HashMap::new();
     let mut prev_screen_rdr_time = Duration::new(0, 0);
 
+    write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+
     while !ui_state.quit {
         let vec_evt = get_input_event(&mut stdin, &mut ui_state);
 
@@ -203,7 +205,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
 
                     if ui_state.resize_flag {
                         // clear screen
-                        write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
+                        write!(stdout, "{}", termion::clear::All).unwrap();
                         ui_state.resize_flag = false;
                     }
 
