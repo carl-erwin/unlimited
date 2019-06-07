@@ -108,10 +108,6 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
             core_tx.send(msg).unwrap_or(());
         }
 
-        if ui_state.prev_input_size >= 255 {
-            // request_layout = false;
-        }
-
         // hack to send multiple page down
         {
             let mut v = vec![];
@@ -148,7 +144,7 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
         }
 
         // evt from core ?
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(7)) {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
@@ -637,50 +633,45 @@ fn get_input_event(
     mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
     ui_state: &mut UiState,
 ) -> Vec<InputEvent> {
-    let mut v = Vec::<InputEvent>::with_capacity(4096);
+    let expected_size = stdin.size_hint().0;
+    let mut raw_evt = Vec::<_>::with_capacity(expected_size);
 
-    let mut do_loop = true;
-    while do_loop {
+    loop {
         let b = stdin.next();
         if let Some(b) = b {
             if let Ok(val) = b {
                 if let Ok(evt) = parse_event(val, &mut stdin) {
-                    let evt = translate_termion_event(evt, ui_state);
-                    v.push(evt);
-                    ui_state.input_wait_time_ms = 0;
-                    if v.len() >= 32000 {
-                        do_loop = false;
+                    raw_evt.push(evt);
+                    if raw_evt.len() >= 32000 {
+                        break;
                     }
                 }
             }
         } else {
-            // TODO: use last input event time
-            ui_state.status = " async no event".to_owned();
-            ui_state.input_wait_time_ms += 2;
-            ui_state.input_wait_time_ms = ::std::cmp::min(ui_state.input_wait_time_ms, 16);
-            do_loop = false;
+            break;
         }
+    }
 
-        // check terminal size
-        let (width, height, start_line) = if ui_state.display_status {
-            let (width, height) = terminal_size().unwrap();
-            (width - 2, height - 2, 2)
-        } else {
-            let dim = terminal_size().unwrap();
-            (dim.0 - 2, dim.1, 1)
-        };
+    let mut v = Vec::<InputEvent>::with_capacity(raw_evt.len());
+    for evt in raw_evt {
+        let evt = translate_termion_event(evt, ui_state);
+        v.push(evt);
+    }
 
-        if ui_state.terminal_width != width || ui_state.terminal_height != height {
-            ui_state.terminal_width = width;
-            ui_state.terminal_height = height;
-            ui_state.view_start_line = start_line;
-            ui_state.input_wait_time_ms = 0;
-            ui_state.resize_flag = true;
-        }
+    // check terminal size
+    let (width, height, start_line) = if ui_state.display_status {
+        let (width, height) = terminal_size().unwrap();
+        (width - 2, height - 2, 2)
+    } else {
+        let dim = terminal_size().unwrap();
+        (dim.0 - 2, dim.1, 1)
+    };
 
-        if ui_state.input_wait_time_ms > 0 {
-            // thread::sleep(Duration::from_millis(ui_state.input_wait_time_ms));
-        }
+    if ui_state.terminal_width != width || ui_state.terminal_height != height {
+        ui_state.terminal_width = width;
+        ui_state.terminal_height = height;
+        ui_state.view_start_line = start_line;
+        ui_state.resize_flag = true;
     }
 
     v
@@ -718,7 +709,7 @@ fn display_status_line(
         _ => 0xffd,
     };
 
-    let mut status_str =  {
+    let mut status_str = {
         format!(
             " unlimitED! {}  doc[{}] file[{}], scr(@{}):'{:08x}' {} sc_bld_time {} prv_rdr_time {} max_ev {} in_size_hint {}",
             VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
