@@ -51,10 +51,16 @@ fn main() {
     let ui_name = config.ui_frontend.clone();
 
     // create core thread
-    let core_th = { Some(thread::spawn(move || core::start(config, &core_rx, &ui_tx))) };
+    let ui_tx_clone = ui_tx.clone();
+    let core_th = {
+        Some(thread::spawn(move || {
+            core::start(config, &core_rx, &ui_tx_clone)
+        }))
+    };
 
     // run the ui loop in the main thread
-    ui::main_loop(ui_name.as_ref(), &ui_rx, &core_tx);
+    let ui_tx_clone = ui_tx.clone();
+    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx_clone, &core_tx);
 
     // wait for core thread
     if let Some(core_handle) = core_th {

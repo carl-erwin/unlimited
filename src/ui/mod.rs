@@ -30,11 +30,16 @@ use std::sync::mpsc::Sender;
 
 use crate::core::event::EventMessage;
 
-pub fn main_loop(ui_name: &str, ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
+pub fn main_loop(
+    ui_name: &str,
+    ui_rx: &Receiver<EventMessage>,
+    ui_tx: &Sender<EventMessage>,
+    core_tx: &Sender<EventMessage>,
+) {
     // TODO: switch ui here
     match ui_name {
         "termion" | _ => {
-            terminal::termion::main_loop(&ui_rx, &core_tx);
+            terminal::termion::main_loop(&ui_rx, &ui_tx, &core_tx);
         }
     }
 

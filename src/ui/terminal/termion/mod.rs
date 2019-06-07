@@ -35,12 +35,12 @@ use std::sync::mpsc::Sender;
 //
 extern crate termion;
 
-use self::termion::async_stdin;
 use self::termion::event::parse_event;
 use self::termion::input::MouseTerminal;
 use self::termion::raw::IntoRawMode;
 use self::termion::screen::{AlternateScreen, ToMainScreen};
 use self::termion::terminal_size;
+use std::io::stdin;
 
 //
 use crate::core::event::Event;
@@ -58,7 +58,17 @@ use crate::core::codepointinfo::CodepointInfo;
 //
 use crate::ui::UiState;
 
-pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>) {
+fn stdin_thread(stdin: &mut ::std::io::Stdin, ui_tx: &Sender<EventMessage>) {
+    loop {
+        get_input_event(stdin, &ui_tx);
+    }
+}
+
+pub fn main_loop(
+    ui_rx: &Receiver<EventMessage>,
+    ui_tx: &Sender<EventMessage>,
+    core_tx: &Sender<EventMessage>,
+) {
     let mut seq: usize = 0;
 
     fn get_next_seq(seq: &mut usize) -> usize {
@@ -70,7 +80,12 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
     // init termion
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
     let mut stdout = AlternateScreen::from(stdout);
-    let mut stdin = async_stdin().bytes();
+
+    let ui_tx_clone = ui_tx.clone();
+    thread::spawn(move || {
+        let mut stdin = stdin();
+        stdin_thread(&mut stdin, &ui_tx_clone);
+    });
 
     // ui state
     let mut ui_state = UiState::new();
@@ -90,38 +105,23 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
 
+    let mut request_layout = false;
+
     while !ui_state.quit {
-        let vec_evt = get_input_event(&mut stdin, &mut ui_state);
+        // check terminal size
+        let (width, height, start_line) = if ui_state.display_status {
+            let (width, height) = terminal_size().unwrap();
+            (width - 2, height - 2, 2)
+        } else {
+            let dim = terminal_size().unwrap();
+            (dim.0 - 2, dim.1, 1)
+        };
 
-        ui_state.max_input_events_stat =
-            ::std::cmp::max(ui_state.max_input_events_stat, vec_evt.len());
-
-        let mut request_layout = !vec_evt.is_empty();
-
-        ui_state.prev_input_size = vec_evt.len();
-
-        if !vec_evt.is_empty() {
-            let msg = EventMessage::new(
-                get_next_seq(&mut seq),
-                Event::InputEvent { events: vec_evt },
-            );
-            core_tx.send(msg).unwrap_or(());
-        }
-
-        // hack to send multiple page down
-        {
-            let mut v = vec![];
-            for _ in 0..0 {
-                let ev = InputEvent::KeyPress {
-                    key: Key::PageDown,
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                };
-                v.push(ev)
-            }
-            let msg = EventMessage::new(get_next_seq(&mut seq), Event::InputEvent { events: v });
-            core_tx.send(msg).unwrap_or(());
+        if ui_state.terminal_width != width || ui_state.terminal_height != height {
+            ui_state.terminal_width = width;
+            ui_state.terminal_height = height;
+            ui_state.view_start_line = start_line;
+            ui_state.resize_flag = true;
         }
 
         // resize ?
@@ -141,11 +141,17 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                 },
             );
             core_tx.send(msg).unwrap_or(());
+            request_layout = false;
         }
 
-        // evt from core ?
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(10)) {
+        if let Ok(evt) = ui_rx.recv() {
             match evt.event {
+                Event::InputEvent { .. } => {
+                    // forward inputs
+                    core_tx.send(evt).unwrap_or(());
+                    request_layout = true;
+                }
+
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
                     let msg =
@@ -236,10 +242,6 @@ pub fn main_loop(ui_rx: &Receiver<EventMessage>, core_tx: &Sender<EventMessage>)
                     let end = Instant::now();
                     prev_screen_rdr_time = end.duration_since(start);
                     last_screen = screen;
-
-                    if ui_state.prev_input_size < 16 {
-                        thread::sleep(Duration::from_millis(16)); //
-                    }
                 }
 
                 _ => {}
@@ -392,23 +394,11 @@ fn terminal_cursor_to(stdout: &mut Stdout, x: u16, y: u16) {
     write!(stdout, "{}", termion::cursor::Goto(x, y)).unwrap();
 }
 
-fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiState) -> InputEvent {
-    fn termion_mouse_button_to_u32(mb: self::termion::event::MouseButton) -> u32 {
-        match mb {
-            self::termion::event::MouseButton::Left => 0,
-            self::termion::event::MouseButton::Right => 1,
-            self::termion::event::MouseButton::Middle => 2,
-            self::termion::event::MouseButton::WheelUp => 3,
-            self::termion::event::MouseButton::WheelDown => 4,
-        }
-    }
-
+fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
     // translate termion event
     match evt {
         self::termion::event::Event::Key(k) => match k {
             self::termion::event::Key::Ctrl('c') => {
-                ui_state.status = "Ctrl-c".to_owned();
-
                 return InputEvent::KeyPress {
                     ctrl: true,
                     alt: false,
@@ -418,8 +408,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
             }
 
             self::termion::event::Key::Char('\n') => {
-                ui_state.status = "<newline>".to_owned();
-
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -429,8 +417,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
             }
 
             self::termion::event::Key::Char(c) => {
-                ui_state.status = format!("{}", c);
-
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -440,8 +426,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
             }
 
             self::termion::event::Key::Alt(c) => {
-                ui_state.status = format!("Alt-{}", c);
-
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: true,
@@ -451,8 +435,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
             }
 
             self::termion::event::Key::Ctrl(c) => {
-                ui_state.status = format!("Ctrl-{}", c);
-
                 return InputEvent::KeyPress {
                     ctrl: true,
                     alt: false,
@@ -461,20 +443,13 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
 
-            self::termion::event::Key::F(1) => {
-                if ui_state.vid > 0 {
-                    ui_state.vid -= 1;
-                }
-            }
+            self::termion::event::Key::F(1) => {}
 
-            self::termion::event::Key::F(2) => {
-                ui_state.vid = ::std::cmp::min(ui_state.vid + 1, (ui_state.nb_view - 1) as u64);
-            }
+            self::termion::event::Key::F(2) => {}
 
-            self::termion::event::Key::F(f) => ui_state.status = format!("F{:?}", f),
+            self::termion::event::Key::F(f) => {}
 
             self::termion::event::Key::Left => {
-                ui_state.status = "<left>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -483,7 +458,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Right => {
-                ui_state.status = "<right>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -492,7 +466,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Up => {
-                ui_state.status = "<up>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -501,7 +474,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Down => {
-                ui_state.status = "<down>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -510,7 +482,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Backspace => {
-                ui_state.status = "<backspc>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -519,7 +490,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Home => {
-                ui_state.status = "<Home>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -528,7 +498,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::End => {
-                ui_state.status = "<End>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -537,7 +506,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::PageUp => {
-                ui_state.status = "<PageUp>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -546,7 +514,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::PageDown => {
-                ui_state.status = "<PageDown>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -555,7 +522,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Delete => {
-                ui_state.status = "<Delete>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -564,7 +530,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Insert => {
-                ui_state.status = "<Insert>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -573,7 +538,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 };
             }
             self::termion::event::Key::Esc => {
-                ui_state.status = "<Esc>".to_owned();
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: false,
@@ -581,15 +545,22 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                     key: Key::Escape,
                 };
             }
-            _ => ui_state.status = "Other".to_owned(),
+            _ => {}
         },
 
         self::termion::event::Event::Mouse(m) => {
+            fn termion_mouse_button_to_u32(mb: self::termion::event::MouseButton) -> u32 {
+                match mb {
+                    self::termion::event::MouseButton::Left => 0,
+                    self::termion::event::MouseButton::Right => 1,
+                    self::termion::event::MouseButton::Middle => 2,
+                    self::termion::event::MouseButton::WheelUp => 3,
+                    self::termion::event::MouseButton::WheelDown => 4,
+                }
+            }
+
             match m {
                 self::termion::event::MouseEvent::Press(mb, x, y) => {
-                    ui_state.status =
-                        format!("MouseEvent::Press => MouseButton {:?} @ ({}, {})", mb, x, y);
-
                     let button = termion_mouse_button_to_u32(mb);
 
                     return InputEvent::ButtonPress {
@@ -603,8 +574,6 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                 }
 
                 self::termion::event::MouseEvent::Release(x, y) => {
-                    ui_state.status = format!("MouseEvent::Release => @ ({}, {})", x, y);
-
                     return InputEvent::ButtonRelease {
                         ctrl: false,
                         alt: false,
@@ -615,66 +584,43 @@ fn translate_termion_event(evt: self::termion::event::Event, ui_state: &mut UiSt
                     };
                 }
 
-                self::termion::event::MouseEvent::Hold(x, y) => {
-                    ui_state.status = format!("MouseEvent::Hold => @ ({}, {})", x, y);
-                }
+                self::termion::event::MouseEvent::Hold(x, y) => {}
             };
         }
 
-        self::termion::event::Event::Unsupported(e) => {
-            ui_state.status = format!("Event::Unsupported {:?}", e);
-        }
+        self::termion::event::Event::Unsupported(e) => {}
     }
 
     crate::core::event::InputEvent::NoInputEvent
 }
 
-fn get_input_event(
-    mut stdin: &mut ::std::io::Bytes<self::termion::AsyncReader>,
-    ui_state: &mut UiState,
-) -> Vec<InputEvent> {
-    let expected_size = stdin.size_hint().0;
-    let mut raw_evt = Vec::<_>::with_capacity(expected_size);
+fn get_input_event(stdin: &mut ::std::io::Stdin, ui_tx: &Sender<EventMessage>) {
+    let mut stdin = stdin.bytes();
 
+    let mut raw_evt = vec![];
     loop {
         let b = stdin.next();
         if let Some(b) = b {
             if let Ok(val) = b {
                 if let Ok(evt) = parse_event(val, &mut stdin) {
                     raw_evt.push(evt);
-                    if raw_evt.len() >= 32000 {
-                        break;
+                    for evt in raw_evt.iter() {
+                        let evt = translate_termion_event(evt.clone());
+                        let mut v = vec![];
+
+                        v.push(evt);
+                        if !v.is_empty() {
+                            let msg = EventMessage::new(0, Event::InputEvent { events: v });
+                            ui_tx.send(msg).unwrap_or(());
+                        }
                     }
+                    raw_evt.clear();
                 }
             }
         } else {
-            break;
+
         }
     }
-
-    let mut v = Vec::<InputEvent>::with_capacity(raw_evt.len());
-    for evt in raw_evt {
-        let evt = translate_termion_event(evt, ui_state);
-        v.push(evt);
-    }
-
-    // check terminal size
-    let (width, height, start_line) = if ui_state.display_status {
-        let (width, height) = terminal_size().unwrap();
-        (width - 2, height - 2, 2)
-    } else {
-        let dim = terminal_size().unwrap();
-        (dim.0 - 2, dim.1, 1)
-    };
-
-    if ui_state.terminal_width != width || ui_state.terminal_height != height {
-        ui_state.terminal_width = width;
-        ui_state.terminal_height = height;
-        ui_state.view_start_line = start_line;
-        ui_state.resize_flag = true;
-    }
-
-    v
 }
 
 fn display_status_line(
