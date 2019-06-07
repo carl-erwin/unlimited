@@ -144,7 +144,7 @@ pub fn main_loop(
             request_layout = false;
         }
 
-        if let Ok(evt) = ui_rx.recv() {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(1000)) {
             match evt.event {
                 Event::InputEvent { .. } => {
                     // forward inputs
