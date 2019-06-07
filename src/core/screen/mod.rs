@@ -53,6 +53,8 @@ pub struct Screen {
     pub doc_max_offset: u64,
     /// time spent to generate the screen content
     pub time_to_build: Duration,
+
+    pub input_size: usize,
 }
 
 impl Screen {
@@ -72,6 +74,7 @@ impl Screen {
             last_offset: 0,
             doc_max_offset: 0,
             time_to_build: Duration::new(0, 0),
+            input_size: 0,
         }
     }
 
@@ -87,6 +90,7 @@ impl Screen {
         self.first_offset = 0;
         self.last_offset = 0;
         self.doc_max_offset = 0;
+        self.input_size = 0;
     }
 
     /// append
@@ -125,6 +129,7 @@ impl Screen {
         self.first_offset = 0;
         self.last_offset = 0;
         self.doc_max_offset = 0;
+        self.input_size = 0;
     }
 
     pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {

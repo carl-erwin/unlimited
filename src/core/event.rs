@@ -163,11 +163,9 @@ pub enum InputEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
     NUL,
-    UNICODE(char), // unicode val
-    Tab,           /* '\t' move to unicode ? */
-    Linefeed,
+    UNICODE(char), // utf32 codepoints
+    UNICODE_ARRAY(Vec<char>),
     Clear,
-    Return, // '\n' ?
     Pause,
     ScrollLock,
     SysReq,

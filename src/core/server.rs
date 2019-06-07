@@ -76,6 +76,7 @@ pub fn build_layout_and_send_event(
 
     let mut new_screen = view.screen.clone();
     new_screen.time_to_build = end.duration_since(start);
+    new_screen.input_size = core_state.pending_events;
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
@@ -192,13 +193,14 @@ pub fn start(
                                 let view_id = 0 as usize;
                                 let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
                                 core_state.pending_events = events.len();
-                                for ev in events {
+                                for ev in &events {
                                     process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
                                     core_state.pending_events -= 1;
                                 }
+                                core_state.pending_events = events.len();
                             }
 
-                            if false {
+                            if !false {
                                 build_layout_and_send_event(
                                     &mut editor,
                                     &mut core_state,
@@ -530,6 +532,16 @@ fn process_input_events(
         } => {
             view.insert_codepoint(cp, core_state.pending_events);
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
+        }
+
+        // insert text block
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::UNICODE_ARRAY(ref v),
+        } => {
+            view.insert_codepoint_array(&v);
         }
 
         // alt+d

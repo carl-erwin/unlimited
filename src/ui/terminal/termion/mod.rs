@@ -24,7 +24,9 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 //
+use std::io::Error;
 use std::io::{self, Read, Stdout, Write};
+
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -32,6 +34,11 @@ use std::time::Instant;
 use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+
+extern crate libc;
+
+use self::libc::{c_void, read};
+
 //
 extern crate termion;
 
@@ -58,9 +65,9 @@ use crate::core::codepointinfo::CodepointInfo;
 //
 use crate::ui::UiState;
 
-fn stdin_thread(stdin: &mut ::std::io::Stdin, ui_tx: &Sender<EventMessage>) {
+fn stdin_thread(ui_tx: &Sender<EventMessage>) {
     loop {
-        get_input_event(stdin, &ui_tx);
+        get_input_events(&ui_tx);
     }
 }
 
@@ -83,8 +90,7 @@ pub fn main_loop(
 
     let ui_tx_clone = ui_tx.clone();
     thread::spawn(move || {
-        let mut stdin = stdin();
-        stdin_thread(&mut stdin, &ui_tx_clone);
+        stdin_thread(&ui_tx_clone);
     });
 
     // ui state
@@ -594,31 +600,78 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
     crate::core::event::InputEvent::NoInputEvent
 }
 
-fn get_input_event(stdin: &mut ::std::io::Stdin, ui_tx: &Sender<EventMessage>) {
-    let mut stdin = stdin.bytes();
+fn get_input_events(ui_tx: &Sender<EventMessage>) {
+    const BUF_SIZE: usize = 1024 * 32;
 
-    let mut raw_evt = vec![];
+    let mut buf = Vec::<u8>::with_capacity(BUF_SIZE);
+    unsafe {
+        buf.set_len(BUF_SIZE);
+    }
+
     loop {
-        let b = stdin.next();
-        if let Some(b) = b {
-            if let Ok(val) = b {
-                if let Ok(evt) = parse_event(val, &mut stdin) {
-                    raw_evt.push(evt);
-                    for evt in raw_evt.iter() {
-                        let evt = translate_termion_event(evt.clone());
-                        let mut v = vec![];
+        let nb_read = unsafe { read(0, buf.as_mut_ptr() as *mut c_void, BUF_SIZE) as usize };
+        let mut buf2 = Vec::<Result<u8, Error>>::with_capacity(nb_read);
+        for i in 0..nb_read {
+            buf2.push(Ok(buf[i]));
+        }
 
-                        v.push(evt);
-                        if !v.is_empty() {
-                            let msg = EventMessage::new(0, Event::InputEvent { events: v });
-                            ui_tx.send(msg).unwrap_or(());
-                        }
+        let mut raw_evt = Vec::<_>::with_capacity(BUF_SIZE);
+        let mut it = buf2.into_iter();
+        loop {
+            if let Some(val) = it.next() {
+                if let Ok(evt) = parse_event(val.unwrap(), &mut it) {
+                    raw_evt.push(evt);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let mut v = vec![];
+        let mut codepoints = Vec::<char>::new();
+
+        for evt in &raw_evt {
+            let evt = translate_termion_event(evt.clone());
+            match evt {
+                InputEvent::KeyPress {
+                    key: Key::UNICODE(c),
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                } => {
+                    codepoints.push(c);
+                }
+
+                _ => {
+                    if !codepoints.is_empty() {
+                        v.push(InputEvent::KeyPress {
+                            key: Key::UNICODE_ARRAY(codepoints),
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        });
+                        codepoints = Vec::<char>::new();
                     }
-                    raw_evt.clear();
+                    v.push(evt);
                 }
             }
-        } else {
+        }
 
+        if !codepoints.is_empty() {
+            v.push(InputEvent::KeyPress {
+                key: Key::UNICODE_ARRAY(codepoints),
+                ctrl: false,
+                alt: false,
+                shift: false,
+            });
+        }
+
+        // merge consecutive events
+        if !v.is_empty() {
+            let msg = EventMessage::new(0, Event::InputEvent { events: v });
+            ui_tx.send(msg).unwrap_or(());
         }
     }
 }
@@ -657,13 +710,12 @@ fn display_status_line(
 
     let mut status_str = {
         format!(
-            " unlimitED! {}  doc[{}] file[{}], scr(@{}):'{:08x}' {} sc_bld_time {} prv_rdr_time {} max_ev {} in_size_hint {}",
+            " unlimitED! {}  doc[{}] file[{}], scr(@{}):'{:08x}' {} sc_bld_time {} prv_rdr_time {} max_ev {} input_size {}",
             VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
             screen.time_to_build.as_micros(),
             prev_screen_rdr_time.as_micros(),
             ui_state.max_input_events_stat,
-            ui_state.prev_input_size,
-
+            screen.input_size,
         )
     };
 
