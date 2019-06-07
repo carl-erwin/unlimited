@@ -718,21 +718,14 @@ fn display_status_line(
         _ => 0xffd,
     };
 
-    let mut status_str = if name != file_name {
+    let mut status_str =  {
         format!(
-            " unlimitED! {}  doc[{}] file[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {} max_ev {}",
+            " unlimitED! {}  doc[{}] file[{}], scr(@{}):'{:08x}' {} sc_bld_time {} prv_rdr_time {} max_ev {} in_size_hint {}",
             VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
             screen.time_to_build.as_micros(),
             prev_screen_rdr_time.as_micros(),
-            ui_state.max_input_events_stat
-        )
-    } else {
-        format!(
-            " unlimitED! {}  doc[{}], screen_start(@{}):'{:08x}' {} scr_build_time {} prv_rdr_time {} max_ev {}",
-            VERSION, file_name, screen.first_offset, mcp, ui_state.status,
-            screen.time_to_build.as_micros(),
-            prev_screen_rdr_time.as_micros(),
-                        ui_state.max_input_events_stat
+            ui_state.max_input_events_stat,
+            ui_state.prev_input_size,
 
         )
     };
