@@ -293,6 +293,10 @@ fn draw_screen(
 
     let check_hash = last_screen.width == screen.width && last_screen.height == screen.height;
 
+    prev_cpi.color.0 = 0;
+    prev_cpi.color.1 = 0;
+    prev_cpi.color.2 = 0;
+
     // default color
     write!(
         stdout,
@@ -366,6 +370,8 @@ fn draw_screen(
             prev_cpi = *cpi;
         }
     }
+
+    write!(stdout, "{}", termion::style::Reset).unwrap();
 }
 
 /*
@@ -683,37 +689,39 @@ fn display_status_line(
     let name = ""; // TODO: from doc list
     let file_name = ""; // TODO: from doc list
 
-    // select/clear last line
+    // default color
+    write!(
+        stdout,
+        "{}{}{}",
+        termion::color::Bg(termion::color::Rgb(255, 255, 255)),
+        termion::color::Fg(termion::color::Rgb(255, 255, 255)),
+        termion::style::Invert,
+    )
+    .unwrap();
+    // fill first line width
     terminal_cursor_to(&mut stdout, 1, line);
     for _ in 0..width + 2 {
-        write!(stdout, "{} ", termion::style::Invert).unwrap();
+        write!(stdout, " ").unwrap();
     }
-    terminal_cursor_to(&mut stdout, 1, line);
 
+    // select/clear second line
     terminal_cursor_to(&mut stdout, 1, line + 1);
+    write!(stdout, "{}", termion::style::Reset).unwrap();
     for _ in 0..width + 2 {
-        write!(stdout, "{} ", termion::style::Reset).unwrap();
+        write!(stdout, " ").unwrap();
     }
     terminal_cursor_to(&mut stdout, 1, line);
-
-    let (cpi, _, _) = screen.find_cpi_by_offset(ui_state.mark_offset);
-
-    let mcp = match cpi {
-        Some(cpi) => cpi.cp as u32,
-        _ => 0xffd,
-    };
 
     let mut status_str = {
         format!(
-            " unlimitED! {}  doc[{}] file[{}], scr(@{}):'{:08x}' {} sc_bld_time {} prv_rdr_time {} max_ev {} input_size {}",
-            VERSION, name, file_name, screen.first_offset, mcp, ui_state.status,
+            " unlimitED! {}  doc[{}] file[{}], scr(@{}) {} sc_bld_time {} prv_rdr_time {} max_ev {} input_size {}",
+            VERSION, name, file_name, screen.first_offset, ui_state.status,
             screen.time_to_build.as_micros(),
             prev_screen_rdr_time.as_micros(),
             ui_state.max_input_events_stat,
             screen.input_size,
         )
     };
-
     status_str.truncate((width + 2) as usize);
 
     write!(
@@ -752,7 +760,7 @@ fn display_status_line(
         "{}{} {}",
         termion::color::Fg(termion::color::Rgb(0xff, 0xff, 0xff)),
         termion::style::Invert,
-        termion::style::Reset
+        termion::style::Reset,
     )
     .unwrap();
 }
