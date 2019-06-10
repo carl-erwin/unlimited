@@ -65,9 +65,9 @@ use crate::core::codepointinfo::CodepointInfo;
 //
 use crate::ui::UiState;
 
-fn stdin_thread(ui_tx: &Sender<EventMessage>) {
+fn stdin_thread(tx: &Sender<EventMessage>) {
     loop {
-        get_input_events(&ui_tx);
+        get_input_events(&tx);
     }
 }
 
@@ -88,9 +88,9 @@ pub fn main_loop(
     let stdout = MouseTerminal::from(io::stdout().into_raw_mode().unwrap());
     let mut stdout = AlternateScreen::from(stdout);
 
-    let ui_tx_clone = ui_tx.clone();
+    let core_tx_clone = core_tx.clone();
     thread::spawn(move || {
-        stdin_thread(&ui_tx_clone);
+        stdin_thread(&core_tx_clone);
     });
 
     // ui state
@@ -152,12 +152,6 @@ pub fn main_loop(
 
         if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(1000)) {
             match evt.event {
-                Event::InputEvent { .. } => {
-                    // forward inputs
-                    core_tx.send(evt).unwrap_or(());
-                    request_layout = true;
-                }
-
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
                     let msg =
@@ -600,7 +594,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
     crate::core::event::InputEvent::NoInputEvent
 }
 
-fn get_input_events(ui_tx: &Sender<EventMessage>) {
+fn get_input_events(tx: &Sender<EventMessage>) {
     const BUF_SIZE: usize = 1024 * 32;
 
     let mut buf = Vec::<u8>::with_capacity(BUF_SIZE);
@@ -671,7 +665,7 @@ fn get_input_events(ui_tx: &Sender<EventMessage>) {
         // merge consecutive events
         if !v.is_empty() {
             let msg = EventMessage::new(0, Event::InputEvent { events: v });
-            ui_tx.send(msg).unwrap_or(());
+            tx.send(msg).unwrap_or(());
         }
     }
 }
