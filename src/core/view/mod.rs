@@ -158,8 +158,10 @@ impl<'a> View<'a> {
         }
 
         // move to upper layer
-        if offset < self.screen.first_offset || offset > self.screen.last_offset ||
-        array.len() > self.screen.width * self.screen.height {
+        if offset < self.screen.first_offset
+            || offset > self.screen.last_offset
+            || array.len() > self.screen.width * self.screen.height
+        {
             self.center_arround_mark();
         }
     }
