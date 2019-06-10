@@ -137,7 +137,7 @@ impl<'a> View<'a> {
     }
 
     pub fn insert_codepoint_array(&mut self, array: &[char]) {
-        let mut utf8 = vec![];
+        let mut utf8 = Vec::with_capacity(array.len());
         for codepoint in array {
             let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
             let data_size = utf8::encode(*codepoint as u32, &mut data);
@@ -146,17 +146,22 @@ impl<'a> View<'a> {
             }
         }
 
+        let mut offset: u64 = 0;
         {
             let mut doc = self.document.as_mut().unwrap().borrow_mut();
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                 doc.insert(m.offset, utf8.len(), &utf8);
                 m.offset += utf8.len() as u64;
+                offset = m.offset;
                 break;
             }
         }
 
         // move to upper layer
-        self.center_arround_mark();
+        if offset < self.screen.first_offset || offset > self.screen.last_offset ||
+        array.len() > self.screen.width * self.screen.height {
+            self.center_arround_mark();
+        }
     }
 
     pub fn insert_codepoint(&mut self, codepoint: char, nr_pending_events: usize) {
