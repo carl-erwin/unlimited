@@ -163,7 +163,7 @@ pub enum InputEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Key {
     NUL,
-    UNICODE(char), // utf32 codepoints
+    Unicode(char), // utf32 codepoints
     UnicodeArray(Vec<char>),
     Clear,
     Pause,

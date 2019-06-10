@@ -403,7 +403,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     ctrl: true,
                     alt: false,
                     shift: false,
-                    key: Key::UNICODE('c'),
+                    key: Key::Unicode('c'),
                 };
             }
 
@@ -412,7 +412,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     ctrl: false,
                     alt: false,
                     shift: false,
-                    key: Key::UNICODE('\n'),
+                    key: Key::Unicode('\n'),
                 };
             }
 
@@ -421,7 +421,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     ctrl: false,
                     alt: false,
                     shift: false,
-                    key: Key::UNICODE(c),
+                    key: Key::Unicode(c),
                 };
             }
 
@@ -430,7 +430,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     ctrl: false,
                     alt: true,
                     shift: false,
-                    key: Key::UNICODE(c),
+                    key: Key::Unicode(c),
                 };
             }
 
@@ -439,7 +439,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     ctrl: true,
                     alt: false,
                     shift: false,
-                    key: Key::UNICODE(c),
+                    key: Key::Unicode(c),
                 };
             }
 
@@ -630,7 +630,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             let evt = translate_termion_event(evt.clone());
             match evt {
                 InputEvent::KeyPress {
-                    key: Key::UNICODE(c),
+                    key: Key::Unicode(c),
                     ctrl: false,
                     alt: false,
                     shift: false,

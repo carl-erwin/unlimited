@@ -285,7 +285,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('q'),
+            key: Key::Unicode('q'),
         } => {
             core_state.quit = true;
         }
@@ -294,7 +294,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('u'),
+            key: Key::Unicode('u'),
         } => {
             view.undo();
         }
@@ -303,7 +303,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('r'),
+            key: Key::Unicode('r'),
         } => {
             view.redo();
         }
@@ -312,7 +312,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('x'),
+            key: Key::Unicode('x'),
         } => {
             clear_keys = false;
         }
@@ -322,7 +322,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('a'),
+            key: Key::Unicode('a'),
         }
         | InputEvent::KeyPress {
             ctrl: false,
@@ -338,7 +338,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('e'),
+            key: Key::Unicode('e'),
         }
         | InputEvent::KeyPress {
             ctrl: false,
@@ -354,7 +354,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('d'),
+            key: Key::Unicode('d'),
         } => {
             view.remove_codepoint();
         }
@@ -364,7 +364,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('s'),
+            key: Key::Unicode('s'),
         } => {
             view.save_document();
         }
@@ -374,7 +374,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('k'),
+            key: Key::Unicode('k'),
         } => {
             view.cut_to_end_of_line();
         }
@@ -384,7 +384,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('y'),
+            key: Key::Unicode('y'),
         } => {
             view.paste();
         }
@@ -394,7 +394,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE('l'),
+            key: Key::Unicode('l'),
         } => {
             view.center_arround_mark();
         }
@@ -404,7 +404,7 @@ fn process_input_events(
             ctrl: true,
             alt: false,
             shift: false,
-            key: Key::UNICODE(c),
+            key: Key::Unicode(c),
         } => {
             core_state.status = format!("ctrl+<{}>", c);
         }
@@ -484,7 +484,7 @@ fn process_input_events(
             ctrl: false,
             alt: true,
             shift: false,
-            key: Key::UNICODE('<'),
+            key: Key::Unicode('<'),
         } => {
             view.move_mark_to_beginning_of_file();
             core_state.status = "<move to beginning of file>".to_owned();
@@ -495,7 +495,7 @@ fn process_input_events(
             ctrl: false,
             alt: true,
             shift: false,
-            key: Key::UNICODE('>'),
+            key: Key::Unicode('>'),
         } => {
             view.move_mark_to_end_of_file();
             core_state.status = "<move to end of file>".to_owned();
@@ -528,7 +528,7 @@ fn process_input_events(
             ctrl: false,
             alt: false,
             shift: false,
-            key: Key::UNICODE(cp),
+            key: Key::Unicode(cp),
         } => {
             view.insert_codepoint(cp, core_state.pending_events);
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
@@ -549,7 +549,7 @@ fn process_input_events(
             ctrl: false,
             alt: true,
             shift: false,
-            key: Key::UNICODE('d'),
+            key: Key::Unicode('d'),
         } => {
             view.remove_until_end_of_word();
         }
