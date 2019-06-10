@@ -647,7 +647,7 @@ fn get_input_events(ui_tx: &Sender<EventMessage>) {
                 _ => {
                     if !codepoints.is_empty() {
                         v.push(InputEvent::KeyPress {
-                            key: Key::UNICODE_ARRAY(codepoints),
+                            key: Key::UnicodeArray(codepoints),
                             ctrl: false,
                             alt: false,
                             shift: false,
@@ -661,7 +661,7 @@ fn get_input_events(ui_tx: &Sender<EventMessage>) {
 
         if !codepoints.is_empty() {
             v.push(InputEvent::KeyPress {
-                key: Key::UNICODE_ARRAY(codepoints),
+                key: Key::UnicodeArray(codepoints),
                 ctrl: false,
                 alt: false,
                 shift: false,

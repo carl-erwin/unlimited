@@ -539,7 +539,7 @@ fn process_input_events(
             ctrl: false,
             alt: false,
             shift: false,
-            key: Key::UNICODE_ARRAY(ref v),
+            key: Key::UnicodeArray(ref v),
         } => {
             view.insert_codepoint_array(&v);
         }

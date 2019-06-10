@@ -164,7 +164,7 @@ pub enum InputEvent {
 pub enum Key {
     NUL,
     UNICODE(char), // utf32 codepoints
-    UNICODE_ARRAY(Vec<char>),
+    UnicodeArray(Vec<char>),
     Clear,
     Pause,
     ScrollLock,
