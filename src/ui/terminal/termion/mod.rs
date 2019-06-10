@@ -623,6 +623,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             }
         }
 
+        // merge consecutive events
         let mut v = vec![];
         let mut codepoints = Vec::<char>::new();
 
@@ -653,6 +654,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             }
         }
 
+        // send
         if !codepoints.is_empty() {
             v.push(InputEvent::KeyPress {
                 key: Key::UnicodeArray(codepoints),
@@ -662,7 +664,6 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             });
         }
 
-        // merge consecutive events
         if !v.is_empty() {
             let msg = EventMessage::new(0, Event::InputEvent { events: v });
             tx.send(msg).unwrap_or(());
