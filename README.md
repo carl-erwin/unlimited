@@ -37,16 +37,17 @@ by default cargo install puts the compiled program in **${HOME}/.cargo/bin**
 unlimited [FILE1] .. [FILEn]
 ```
 
-#### Keyboard mapping (hard-coded)
+#### Keyboard mapping (hard-coded) 
 
-  * **F1**: select previous file
-  * **F2**: select next file
+  * **F1**: select previous file (currently disabled)
+  * **F2**: select next file (currently disabled)
   * **Any character**: insert the character
   * **Undo**: ctrl-u
   * **Redo**: ctrl-r
   * **Delete previous character**: backspace
   * **Delete current character**: ctrl-d
   * **Delete current character**: suppr
+  * **Delete to end of word**: alt+d
   * **Cut current line**: ctrl-k (from cursor to end of line)
   * **Paste previous killed line**: ctrl-y
   * **Save**: ctrl-s
