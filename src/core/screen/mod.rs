@@ -38,7 +38,7 @@ pub struct Screen {
     /// the underlying lines storage
     pub line: Vec<Line>,
     /// the index of the line filled with the push method
-    pub current_line_index: LineCellIndex,
+    pub current_line_index: LineIndex,
     /// maximum number of elements the screen line can hold
     pub width: usize,
     /// maximum number of lines the screen can hold
