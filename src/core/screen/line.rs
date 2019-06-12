@@ -54,7 +54,10 @@ pub struct Line {
     pub cells: Vec<LineCell>,
     pub nb_cells: usize,
     pub width: usize,
+    pub skip: Option<usize>,
+    pub clip_width: Option<usize>,
     pub read_only: bool,
+    pub metadata: bool,
     hash_cache: u64,
 }
 
@@ -71,7 +74,10 @@ impl Line {
             cells,
             nb_cells: 0,
             width,
+            skip: None,
+            clip_width: None,
             read_only: false,
+            metadata: false,
             hash_cache: 0,
         }
     }
@@ -94,16 +100,47 @@ impl Line {
         self.cells.resize(width, LineCell::new());
         self.nb_cells = 0;
         self.width = width;
+        self.skip = None;
+        self.clip_width = None;
+        self.read_only = false;
+        self.metadata = false;
+    }
+
+    pub fn skip(&mut self, width: usize) {
+        let width = ::std::cmp::min(width, self.width - 1);
+        self.skip = Some(width);
+        self.nb_cells = 0;
         self.read_only = false;
     }
 
+    pub fn clear_skip(&mut self) {
+        self.skip = None;
+        self.nb_cells = 0;
+        self.read_only = false;
+    }
+
+    pub fn clip_width(&mut self, width: usize) {
+        let width = ::std::cmp::min(width, self.width);
+        self.clip_width = Some(width);
+    }
+
+    pub fn clear_clip_width(&mut self) {
+        self.clip_width = None;
+    }
+
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
-        if self.nb_cells < self.width && !self.read_only {
-            self.cells[self.nb_cells].cpi = cpi;
-            self.cells[self.nb_cells].is_used = true;
+        let max_width = self.clip_width.unwrap_or(self.width);
+
+        // clip
+        let pos = self.skip.unwrap_or(0) + self.nb_cells;
+
+        if pos < max_width && !self.read_only {
+            self.cells[pos].cpi = cpi;
+            self.cells[pos].is_used = true;
+
             self.nb_cells += 1;
 
-            if self.nb_cells == self.width {
+            if self.nb_cells == max_width {
                 self.read_only = true;
             }
 
@@ -120,36 +157,49 @@ impl Line {
         }
         self.nb_cells = 0;
         self.read_only = false;
+        self.metadata = false;
         self.hash_cache = 0;
-    }
-
-    pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
-        if index < self.width {
-            Some(&self.cells[index].cpi)
-        } else {
-            None
-        }
+        self.skip = None;
+        self.clip_width = None;
     }
 
     pub fn get_first_cpi(&self) -> Option<&CodepointInfo> {
-        if 0 < self.nb_cells {
-            Some(&self.cells[0].cpi)
+        let max_width = self.clip_width.unwrap_or(self.width);
+        let skip = self.skip.unwrap_or(0);
+
+        if skip < max_width {
+            Some(&self.cells[skip].cpi)
         } else {
             None
         }
     }
 
     pub fn get_last_cpi(&self) -> Option<&CodepointInfo> {
-        if self.nb_cells > 0 {
-            Some(&self.cells[self.nb_cells - 1].cpi)
+        let pos = self.skip.unwrap_or(0) + self.nb_cells;
+        if pos > 0 {
+            Some(&self.cells[pos - 1].cpi)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
+        let max_width = self.clip_width.unwrap_or(self.width);
+        let skip = self.skip.unwrap_or(0);
+
+        if skip + index < max_width {
+            Some(&self.cells[skip + index].cpi)
         } else {
             None
         }
     }
 
     pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
-        if index < self.width {
-            Some(&mut self.cells[index].cpi)
+        let max_width = self.clip_width.unwrap_or(self.width);
+        let skip = self.skip.unwrap_or(0);
+
+        if skip + index < max_width {
+            Some(&mut self.cells[skip + index].cpi)
         } else {
             None
         }
@@ -157,7 +207,7 @@ impl Line {
 
     pub fn get_used_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
         if index < self.nb_cells {
-            Some(&self.cells[index].cpi)
+            self.get_cpi(index)
         } else {
             None
         }
@@ -165,7 +215,7 @@ impl Line {
 
     pub fn get_mut_used_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
         if index < self.nb_cells {
-            Some(&mut self.cells[index].cpi)
+            self.get_mut_cpi(index)
         } else {
             None
         }

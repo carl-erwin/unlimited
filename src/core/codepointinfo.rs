@@ -28,6 +28,7 @@
 
 #[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
+    pub metadata: bool, // offset cannot be used
     pub cp: char,
     pub displayed_cp: char,
     pub offset: u64,
@@ -42,6 +43,7 @@ impl CodepointInfo {
 
     pub fn new() -> Self {
         CodepointInfo {
+            metadata: false,
             cp: ' ',
             displayed_cp: ' ',
             offset: 0,

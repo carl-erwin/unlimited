@@ -95,7 +95,6 @@ pub fn main_loop(
 
     // ui state
     let mut ui_state = UiState::new();
-    ui_state.view_start_line = if ui_state.display_status { 2 } else { 1 };
 
     // send first event
     let msg = EventMessage::new(get_next_seq(&mut seq), Event::RequestDocumentList);
@@ -115,18 +114,11 @@ pub fn main_loop(
 
     while !ui_state.quit {
         // check terminal size
-        let (width, height, start_line) = if ui_state.display_status {
-            let (width, height) = terminal_size().unwrap();
-            (width - 2, height - 2, 2)
-        } else {
-            let dim = terminal_size().unwrap();
-            (dim.0 - 2, dim.1, 1)
-        };
+        let (width, height) = terminal_size().unwrap();
 
         if ui_state.terminal_width != width || ui_state.terminal_height != height {
             ui_state.terminal_width = width;
             ui_state.terminal_height = height;
-            ui_state.view_start_line = start_line;
             ui_state.resize_flag = true;
         }
 
@@ -220,23 +212,14 @@ pub fn main_loop(
                         ui_state.resize_flag = false;
                     }
 
-                    if ui_state.display_status {
-                        let status_line_y = 1;
+                    draw_view(&mut last_screen, &mut screen, &mut stdout);
 
-                        display_status_line(
-                            &ui_state,
-                            &screen,
-                            status_line_y,
-                            ui_state.terminal_width,
-                            ui_state.terminal_height,
-                            &prev_screen_rdr_time,
-                            &mut stdout,
-                        );
-                    }
-
-                    if ui_state.display_view {
-                        draw_view(&mut ui_state, &mut last_screen, &mut screen, &mut stdout);
-                    }
+                    display_scroll_bar(
+                        &screen,
+                        ui_state.terminal_width,
+                        ui_state.terminal_height,
+                        &mut stdout,
+                    );
 
                     stdout.flush().unwrap();
                     let end = Instant::now();
@@ -280,39 +263,23 @@ derive_csi_sequence!("Framed text (not widely supported).", Framed, "51m");
 
 */
 
-fn draw_screen(
-    last_screen: &mut Screen,
-    screen: &mut Screen,
-    start_line: usize,
-    mut stdout: &mut Stdout,
-) {
-    write!(stdout, "{}", termion::cursor::Goto(1, start_line as u16)).unwrap();
+fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
+    write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
     let mut prev_cpi = CodepointInfo::new();
 
-    let check_hash = last_screen.width == screen.width && last_screen.height == screen.height;
+    let check_hash = last_screen.max_width() == screen.max_width()
+        && last_screen.max_height() == screen.max_height();
 
     prev_cpi.color.0 = 0;
     prev_cpi.color.1 = 0;
     prev_cpi.color.2 = 0;
 
-    // default color
-    write!(
-        stdout,
-        "{}",
-        termion::color::Fg(termion::color::Rgb(
-            prev_cpi.color.0,
-            prev_cpi.color.1,
-            prev_cpi.color.2
-        ))
-    )
-    .unwrap();
+    for l in 0..screen.max_height() {
+        let line = screen.get_mut_unclipped_line(l).unwrap();
 
-    for l in 0..screen.height {
-        let line = screen.get_mut_line(l).unwrap();
-
-        terminal_cursor_to(&mut stdout, 1, (start_line + l + 1) as u16);
+        terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 
         let mut have_cursor = false;
         for c in 0..line.width {
@@ -326,7 +293,7 @@ fn draw_screen(
 
         if check_hash {
             // check previous line
-            let prev_line = last_screen.get_line(l).unwrap();
+            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             for c in 0..prev_line.width {
                 let cpi = prev_line.get_cpi(c).unwrap();
                 if cpi.is_selected {
@@ -338,7 +305,7 @@ fn draw_screen(
         }
 
         if check_hash && !have_cursor {
-            let prev_line = last_screen.get_mut_line(l).unwrap();
+            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
                 continue;
             }
@@ -380,14 +347,8 @@ fn draw_screen(
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(
-    ui_state: &mut UiState,
-    last_screen: &mut Screen,
-    mut screen: &mut Screen,
-    mut stdout: &mut Stdout,
-) {
-    let start_line = ui_state.view_start_line;
-    draw_screen(last_screen, &mut screen, start_line, &mut stdout);
+fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut Stdout) {
+    draw_screen(last_screen, &mut screen, &mut stdout);
 }
 
 fn _terminal_clear_current_line(stdout: &mut Stdout, line_width: u16) {
@@ -659,62 +620,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
     }
 }
 
-fn display_status_line(
-    ui_state: &UiState,
-    screen: &Screen,
-    line: u16,
-    width: u16,
-    height: u16,
-    prev_screen_rdr_time: &Duration,
-    mut stdout: &mut Stdout,
-) {
-    let name = ""; // TODO: from doc list
-    let file_name = ""; // TODO: from doc list
-
-    // default color
-    write!(
-        stdout,
-        "{}{}{}",
-        termion::color::Bg(termion::color::Rgb(255, 255, 255)),
-        termion::color::Fg(termion::color::Rgb(255, 255, 255)),
-        termion::style::Invert,
-    )
-    .unwrap();
-    // fill first line width
-    terminal_cursor_to(&mut stdout, 1, line);
-    for _ in 0..width + 2 {
-        write!(stdout, " ").unwrap();
-    }
-
-    // select/clear second line
-    terminal_cursor_to(&mut stdout, 1, line + 1);
-    write!(stdout, "{}", termion::style::Reset).unwrap();
-    for _ in 0..width + 2 {
-        write!(stdout, " ").unwrap();
-    }
-    terminal_cursor_to(&mut stdout, 1, line);
-
-    let mut status_str = {
-        format!(
-            " unlimitED! {}  doc[{}] file[{}], scr(@{}) {} sc_bld_time {} prv_rdr_time {} max_ev {} input_size {}",
-            VERSION, name, file_name, screen.first_offset, ui_state.status,
-            screen.time_to_build.as_micros(),
-            prev_screen_rdr_time.as_micros(),
-            ui_state.max_input_events_stat,
-            screen.input_size,
-        )
-    };
-    status_str.truncate((width + 2) as usize);
-
-    write!(
-        stdout,
-        "{}{}{}",
-        termion::style::Invert,
-        status_str,
-        termion::style::Reset
-    )
-    .unwrap();
-
+fn display_scroll_bar(screen: &Screen, width: u16, height: u16, mut stdout: &mut Stdout) {
     // scroolbar
     // color
     write!(

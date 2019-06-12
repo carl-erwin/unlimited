@@ -160,7 +160,7 @@ impl<'a> View<'a> {
         // move to upper layer
         if offset < self.screen.first_offset
             || offset > self.screen.last_offset
-            || array.len() > self.screen.width * self.screen.height
+            || array.len() > self.screen.width() * self.screen.height()
         {
             self.center_arround_mark();
         }
@@ -177,7 +177,7 @@ impl<'a> View<'a> {
             for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                 // TODO: add main mark check
                 let (_, _, y) = self.screen.find_cpi_by_offset(m.offset);
-                if y == self.screen.height - 1 && codepoint == '\n' {
+                if y == self.screen.height() - 1 && codepoint == '\n' {
                     scroll_needed = true;
                 }
 
@@ -353,6 +353,7 @@ impl<'a> View<'a> {
 
     pub fn move_marks_to_previous_line(&mut self) {
         let mut scroll_needed = false;
+        let mut mark_moved = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             // if view.is_mark_on_screen(m) {
@@ -363,16 +364,21 @@ impl<'a> View<'a> {
                 let l = self.screen.get_line(new_y).unwrap();
                 let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                 let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                m.offset = cpi.offset;
-            } else {
+                if cpi.metadata == false {
+                    m.offset = cpi.offset;
+                    mark_moved = true;
+                }
+            }
+
+            if mark_moved == false {
                 // mark was on first line or offscreen
                 if self.screen.contains_offset(m.offset) {
                     scroll_needed = true;
                 }
 
                 // mark is offscren
-                let screen_width = self.screen.width;
-                let screen_height = self.screen.height;
+                let screen_width = self.screen.width();
+                let screen_height = self.screen.height();
 
                 // sync_offset
                 let end_offset = m.offset;
@@ -441,7 +447,7 @@ impl<'a> View<'a> {
         }
 
         if scroll_needed {
-            let n = self.screen.height / 2;
+            let n = self.screen.height() / 2;
             self.scroll_up(n);
         }
     }
@@ -464,7 +470,7 @@ impl<'a> View<'a> {
             if self.screen.contains_offset(m.offset) {
                 // yes get coordinates
                 let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
-                if y < self.screen.height - 1 {
+                if y < self.screen.height() - 1 {
                     is_offscreen = false;
 
                     let new_y = y + 1;
@@ -472,7 +478,9 @@ impl<'a> View<'a> {
                     if l.nb_cells > 0 {
                         let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                         let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                        m.offset = cpi.offset;
+                        if cpi.metadata == false {
+                            m.offset = cpi.offset;
+                        }
                     }
                 } else {
                     scroll_needed = true;
@@ -481,8 +489,8 @@ impl<'a> View<'a> {
 
             if is_offscreen {
                 // mark is offscren
-                let screen_width = self.screen.width;
-                let screen_height = self.screen.height;
+                let screen_width = self.screen.width();
+                let screen_height = self.screen.height();
 
                 // get start_of_line(m.offset) -> u64
                 let start_offset = {
@@ -562,7 +570,7 @@ impl<'a> View<'a> {
 
         // only if main mark
         if scroll_needed {
-            let n = self.screen.height / 2;
+            let n = self.screen.height() / 2;
             self.scroll_down(n);
         }
     }
@@ -586,7 +594,7 @@ impl<'a> View<'a> {
     }
 
     pub fn scroll_to_previous_screen(&mut self) {
-        let nb = ::std::cmp::max(self.screen.height - 1, 1);
+        let nb = ::std::cmp::max(self.screen.height() - 1, 1);
         self.scroll_up(nb);
         self.move_mark_to_screen_end();
     }
@@ -596,8 +604,8 @@ impl<'a> View<'a> {
             return;
         }
 
-        let width = self.screen.width;
-        let height = self.screen.height;
+        let width = self.screen.width();
+        let height = self.screen.height();
 
         // the offset to find is the first screen codepoint
         let offset_to_find = self.start_offset;
@@ -656,7 +664,7 @@ impl<'a> View<'a> {
             break;
         }
 
-        let h = self.screen.height / 2;
+        let h = self.screen.height() / 2;
         self.scroll_up(h);
     }
 
@@ -672,12 +680,12 @@ impl<'a> View<'a> {
         }
 
         self.start_offset = size as u64;
-        let h = self.screen.height / 2;
+        let h = self.screen.height() / 2;
         self.scroll_up(h);
     }
 
     pub fn scroll_to_next_screen(&mut self) {
-        let nb = ::std::cmp::max(self.screen.height - 1, 1);
+        let nb = ::std::cmp::max(self.screen.height() - 1, 1);
         self.scroll_down(nb);
         self.move_mark_to_screen_start();
     }
@@ -692,11 +700,11 @@ impl<'a> View<'a> {
             doc.buffer.size as u64
         };
 
-        if nb_lines >= self.screen.height {
+        if nb_lines >= self.screen.height() {
             // will be slower than just reading the current screen
 
-            let screen_width = self.screen.width;
-            let screen_height = self.screen.height + 32;
+            let screen_width = self.screen.width();
+            let screen_height = self.screen.height() + 32;
 
             let start_offset = self.start_offset;
             let end_offset = ::std::cmp::min(
@@ -794,13 +802,35 @@ impl<'a> View<'a> {
 
         // move cursor to (x,y)
         let (x, y) = (x as usize, y as usize);
-        let (cpi, _, _) = self.screen.get_used_cpinfo_clipped(x, y);
 
-        if let Some(cpi) = cpi {
-            for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                m.offset = cpi.offset;
-                // we only move one mark
-                break; // TODO: add main mark ref
+        let max_offset = self.screen.doc_max_offset;
+
+        // check click past eof
+        let force_eof = if let (Some(_), _, last_y) = self.screen.get_last_cpinfo() {
+            y > last_y
+        } else {
+            false
+        };
+
+        let skip_h = self.screen.skip_height.unwrap_or(0);
+        if y <= skip_h {
+            return;
+        }
+        let y = y - skip_h;
+
+        let skip_w = self.screen.skip_width.unwrap_or(0);
+        if x <= skip_w {
+            return;
+        }
+        let x = x - skip_w;
+
+        if let (Some(cpi), _, _) = self.screen.get_used_cpinfo_clipped(x, y) {
+            if cpi.metadata == false {
+                for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                    m.offset = if force_eof { max_offset } else { cpi.offset };
+                    // we only move one mark
+                    break; // TODO: add main mark ref
+                }
             }
         }
     }
@@ -819,6 +849,8 @@ impl<'a> View<'a> {
     }
 }
 
+// TODO: screen_putstr_with_attr metadat etc ...
+// return array of built &cpi ? to allow attr changes pass ?
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     for c in s.chars() {
         let ok = screen_putchar(&mut screen, c, 0xffff_ffff_ffff_ffff);

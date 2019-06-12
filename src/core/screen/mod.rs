@@ -40,9 +40,20 @@ pub struct Screen {
     /// the index of the line filled with the push method
     pub current_line_index: LineIndex,
     /// maximum number of elements the screen line can hold
-    pub width: usize,
+    width: usize,
     /// maximum number of lines the screen can hold
-    pub height: usize,
+    height: usize,
+
+    /// TODO
+    pub skip_width: Option<usize>,
+    /// TODO
+    pub skip_height: Option<usize>,
+
+    /// TODO
+    pub clip_width: Option<usize>,
+    /// TODO
+    pub clip_height: Option<usize>,
+
     /// the number of elements pushed in the screen
     pub nb_push: usize,
     /// placeholder to record the offset of the first pushed CodepointInfo (used by View)
@@ -69,6 +80,10 @@ impl Screen {
             current_line_index: 0,
             width,
             height,
+            skip_width: None,
+            skip_height: None,
+            clip_width: None,
+            clip_height: None,
             nb_push: 0,
             first_offset: 0,
             last_offset: 0,
@@ -78,6 +93,73 @@ impl Screen {
         }
     }
 
+    pub fn width(&self) -> usize {
+        self.clip_width.unwrap_or(self.width)
+    }
+
+    pub fn height(&self) -> usize {
+        self.clip_height.unwrap_or(self.height)
+    }
+
+    // TODO: return bool
+    pub fn set_skip_width(&mut self, n: usize) {
+        if n < self.width() - 1 {
+            for h in 0..self.height {
+                self.line[h].skip(n);
+            }
+            self.skip_width = Some(n);
+        }
+    }
+
+    pub fn clear_skip_width(&mut self) {
+        self.skip_width = None;
+
+        for h in 0..self.height {
+            self.line[h].clear_clip_width();
+        }
+        self.clip_width = None;
+    }
+
+    // TODO: return bool
+    pub fn set_skip_height(&mut self, n: usize) {
+        if n < self.height - 1 {
+            self.set_clip_height(self.height - n);
+            self.skip_height = Some(n);
+        }
+    }
+
+    pub fn clear_skip_height(&mut self) {
+        self.skip_height = None;
+        self.clear_clip_height();
+    }
+
+    pub fn set_clip_width(&mut self, width: usize) {
+        if width < self.width {
+            for h in 0..self.height {
+                self.line[h].clip_width(width);
+            }
+            self.clip_width = Some(width);
+        }
+    }
+
+    pub fn clear_clip_width(&mut self) {
+        for h in 0..self.height {
+            self.line[h].clear_clip_width();
+        }
+        self.clip_width = None;
+    }
+
+    pub fn set_clip_height(&mut self, height: usize) {
+        if height < self.height - self.skip_height.unwrap_or(0) {
+            self.clip_height = Some(height);
+            self.current_line_index = 0;
+        }
+    }
+
+    pub fn clear_clip_height(&mut self) {
+        self.clip_height = None;
+    }
+
     pub fn resize(&mut self, width: usize, height: usize) {
         self.line.resize(height, Line::new(width));
         for i in 0..height {
@@ -85,6 +167,10 @@ impl Screen {
         }
         self.width = width;
         self.height = height;
+        self.skip_width = None;
+        self.skip_height = None;
+        self.clip_width = None;
+        self.clip_height = None;
         self.current_line_index = 0;
         self.nb_push = 0;
         self.first_offset = 0;
@@ -93,22 +179,26 @@ impl Screen {
         self.input_size = 0;
     }
 
+    /// 0-----skip---cur_index----max_height---capacity
+
     /// append
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
-        if self.current_line_index == self.height {
+        let skip = self.skip_height.unwrap_or(0);
+
+        if self.current_line_index == self.height() {
             return (false, self.current_line_index);
         }
 
-        if self.line[self.current_line_index].read_only {
+        if self.line[skip + self.current_line_index].read_only {
             self.current_line_index += 1;
         }
 
-        if self.current_line_index == self.height {
+        if self.current_line_index == self.height() {
             return (false, self.current_line_index);
         }
 
         let cp = cpi.cp;
-        let line = &mut self.line[self.current_line_index];
+        let line = &mut self.line[skip + self.current_line_index];
         let (ok, _) = line.push(cpi);
 
         if ok {
@@ -130,9 +220,19 @@ impl Screen {
         self.last_offset = 0;
         self.doc_max_offset = 0;
         self.input_size = 0;
+        self.clear_clip_height();
+        self.clear_clip_width();
     }
 
-    pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
+    pub fn max_width(&self) -> usize {
+        self.width
+    }
+
+    pub fn max_height(&self) -> usize {
+        self.height
+    }
+
+    pub fn get_mut_unclipped_line(&mut self, index: usize) -> Option<&mut Line> {
         if index < self.height {
             Some(&mut self.line[index])
         } else {
@@ -140,7 +240,16 @@ impl Screen {
         }
     }
 
-    pub fn get_line(&self, index: usize) -> Option<&Line> {
+    pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
+        let skip = self.skip_height.unwrap_or(0);
+        if index < self.height() {
+            Some(&mut self.line[skip + index])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_unclipped_line(&self, index: usize) -> Option<&Line> {
         if index < self.height {
             Some(&self.line[index])
         } else {
@@ -148,9 +257,21 @@ impl Screen {
         }
     }
 
+    pub fn get_line(&self, index: usize) -> Option<&Line> {
+        let skip = self.skip_height.unwrap_or(0);
+
+        if index < self.height() {
+            Some(&self.line[skip + index])
+        } else {
+            None
+        }
+    }
+
     pub fn get_mut_used_line(&mut self, index: usize) -> Option<&mut Line> {
-        if index < self.current_line_index {
-            Some(&mut self.line[index])
+        let skip = self.skip_height.unwrap_or(0);
+
+        if index <= self.current_line_index && self.line[skip + index].nb_cells > 0 {
+            Some(&mut self.line[skip + index])
         } else {
             None
         }
@@ -162,17 +283,25 @@ impl Screen {
     }
 
     pub fn get_used_line(&self, index: usize) -> Option<&Line> {
-        if index < self.current_line_index {
-            Some(&self.line[index])
+        let skip = self.skip_height.unwrap_or(0);
+
+        if index >= self.height() {
+            return None;
+        }
+
+        if index <= self.current_line_index && self.line[skip + index].nb_cells > 0 {
+            Some(&self.line[skip + index])
         } else {
             None
         }
     }
 
-    /// there must be 2 line a least
+    /// there must be 2 lines a least
     pub fn get_first_used_line(&self) -> Option<&Line> {
+        let skip = self.skip_height.unwrap_or(0);
+
         if 0 < self.current_line_index {
-            Some(&self.line[0])
+            Some(&self.line[skip])
         } else {
             None
         }
@@ -180,8 +309,9 @@ impl Screen {
 
     /// there must be 2 line a least
     pub fn get_last_used_line(&self) -> Option<&Line> {
+        let skip = self.skip_height.unwrap_or(0);
         if self.current_line_index > 0 {
-            Some(&self.line[self.current_line_index - 1])
+            Some(&self.line[skip + self.current_line_index - 1])
         } else {
             None
         }
@@ -268,6 +398,20 @@ impl Screen {
         }
     }
 
+    pub fn get_used_cpinfo_unclipped(
+        &mut self,
+        x: usize,
+        y: usize,
+    ) -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
+        match self.get_used_line(y) {
+            None => (None, x, y),
+            Some(l) => match l.get_used_cpi(x) {
+                Some(optcpi) => (Some(optcpi), x, y),
+                None => (None, x, y),
+            },
+        }
+    }
+
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
 
@@ -275,14 +419,18 @@ impl Screen {
             return (None, 0, 0);
         }
 
-        for y in 0..self.height {
+        for y in 0..self.height() {
             let l = self.get_line(y).unwrap();
             if l.nb_cells == 0 {
                 continue;
             }
 
+            // TODO: handle line.skip
             for x in 0..l.width {
                 let cpi = l.get_cpi(x).unwrap();
+                if cpi.metadata == true {
+                    break;
+                }
                 if cpi.offset == offset {
                     return (Some(cpi), x, y);
                 }

@@ -182,7 +182,7 @@ pub fn get_lines_offsets<'a>(
         // eof reached ?
         // FIXME: the api is not yet READY
         // we must find a way to cover all filled lines
-        if screen.current_line_index < screen.height {
+        if screen.current_line_index < screen.height() {
             let s = screen.line[screen.current_line_index]
                 .get_first_cpi()
                 .unwrap()
@@ -218,15 +218,6 @@ pub fn get_lines_offsets<'a>(
     }
 }
 
-// Trait filter context
-fn _utf8_filter(
-    ctx: &mut FilterContext,
-    filter_in: &mut Vec<FilterIoData>,
-    filter_out: &mut Vec<FilterIoData>,
-) -> u32 {
-    0
-}
-
 #[derive(Debug, Clone)]
 struct _LayoutPlugin {
     plugin_id: u32,
@@ -240,7 +231,7 @@ fn layout_filter_prepare_raw_data<'a>(
     base_offset: u64,
     max_offset: u64,
 ) -> Vec<FilterIoData<'a>> {
-    let mut data_vec: Vec<FilterIoData<'a>> = Vec::with_capacity(screen.width * screen.height);
+    let mut data_vec: Vec<FilterIoData<'a>> = Vec::with_capacity(screen.width() * screen.height());
 
     data_vec.push(FilterIoData {
         is_valid: true,
@@ -272,8 +263,8 @@ fn layout_filter_prepare_raw_data<'a>(
     if base_offset + data.len() as u64 == max_offset {
         data_vec.push(FilterIoData {
             is_valid: true,
-            end_of_pipe: true, // skip
-            quit: false,       // close pipeline
+            end_of_pipe: false, // skip
+            quit: false,        // close pipeline
             is_selected: true,
             color: CodepointInfo::default_color(),
             offset: base_offset + data.len() as u64,
@@ -692,6 +683,7 @@ pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointI
     };
 
     CodepointInfo {
+        metadata: false,
         cp: c,
         displayed_cp,
         offset,

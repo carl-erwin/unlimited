@@ -41,10 +41,10 @@ use crate::core::event::Key;
 use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
 
+use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
 pub struct CoreState {
-    keys: Vec<InputEvent>,
     pending_events: usize,
     quit: bool,
     status: String,
@@ -53,7 +53,6 @@ pub struct CoreState {
 impl CoreState {
     fn new() -> Self {
         CoreState {
-            keys: Vec::new(),
             pending_events: 0,
             quit: false,
             status: String::new(),
@@ -168,7 +167,7 @@ pub fn start(
                                 let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
 
                                 // resize ?
-                                if width != view.screen.width || height != view.screen.height {
+                                if width != view.screen.width() || height != view.screen.height() {
                                     view.screen = Box::new(Screen::new(width, height));
                                 }
                             }
@@ -224,18 +223,57 @@ pub fn start(
     ui_tx.send(msg).unwrap_or(());
 }
 
-fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
+use crate::core::VERSION;
+
+fn fill_screen(core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
         let mut screen = &mut view.screen;
 
         screen.clear();
+        screen.clear_skip_height();
+        screen.clear_clip_width();
 
         let mut data = vec![];
-        let max_size = (screen.width * screen.height * 4) as usize;
         let doc = view.document.as_ref().unwrap().borrow_mut();
-        doc.read(view.start_offset, max_size, &mut data);
 
         let max_offset = doc.buffer.size as u64;
+
+        // print header "unlimitED!"
+        if true {
+            let mut nb_push = 0;
+            for c in format!("  unlimitED! {} {}", VERSION, core_state.status)
+                .chars()
+                .take(screen.width())
+            {
+                let mut cpi = CodepointInfo::new();
+                cpi.metadata = true;
+                cpi.is_selected = true;
+                cpi.cp = c;
+                cpi.displayed_cp = c;
+                screen.push(cpi);
+                nb_push += 1;
+            }
+            // fill line
+            for _ in nb_push..screen.width() {
+                let mut cpi = CodepointInfo::new();
+                cpi.metadata = true;
+                cpi.is_selected = true;
+
+                cpi.cp = ' ';
+                cpi.displayed_cp = ' ';
+                screen.push(cpi);
+            }
+
+            // nano-like help line
+            // todo: add line.metadata = true;
+            if screen.height() >= 5 {
+                screen.set_skip_height(2);
+                //     screen.set_clip_height(screen.height() - 3);
+            }
+        }
+
+        let max_size = (screen.width() * screen.height() * 4) as usize;
+        doc.read(view.start_offset, max_size, &mut data);
 
         view.end_offset = build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
 
@@ -244,11 +282,18 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
         // render marks
 
         // brute force for now
+
         for m in view.moving_marks.borrow().iter() {
             // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+
             if m.offset >= view.start_offset && m.offset <= view.end_offset {
-                for l in 0..screen.height {
+                for l in 0..screen.height() {
                     let line = screen.get_mut_line(l).unwrap();
+
+                    if line.metadata == true {
+                        continue;
+                    }
+
                     for c in 0..line.nb_cells {
                         let cpi = line.get_mut_cpi(c).unwrap();
 
@@ -256,7 +301,7 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
                         //break;
                         //}
 
-                        if cpi.offset == m.offset {
+                        if cpi.offset == m.offset && cpi.metadata == false {
                             cpi.is_selected = true;
                             // core_state.mark_offset = m.offset;
                         }
@@ -264,6 +309,8 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
                 }
             }
         }
+
+        // restore state here
     }
 }
 
@@ -278,9 +325,6 @@ fn process_input_events(
         return;
     }
 
-    core_state.keys.push(ev.clone());
-
-    let mut clear_keys = true;
     match *ev {
         InputEvent::KeyPress {
             ctrl: true,
@@ -298,6 +342,7 @@ fn process_input_events(
             key: Key::Unicode('u'),
         } => {
             view.undo();
+            core_state.status = format!("<undo>");
         }
 
         InputEvent::KeyPress {
@@ -307,15 +352,7 @@ fn process_input_events(
             key: Key::Unicode('r'),
         } => {
             view.redo();
-        }
-
-        InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
-            key: Key::Unicode('x'),
-        } => {
-            clear_keys = false;
+            core_state.status = format!("<redo>");
         }
 
         // ctrl+a
@@ -543,6 +580,10 @@ fn process_input_events(
             key: Key::UnicodeArray(ref v),
         } => {
             view.insert_codepoint_array(&v);
+
+            if v.len() == 1 {
+                core_state.status = format!("<insert [0x{:x}]>", v[0] as u32);
+            }
         }
 
         // alt+d
@@ -565,16 +606,16 @@ fn process_input_events(
             button,
         } => match button {
             0 | 1 => {
-                view.button_press(button, x, y - 2);
-                core_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
+                view.button_press(button, x, y);
+                core_state.status = format!("<click({},@({},{}))>", button, x, y);
             }
             3 => {
                 view.scroll_up(3);
-                core_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
+                core_state.status = format!("<click({},@({},{}))>", button, x, y);
             }
             4 => {
                 view.scroll_down(3);
-                core_state.status = format!("<click({},@({},{}))]>", button, x, y - 2);
+                core_state.status = format!("<click({},@({},{}))>", button, x, y);
             }
 
             _ => {}
@@ -590,13 +631,9 @@ fn process_input_events(
             button,
         } => {
             view.button_release(button, x, y);
-            core_state.status = format!("<unclick({},@({},{}))]>", button, x, y);
+            core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
         }
 
         _ => {}
-    }
-
-    if clear_keys {
-        core_state.keys.clear();
     }
 }
