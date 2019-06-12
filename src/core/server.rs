@@ -200,7 +200,8 @@ pub fn start(
                                 core_state.pending_events = events.len();
                             }
 
-                            if !false {
+                            // TODO: is view changed only
+                            if true {
                                 build_layout_and_send_event(
                                     &mut editor,
                                     &mut core_state,
