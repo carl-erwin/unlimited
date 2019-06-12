@@ -404,21 +404,12 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
     // translate termion event
     match evt {
         self::termion::event::Event::Key(k) => match k {
-            self::termion::event::Key::Ctrl('c') => {
+            self::termion::event::Key::Ctrl(c) => {
                 return InputEvent::KeyPress {
                     ctrl: true,
                     alt: false,
                     shift: false,
-                    key: Key::Unicode('c'),
-                };
-            }
-
-            self::termion::event::Key::Char('\n') => {
-                return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                    key: Key::Unicode('\n'),
+                    key: Key::Unicode(c),
                 };
             }
 
@@ -435,15 +426,6 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 return InputEvent::KeyPress {
                     ctrl: false,
                     alt: true,
-                    shift: false,
-                    key: Key::Unicode(c),
-                };
-            }
-
-            self::termion::event::Key::Ctrl(c) => {
-                return InputEvent::KeyPress {
-                    ctrl: true,
-                    alt: false,
                     shift: false,
                     key: Key::Unicode(c),
                 };
