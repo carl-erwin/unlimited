@@ -100,8 +100,14 @@ impl Mark {
             let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
             let relative_offset = self.offset - base_offset;
 
+            assert!(self.offset <= buffer.size as u64);
+            assert!(base_offset <= buffer.size as u64);
+
             let mut data = Vec::with_capacity(4);
-            buffer.read(base_offset, data.capacity(), &mut data);
+            let nb = buffer.read(base_offset, data.capacity(), &mut data);
+
+            assert!(nb <= data.capacity());
+            assert!(nb == data.len());
 
             let (cp, off, size) = get_prev_codepoint(&data, relative_offset);
             let delta = relative_offset - off;

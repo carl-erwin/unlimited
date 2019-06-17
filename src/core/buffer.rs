@@ -136,12 +136,12 @@ impl<'a> Buffer<'a> {
     /// return the number of written bytes (TODO: use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
         let mut it = MappedFile::iter_from(&self.data, offset);
-        MappedFile::insert(&mut it, &data);
-
-        self.size += nr_bytes;
+        let nb = MappedFile::insert(&mut it, &data);
+        assert_eq!(nb, nr_bytes);
+        self.size += nb;
         self.nr_changes += 1;
 
-        nr_bytes
+        nb
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
@@ -163,12 +163,12 @@ impl<'a> Buffer<'a> {
         }
 
         let mut it = MappedFile::iter_from(&self.data, start_offset as u64);
-        MappedFile::remove(&mut it, nr_bytes_removed);
-
-        self.size -= nr_bytes_removed;
+        let nb = MappedFile::remove(&mut it, nr_bytes_removed);
+        assert!(nb <= nr_bytes_removed);
+        self.size -= nb;
         self.nr_changes += 1;
 
-        nr_bytes_removed
+        nb
     }
 
     /// can be used to know the number of blocks that compose the buffer,

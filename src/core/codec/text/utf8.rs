@@ -135,6 +135,8 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 
 // TODO: change this with temporary (cp, offset, size) until from_offset
 pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
+    assert!(data.len() >= from_offset as usize);
+
     //                 cp    size   offset
     let mut cp_info: [(char, usize, u64); 8] = [
         ('\0', 0, 0),
@@ -158,6 +160,9 @@ pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
         nr_cpinfo += 1;
 
         off += size as u64;
+        if nr_cpinfo == 4 {
+            break;
+        }
     }
 
     if nr_cpinfo != 0 {
@@ -310,6 +315,9 @@ fn test_backward_decode() {
         start_offset, data[start_offset as usize] as u32
     );
 
+    // TODO: transform all return code into Error
+    // for example start_offset can be greater than data.len()
+    // we could return something like Error(invalid offset)
     let off = get_previous_codepoint_start(&data, start_offset as u64);
     println!(
         "start_offset({}) - off({}) = {}",

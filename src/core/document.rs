@@ -211,3 +211,142 @@ impl<'a> Document<'a> {
         self.apply_log_operation(&op)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    extern crate rand;
+
+    use super::*;
+    use rand::Rng;
+
+    #[test]
+    fn undo_redo() {
+        let mut doc = DocumentBuilder::new()
+            .document_name("untitled-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .finalize();
+
+        let mut doc = doc.as_mut().unwrap().borrow_mut();
+
+        const STR_LEN: usize = 1000;
+
+        let mut s = String::new();
+        for i in 0..STR_LEN {
+            s.push_str("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
+        }
+
+        const NB_INSERT: usize = 1000;
+        let max = NB_INSERT;
+
+        for _ in 0..10 {
+            println!("start insert test");
+
+            let mut off: u64 = 0;
+
+            for i in 0..max {
+                println!("insert ({}/{}) -------", i + 1, max);
+
+                let off_update = doc.insert(off, s.len(), s.as_ref());
+                off += off_update as u64;
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            println!("start undo test");
+            for i in 0..max {
+                println!("undo ({}/{}) -------", i + 1, max);
+                doc.undo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            println!("start redo test");
+
+            for i in 0..max {
+                println!("redo ({}/{}) -------", i + 1, max);
+                doc.redo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            println!("start undo test (2nd pass)");
+            for i in 0..max {
+                println!("undo ({}/{}) -------", i + 1, max);
+                doc.undo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+        }
+    }
+
+    #[test]
+    fn doc_random_size_inserts() {
+        let mut doc = DocumentBuilder::new()
+            .document_name("untitled-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .finalize();
+
+        let mut doc = doc.as_mut().unwrap().borrow_mut();
+
+        const NB_STR: usize = 10000;
+
+        let mut s = String::new();
+        for i in 0..NB_STR {
+            s.push_str("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
+        }
+
+        const NB_INSERT: usize = 150;
+        let max = NB_INSERT;
+
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..10 {
+            println!("start insert test");
+
+            let mut off: u64 = 0;
+
+            for i in 0..max {
+                println!("insert ({}/{}) -------", i, max);
+
+                // randomize s.len
+
+                let random_size: usize = rng.gen_range(0, s.len());
+                println!("random insert size = {}", random_size);
+                let off_update = doc.insert(off, random_size, s.as_ref());
+                off += off_update as u64;
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            for i in 0..max {
+                println!("undo ({}/{}) -------", i + 1, max);
+
+                doc.undo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            println!("start redo test");
+
+            for i in 0..max {
+                println!("redo ({}/{}) -------", i + 1, max);
+
+                doc.redo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+
+            for i in 0..max {
+                println!("undo ({}/{}) -------", i + 1, max);
+
+                doc.undo();
+            }
+
+            println!("doc.size = {}", doc.buffer.size());
+        }
+    }
+
+}

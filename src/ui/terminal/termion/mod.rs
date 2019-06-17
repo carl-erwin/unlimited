@@ -47,7 +47,6 @@ use self::termion::input::MouseTerminal;
 use self::termion::raw::IntoRawMode;
 use self::termion::screen::{AlternateScreen, ToMainScreen};
 use self::termion::terminal_size;
-use std::io::stdin;
 
 //
 use crate::core::event::Event;
@@ -57,8 +56,6 @@ use crate::core::event::InputEvent;
 use crate::core::screen::Screen;
 
 use crate::core::event::Key;
-
-use crate::core::VERSION;
 
 use crate::core::codepointinfo::CodepointInfo;
 
