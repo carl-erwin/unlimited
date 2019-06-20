@@ -48,6 +48,7 @@ pub struct CoreState {
     pending_events: usize,
     quit: bool,
     status: String,
+    last_offset: u64,
 }
 
 impl CoreState {
@@ -56,6 +57,7 @@ impl CoreState {
             pending_events: 0,
             quit: false,
             status: String::new(),
+            last_offset: 0,
         }
     }
 }
@@ -225,44 +227,56 @@ pub fn start(
 
 use crate::core::VERSION;
 
+fn print_clipped_line(screen: &mut Screen, s: &str) {
+    let mut nb_push = 0;
+    for c in s.chars().take(screen.width()) {
+        let mut cpi = CodepointInfo::new();
+        cpi.metadata = true;
+        cpi.is_selected = true;
+        cpi.cp = c;
+        cpi.displayed_cp = c;
+        screen.push(cpi);
+        nb_push += 1;
+    }
+    // fill line
+    for _ in nb_push..screen.width() {
+        let mut cpi = CodepointInfo::new();
+        cpi.metadata = true;
+        cpi.is_selected = true;
+
+        cpi.cp = ' ';
+        cpi.displayed_cp = ' ';
+        screen.push(cpi);
+    }
+}
+
 fn fill_screen(core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
         let mut screen = &mut view.screen;
 
         screen.clear();
-        screen.clear_skip_height();
+
+        screen.clear_skip_width();
         screen.clear_clip_width();
+
+        screen.clear_skip_height();
+        screen.clear_clip_height();
 
         let mut data = vec![];
         let doc = view.document.as_ref().unwrap().borrow_mut();
 
         let max_offset = doc.buffer.size as u64;
 
-        // print header "unlimitED!"
-        if true {
-            let mut nb_push = 0;
-            for c in format!("  unlimitED! {} {}", VERSION, core_state.status)
-                .chars()
-                .take(screen.width())
-            {
-                let mut cpi = CodepointInfo::new();
-                cpi.metadata = true;
-                cpi.is_selected = true;
-                cpi.cp = c;
-                cpi.displayed_cp = c;
-                screen.push(cpi);
-                nb_push += 1;
-            }
-            // fill line
-            for _ in nb_push..screen.width() {
-                let mut cpi = CodepointInfo::new();
-                cpi.metadata = true;
-                cpi.is_selected = true;
+         let (w0,h0) = (screen.width(), screen.height());
 
-                cpi.cp = ' ';
-                cpi.displayed_cp = ' ';
-                screen.push(cpi);
-            }
+        let mut have_footer = false;
+
+        // print header
+        if true {
+            print_clipped_line(
+                &mut screen,
+                &format!("  unlimitED! {} {}", VERSION, core_state.status),
+            );
 
             // nano-like help line
             // todo: add line.metadata = true;
