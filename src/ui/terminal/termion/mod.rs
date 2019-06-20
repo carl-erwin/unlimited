@@ -25,7 +25,7 @@
 
 //
 use std::io::Error;
-use std::io::{self, Read, Stdout, Write};
+use std::io::{self, Stdout, Write};
 
 use std::thread;
 use std::time::Duration;
@@ -70,7 +70,7 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
 
 pub fn main_loop(
     ui_rx: &Receiver<EventMessage>,
-    ui_tx: &Sender<EventMessage>,
+    _ui_tx: &Sender<EventMessage>,
     core_tx: &Sender<EventMessage>,
 ) {
     let mut seq: usize = 0;
@@ -103,7 +103,7 @@ pub fn main_loop(
     let mut current_view_id = 0;
     let mut last_screen = Box::new(Screen::new(0, 0)); // last screen ?
     let mut view_doc_map = HashMap::new();
-    let mut prev_screen_rdr_time = Duration::new(0, 0);
+    let mut _prev_screen_rdr_time = Duration::new(0, 0);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
 
@@ -220,7 +220,7 @@ pub fn main_loop(
 
                     stdout.flush().unwrap();
                     let end = Instant::now();
-                    prev_screen_rdr_time = end.duration_since(start);
+                    _prev_screen_rdr_time = end.duration_since(start);
                     last_screen = screen;
                 }
 
@@ -389,11 +389,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 };
             }
 
-            self::termion::event::Key::F(1) => {}
-
-            self::termion::event::Key::F(2) => {}
-
-            self::termion::event::Key::F(f) => {}
+            self::termion::event::Key::F(_f) => {}
 
             self::termion::event::Key::Left => {
                 return InputEvent::KeyPress {
@@ -530,11 +526,11 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     };
                 }
 
-                self::termion::event::MouseEvent::Hold(x, y) => {}
+                self::termion::event::MouseEvent::Hold(_x, _y) => {}
             };
         }
 
-        self::termion::event::Event::Unsupported(e) => {}
+        self::termion::event::Event::Unsupported(_e) => {}
     }
 
     crate::core::event::InputEvent::NoInputEvent

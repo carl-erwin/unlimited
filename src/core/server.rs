@@ -48,7 +48,6 @@ pub struct CoreState {
     pending_events: usize,
     quit: bool,
     status: String,
-    last_offset: u64,
 }
 
 impl CoreState {
@@ -57,7 +56,6 @@ impl CoreState {
             pending_events: 0,
             quit: false,
             status: String::new(),
-            last_offset: 0,
         }
     }
 }
@@ -267,10 +265,6 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
         let max_offset = doc.buffer.size as u64;
 
-         let (w0,h0) = (screen.width(), screen.height());
-
-        let mut have_footer = false;
-
         // print header
         if true {
             print_clipped_line(
@@ -282,7 +276,6 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             // todo: add line.metadata = true;
             if screen.height() >= 5 {
                 screen.set_skip_height(2);
-                //     screen.set_clip_height(screen.height() - 3);
             }
         }
 

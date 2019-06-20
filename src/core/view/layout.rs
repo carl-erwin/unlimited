@@ -91,9 +91,9 @@ impl<'a> FilterIoData<'a> {
             size: cp_size,
             data:
                 FilterData::Unicode {
-                    cp,
+                    cp: _,
                     real_cp,
-                    cp_index, // be carefull used const u64 invalid_cp_index
+                    cp_index, // be careful used const u64 invalid_cp_index
                     fragment_flag,
                     fragment_count,
                 },
@@ -111,7 +111,7 @@ impl<'a> FilterIoData<'a> {
                 data: FilterData::Unicode {
                     cp: new_cp as u32,
                     real_cp,
-                    cp_index, // be carefull used const u64 invalid_cp_index
+                    cp_index, // be careful used const u64 invalid_cp_index
                     fragment_flag,
                     fragment_count,
                 },
@@ -652,20 +652,20 @@ pub fn build_screen_layout(
 
     //
     let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let ret = layout_filter_utf8(&filter_in, &mut filter_out);
+    let _ret = layout_filter_utf8(&filter_in, &mut filter_out);
     filter_in = filter_out;
 
     //
     let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let ret = layout_filter_tabulation(&filter_in, &mut filter_out);
+    let _ret = layout_filter_tabulation(&filter_in, &mut filter_out);
     filter_in = filter_out;
 
     let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let ret = layout_keyword_highlighting(&filter_in, &mut filter_out);
+    let _ret = layout_keyword_highlighting(&filter_in, &mut filter_out);
     filter_in = filter_out;
 
     // last pass
-    let ret = layout_fill_screen(&filter_in, max_offset, &mut screen);
+    let _ret = layout_fill_screen(&filter_in, max_offset, &mut screen);
 
     screen.last_offset
 }

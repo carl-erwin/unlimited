@@ -49,30 +49,18 @@ pub fn main_loop(
 
 struct UiState {
     quit: bool,
-    status: String,
-    vid: u64,
-    nb_view: usize,
-    mark_offset: u64,
     terminal_width: u16,
     terminal_height: u16,
     resize_flag: bool,
-    max_input_events_stat: usize,
-    prev_input_size: usize,
 }
 
 impl UiState {
     fn new() -> Self {
         UiState {
             quit: false,
-            status: String::new(),
-            vid: 0,
-            nb_view: 0,
-            mark_offset: 0,
             terminal_width: 0,
             terminal_height: 0,
             resize_flag: false,
-            max_input_events_stat: 0,
-            prev_input_size: 0,
         }
     }
 }
