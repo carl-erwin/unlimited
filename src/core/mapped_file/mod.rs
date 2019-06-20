@@ -1247,13 +1247,7 @@ impl<'a> MappedFile<'a> {
                 eprintln!("local_offset {}", local_offset);
             }
 
-            match *file.pool[idx]
-                .cow
-                .as_ref()
-                .unwrap()
-                .as_ref()
-                .borrow_mut()
-            {
+            match *file.pool[idx].cow.as_ref().unwrap().as_ref().borrow_mut() {
                 Page::OnDisk { .. } => {
                     panic!("trying to write on read only memory");
                 }
@@ -1649,14 +1643,8 @@ impl<'a> MappedFile<'a> {
 
         if file.pool.slot[idx].prev.is_some() {
             if DEBUG {
-                eprintln!(
-                    "prev node is set to {:?} ????",
-                    file.pool.slot[idx].prev
-                );
-                eprintln!(
-                    "current leaf is idx({}) : {:?} ",
-                    idx, file.pool.slot[idx]
-                );
+                eprintln!("prev node is set to {:?} ????", file.pool.slot[idx].prev);
+                eprintln!("current leaf is idx({}) : {:?} ", idx, file.pool.slot[idx]);
             }
             panic!();
         };

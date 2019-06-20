@@ -362,11 +362,13 @@ impl<'a> View<'a> {
             if y > 0 {
                 let new_y = y - 1;
                 let l = self.screen.get_line(new_y).unwrap();
-                let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                if cpi.metadata == false {
-                    m.offset = cpi.offset;
-                    mark_moved = true;
+                if l.nb_cells > 0 {
+                    let new_x = ::std::cmp::min(x, l.nb_cells - 1);
+                    let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                    if cpi.metadata == false {
+                        m.offset = cpi.offset;
+                        mark_moved = true;
+                    }
                 }
             }
 
@@ -812,24 +814,44 @@ impl<'a> View<'a> {
             false
         };
 
-        let skip_h = self.screen.skip_height.unwrap_or(0);
-        if y <= skip_h {
+        // TODO: (x,y) = clip coordinates(x,y)
+        let skip_y = self.screen.clip_rect().y;
+        if y < skip_y {
             return;
         }
-        let y = y - skip_h;
-
-        let skip_w = self.screen.skip_width.unwrap_or(0);
-        if x <= skip_w {
+        if y > skip_y + self.screen.clip_rect().height {
             return;
         }
-        let x = x - skip_w;
+        let y = y - skip_y;
 
-        if let (Some(cpi), _, _) = self.screen.get_used_cpinfo_clipped(x, y) {
+        let skip_x = self.screen.clip_rect().x;
+        if x < skip_x {
+            return;
+        }
+        if x > skip_x + self.screen.clip_rect().width {
+            return;
+        }
+        let x = x - skip_x;
+
+        //
+        if let Some(cpi) = self.screen.get_used_cpinfo(x, y) {
             if cpi.metadata == false {
                 for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                     m.offset = if force_eof { max_offset } else { cpi.offset };
                     // we only move one mark
                     break; // TODO: add main mark ref
+                }
+            }
+        } else {
+            if let Some(l) = self.screen.get_used_line(y) {
+                if let Some(cpi) = l.get_last_cpi() {
+                    if cpi.metadata == false {
+                        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
+                            m.offset = if force_eof { max_offset } else { cpi.offset };
+                            // we only move one mark
+                            break; // TODO: add main mark ref
+                        }
+                    }
                 }
             }
         }

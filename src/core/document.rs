@@ -233,7 +233,7 @@ mod tests {
         const STR_LEN: usize = 1000;
 
         let mut s = String::new();
-        for i in 0..STR_LEN {
+        for _ in 0..STR_LEN {
             s.push_str("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
         }
 
@@ -294,7 +294,7 @@ mod tests {
         const NB_STR: usize = 10000;
 
         let mut s = String::new();
-        for i in 0..NB_STR {
+        for _ in 0..NB_STR {
             s.push_str("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
         }
 

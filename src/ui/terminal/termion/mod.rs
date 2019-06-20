@@ -101,7 +101,7 @@ pub fn main_loop(
     let mut doc_list;
     let mut current_doc_id = 0;
     let mut current_view_id = 0;
-    let mut last_screen = Box::new(Screen::new(0, 0)); // last screen ?
+    let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
     let mut view_doc_map = HashMap::new();
     let mut _prev_screen_rdr_time = Duration::new(0, 0);
 
@@ -279,7 +279,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 
         let mut have_cursor = false;
-        for c in 0..line.width {
+        for c in 0..line.width() {
             let cpi = line.get_cpi(c).unwrap();
 
             if cpi.is_selected {
@@ -291,7 +291,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         if check_hash {
             // check previous line
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            for c in 0..prev_line.width {
+            for c in 0..prev_line.width() {
                 let cpi = prev_line.get_cpi(c).unwrap();
                 if cpi.is_selected {
                     have_cursor = true;
@@ -308,7 +308,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
             }
         }
 
-        for c in 0..line.width {
+        for c in 0..line.width() {
             let cpi = line.get_cpi(c).unwrap();
 
             if prev_cpi.is_selected != cpi.is_selected {

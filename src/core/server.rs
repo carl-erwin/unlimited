@@ -254,31 +254,73 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
         screen.clear();
 
-        screen.clear_skip_width();
-        screen.clear_clip_width();
-
-        screen.clear_skip_height();
-        screen.clear_clip_height();
-
         let mut data = vec![];
         let doc = view.document.as_ref().unwrap().borrow_mut();
 
         let max_offset = doc.buffer.size as u64;
 
-        // print header
-        if true {
+        let nano_like = false;
+
+        // print header+footer
+        if nano_like {
+            let (mw, mh) = (screen.max_width(), screen.max_height());
             print_clipped_line(
                 &mut screen,
-                &format!("  unlimitED! {} {}", VERSION, core_state.status),
+                &format!(
+                    "  unlimitED! {} {} {}x{}",
+                    VERSION, core_state.status, mw, mh
+                ),
             );
 
+            if screen.max_height() >= 5 {
+                let header_start_h = 2;
+                let footer_h = 4;
+                screen.set_clipping(
+                    0,
+                    header_start_h,
+                    screen.max_width() - 2,
+                    screen.max_height() - (header_start_h + footer_h),
+                );
+            }
+
+            // print footer
             // nano-like help line
             // todo: add line.metadata = true;
-            if screen.height() >= 5 {
-                screen.set_skip_height(2);
+            if screen.max_height() >= 5 {
+                let footer_h = 4;
+                screen.set_clipping(
+                    0,
+                    screen.max_height() - (footer_h),
+                    screen.max_width() - 2,
+                    footer_h,
+                );
+
+                screen.current_line_index = 1;
+                print_clipped_line(
+                    &mut screen,
+                    &format!("  footer! {} {}", VERSION, core_state.status),
+                );
+
+                for i in 2..footer_h {
+                    screen.current_line_index = i;
+                    print_clipped_line(&mut screen, &format!(""));
+                }
             }
         }
-
+        // restore state here
+        let widths = [0 /* (screen.max_width() - 2) / 2 */];
+        for off in widths.iter() {
+            if nano_like && screen.max_height() >= 5 {
+                let header_h = 2;
+                let footer_h = 4;
+                screen.set_clipping(
+                    *off,
+                    header_h,
+                    (screen.max_width() - 2) / widths.len(),
+                    screen.max_height() - (header_h + footer_h),
+                );
+            }
+        }
         let max_size = (screen.width() * screen.height() * 4) as usize;
         doc.read(view.start_offset, max_size, &mut data);
 
@@ -316,8 +358,6 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 }
             }
         }
-
-        // restore state here
     }
 }
 

@@ -53,12 +53,13 @@ impl LineCell {
 pub struct Line {
     pub cells: Vec<LineCell>,
     pub nb_cells: usize,
-    pub width: usize,
-    pub skip: Option<usize>,
-    pub clip_width: Option<usize>,
+    pub max_width: usize,
+    pub start_index: usize,
+    width: usize,
     pub read_only: bool,
     pub metadata: bool,
     hash_cache: u64,
+    hash_unclipped_cache: u64,
 }
 
 impl Line {
@@ -73,12 +74,13 @@ impl Line {
         Line {
             cells,
             nb_cells: 0,
+            max_width: width,
+            start_index: 0,
             width,
-            skip: None,
-            clip_width: None,
             read_only: false,
             metadata: false,
             hash_cache: 0,
+            hash_unclipped_cache: 0,
         }
     }
 
@@ -90,57 +92,76 @@ impl Line {
         let mut s = DefaultHasher::new();
 
         for i in 0..self.nb_cells {
-            self.cells[i].hash(&mut s);
+            self.cells[self.start_index + i].hash(&mut s);
         }
         self.hash_cache = s.finish();
         self.hash_cache
     }
 
+    pub fn hash_unclipped(&mut self) -> u64 {
+        if self.hash_unclipped_cache != 0 {
+            return self.hash_unclipped_cache;
+        }
+
+        let mut s = DefaultHasher::new();
+
+        for i in 0..self.max_width {
+            self.cells[i].hash(&mut s);
+        }
+        self.hash_unclipped_cache = s.finish();
+        self.hash_unclipped_cache
+    }
+
+    pub fn width(&self) -> usize {
+        self.width - self.start_index
+    }
+
+    pub fn max_width(&self) -> usize {
+        self.max_width
+    }
+
     pub fn resize(&mut self, width: LineCellIndex) {
         self.cells.resize(width, LineCell::new());
         self.nb_cells = 0;
+        self.max_width = width;
+        self.start_index = 0;
         self.width = width;
-        self.skip = None;
-        self.clip_width = None;
         self.read_only = false;
         self.metadata = false;
+        self.hash_cache = 0;
     }
 
-    pub fn skip(&mut self, width: usize) {
-        let width = ::std::cmp::min(width, self.width - 1);
-        self.skip = Some(width);
+    /// returns (start_index, width) tupple
+    /// [ 0 <= start_index < width <= screen.max_width() ]
+    pub fn clipping(&mut self) -> (usize, usize) {
+        (self.start_index, self.width)
+    }
+
+    /// [ 0 <= start_index < width <= screen.max_width() ]
+    pub fn set_clipping(&mut self, start_index: usize, width: usize) {
+        assert!(start_index < self.max_width);
+        assert!(width <= self.max_width);
+        assert!(start_index + width <= self.max_width);
+
+        self.start_index = start_index;
+        self.width = start_index + width;
+        self.hash_cache = 0;
         self.nb_cells = 0;
         self.read_only = false;
-    }
-
-    pub fn clear_skip(&mut self) {
-        self.skip = None;
-        self.nb_cells = 0;
-        self.read_only = false;
-    }
-
-    pub fn clip_width(&mut self, width: usize) {
-        let width = ::std::cmp::min(width, self.width);
-        self.clip_width = Some(width);
     }
 
     pub fn clear_clip_width(&mut self) {
-        self.clip_width = None;
+        self.set_clipping(0, self.max_width);
     }
 
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
-        let max_width = self.clip_width.unwrap_or(self.width);
-
-        // clip
-        let pos = self.skip.unwrap_or(0) + self.nb_cells;
-
-        if pos < max_width && !self.read_only {
-            self.cells[pos].cpi = cpi;
-            self.cells[pos].is_used = true;
+        if self.nb_cells < self.width() && !self.read_only {
+            self.cells[self.start_index + self.nb_cells].cpi = cpi;
+            self.cells[self.start_index + self.nb_cells].is_used = true;
 
             self.nb_cells += 1;
 
-            if self.nb_cells == max_width {
+            if self.nb_cells == self.width {
                 self.read_only = true;
             }
 
@@ -152,54 +173,45 @@ impl Line {
     }
 
     pub fn clear(&mut self) {
-        for w in 0..self.width {
-            self.cells[w] = LineCell::new();
+        for i in self.start_index..self.width {
+            self.cells[i] = LineCell::new();
         }
+
+        self.hash_cache = 0;
         self.nb_cells = 0;
         self.read_only = false;
         self.metadata = false;
         self.hash_cache = 0;
-        self.skip = None;
-        self.clip_width = None;
     }
 
     pub fn get_first_cpi(&self) -> Option<&CodepointInfo> {
-        let max_width = self.clip_width.unwrap_or(self.width);
-        let skip = self.skip.unwrap_or(0);
-
-        if skip < max_width {
-            Some(&self.cells[skip].cpi)
+        if self.start_index < self.width {
+            Some(&self.cells[self.start_index].cpi)
         } else {
+            // internal error
             None
         }
     }
 
     pub fn get_last_cpi(&self) -> Option<&CodepointInfo> {
-        let pos = self.skip.unwrap_or(0) + self.nb_cells;
-        if pos > 0 {
-            Some(&self.cells[pos - 1].cpi)
+        if self.nb_cells > 0 {
+            Some(&self.cells[self.start_index + self.nb_cells - 1].cpi)
         } else {
             None
         }
     }
 
     pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
-        let max_width = self.clip_width.unwrap_or(self.width);
-        let skip = self.skip.unwrap_or(0);
-
-        if skip + index < max_width {
-            Some(&self.cells[skip + index].cpi)
+        if index < self.width {
+            Some(&self.cells[self.start_index + index].cpi)
         } else {
             None
         }
     }
 
     pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
-        let max_width = self.clip_width.unwrap_or(self.width);
-        let skip = self.skip.unwrap_or(0);
-
-        if skip + index < max_width {
-            Some(&mut self.cells[skip + index].cpi)
+        if index < self.width {
+            Some(&mut self.cells[self.start_index + index].cpi)
         } else {
             None
         }

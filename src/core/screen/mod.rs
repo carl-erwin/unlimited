@@ -32,6 +32,14 @@ use self::line::LineCellIndex;
 
 pub type LineIndex = usize;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Rect {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
 /// A Screen is composed of Line(s).<br/>
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Screen {
@@ -39,20 +47,14 @@ pub struct Screen {
     pub line: Vec<Line>,
     /// the index of the line filled with the push method
     pub current_line_index: LineIndex,
+
+    //
+    clip: Rect,
+
     /// maximum number of elements the screen line can hold
-    width: usize,
+    max_width: usize,
     /// maximum number of lines the screen can hold
-    height: usize,
-
-    /// TODO
-    pub skip_width: Option<usize>,
-    /// TODO
-    pub skip_height: Option<usize>,
-
-    /// TODO
-    pub clip_width: Option<usize>,
-    /// TODO
-    pub clip_height: Option<usize>,
+    max_height: usize,
 
     /// the number of elements pushed in the screen
     pub nb_push: usize,
@@ -70,6 +72,9 @@ pub struct Screen {
 
 impl Screen {
     pub fn new(width: usize, height: usize) -> Screen {
+        assert!(width > 0);
+        assert!(height > 0);
+
         let mut line: Vec<Line> = Vec::new();
         for _ in 0..height {
             line.push(Line::new(width));
@@ -78,12 +83,15 @@ impl Screen {
         Screen {
             line,
             current_line_index: 0,
-            width,
-            height,
-            skip_width: None,
-            skip_height: None,
-            clip_width: None,
-            clip_height: None,
+            clip: Rect {
+                x: 0,
+                y: 0,
+                width,
+                height,
+            },
+            max_width: width,
+            max_height: height,
+
             nb_push: 0,
             first_offset: 0,
             last_offset: 0,
@@ -93,71 +101,41 @@ impl Screen {
         }
     }
 
+    pub fn clip_rect(&self) -> Rect {
+        self.clip.clone()
+    }
+
     pub fn width(&self) -> usize {
-        self.clip_width.unwrap_or(self.width)
+        self.clip.width - self.clip.x
     }
 
     pub fn height(&self) -> usize {
-        self.clip_height.unwrap_or(self.height)
+        self.clip.height - self.clip.y
     }
 
     // TODO: return bool
-    pub fn set_skip_width(&mut self, n: usize) {
-        if n < self.width() - 1 {
-            for h in 0..self.height {
-                self.line[h].skip(n);
-            }
-            self.skip_width = Some(n);
+    pub fn set_clipping(&mut self, x: usize, y: usize, width: usize, height: usize) {
+        assert!(x < self.max_width);
+        assert!(width <= self.max_width);
+        assert!(x + width <= self.max_width);
+
+        assert!(y < self.max_height);
+        assert!(height <= self.max_height);
+        assert!(y + height <= self.max_height);
+
+        for i in y..y + height {
+            self.line[i].set_clipping(x, width);
         }
-    }
 
-    pub fn clear_skip_width(&mut self) {
-        self.skip_width = None;
+        // store
+        self.clip = Rect {
+            x,
+            y,
+            width: x + width,
+            height: y + height,
+        };
 
-        for h in 0..self.height {
-            self.line[h].clear_clip_width();
-        }
-        self.clip_width = None;
-    }
-
-    // TODO: return bool
-    pub fn set_skip_height(&mut self, n: usize) {
-        if n < self.height - 1 {
-            self.set_clip_height(self.height - n);
-            self.skip_height = Some(n);
-        }
-    }
-
-    pub fn clear_skip_height(&mut self) {
-        self.skip_height = None;
-        self.clear_clip_height();
-    }
-
-    pub fn set_clip_width(&mut self, width: usize) {
-        if width < self.width {
-            for h in 0..self.height {
-                self.line[h].clip_width(width);
-            }
-            self.clip_width = Some(width);
-        }
-    }
-
-    pub fn clear_clip_width(&mut self) {
-        for h in 0..self.height {
-            self.line[h].clear_clip_width();
-        }
-        self.clip_width = None;
-    }
-
-    pub fn set_clip_height(&mut self, height: usize) {
-        if height < self.height - self.skip_height.unwrap_or(0) {
-            self.clip_height = Some(height);
-            self.current_line_index = 0;
-        }
-    }
-
-    pub fn clear_clip_height(&mut self) {
-        self.clip_height = None;
+        self.current_line_index = 0; // TODO: save screen state and restore while switching clip
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
@@ -165,12 +143,10 @@ impl Screen {
         for i in 0..height {
             self.line[i].resize(width);
         }
-        self.width = width;
-        self.height = height;
-        self.skip_width = None;
-        self.skip_height = None;
-        self.clip_width = None;
-        self.clip_height = None;
+        self.max_height = height;
+        self.max_width = width;
+        self.set_clipping(0, 0, width, height);
+
         self.current_line_index = 0;
         self.nb_push = 0;
         self.first_offset = 0;
@@ -183,13 +159,11 @@ impl Screen {
 
     /// append
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
-        let skip = self.skip_height.unwrap_or(0);
-
         if self.current_line_index == self.height() {
             return (false, self.current_line_index);
         }
 
-        if self.line[skip + self.current_line_index].read_only {
+        if self.line[self.clip.y + self.current_line_index].read_only {
             self.current_line_index += 1;
         }
 
@@ -198,7 +172,7 @@ impl Screen {
         }
 
         let cp = cpi.cp;
-        let line = &mut self.line[skip + self.current_line_index];
+        let line = &mut self.line[self.clip.y + self.current_line_index];
         let (ok, _) = line.push(cpi);
 
         if ok {
@@ -211,7 +185,7 @@ impl Screen {
     }
 
     pub fn clear(&mut self) {
-        for h in 0..self.height {
+        for h in 0..self.max_height {
             self.line[h].clear();
         }
         self.current_line_index = 0;
@@ -220,20 +194,19 @@ impl Screen {
         self.last_offset = 0;
         self.doc_max_offset = 0;
         self.input_size = 0;
-        self.clear_clip_height();
-        self.clear_clip_width();
+        self.set_clipping(0, 0, self.max_width, self.max_height);
     }
 
     pub fn max_width(&self) -> usize {
-        self.width
+        self.max_width
     }
 
     pub fn max_height(&self) -> usize {
-        self.height
+        self.max_height
     }
 
     pub fn get_mut_unclipped_line(&mut self, index: usize) -> Option<&mut Line> {
-        if index < self.height {
+        if index < self.max_height {
             Some(&mut self.line[index])
         } else {
             None
@@ -241,16 +214,15 @@ impl Screen {
     }
 
     pub fn get_mut_line(&mut self, index: usize) -> Option<&mut Line> {
-        let skip = self.skip_height.unwrap_or(0);
         if index < self.height() {
-            Some(&mut self.line[skip + index])
+            Some(&mut self.line[self.clip.y + index])
         } else {
             None
         }
     }
 
     pub fn get_unclipped_line(&self, index: usize) -> Option<&Line> {
-        if index < self.height {
+        if index < self.max_height {
             Some(&self.line[index])
         } else {
             None
@@ -258,20 +230,16 @@ impl Screen {
     }
 
     pub fn get_line(&self, index: usize) -> Option<&Line> {
-        let skip = self.skip_height.unwrap_or(0);
-
         if index < self.height() {
-            Some(&self.line[skip + index])
+            Some(&self.line[self.clip.y + index])
         } else {
             None
         }
     }
 
     pub fn get_mut_used_line(&mut self, index: usize) -> Option<&mut Line> {
-        let skip = self.skip_height.unwrap_or(0);
-
-        if index <= self.current_line_index && self.line[skip + index].nb_cells > 0 {
-            Some(&mut self.line[skip + index])
+        if index <= self.current_line_index && self.line[self.clip.y + index].nb_cells > 0 {
+            Some(&mut self.line[self.clip.y + index])
         } else {
             None
         }
@@ -282,15 +250,14 @@ impl Screen {
         (self.get_used_line(index), index)
     }
 
+    // improve this: loop over line nb_push > 0
     pub fn get_used_line(&self, index: usize) -> Option<&Line> {
-        let skip = self.skip_height.unwrap_or(0);
-
         if index >= self.height() {
             return None;
         }
 
-        if index <= self.current_line_index && self.line[skip + index].nb_cells > 0 {
-            Some(&self.line[skip + index])
+        if index <= self.current_line_index && self.line[self.clip.y + index].nb_cells > 0 {
+            Some(&self.line[self.clip.y + index])
         } else {
             None
         }
@@ -298,10 +265,8 @@ impl Screen {
 
     /// there must be 2 lines a least
     pub fn get_first_used_line(&self) -> Option<&Line> {
-        let skip = self.skip_height.unwrap_or(0);
-
         if 0 < self.current_line_index {
-            Some(&self.line[skip])
+            Some(&self.line[self.clip.y])
         } else {
             None
         }
@@ -309,9 +274,8 @@ impl Screen {
 
     /// there must be 2 line a least
     pub fn get_last_used_line(&self) -> Option<&Line> {
-        let skip = self.skip_height.unwrap_or(0);
         if self.current_line_index > 0 {
-            Some(&self.line[skip + self.current_line_index - 1])
+            Some(&self.line[self.clip.y + self.current_line_index - 1])
         } else {
             None
         }
@@ -371,7 +335,13 @@ impl Screen {
     }
 
     pub fn get_last_cpinfo(&self) -> (Option<&CodepointInfo>, usize, usize) {
-        let y = self.current_line_index;
+        // TODO: check
+        let y = if self.current_line_index == self.clip.height {
+            self.current_line_index - 1
+        } else {
+            self.current_line_index
+        };
+
         match self.get_used_line(y) {
             None => (None, 0, 0),
             Some(l) => {
@@ -382,19 +352,6 @@ impl Screen {
                     (None, 0, 0)
                 }
             }
-        }
-    }
-
-    pub fn get_used_cpinfo_clipped(
-        &mut self,
-        x: usize,
-        y: usize,
-    ) -> (Option<&CodepointInfo>, LineCellIndex, LineIndex) {
-        match self.get_used_line_clipped(y) {
-            (None, li) => (None, x, li),
-            (Some(l), li) => match l.get_used_cpi_clipped(x) {
-                (optcpi, lci) => (optcpi, lci, li),
-            },
         }
     }
 
@@ -422,11 +379,11 @@ impl Screen {
         for y in 0..self.height() {
             let l = self.get_line(y).unwrap();
             if l.nb_cells == 0 {
-                continue;
+                // continue; // TODO clipping ....
             }
 
             // TODO: handle line.skip
-            for x in 0..l.width {
+            for x in 0..l.width() {
                 let cpi = l.get_cpi(x).unwrap();
                 if cpi.metadata == true {
                     break;
@@ -455,26 +412,26 @@ impl Screen {
 #[test]
 fn test_screen() {
     let mut scr = Screen::new(640, 480);
-    assert_eq!(640, scr.width);
-    assert_eq!(480, scr.height);
-    assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].cells.len());
+    assert_eq!(640, scr.width());
+    assert_eq!(480, scr.height());
+    assert_eq!(scr.height(), scr.line.len());
+    assert_eq!(scr.width(), scr.line[0].cells.len());
 
     scr.resize(800, 600);
-    assert_eq!(800, scr.width);
-    assert_eq!(600, scr.height);
-    assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].cells.len());
+    assert_eq!(800, scr.width());
+    assert_eq!(600, scr.height());
+    assert_eq!(scr.height(), scr.line.len());
+    assert_eq!(scr.width(), scr.line[0].cells.len());
 
     scr.resize(1024, 768);
-    assert_eq!(1024, scr.width);
-    assert_eq!(768, scr.height);
-    assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].cells.len());
+    assert_eq!(1024, scr.width());
+    assert_eq!(768, scr.height());
+    assert_eq!(scr.height(), scr.line.len());
+    assert_eq!(scr.width(), scr.line[0].cells.len());
 
     scr.resize(640, 480);
-    assert_eq!(640, scr.width);
-    assert_eq!(480, scr.height);
-    assert_eq!(scr.height, scr.line.len());
-    assert_eq!(scr.width, scr.line[0].cells.len());
+    assert_eq!(640, scr.width());
+    assert_eq!(480, scr.height());
+    assert_eq!(scr.height(), scr.line.len());
+    assert_eq!(scr.width(), scr.line[0].cells.len());
 }
