@@ -389,7 +389,14 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 };
             }
 
-            self::termion::event::Key::F(_f) => {}
+            self::termion::event::Key::F(n) => {
+                return InputEvent::KeyPress {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                    key: Key::F(n as usize),
+                };
+            }
 
             self::termion::event::Key::Left => {
                 return InputEvent::KeyPress {
