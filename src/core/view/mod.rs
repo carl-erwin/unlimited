@@ -750,7 +750,7 @@ impl<'a> View<'a> {
     }
 
     pub fn save_document(&mut self) -> bool {
-        let doc = self.document.as_mut().unwrap().borrow_mut();
+        let mut doc = self.document.as_mut().unwrap().borrow_mut();
         match doc.sync_to_disk() {
             Err(_) => false,
             Ok(_) => true,

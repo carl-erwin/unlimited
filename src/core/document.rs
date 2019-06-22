@@ -119,10 +119,13 @@ pub struct Document<'a> {
 }
 
 impl<'a> Document<'a> {
-    pub fn sync_to_disk(&self) -> ::std::io::Result<()> {
+    pub fn sync_to_disk(&mut self) -> ::std::io::Result<()> {
         let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
-        self.buffer.sync_to_disk(&tmp_file_name)
+        self.buffer.sync_to_disk(&tmp_file_name).unwrap();
+        self.changed = false;
+
+        Ok(())
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
@@ -142,7 +145,11 @@ impl<'a> Document<'a> {
         self.buffer_log
             .add(offset, BufferOperationType::Insert, ins_data);
 
-        self.buffer.insert(offset, nr_bytes, &data[..nr_bytes])
+        let sz = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
+        if sz > 0 {
+            self.changed = true;
+        }
+        sz
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
@@ -164,7 +171,9 @@ impl<'a> Document<'a> {
 
         self.buffer_log
             .add(offset, BufferOperationType::Remove, rm_data);
-
+        if nr_bytes_removed > 0 {
+            self.changed = true;
+        }
         nr_bytes_removed
     }
 
@@ -172,12 +181,17 @@ impl<'a> Document<'a> {
         // apply op
         let mark_offset = match op.op {
             BufferOperationType::Insert => {
+                // TODO: check i/o errors
                 self.buffer.insert(op.offset, op.data.len(), &op.data);
+                self.changed = true;
 
                 op.offset + op.data.len() as u64
             }
             BufferOperationType::Remove => {
+                // TODO: check i/o errors
                 self.buffer.remove(op.offset, op.data.len(), None);
+                self.changed = true;
+
                 op.offset
             }
         };
