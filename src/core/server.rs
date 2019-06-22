@@ -266,10 +266,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             let (mw, mh) = (screen.max_width(), screen.max_height());
             print_clipped_line(
                 &mut screen,
-                &format!(
-                    "  unlimitED! {} {} {}x{}",
-                    VERSION, core_state.status, mw, mh
-                ),
+                &format!("  unlimitED! : {} {}x{} : {}", VERSION, mw, mh, doc.name),
             );
 
             if screen.max_height() >= 5 {
@@ -296,10 +293,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 );
 
                 screen.current_line_index = 1;
-                print_clipped_line(
-                    &mut screen,
-                    &format!("  footer! {} {}", VERSION, core_state.status),
-                );
+                print_clipped_line(&mut screen, &format!("{}", core_state.status));
 
                 for i in 2..footer_h {
                     screen.current_line_index = i;
@@ -469,6 +463,7 @@ fn process_input_events(
             key: Key::Unicode('s'),
         } => {
             view.save_document();
+            core_state.status = format!("<save>");
         }
 
         // ctrl+k
@@ -685,6 +680,17 @@ fn process_input_events(
             _ => {}
         },
 
+        InputEvent::ButtonPress {
+            ctrl: false,
+            alt: false,
+            shift: true,
+            x,
+            y,
+            button,
+        } => {
+            core_state.status = format!("<shift+click({},@({},{}))>", button, x, y);
+        }
+
         // mouse button released
         InputEvent::ButtonRelease {
             ctrl: false,
@@ -698,6 +704,8 @@ fn process_input_events(
             core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
         }
 
-        _ => {}
+        _ => {
+            core_state.status = format!(" unhandled event : {:?}", *ev);
+        }
     }
 }
