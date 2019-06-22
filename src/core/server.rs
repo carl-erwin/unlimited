@@ -259,7 +259,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
         let max_offset = doc.buffer.size as u64;
 
-        let nano_like = false;
+        let nano_like = true;
 
         // print header+footer
         if nano_like {
