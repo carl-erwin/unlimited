@@ -379,6 +379,23 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('q'),
         } => {
+            core_state.status = format!("<quit>");
+
+            let doc = view.document.as_mut().unwrap().borrow_mut();
+            if doc.changed == true {
+                core_state.status =
+                    format!("<quit> : modified buffer exits. type F4 to quit without saving");
+            } else {
+                core_state.quit = true;
+            }
+        }
+
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::F(4),
+        } => {
             core_state.quit = true;
         }
 
