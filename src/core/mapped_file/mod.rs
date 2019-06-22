@@ -790,8 +790,6 @@ impl<'a> MappedFile<'a> {
             return 0;
         }
 
-        assert!(nr_to_read > 0);
-
         let mut nr_read = 0;
         let mut nr_to_read = nr_to_read;
 
