@@ -279,8 +279,8 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 
         let mut have_cursor = false;
-        for c in 0..line.width() {
-            let cpi = line.get_cpi(c).unwrap();
+        for c in 0..line.max_width() {
+            let cpi = line.get_unclipped_cpi(c).unwrap();
 
             if cpi.is_selected {
                 have_cursor = true;
@@ -292,7 +292,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
             // check previous line
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             for c in 0..prev_line.width() {
-                let cpi = prev_line.get_cpi(c).unwrap();
+                let cpi = prev_line.get_unclipped_cpi(c).unwrap();
                 if cpi.is_selected {
                     have_cursor = true;
                     write!(stdout, "{}", termion::style::NoBold).unwrap();
@@ -308,8 +308,8 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
             }
         }
 
-        for c in 0..line.width() {
-            let cpi = line.get_cpi(c).unwrap();
+        for c in 0..line.max_width() {
+            let cpi = line.get_unclipped_cpi(c).unwrap();
 
             if prev_cpi.is_selected != cpi.is_selected {
                 if cpi.is_selected {
@@ -554,8 +554,13 @@ fn get_input_events(tx: &Sender<EventMessage>) {
     loop {
         let nb_read = unsafe { read(0, buf.as_mut_ptr() as *mut c_void, BUF_SIZE) as usize };
         let mut buf2 = Vec::<Result<u8, Error>>::with_capacity(nb_read);
+
+        let mut raw_data = Vec::<u8>::with_capacity(nb_read);
+
         for i in 0..nb_read {
             buf2.push(Ok(buf[i]));
+
+            raw_data.push(buf[i]);
         }
 
         let mut raw_evt = Vec::<_>::with_capacity(BUF_SIZE);
@@ -614,7 +619,13 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         }
 
         if !v.is_empty() {
-            let msg = EventMessage::new(0, Event::InputEvent { events: v });
+            let msg = EventMessage::new(
+                0,
+                Event::InputEvent {
+                    events: v,
+                    raw_data: Some(raw_data),
+                },
+            );
             tx.send(msg).unwrap_or(());
         }
     }

@@ -281,6 +281,10 @@ impl Screen {
         }
     }
 
+    pub fn get_last_used_line_index(&self) -> usize {
+        self.current_line_index
+    }
+
     pub fn get_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
         match self.get_line(y) {
             None => None,

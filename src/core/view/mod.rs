@@ -794,67 +794,98 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn button_press(&mut self, button: u32, x: i32, y: i32) {
+    pub fn button_press(&mut self, button: u32, x: i32, y: i32) -> String {
+        let mut s = String::new();
+
+        s.push_str(&format!("clip : {:?}", self.screen.clip_rect()));
+
         match button {
             0 => {}
             _ => {
-                return;
+                return s;
             }
         }
 
+        /*
+          (0,0) --------------------- max_width
+                     clip.x
+                 -------------------
+            |    | | | | | | | | | | |
+            |    | |   clip.width  | |
+          clip.y | | |_|_|_|_|_|_| h |
+            |    | | | | | | | | | e |
+            |    | | | | | | | | | i |
+            |    | | | | | | | | | g |
+            |    | | |_|_|_|_|_|_| h |
+            |    | | | | | | | | | t |
+            |    | | | | | | | | | | |
+            |    -------------------
+        max_height
+
+        */
+
         // move cursor to (x,y)
-        let (x, y) = (x as usize, y as usize);
+        let (mut x, mut y) = (x as usize, y as usize);
 
-        let max_offset = self.screen.doc_max_offset;
-
-        // check click past eof
-        let force_eof = if let (Some(_), _, last_y) = self.screen.get_last_cpinfo() {
-            y > last_y
+        // 0 <= x < screen.width()
+        if x < self.screen.clip_rect().x {
+            x = 0;
+        } else if x >= self.screen.clip_rect().x + self.screen.clip_rect().width {
+            x = self.screen.clip_rect().width - 1;
         } else {
-            false
-        };
+            x = x - self.screen.clip_rect().x;
+        }
 
-        // TODO: (x,y) = clip coordinates(x,y)
-        let skip_y = self.screen.clip_rect().y;
-        if y < skip_y {
-            return;
+        // 0 <= y < screen.height()
+        if y < self.screen.clip_rect().y {
+            y = 0;
+            s.push_str(&format!(", y case 1"));
+        } else if y > self.screen.clip_rect().y + self.screen.clip_rect().height {
+            y = self.screen.clip_rect().height - 1;
+            s.push_str(&format!(", y case 1"));
+        } else {
+            y = y - self.screen.clip_rect().y;
+            s.push_str(&format!(", y case 1"));
         }
-        if y > skip_y + self.screen.clip_rect().height {
-            return;
-        }
-        let y = y - skip_y;
-
-        let skip_x = self.screen.clip_rect().x;
-        if x < skip_x {
-            return;
-        }
-        if x > skip_x + self.screen.clip_rect().width {
-            return;
-        }
-        let x = x - skip_x;
 
         //
+        let max_offset = self.screen.doc_max_offset;
+
+        let last_li = self.screen.get_last_used_line_index();
+        if y >= last_li {
+            if last_li >= self.screen.height() {
+                y = self.screen.height() - 1;
+            } else {
+                y = last_li;
+            }
+            s.push_str(&format!(", y >= last_li"));
+        }
+
+        if let Some(l) = self.screen.get_line(y) {
+            s.push_str(&format!(", get line ok , x:{}, nbcells:{}", x, l.nb_cells));
+
+            if l.nb_cells > 0 && x > l.nb_cells {
+                x = l.nb_cells - 1;
+            } else if l.nb_cells == 0 {
+                x = 0;
+            }
+        } else {
+            s.push_str(&format!(", get line failed"));
+        }
+
+        s.push_str(&format!(", new (x:{},y:{})", x, y));
+
         if let Some(cpi) = self.screen.get_used_cpinfo(x, y) {
             if cpi.metadata == false {
                 for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                    m.offset = if force_eof { max_offset } else { cpi.offset };
+                    m.offset = cpi.offset;
                     // we only move one mark
                     break; // TODO: add main mark ref
                 }
             }
-        } else {
-            if let Some(l) = self.screen.get_used_line(y) {
-                if let Some(cpi) = l.get_last_cpi() {
-                    if cpi.metadata == false {
-                        for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-                            m.offset = if force_eof { max_offset } else { cpi.offset };
-                            // we only move one mark
-                            break; // TODO: add main mark ref
-                        }
-                    }
-                }
-            }
         }
+
+        s
     }
 
     pub fn button_release(&mut self, button: u32, _x: i32, _y: i32) {

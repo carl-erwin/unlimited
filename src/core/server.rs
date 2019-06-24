@@ -186,14 +186,20 @@ pub fn start(
                         // alloc/resize screen
                     }
 
-                    Event::InputEvent { events } => {
+                    Event::InputEvent { events, raw_data } => {
                         if !editor.view_map.is_empty() {
                             {
                                 let view_id = 0 as usize;
                                 let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
                                 core_state.pending_events = events.len();
                                 for ev in &events {
-                                    process_input_events(&mut core_state, &mut view, &ui_tx, &ev);
+                                    process_input_events(
+                                        &mut core_state,
+                                        &mut view,
+                                        &ui_tx,
+                                        &ev,
+                                        &raw_data,
+                                    );
                                     core_state.pending_events -= 1;
                                 }
                                 core_state.pending_events = events.len();
@@ -270,12 +276,13 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             );
 
             if screen.max_height() >= 5 {
+                let header_start_w = 2;
                 let header_start_h = 2;
                 let footer_h = 4;
                 screen.set_clipping(
-                    0,
+                    header_start_w,
                     header_start_h,
-                    screen.max_width() - 2,
+                    screen.max_width() - (header_start_w + 2),
                     screen.max_height() - (header_start_h + footer_h),
                 );
             }
@@ -305,12 +312,13 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
         let widths = [0 /* (screen.max_width() - 2) / 2 */];
         for off in widths.iter() {
             if nano_like && screen.max_height() >= 5 {
+                let header_w = 2;
                 let header_h = 2;
                 let footer_h = 4;
                 screen.set_clipping(
-                    *off,
+                    *off + header_w,
                     header_h,
-                    (screen.max_width() - 2) / widths.len(),
+                    (screen.max_width() - (header_w + 2)) / widths.len(),
                     screen.max_height() - (header_h + footer_h),
                 );
             }
@@ -360,9 +368,11 @@ fn process_input_events(
     view: &mut View,
     _ui_tx: &Sender<EventMessage>,
     ev: &InputEvent,
+    raw_data: &Option<Vec<u8>>,
 ) {
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
+        core_state.status = format!("no input event");
         return;
     }
 
@@ -665,8 +675,8 @@ fn process_input_events(
             button,
         } => match button {
             0 | 1 => {
-                view.button_press(button, x, y);
-                core_state.status = format!("<click({},@({},{}))>", button, x, y);
+                let s = view.button_press(button, x, y);
+                core_state.status = format!("<click({},@({},{}))> : {}", button, x, y, s);
             }
             3 => {
                 view.scroll_up(3);

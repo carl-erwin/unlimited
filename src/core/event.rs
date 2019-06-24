@@ -84,6 +84,7 @@ pub enum Event {
     /// Sent by ui thread. contains user input information.
     InputEvent {
         events: Vec<self::InputEvent>,
+        raw_data: Option<Vec<u8>>, /* raw data for debug */
     },
     /// Sent by ui thread. Request the rendering of a given view.
     RequestLayoutEvent {

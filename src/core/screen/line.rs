@@ -173,8 +173,8 @@ impl Line {
     }
 
     pub fn clear(&mut self) {
-        for i in self.start_index..self.width {
-            self.cells[i] = LineCell::new();
+        for i in 0..self.width() {
+            self.cells[self.start_index + i] = LineCell::new();
         }
 
         self.hash_cache = 0;
@@ -202,15 +202,23 @@ impl Line {
     }
 
     pub fn get_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
-        if index < self.width {
+        if index < self.width() {
             Some(&self.cells[self.start_index + index].cpi)
         } else {
             None
         }
     }
 
+    pub fn get_unclipped_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
+        if index < self.max_width() {
+            Some(&self.cells[index].cpi)
+        } else {
+            None
+        }
+    }
+
     pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
-        if index < self.width {
+        if index < self.width() {
             Some(&mut self.cells[self.start_index + index].cpi)
         } else {
             None
