@@ -816,7 +816,6 @@ impl<'a> MappedFile<'a> {
             }
         }
 
-        assert!(nr_read > 0);
         nr_read
     }
 
