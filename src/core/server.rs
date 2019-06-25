@@ -256,102 +256,70 @@ fn print_clipped_line(screen: &mut Screen, s: &str) {
 
 fn fill_screen(core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
-        let mut screen = &mut view.screen;
-
-        screen.clear();
-
         let mut data = vec![];
         let doc = view.document.as_ref().unwrap().borrow_mut();
 
         let max_offset = doc.buffer.size as u64;
 
-        let nano_like = true;
+        let mut nano_like = true;
+        if view.screen.height() < 7 {
+            nano_like = false;
+        }
 
         // print header+footer
+        let mut header_screen = Screen::new(view.screen.width(), 2);
+        let mut footer_screen = Screen::new(view.screen.width(), 3);
+
         if nano_like {
-            let (mw, mh) = (screen.max_width(), screen.max_height());
+            let (mw, mh) = (view.screen.max_width(), view.screen.max_height());
             print_clipped_line(
-                &mut screen,
+                &mut header_screen,
                 &format!("  unlimitED! : {} {}x{} : {}", VERSION, mw, mh, doc.name),
             );
 
-            if screen.max_height() >= 5 {
-                let header_start_w = 2;
-                let header_start_h = 2;
-                let footer_h = 4;
-                screen.set_clipping(
-                    header_start_w,
-                    header_start_h,
-                    screen.max_width() - (header_start_w + 2),
-                    screen.max_height() - (header_start_h + footer_h),
-                );
+            print_clipped_line(&mut footer_screen, &format!("{}", core_state.status));
+            for i in 1..3 {
+                footer_screen.current_line_index = i;
+                print_clipped_line(&mut footer_screen, &format!(""));
             }
+        };
 
-            // print footer
-            // nano-like help line
-            // todo: add line.metadata = true;
-            if screen.max_height() >= 5 {
-                let footer_h = 4;
-                screen.set_clipping(
-                    0,
-                    screen.max_height() - (footer_h),
-                    screen.max_width() - 2,
-                    footer_h,
-                );
+        let nb_splits = 8;
 
-                screen.current_line_index = 1;
-                print_clipped_line(&mut screen, &format!("{}", core_state.status));
+        let mut height = view.screen.height();
+        let width = ((view.screen.max_width() - 2) / nb_splits) - 1;
 
-                for i in 2..footer_h {
-                    screen.current_line_index = i;
-                    print_clipped_line(&mut screen, &format!(""));
-                }
-            }
-        }
-        // restore state here
-        let widths = [0 /* (screen.max_width() - 2) / 2 */];
-        for off in widths.iter() {
-            if nano_like && screen.max_height() >= 5 {
-                let header_w = 2;
-                let header_h = 2;
-                let footer_h = 4;
-                screen.set_clipping(
-                    *off + header_w,
-                    header_h,
-                    (screen.max_width() - (header_w + 2)) / widths.len(),
-                    screen.max_height() - (header_h + footer_h),
-                );
-            }
-        }
-        let max_size = (screen.width() * screen.height() * 4) as usize;
+        let max_size = (width * height * 4) as usize;
         doc.read(view.start_offset, max_size, &mut data);
 
-        view.end_offset = build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
+        view.screen.clear();
+        for n in 0..nb_splits {
+            if nano_like {
+                height =
+                    view.screen.height() - (header_screen.height() + footer_screen.height() + 1);
+            }
+            let mut screen = Screen::new(width, height);
 
-        // core_state.last_offset = view.end_offset;
+            view.end_offset =
+                build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
 
-        // render marks
+            // set_render_marks
+            // brute force for now
+            for m in view.moving_marks.borrow().iter() {
+                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+                if m.offset < view.start_offset || m.offset > view.end_offset {
+                    continue;
+                }
 
-        // brute force for now
-
-        for m in view.moving_marks.borrow().iter() {
-            // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
-
-            if m.offset >= view.start_offset && m.offset <= view.end_offset {
                 for l in 0..screen.height() {
                     let line = screen.get_mut_line(l).unwrap();
 
                     if line.metadata == true {
-                        continue;
+                        // continue;
                     }
 
                     for c in 0..line.nb_cells {
                         let cpi = line.get_mut_cpi(c).unwrap();
-
-                        //if cpi.offset > m.offset {
-                        //break;
-                        //}
-
                         if cpi.offset == m.offset && cpi.metadata == false {
                             cpi.is_selected = true;
                             // core_state.mark_offset = m.offset;
@@ -359,6 +327,24 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                     }
                 }
             }
+            // view.screen.set_clipping(n*width, header_h, width, height);
+            let (x, y) = if nano_like {
+                (n * width + n, header_screen.height())
+            } else {
+                (n * width + n, 0)
+            };
+            let ret = view.screen.copy_to(x, y, &screen);
+            assert_eq!(ret, true);
+        }
+
+        if nano_like {
+            let (x, y) = (0, 0);
+            let ret = view.screen.copy_to(x, y, &header_screen);
+            assert_eq!(ret, true);
+
+            let (x, y) = (0, view.screen.max_height() - footer_screen.height());
+            let ret = view.screen.copy_to(x, y, &footer_screen);
+            assert_eq!(ret, true);
         }
     }
 }

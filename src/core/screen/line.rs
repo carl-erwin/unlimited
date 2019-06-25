@@ -218,6 +218,14 @@ impl Line {
         }
     }
 
+    pub fn get_mut_unclipped_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
+        if index < self.max_width() {
+            Some(&mut self.cells[index].cpi)
+        } else {
+            None
+        }
+    }
+
     pub fn get_mut_cpi(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
         if index < self.width() {
             Some(&mut self.cells[self.start_index + index].cpi)

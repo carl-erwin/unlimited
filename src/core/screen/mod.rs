@@ -101,6 +101,25 @@ impl Screen {
         }
     }
 
+    pub fn copy_to(&mut self, x: usize, y: usize, src: &Screen) -> bool {
+        if x + src.width() > self.width() || y + src.height() > self.height() {
+            panic!();
+            return false;
+        }
+
+        for src_y in 0..src.height() {
+            for src_x in 0..src.width() {
+                if let Some(cpi_src) = src.get_cpinfo(src_x, src_y) {
+                    if let Some(cpi_dst) = self.get_mut_cpinfo(x + src_x, y + src_y) {
+                        *cpi_dst = *cpi_src;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
     pub fn clip_rect(&self) -> Rect {
         self.clip.clone()
     }
