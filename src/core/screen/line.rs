@@ -91,9 +91,10 @@ impl Line {
 
         let mut s = DefaultHasher::new();
 
-        for i in 0..self.nb_cells {
+        for i in 0..self.width() {
             self.cells[self.start_index + i].hash(&mut s);
         }
+
         self.hash_cache = s.finish();
         self.hash_cache
     }

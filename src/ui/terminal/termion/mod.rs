@@ -289,7 +289,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         }
 
         if check_hash {
-            // check previous line
+            // check previous screen line
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             for c in 0..prev_line.width() {
                 let cpi = prev_line.get_unclipped_cpi(c).unwrap();
@@ -304,6 +304,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         if check_hash && !have_cursor {
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
+                 // write!(stdout, "SAME ").unwrap();
                 continue;
             }
         }
