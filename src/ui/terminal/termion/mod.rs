@@ -76,7 +76,7 @@ pub fn main_loop(
     let mut seq: usize = 0;
 
     fn get_next_seq(seq: &mut usize) -> usize {
-        *seq = *seq + 1;
+        *seq += 1;
         *seq
     }
 
@@ -304,7 +304,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
         if check_hash && !have_cursor {
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
-                 // write!(stdout, "SAME ").unwrap();
+                // write!(stdout, "SAME ").unwrap();
                 continue;
             }
         }
@@ -558,21 +558,17 @@ fn get_input_events(tx: &Sender<EventMessage>) {
 
         let mut raw_data = Vec::<u8>::with_capacity(nb_read);
 
-        for i in 0..nb_read {
-            buf2.push(Ok(buf[i]));
-
-            raw_data.push(buf[i]);
+        for b in buf.iter().take(nb_read) {
+            buf2.push(Ok(*b));
+            raw_data.push(*b);
         }
 
         let mut raw_evt = Vec::<_>::with_capacity(BUF_SIZE);
         let mut it = buf2.into_iter();
-        loop {
-            if let Some(val) = it.next() {
-                if let Ok(evt) = parse_event(val.unwrap(), &mut it) {
-                    raw_evt.push(evt);
-                } else {
-                    break;
-                }
+
+        while let Some(val) = it.next() {
+            if let Ok(evt) = parse_event(val.unwrap(), &mut it) {
+                raw_evt.push(evt);
             } else {
                 break;
             }
@@ -643,7 +639,7 @@ fn display_scroll_bar(screen: &Screen, width: u16, height: u16, mut stdout: &mut
     .unwrap();
 
     // spaces
-    for h in 0..height + 1 {
+    for h in 0..=height {
         terminal_cursor_to(&mut stdout, width + 2, h + 3);
         write!(stdout, " ",).unwrap();
     }

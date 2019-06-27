@@ -91,11 +91,11 @@ impl<'a> FilterIoData<'a> {
             size: cp_size,
             data:
                 FilterData::Unicode {
-                    cp: _,
                     real_cp,
                     cp_index, // be careful used const u64 invalid_cp_index
                     fragment_flag,
                     fragment_count,
+                    ..
                 },
         } = io
         {
@@ -276,7 +276,10 @@ fn layout_filter_prepare_raw_data<'a>(
     data_vec
 }
 
-fn layout_filter_utf8(filter_in: &Vec<FilterIoData>, filter_out: &mut Vec<FilterIoData>) -> bool {
+fn layout_filter_utf8<'a>(
+    filter_in: &'a [FilterIoData],
+    filter_out: &mut Vec<FilterIoData>,
+) -> bool {
     if filter_in.is_empty() {
         *filter_out = vec![];
         return true;
@@ -439,37 +442,35 @@ fn layout_filter_tabulation<'a>(
     let mut column_count = 0;
 
     for io in filter_in.iter() {
-        match &*io {
-            FilterIoData {
-                data: FilterData::Unicode { cp, .. },
-                ..
-            } => {
-                if prev_cp == '\r' || prev_cp == '\n' {
-                    column_count = 0;
-                }
+        if let FilterIoData {
+            data: FilterData::Unicode { cp, .. },
+            ..
+        } = &*io
+        {
+            if prev_cp == '\r' || prev_cp == '\n' {
+                column_count = 0;
+            }
 
-                match (prev_cp, u32_to_char(*cp)) {
-                    (_, '\t') => {
-                        prev_cp = '\t';
+            match (prev_cp, u32_to_char(*cp)) {
+                (_, '\t') => {
+                    prev_cp = '\t';
 
-                        let tab_size = 8;
-                        let padding = tab_size - (column_count % tab_size);
+                    let tab_size = 8;
+                    let padding = tab_size - (column_count % tab_size);
 
-                        for _ in 0..padding {
-                            let new_io = FilterIoData::replace_codepoint(io, ' ' as char);
-                            filter_out.push(new_io);
-                            column_count += 1;
-                        }
-                    }
-
-                    (_, codepoint) => {
-                        prev_cp = codepoint;
-                        filter_out.push(io.clone());
+                    for _ in 0..padding {
+                        let new_io = FilterIoData::replace_codepoint(io, ' ');
+                        filter_out.push(new_io);
                         column_count += 1;
                     }
                 }
+
+                (_, codepoint) => {
+                    prev_cp = codepoint;
+                    filter_out.push(io.clone());
+                    column_count += 1;
+                }
             }
-            _ => { /* unexpected */ }
         }
     }
 
@@ -503,8 +504,8 @@ fn layout_keyword_highlighting<'a>(
                     accum.push(io.clone());
                     let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
                     let nr_bytes = utf8::encode(*cp, &mut utf8_out);
-                    for i in 0..nr_bytes {
-                        utf8_word.push(utf8_out[i]);
+                    for b in utf8_out.iter().take(nr_bytes) {
+                        utf8_word.push(*b);
                     }
                     continue;
                 }
@@ -560,7 +561,7 @@ fn layout_keyword_highlighting<'a>(
                     _ => {
                         let mut is_digit = true;
                         for c in utf8_word.iter() {
-                            if c < &b'0' || c > &b'9' {
+                            if *c < b'0' || *c > b'9' {
                                 is_digit = false;
                                 break;
                             }
@@ -612,21 +613,19 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
     let mut last_pushed_offset = base_offset;
 
     for io in filter_in.iter() {
-        match &*io {
-            FilterIoData {
-                offset,
-                data: FilterData::Unicode { cp, .. },
-                color,
-                ..
-            } => {
-                let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset, *color));
-                if push_ok == false {
-                    break;
-                }
-
-                last_pushed_offset = *offset;
+        if let FilterIoData {
+            offset,
+            data: FilterData::Unicode { cp, .. },
+            color,
+            ..
+        } = &*io
+        {
+            let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset, *color));
+            if !push_ok {
+                break;
             }
-            _ => {}
+
+            last_pushed_offset = *offset;
         }
     }
 

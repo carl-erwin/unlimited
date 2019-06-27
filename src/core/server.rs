@@ -98,130 +98,127 @@ pub fn start(
     let mut seq: usize = 0;
 
     fn get_next_seq(seq: &mut usize) -> usize {
-        *seq = *seq + 1;
+        *seq += 1;
         *seq
     }
 
     while !core_state.quit {
-        match core_rx.recv() {
-            Ok(evt) => {
-                match evt.event {
-                    Event::ApplicationQuitEvent => {
-                        break;
-                    }
+        if let Ok(evt) = core_rx.recv() {
+            match evt.event {
+                Event::ApplicationQuitEvent => {
+                    break;
+                }
 
-                    Event::RequestDocumentList => {
-                        let mut list: Vec<(document::Id, String)> = vec![];
-                        for e in &editor.document_map {
-                            let name = &e.1.as_ref().borrow().name;
-                            list.push((*e.0, name.to_string()));
-                        }
-                        let msg =
-                            EventMessage::new(get_next_seq(&mut seq), Event::DocumentList { list });
+                Event::RequestDocumentList => {
+                    let mut list: Vec<(document::Id, String)> = vec![];
+                    for e in &editor.document_map {
+                        let name = &e.1.as_ref().borrow().name;
+                        list.push((*e.0, name.to_string()));
+                    }
+                    let msg =
+                        EventMessage::new(get_next_seq(&mut seq), Event::DocumentList { list });
+                    ui_tx.send(msg).unwrap_or(());
+                }
+
+                Event::CreateView {
+                    width,
+                    height,
+                    doc_id,
+                } => {
+                    let vid = editor.view_map.len();
+                    let doc = editor.document_map.get(&doc_id);
+                    if let Some(doc) = doc {
+                        let view =
+                            View::new(vid as u64, 0 as u64, width, height, Some(doc.clone()));
+
+                        editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
+
+                        let msg = EventMessage::new(
+                            get_next_seq(&mut seq),
+                            Event::ViewCreated {
+                                width,
+                                height,
+                                doc_id,
+                                view_id: vid as Id,
+                            },
+                        );
                         ui_tx.send(msg).unwrap_or(());
                     }
+                }
 
-                    Event::CreateView {
-                        width,
-                        height,
-                        doc_id,
-                    } => {
-                        let vid = editor.view_map.len();
-                        let doc = editor.document_map.get(&doc_id);
-                        if let Some(doc) = doc {
-                            let view =
-                                View::new(vid as u64, 0 as u64, width, height, Some(doc.clone()));
+                /*
+                    <- createView : w, h , doc::id
+                    -> viewCreate : view id, w, h, doc::id
+                */
+                /*
+                    <- destroyView : w, h , doc::id
+                    -> viewDestroyed : view id, w, h, doc::id
+                */
+                Event::RequestLayoutEvent {
+                    view_id,
+                    doc_id,
+                    width,
+                    height,
+                } => {
+                    let view_id = view_id as usize;
+                    if view_id < editor.view_map.len() {
+                        {
+                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
 
-                            editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
-
-                            let msg = EventMessage::new(
-                                get_next_seq(&mut seq),
-                                Event::ViewCreated {
-                                    width,
-                                    height,
-                                    doc_id,
-                                    view_id: vid as Id,
-                                },
-                            );
-                            ui_tx.send(msg).unwrap_or(());
+                            // resize ?
+                            if width != view.screen.width() || height != view.screen.height() {
+                                view.screen = Box::new(Screen::new(width, height));
+                            }
                         }
+
+                        build_layout_and_send_event(
+                            &mut editor,
+                            &mut core_state,
+                            ui_tx,
+                            doc_id,
+                            view_id as u64,
+                        );
                     }
 
-                    /*
-                        <- createView : w, h , doc::id
-                        -> viewCreate : view id, w, h, doc::id
-                    */
-                    /*
-                        <- destroyView : w, h , doc::id
-                        -> viewDestroyed : view id, w, h, doc::id
-                    */
-                    Event::RequestLayoutEvent {
-                        view_id,
-                        doc_id,
-                        width,
-                        height,
-                    } => {
-                        let view_id = view_id as usize;
-                        if view_id < editor.view_map.len() {
-                            {
-                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                    // is there a view/screen ?
+                    // with the correct size ?
+                    // alloc/resize screen
+                }
 
-                                // resize ?
-                                if width != view.screen.width() || height != view.screen.height() {
-                                    view.screen = Box::new(Screen::new(width, height));
-                                }
+                Event::InputEvent { events, raw_data } => {
+                    if !editor.view_map.is_empty() {
+                        {
+                            let view_id = 0 as usize;
+                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                            core_state.pending_events = events.len();
+                            for ev in &events {
+                                process_input_events(
+                                    &mut core_state,
+                                    &mut view,
+                                    &ui_tx,
+                                    &ev,
+                                    &raw_data,
+                                );
+                                core_state.pending_events -= 1;
                             }
+                            core_state.pending_events = events.len();
+                        }
 
+                        // TODO: is view changed only
+                        if true {
                             build_layout_and_send_event(
                                 &mut editor,
                                 &mut core_state,
                                 ui_tx,
-                                doc_id,
-                                view_id as u64,
+                                0,
+                                0 as u64,
                             );
                         }
-
-                        // is there a view/screen ?
-                        // with the correct size ?
-                        // alloc/resize screen
                     }
-
-                    Event::InputEvent { events, raw_data } => {
-                        if !editor.view_map.is_empty() {
-                            {
-                                let view_id = 0 as usize;
-                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-                                core_state.pending_events = events.len();
-                                for ev in &events {
-                                    process_input_events(
-                                        &mut core_state,
-                                        &mut view,
-                                        &ui_tx,
-                                        &ev,
-                                        &raw_data,
-                                    );
-                                    core_state.pending_events -= 1;
-                                }
-                                core_state.pending_events = events.len();
-                            }
-
-                            // TODO: is view changed only
-                            if true {
-                                build_layout_and_send_event(
-                                    &mut editor,
-                                    &mut core_state,
-                                    ui_tx,
-                                    0,
-                                    0 as u64,
-                                );
-                            }
-                        }
-                    }
-
-                    _ => {}
                 }
+
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -261,10 +258,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
         let max_offset = doc.buffer.size as u64;
 
-        let mut nano_like = true;
-        if view.screen.height() < 7 {
-            nano_like = false;
-        }
+        let nano_like = view.screen.height() >= 7;
 
         // print header+footer
         let mut header_screen = Screen::new(view.screen.width(), 2);
@@ -277,10 +271,10 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 &format!("  unlimitED! : {} {}x{} : {}", VERSION, mw, mh, doc.name),
             );
 
-            print_clipped_line(&mut footer_screen, &format!("{}", core_state.status));
+            print_clipped_line(&mut footer_screen, &core_state.status.to_string());
             for i in 1..3 {
                 footer_screen.current_line_index = i;
-                print_clipped_line(&mut footer_screen, &format!(""));
+                print_clipped_line(&mut footer_screen, &"".to_string());
             }
         };
 
@@ -314,16 +308,13 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 for l in 0..screen.height() {
                     let line = screen.get_mut_line(l).unwrap();
 
-                    if line.metadata == true {
+                    if line.metadata {
                         // continue;
                     }
 
                     for c in 0..line.nb_cells {
                         let cpi = line.get_mut_cpi(c).unwrap();
-                        if cpi.offset == m.offset && cpi.metadata == false {
-                            cpi.is_selected = true;
-                            // core_state.mark_offset = m.offset;
-                        }
+                        cpi.is_selected = cpi.offset == m.offset && !cpi.metadata;
                     }
                 }
             }
@@ -354,11 +345,11 @@ fn process_input_events(
     view: &mut View,
     _ui_tx: &Sender<EventMessage>,
     ev: &InputEvent,
-    raw_data: &Option<Vec<u8>>,
+    _raw_data: &Option<Vec<u8>>,
 ) {
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
-        core_state.status = format!("no input event");
+        core_state.status = "no input event".to_string();
         return;
     }
 
@@ -369,12 +360,12 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('q'),
         } => {
-            core_state.status = format!("<quit>");
+            core_state.status = "<quit>".to_string();
 
             let doc = view.document.as_mut().unwrap().borrow_mut();
-            if doc.changed == true {
+            if doc.changed {
                 core_state.status =
-                    format!("<quit> : modified buffer exits. type F4 to quit without saving");
+                    "<quit> : modified buffer exits. type F4 to quit without saving".to_string();
             } else {
                 core_state.quit = true;
             }
@@ -396,7 +387,7 @@ fn process_input_events(
             key: Key::Unicode('u'),
         } => {
             view.undo();
-            core_state.status = format!("<undo>");
+            core_state.status = "<undo>".to_string();
         }
 
         InputEvent::KeyPress {
@@ -406,7 +397,7 @@ fn process_input_events(
             key: Key::Unicode('r'),
         } => {
             view.redo();
-            core_state.status = format!("<redo>");
+            core_state.status = "<redo>".to_string();
         }
 
         // ctrl+a
@@ -459,7 +450,7 @@ fn process_input_events(
             key: Key::Unicode('s'),
         } => {
             view.save_document();
-            core_state.status = format!("<save>");
+            core_state.status = "<save>".to_string();
         }
 
         // ctrl+k

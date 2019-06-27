@@ -141,8 +141,8 @@ impl<'a> View<'a> {
         for codepoint in array {
             let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
             let data_size = utf8::encode(*codepoint as u32, &mut data);
-            for i in 0..data_size {
-                utf8.push(data[i]);
+            for d in data.iter().take(data_size) {
+                utf8.push(*d);
             }
         }
 
@@ -365,14 +365,14 @@ impl<'a> View<'a> {
                 if l.nb_cells > 0 {
                     let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                     let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                    if cpi.metadata == false {
+                    if !cpi.metadata {
                         m.offset = cpi.offset;
                         mark_moved = true;
                     }
                 }
             }
 
-            if mark_moved == false {
+            if !mark_moved {
                 // mark was on first line or offscreen
                 if self.screen.contains_offset(m.offset) {
                     scroll_needed = true;
@@ -480,7 +480,7 @@ impl<'a> View<'a> {
                     if l.nb_cells > 0 {
                         let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                         let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                        if cpi.metadata == false {
+                        if !cpi.metadata {
                             m.offset = cpi.offset;
                         }
                     }
@@ -751,10 +751,7 @@ impl<'a> View<'a> {
 
     pub fn save_document(&mut self) -> bool {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
-        match doc.sync_to_disk() {
-            Err(_) => false,
-            Ok(_) => true,
-        }
+        doc.sync_to_disk().is_ok()
     }
 
     pub fn cut_to_end_of_line(&mut self) -> bool {
@@ -833,23 +830,23 @@ impl<'a> View<'a> {
         } else if x >= self.screen.clip_rect().x + self.screen.clip_rect().width {
             x = self.screen.clip_rect().width - 1;
         } else {
-            x = x - self.screen.clip_rect().x;
+            x -= self.screen.clip_rect().x;
         }
 
         // 0 <= y < screen.height()
         if y < self.screen.clip_rect().y {
             y = 0;
-            s.push_str(&format!(", y case 1"));
+            s.push_str(", y case 1");
         } else if y > self.screen.clip_rect().y + self.screen.clip_rect().height {
             y = self.screen.clip_rect().height - 1;
-            s.push_str(&format!(", y case 1"));
+            s.push_str(", y case 2");
         } else {
-            y = y - self.screen.clip_rect().y;
-            s.push_str(&format!(", y case 1"));
+            y -= self.screen.clip_rect().y;
+            s.push_str(", y case 3");
         }
 
         //
-        let max_offset = self.screen.doc_max_offset;
+        let _max_offset = self.screen.doc_max_offset;
 
         let last_li = self.screen.get_last_used_line_index();
         if y >= last_li {
@@ -858,7 +855,7 @@ impl<'a> View<'a> {
             } else {
                 y = last_li;
             }
-            s.push_str(&format!(", y >= last_li"));
+            s.push_str(", y >= last_li");
         }
 
         if let Some(l) = self.screen.get_line(y) {
@@ -870,13 +867,13 @@ impl<'a> View<'a> {
                 x = 0;
             }
         } else {
-            s.push_str(&format!(", get line failed"));
+            s.push_str(", get line failed");
         }
 
         s.push_str(&format!(", new (x:{},y:{})", x, y));
 
         if let Some(cpi) = self.screen.get_used_cpinfo(x, y) {
-            if cpi.metadata == false {
+            if !cpi.metadata {
                 for m in &mut self.moving_marks.borrow_mut().iter_mut() {
                     m.offset = cpi.offset;
                     // we only move one mark

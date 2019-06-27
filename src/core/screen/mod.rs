@@ -103,7 +103,6 @@ impl Screen {
 
     pub fn copy_to(&mut self, x: usize, y: usize, src: &Screen) -> bool {
         if x + src.width() > self.width() || y + src.height() > self.height() {
-            panic!();
             return false;
         }
 
@@ -408,7 +407,7 @@ impl Screen {
             // TODO: handle line.skip
             for x in 0..l.width() {
                 let cpi = l.get_cpi(x).unwrap();
-                if cpi.metadata == true {
+                if !cpi.metadata {
                     break;
                 }
                 if cpi.offset == offset {

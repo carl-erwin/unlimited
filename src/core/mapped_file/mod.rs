@@ -491,8 +491,8 @@ impl<'a> MappedFile<'a> {
 
         let (node_ref, name) = if let Some(parent_idx) = parent_idx {
             match relation {
-                &NodeRelation::Left => (&mut pool[parent_idx].left, "left"),
-                &NodeRelation::Right => (&mut pool[parent_idx].right, "right"),
+                NodeRelation::Left => (&mut pool[parent_idx].left, "left"),
+                NodeRelation::Right => (&mut pool[parent_idx].right, "right"),
                 _ => unimplemented!(),
             }
         } else {
@@ -535,7 +535,7 @@ impl<'a> MappedFile<'a> {
         pg_size: u64,
         node_size: u64,
         base_offset: u64,
-    ) -> () {
+    ) {
         let b_off = base_offset;
 
         // is leaf ?
@@ -758,11 +758,7 @@ impl<'a> MappedFile<'a> {
                 }
 
                 unsafe {
-                    ptr::copy(
-                        &it.base[off],
-                        vec.as_mut_ptr().offset(nr_read as isize),
-                        max_read,
-                    );
+                    ptr::copy(&it.base[off], vec.as_mut_ptr().add(nr_read), max_read);
                 }
 
                 nr_to_read -= max_read;
@@ -1069,7 +1065,7 @@ impl<'a> MappedFile<'a> {
         }
 
         // build flatmap iterator
-        let mut input_data_iter = input_slc.iter().flat_map(|&x| x.iter()).into_iter();
+        let mut input_data_iter = input_slc.iter().flat_map(|&x| x.iter());
 
         // copy
         let mut prev_idx = prev_idx;
@@ -1338,16 +1334,14 @@ impl<'a> MappedFile<'a> {
         node: Option<NodeIndex>,
     ) {
         if let Some(idx) = node {
-            if pool[idx].to_delete == false {
+            if !pool[idx].to_delete {
                 if DEBUG {
                     eprintln!(" mark for deletion idx({})", idx);
                 }
                 to_delete.push(idx);
                 pool[idx].to_delete = true;
-            } else {
-                if DEBUG {
-                    eprintln!(" idx({}) ALREDY MARK FOR DELETION", idx);
-                }
+            } else if DEBUG {
+                eprintln!(" idx({}) ALREDY MARK FOR DELETION", idx);
             }
         }
     }
@@ -1406,9 +1400,7 @@ impl<'a> MappedFile<'a> {
         mut pool: &mut FreeListAllocator<Node>,
         node_idx: Option<NodeIndex>,
     ) -> Option<NodeIndex> {
-        if node_idx.is_none() {
-            return None;
-        }
+        node_idx?;
 
         let idx = node_idx.unwrap();
         let mut new_root = Some(idx);
@@ -1521,15 +1513,12 @@ impl<'a> MappedFile<'a> {
             eprintln!("*************  ALL USED NODES ({}) ***********", rsn);
             for i in 0..file.pool.slot.len() {
                 let n = &file.pool.slot[i];
-                match n.used {
-                    true => {
-                        eprintln!("[{}] : {:?}", i, file.pool.slot[i]);
-                    }
-                    false => {
-                        assert_eq!(n.parent, None);
-                        assert_eq!(n.prev, None);
-                        assert_eq!(n.next, None);
-                    }
+                if n.used {
+                    eprintln!("[{}] : {:?}", i, file.pool.slot[i]);
+                } else {
+                    assert_eq!(n.parent, None);
+                    assert_eq!(n.prev, None);
+                    assert_eq!(n.next, None);
                 }
             }
             eprintln!("***********************");
@@ -1657,7 +1646,7 @@ impl<'a> MappedFile<'a> {
                 eprintln!("current leaf is idx({}) : {:?} ", idx, n);
             }
 
-            assert!(n.used == true);
+            assert!(n.used);
 
             if visited.contains(&idx) {
                 panic!();
@@ -1691,13 +1680,10 @@ impl<'a> MappedFile<'a> {
 
         for i in 0..file.pool.slot.len() {
             let n = &file.pool.slot[i];
-            match n.used {
-                true => {}
-                false => {
-                    assert_eq!(n.parent, None);
-                    assert_eq!(n.prev, None);
-                    assert_eq!(n.next, None);
-                }
+            if !n.used {
+                assert_eq!(n.parent, None);
+                assert_eq!(n.prev, None);
+                assert_eq!(n.next, None);
             }
         }
     }
@@ -1932,7 +1918,7 @@ mod tests {
         let root_node = Node {
             used: true,
             to_delete: false,
-            fd: fd,
+            fd,
             size: file_size,
             parent: None,
             left: None,
