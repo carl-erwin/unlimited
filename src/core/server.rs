@@ -228,7 +228,7 @@ pub fn start(
 
 use crate::core::VERSION;
 
-fn print_clipped_line(screen: &mut Screen, s: &str) {
+fn print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     let mut nb_push = 0;
     for c in s.chars().take(screen.width()) {
         let mut cpi = CodepointInfo::new();
@@ -236,6 +236,7 @@ fn print_clipped_line(screen: &mut Screen, s: &str) {
         cpi.is_selected = true;
         cpi.cp = c;
         cpi.displayed_cp = c;
+        cpi.color = color;
         screen.push(cpi);
         nb_push += 1;
     }
@@ -247,6 +248,7 @@ fn print_clipped_line(screen: &mut Screen, s: &str) {
 
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
+        cpi.color = color;
         screen.push(cpi);
     }
 }
@@ -263,18 +265,36 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
         // print header+footer
         let mut header_screen = Screen::new(view.screen.width(), 2);
         let mut footer_screen = Screen::new(view.screen.width(), 3);
+        let mut scrollbar_screen = Screen::new(1, view.screen.height() - (5 + 1));
 
         if nano_like {
             let (mw, mh) = (view.screen.max_width(), view.screen.max_height());
             print_clipped_line(
                 &mut header_screen,
-                &format!("  unlimitED! : {} {}x{} : {}", VERSION, mw, mh, doc.name),
+                CodepointInfo::default_color(),
+                &format!(
+                    "  unlimitED! : {} {}x{} : {} scroll {}x{}",
+                    VERSION,
+                    mw,
+                    mh,
+                    doc.name,
+                    scrollbar_screen.width(),
+                    scrollbar_screen.height()
+                ),
             );
 
-            print_clipped_line(&mut footer_screen, &core_state.status.to_string());
+            print_clipped_line(
+                &mut footer_screen,
+                CodepointInfo::default_color(),
+                &core_state.status.to_string(),
+            );
             for i in 1..3 {
                 footer_screen.current_line_index = i;
-                print_clipped_line(&mut footer_screen, &"".to_string());
+                print_clipped_line(
+                    &mut footer_screen,
+                    CodepointInfo::default_color(),
+                    &"".to_string(),
+                );
             }
         };
 
@@ -336,6 +356,31 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             let (x, y) = (0, view.screen.max_height() - footer_screen.height());
             let ret = view.screen.copy_to(x, y, &footer_screen);
             assert_eq!(ret, true);
+        }
+
+        if true {
+            let y = scrollbar_screen.height();
+            //
+
+            //view.end_offset
+
+            let off = view.start_offset as f64;
+            let max_size = max_offset as f64;
+
+            let pos = ((off / max_size) * (y as f64)) as usize;
+
+            for _ in 0..pos {
+                print_clipped_line(&mut scrollbar_screen, (35, 34, 89), " ");
+            }
+            for _ in pos..pos + 1 {
+                print_clipped_line(&mut scrollbar_screen, (192, 192, 192), " ");
+            }
+            for _ in pos + 1..y {
+                print_clipped_line(&mut scrollbar_screen, (35, 34, 89), " ");
+            }
+
+            let (x, y) = (view.screen.max_width() - 1, 2);
+            view.screen.copy_to(x, y, &scrollbar_screen);
         }
     }
 }

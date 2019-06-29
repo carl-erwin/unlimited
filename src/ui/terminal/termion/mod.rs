@@ -211,13 +211,6 @@ pub fn main_loop(
 
                     draw_view(&mut last_screen, &mut screen, &mut stdout);
 
-                    display_scroll_bar(
-                        &screen,
-                        ui_state.terminal_width,
-                        ui_state.terminal_height,
-                        &mut stdout,
-                    );
-
                     stdout.flush().unwrap();
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
@@ -238,7 +231,6 @@ pub fn main_loop(
     stdout.flush().unwrap();
     // ----}
 }
-
 
 fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
@@ -606,37 +598,4 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             tx.send(msg).unwrap_or(());
         }
     }
-}
-
-fn display_scroll_bar(screen: &Screen, width: u16, height: u16, mut stdout: &mut Stdout) {
-    // scroolbar
-    // color
-    write!(
-        stdout,
-        "{}",
-        termion::color::Bg(termion::color::Rgb(0x00, 0x00, 0xff))
-    )
-    .unwrap();
-
-    // spaces
-    for h in 0..=height {
-        terminal_cursor_to(&mut stdout, width + 2, h + 3);
-        write!(stdout, " ",).unwrap();
-    }
-
-    let off = screen.first_offset as f64;
-    let max_size = screen.doc_max_offset as f64;
-
-    let pos = ((off / max_size) * f64::from(height)) as u16;
-
-    terminal_cursor_to(&mut stdout, width + 2, 3 + pos);
-
-    write!(
-        stdout,
-        "{}{} {}",
-        termion::color::Fg(termion::color::Rgb(0xff, 0xff, 0xff)),
-        termion::style::Invert,
-        termion::style::Reset,
-    )
-    .unwrap();
 }
