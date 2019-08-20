@@ -289,7 +289,7 @@ impl<T> FreeListAllocator<T> {
         }
     }
 
-    fn allocate(&mut self, n: T, check_previous: &Fn(&mut T)) -> (NodeIndex, &mut T) {
+    fn allocate(&mut self, n: T, check_previous: &dyn Fn(&mut T)) -> (NodeIndex, &mut T) {
         if !self.free_indexes.is_empty() {
             let i = self.free_indexes.pop().unwrap();
             if DEBUG {
