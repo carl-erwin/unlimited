@@ -260,12 +260,17 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
         let max_offset = doc.buffer.size as u64;
 
-        let nano_like = view.screen.height() >= 7;
+        let nano_like = false; // view.screen.height() >= 7;
 
         // print header+footer
         let mut header_screen = Screen::new(view.screen.width(), 2);
         let mut footer_screen = Screen::new(view.screen.width(), 3);
-        let mut scrollbar_screen = Screen::new(1, view.screen.height() - (5 + 1));
+
+        let mut scrollbar_screen = if nano_like {
+            Screen::new(1, view.screen.height() - (5 + 1))
+        } else {
+            Screen::new(1, view.screen.height())
+        };
 
         if nano_like {
             let (mw, mh) = (view.screen.max_width(), view.screen.max_height());
@@ -298,7 +303,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             }
         };
 
-        let nb_splits = 8;
+        let nb_splits = 1;
 
         let mut height = view.screen.height();
         let width = ((view.screen.max_width() - 2) / nb_splits) - 1;
@@ -379,7 +384,12 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 print_clipped_line(&mut scrollbar_screen, (35, 34, 89), " ");
             }
 
-            let (x, y) = (view.screen.max_width() - 1, 2);
+            let (x, y) = if nano_like {
+                (view.screen.max_width() - 1, 2)
+            } else {
+                (view.screen.max_width() - 1, 0)
+            };
+
             view.screen.copy_to(x, y, &scrollbar_screen);
         }
     }
@@ -546,6 +556,7 @@ fn process_input_events(
             key: Key::Left,
         } => {
             view.move_marks_backward();
+            view.center_arround_mark();
 
             core_state.status = "<left>".to_owned();
         }
@@ -558,6 +569,7 @@ fn process_input_events(
             key: Key::Up,
         } => {
             view.move_marks_to_previous_line();
+            view.center_arround_mark();
 
             core_state.status = "<up>".to_owned();
         }
@@ -570,6 +582,7 @@ fn process_input_events(
             key: Key::Down,
         } => {
             view.move_marks_to_next_line();
+            view.center_arround_mark();
 
             core_state.status = "<down>".to_owned();
         }
@@ -582,6 +595,7 @@ fn process_input_events(
             key: Key::Right,
         } => {
             view.move_marks_forward();
+            view.center_arround_mark();
 
             core_state.status = "<right>".to_owned();
         }
