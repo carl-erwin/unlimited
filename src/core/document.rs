@@ -362,5 +362,4 @@ mod tests {
             println!("doc.size = {}", doc.buffer.size());
         }
     }
-
 }

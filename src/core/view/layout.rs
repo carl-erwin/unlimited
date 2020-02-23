@@ -276,155 +276,110 @@ fn layout_filter_prepare_raw_data<'a>(
     data_vec
 }
 
+struct Utf8FilterCtx<'a, 'b> {
+    from_offset: u64,
+    state: u32,
+    codep: u32,
+    cp_size: usize,
+    cp_index: u64,
+    filter_out: &'a mut Vec<FilterIoData<'b>>,
+}
+
+fn filter_utf8_byte<'a, 'b>(ctx: &mut Utf8FilterCtx<'a, 'b>) {
+    match ctx.state {
+        utf8::UTF8_ACCEPT => {
+            let io = FilterIoData {
+                // general info
+                is_valid: true,
+                end_of_pipe: false, // skip
+                quit: false,        // close pipeline
+                is_selected: false,
+                color: CodepointInfo::default_color(),
+                offset: ctx.from_offset,
+                size: ctx.cp_size,
+                data: FilterData::Unicode {
+                    cp: ctx.codep,
+                    real_cp: ctx.codep,
+                    cp_index: ctx.cp_index, // be carefull used const u64 invalid_cp_index
+                    fragment_flag: false,
+                    fragment_count: 0,
+                },
+            };
+
+            ctx.filter_out.push(io);
+
+            ctx.cp_index += 1;
+            ctx.from_offset += ctx.cp_size as u64;
+
+            ctx.codep = 0;
+            ctx.cp_size = 0;
+        }
+
+        utf8::UTF8_REJECT => {
+            // decode error : invalid sequence
+            let io = FilterIoData {
+                // general info
+                is_valid: true,
+                end_of_pipe: false, // skip
+                quit: false,        // close pipeline
+                is_selected: false,
+                color: CodepointInfo::default_color(),
+
+                offset: ctx.from_offset,
+                size: 1,
+                data: FilterData::Unicode {
+                    cp: 0xfffd,
+                    real_cp: 0xfffd,
+                    cp_index: ctx.cp_index, // be carefull used const u64 invalid_cp_index
+                    fragment_flag: false,
+                    fragment_count: 0,
+                },
+            };
+            ctx.filter_out.push(io);
+
+            // restart @ next byte
+            ctx.cp_index += 1;
+            ctx.from_offset += 1 as u64;
+
+            ctx.codep = 0;
+            ctx.cp_size = 0;
+        }
+        _ => { /* need more data */ }
+    }
+}
+
 fn layout_filter_utf8<'a>(
     filter_in: &'a [FilterIoData],
-    filter_out: &mut Vec<FilterIoData>,
+    mut filter_out: &mut Vec<FilterIoData>,
 ) -> bool {
     if filter_in.is_empty() {
         *filter_out = vec![];
         return true;
     }
 
-    // start offset
-    let mut from_offset = filter_in[0].offset;
-
-    let mut state = 0;
-    let mut codep = 0;
-    let mut cp_size = 0;
-    let mut cp_index = 0;
+    let mut ctx = Utf8FilterCtx {
+        from_offset: filter_in[0].offset, // start offset
+        state: 0,
+        codep: 0,
+        cp_size: 0,
+        cp_index: 0,
+        filter_out: &mut filter_out,
+    };
 
     for d in filter_in {
         match d.data {
             FilterData::ByteArray { array } => {
                 for val in array {
-                    cp_size += 1;
-                    state = utf8::decode_byte(state, *val, &mut codep);
-                    match state {
-                        utf8::UTF8_ACCEPT => {
-                            let io = FilterIoData {
-                                // general info
-                                is_valid: true,
-                                end_of_pipe: false, // skip
-                                quit: false,        // close pipeline
-                                is_selected: false,
-                                color: CodepointInfo::default_color(),
-                                offset: from_offset,
-                                size: cp_size,
-                                data: FilterData::Unicode {
-                                    cp: codep,
-                                    real_cp: codep,
-                                    cp_index, // be carefull used const u64 invalid_cp_index
-                                    fragment_flag: false,
-                                    fragment_count: 0,
-                                },
-                            };
-
-                            filter_out.push(io);
-
-                            cp_index += 1;
-                            from_offset += cp_size as u64;
-
-                            codep = 0;
-                            cp_size = 0;
-                        }
-
-                        utf8::UTF8_REJECT => {
-                            // decode error : invalid sequence
-                            let io = FilterIoData {
-                                // general info
-                                is_valid: true,
-                                end_of_pipe: false, // skip
-                                quit: false,        // close pipeline
-                                is_selected: false,
-                                color: CodepointInfo::default_color(),
-
-                                offset: from_offset,
-                                size: 1,
-                                data: FilterData::Unicode {
-                                    cp: 0xfffd,
-                                    real_cp: 0xfffd,
-                                    cp_index, // be carefull used const u64 invalid_cp_index
-                                    fragment_flag: false,
-                                    fragment_count: 0,
-                                },
-                            };
-                            filter_out.push(io);
-
-                            // restart @ next byte
-                            cp_index += 1;
-                            from_offset += 1 as u64;
-
-                            codep = 0;
-                            cp_size = 0;
-                        }
-                        _ => { /* need more data */ }
-                    }
+                    ctx.cp_size += 1;
+                    ctx.state = utf8::decode_byte(ctx.state, *val, &mut ctx.codep);
+                    filter_utf8_byte(&mut ctx);
                 }
             }
 
             FilterData::Byte { val } => {
-                cp_size += 1;
-                state = utf8::decode_byte(state, val, &mut codep);
-                match state {
-                    utf8::UTF8_ACCEPT => {
-                        let io = FilterIoData {
-                            // general info
-                            is_valid: true,
-                            end_of_pipe: false, // skip
-                            quit: false,        // close pipeline
-                            is_selected: false,
-                            color: CodepointInfo::default_color(),
-                            offset: from_offset,
-                            size: cp_size,
-                            data: FilterData::Unicode {
-                                cp: codep,
-                                real_cp: codep,
-                                cp_index, // be carefull used const u64 invalid_cp_index
-                                fragment_flag: false,
-                                fragment_count: 0,
-                            },
-                        };
-
-                        filter_out.push(io);
-
-                        cp_index += 1;
-                        from_offset += cp_size as u64;
-
-                        codep = 0;
-                        cp_size = 0;
-                    }
-
-                    utf8::UTF8_REJECT => {
-                        // decode error : invalid sequence
-                        let io = FilterIoData {
-                            // general info
-                            is_valid: true,
-                            end_of_pipe: false, // skip
-                            quit: false,        // close pipeline
-                            is_selected: false,
-                            color: CodepointInfo::default_color(),
-
-                            offset: from_offset,
-                            size: 1,
-                            data: FilterData::Unicode {
-                                cp: 0xfffd,
-                                real_cp: 0xfffd,
-                                cp_index, // be carefull used const u64 invalid_cp_index
-                                fragment_flag: false,
-                                fragment_count: 0,
-                            },
-                        };
-                        filter_out.push(io);
-
-                        // restart @ next byte
-                        cp_index += 1;
-                        from_offset += 1 as u64;
-
-                        codep = 0;
-                        cp_size = 0;
-                    }
-                    _ => { /* need more data */ }
-                }
+                ctx.cp_size += 1;
+                ctx.state = utf8::decode_byte(ctx.state, val, &mut ctx.codep);
+                filter_utf8_byte(&mut ctx);
             }
 
             _ => { /* unexpected */ }
@@ -531,7 +486,7 @@ fn layout_keyword_highlighting<'a>(
                         true
                     }
 
-                    // C prepropcessor
+                    // C preprocessor
                     "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#define" => {
                         new_color = (255, 0, 0);
                         true

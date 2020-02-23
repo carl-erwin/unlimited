@@ -2117,5 +2117,4 @@ mod tests {
         let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
         let _ = fs::remove_file("/tmp/playground_insert_test");
     }
-
 }
