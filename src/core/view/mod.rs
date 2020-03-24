@@ -53,7 +53,9 @@ pub type Id = u64;
 
 pub mod layout;
 
-// TODO: add the main mark as a ref
+/// The **View** represents a way to represent a given Document.<br/>
+// TODO: find a way to have marks as plugin.<br/>
+// in future version marks will be stored in buffer meta data.<br/>
 #[derive(Debug)]
 pub struct View<'a> {
     pub id: Id,
@@ -62,7 +64,6 @@ pub struct View<'a> {
     pub document: Option<Rc<RefCell<Document<'a>>>>,
     pub screen: Box<Screen>,
 
-    // TODO: in future version marks will be stored in buffer meta data
     pub moving_marks: Rc<RefCell<Vec<Mark>>>,
     pub fixed_marks: Rc<RefCell<Vec<Mark>>>,
     // use for cut and paste
@@ -70,6 +71,7 @@ pub struct View<'a> {
 }
 
 impl<'a> View<'a> {
+    /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
         id: Id,
         start_offset: u64,
@@ -94,6 +96,11 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn check_invariants(&self) {
+        self.screen.check_invariants();
+    }
+
+    /// Undo the previous write operation and sync the screen around the main mark.<br/>
     pub fn undo(&mut self) {
         let mut sync_view = false;
 
@@ -115,6 +122,7 @@ impl<'a> View<'a> {
         }
     }
 
+    /// Redo the previous write operation and sync the screen around the main mark.<br/>
     pub fn redo(&mut self) {
         let mut sync_view = false;
 
@@ -136,6 +144,7 @@ impl<'a> View<'a> {
         }
     }
 
+    /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
     pub fn insert_codepoint_array(&mut self, array: &[char]) {
         let mut utf8 = Vec::with_capacity(array.len());
         for codepoint in array {
@@ -166,6 +175,7 @@ impl<'a> View<'a> {
         }
     }
 
+    /// Insert a single unicode code point using hardcoded utf8 codec.<br/>
     pub fn insert_codepoint(&mut self, codepoint: char, nr_pending_events: usize) {
         let mut scroll_needed = false;
         let mut sync_view = false;
@@ -199,6 +209,7 @@ impl<'a> View<'a> {
         }
     }
 
+    /// Remove the current utf8 encoded code point.<br/>
     pub fn remove_codepoint(&mut self) {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
@@ -209,6 +220,7 @@ impl<'a> View<'a> {
         }
     }
 
+    /// Skip blanks (if any) and remove until end of the word.
     pub fn remove_until_end_of_word(&mut self) {
         let mut doc = self.document.as_mut().unwrap().borrow_mut();
 
@@ -570,11 +582,12 @@ impl<'a> View<'a> {
             }
         }
 
-        // only if main mark
         if scroll_needed {
-            let n = self.screen.height() / 2;
-            self.scroll_down(n);
+            self.scroll_down(1);
         }
+
+        // CEG
+        // self.center_arround_mark();
     }
 
     pub fn move_mark_to_screen_start(&mut self) {

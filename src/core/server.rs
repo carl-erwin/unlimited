@@ -321,6 +321,10 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
 
             view.end_offset =
                 build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
+            view.screen.first_offset = screen.first_offset;
+            view.screen.last_offset = screen.last_offset;
+
+            view.check_invariants();
 
             // set_render_marks
             // brute force for now
@@ -350,6 +354,9 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
                 (n * width + n, 0)
             };
             let ret = view.screen.copy_to(x, y, &screen);
+            view.screen.first_offset = screen.first_offset;
+            view.screen.last_offset = screen.last_offset;
+
             assert_eq!(ret, true);
         }
 
@@ -363,7 +370,7 @@ fn fill_screen(core_state: &mut CoreState, view: &mut View) {
             assert_eq!(ret, true);
         }
 
-        if true {
+        if false {
             let y = scrollbar_screen.height();
             //
 
@@ -582,7 +589,8 @@ fn process_input_events(
             key: Key::Down,
         } => {
             view.move_marks_to_next_line();
-            view.center_arround_mark();
+
+            //            view.center_arround_mark();
 
             core_state.status = "<down>".to_owned();
         }
@@ -595,7 +603,7 @@ fn process_input_events(
             key: Key::Right,
         } => {
             view.move_marks_forward();
-            view.center_arround_mark();
+            //            view.center_arround_mark();
 
             core_state.status = "<right>".to_owned();
         }

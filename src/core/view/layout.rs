@@ -49,7 +49,7 @@ pub enum FilterData<'a> {
     Unicode {
         cp: u32,
         real_cp: u32,
-        cp_index: u64, // be carefull used const u64 invalid_cp_index
+        cp_index: u64, // be careful used const u64 invalid_cp_index
         fragment_flag: bool,
         fragment_count: u32,
     },
