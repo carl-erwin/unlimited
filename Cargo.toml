@@ -19,3 +19,8 @@ rand = "*"
 #lto = true
 debug = true
 opt-level = 3
+panic = "abort"
+
+
+[profile.dev]
+panic = "abort"
