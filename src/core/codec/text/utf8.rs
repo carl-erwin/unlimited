@@ -32,7 +32,7 @@ pub const UTF8_ACCEPT: u32 = 0;
 pub const UTF8_REJECT: u32 = 12;
 
 #[rustfmt::skip]
-static UTF8D: &'static [u8] = &[
+static UTF8D: &[u8] = &[
   // The first part of the table maps bytes to character classes that
   // to reduce the size of the transition table and create bitmasks.
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

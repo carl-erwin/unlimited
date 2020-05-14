@@ -697,22 +697,19 @@ impl<'a> MappedFile<'a> {
     // always start @ local_offset 0
     pub fn iter_from_node_index(file_: &FileHandle<'a>, node_idx: NodeIndex) -> FileIterator<'a> {
         let file = file_.borrow_mut();
-        match node_idx {
-            _ => {
-                let page = file.pool[node_idx as usize].page.upgrade().unwrap();
-                let slice = page.as_ref().borrow_mut().as_slice().unwrap();
 
-                MappedFileIterator::Real(IteratorInstance {
-                    file: Rc::clone(file_),
-                    file_size: file.size(),
-                    local_offset: 0,
-                    page_size: file.pool[node_idx as usize].size,
-                    node_idx,
-                    page,
-                    base: slice,
-                })
-            }
-        }
+        let page = file.pool[node_idx as usize].page.upgrade().unwrap();
+        let slice = page.as_ref().borrow_mut().as_slice().unwrap();
+
+        MappedFileIterator::Real(IteratorInstance {
+            file: Rc::clone(file_),
+            file_size: file.size(),
+            local_offset: 0,
+            page_size: file.pool[node_idx as usize].size,
+            node_idx,
+            page,
+            base: slice,
+        })
     }
 
     pub fn iter_from(file_: &FileHandle<'a>, offset: u64) -> FileIterator<'a> {
