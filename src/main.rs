@@ -47,20 +47,20 @@ fn main() {
 
     // build core/ui communication channels
     let (ui_tx, ui_rx) = channel();
-    let (core_tx, core_rx) = channel();
+    let (cr_tx, cr_rx) = channel();
     let ui_name = config.ui_frontend.clone();
 
     // create core thread
-    let ui_tx_clone = ui_tx.clone();
     let core_th = {
+
+        let ui_tx_clone = ui_tx.clone();
         Some(thread::spawn(move || {
-            core::start(config, &core_rx, &ui_tx_clone)
+            core::start(config, &cr_rx, &ui_tx_clone)
         }))
     };
 
     // run the ui loop in the main thread
-    let ui_tx_clone = ui_tx.clone();
-    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx_clone, &core_tx);
+    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx, &cr_tx);
 
     // wait for core thread
     if let Some(core_handle) = core_th {
