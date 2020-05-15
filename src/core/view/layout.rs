@@ -592,6 +592,7 @@ fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &m
 
 /// This function can be considered as the core of the editor.<br/>
 /// It will run the configured filters until the screen is filled or eof is reached.<br/>
+/// the screen is clear first
 /// TODO: pass list of filter function to be applied
 /// 0 - allocate context for each configurred plugin
 /// 1 - utf8 || hexa
@@ -602,9 +603,10 @@ pub fn build_screen_layout(
     max_offset: u64,
     mut screen: &mut Screen,
 ) -> u64 {
+    screen.clear();
+
     let mut filter_in = layout_filter_prepare_raw_data(&screen, data, base_offset, max_offset);
 
-    //
     let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
     let _ret = layout_filter_utf8(&filter_in, &mut filter_out);
     filter_in = filter_out;

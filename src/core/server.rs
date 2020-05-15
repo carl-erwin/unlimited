@@ -226,9 +226,7 @@ pub fn start(
     ui_tx.send(msg).unwrap_or(());
 }
 
-use crate::core::VERSION;
-
-fn print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
+fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     let mut nb_push = 0;
     for c in s.chars().take(screen.width()) {
         let mut cpi = CodepointInfo::new();
@@ -253,151 +251,46 @@ fn print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     }
 }
 
-fn fill_screen(core_state: &mut CoreState, view: &mut View) {
+// TODO: test-mode
+// scroll bar: bg color (35, 34, 89)
+// scroll bar: cursor color (192, 192, 192)
+fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
     if let Some(ref _buf) = view.document {
         let mut data = vec![];
         let doc = view.document.as_ref().unwrap().borrow_mut();
 
         let max_offset = doc.buffer.size as u64;
 
-        let nano_like = false; // view.screen.height() >= 7;
+        let height = view.screen.height();
+        let width = view.screen.max_width();
 
-        // print header+footer
-        let mut header_screen = Screen::new(view.screen.width(), 2);
-        let mut footer_screen = Screen::new(view.screen.width(), 3);
-
-        let mut scrollbar_screen = if nano_like {
-            Screen::new(1, view.screen.height() - (5 + 1))
-        } else {
-            Screen::new(1, view.screen.height())
-        };
-
-        if nano_like {
-            let (mw, mh) = (view.screen.max_width(), view.screen.max_height());
-            print_clipped_line(
-                &mut header_screen,
-                CodepointInfo::default_color(),
-                &format!(
-                    "  unlimitED! : {} {}x{} : {} scroll {}x{}",
-                    VERSION,
-                    mw,
-                    mh,
-                    doc.name,
-                    scrollbar_screen.width(),
-                    scrollbar_screen.height()
-                ),
-            );
-
-            print_clipped_line(
-                &mut footer_screen,
-                CodepointInfo::default_color(),
-                &core_state.status.to_string(),
-            );
-            for i in 1..3 {
-                footer_screen.current_line_index = i;
-                print_clipped_line(
-                    &mut footer_screen,
-                    CodepointInfo::default_color(),
-                    &"".to_string(),
-                );
-            }
-        };
-
-        let nb_splits = 1;
-
-        let mut height = view.screen.height();
-        let width = ((view.screen.max_width() - 2) / nb_splits) - 1;
-
-        let max_size = (width * height * 4) as usize;
+        let max_size = (width * height * 4) as usize; // 4 is max utf8 encoding size
         doc.read(view.start_offset, max_size, &mut data);
 
-        view.screen.clear();
-        for n in 0..nb_splits {
-            if nano_like {
-                height =
-                    view.screen.height() - (header_screen.height() + footer_screen.height() + 1);
+        view.end_offset =
+            build_screen_layout(&data, view.start_offset, max_offset, &mut view.screen);
+        view.check_invariants();
+
+        // set_render_marks
+        // brute force for now
+        for m in view.moving_marks.borrow().iter() {
+            // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
+            if m.offset < view.start_offset || m.offset > view.end_offset {
+                continue;
             }
-            let mut screen = Screen::new(width, height);
 
-            view.end_offset =
-                build_screen_layout(&data, view.start_offset, max_offset, &mut screen);
-            view.screen.first_offset = screen.first_offset;
-            view.screen.last_offset = screen.last_offset;
+            for l in 0..view.screen.height() {
+                let line = view.screen.get_mut_line(l).unwrap();
 
-            view.check_invariants();
-
-            // set_render_marks
-            // brute force for now
-            for m in view.moving_marks.borrow().iter() {
-                // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
-                if m.offset < view.start_offset || m.offset > view.end_offset {
-                    continue;
+                if line.metadata {
+                    // continue;
                 }
 
-                for l in 0..screen.height() {
-                    let line = screen.get_mut_line(l).unwrap();
-
-                    if line.metadata {
-                        // continue;
-                    }
-
-                    for c in 0..line.nb_cells {
-                        let cpi = line.get_mut_cpi(c).unwrap();
-                        cpi.is_selected = cpi.offset == m.offset && !cpi.metadata;
-                    }
+                for c in 0..line.nb_cells {
+                    let cpi = line.get_mut_cpi(c).unwrap();
+                    cpi.is_selected = cpi.offset == m.offset && !cpi.metadata;
                 }
             }
-            // view.screen.set_clipping(n*width, header_h, width, height);
-            let (x, y) = if nano_like {
-                (n * width + n, header_screen.height())
-            } else {
-                (n * width + n, 0)
-            };
-            let ret = view.screen.copy_to(x, y, &screen);
-            view.screen.first_offset = screen.first_offset;
-            view.screen.last_offset = screen.last_offset;
-
-            assert_eq!(ret, true);
-        }
-
-        if nano_like {
-            let (x, y) = (0, 0);
-            let ret = view.screen.copy_to(x, y, &header_screen);
-            assert_eq!(ret, true);
-
-            let (x, y) = (0, view.screen.max_height() - footer_screen.height());
-            let ret = view.screen.copy_to(x, y, &footer_screen);
-            assert_eq!(ret, true);
-        }
-
-        if false {
-            let y = scrollbar_screen.height();
-            //
-
-            //view.end_offset
-
-            let off = view.start_offset as f64;
-            let max_size = max_offset as f64;
-
-            let pos = ((off / max_size) * (y as f64)) as usize;
-
-            for _ in 0..pos {
-                print_clipped_line(&mut scrollbar_screen, (35, 34, 89), " ");
-            }
-            for _ in pos..pos + 1 {
-                print_clipped_line(&mut scrollbar_screen, (192, 192, 192), " ");
-            }
-            for _ in pos + 1..y {
-                print_clipped_line(&mut scrollbar_screen, (35, 34, 89), " ");
-            }
-
-            let (x, y) = if nano_like {
-                (view.screen.max_width() - 1, 2)
-            } else {
-                (view.screen.max_width() - 1, 0)
-            };
-
-            view.screen.copy_to(x, y, &scrollbar_screen);
         }
     }
 }
@@ -563,9 +456,27 @@ fn process_input_events(
             key: Key::Left,
         } => {
             view.move_marks_backward();
-            view.center_arround_mark();
+
+            if view.center_on_cursor_move {
+                view.center_arround_mark();
+            }
 
             core_state.status = "<left>".to_owned();
+        }
+
+        // right
+        InputEvent::KeyPress {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: Key::Right,
+        } => {
+            view.move_marks_forward();
+            if view.center_on_cursor_move {
+                view.center_arround_mark();
+            }
+
+            core_state.status = "<right>".to_owned();
         }
 
         // up
@@ -576,7 +487,10 @@ fn process_input_events(
             key: Key::Up,
         } => {
             view.move_marks_to_previous_line();
-            view.center_arround_mark();
+
+            if view.center_on_cursor_move {
+                view.center_arround_mark();
+            }
 
             core_state.status = "<up>".to_owned();
         }
@@ -590,22 +504,11 @@ fn process_input_events(
         } => {
             view.move_marks_to_next_line();
 
-            //            view.center_arround_mark();
+            if view.center_on_cursor_move {
+                view.center_arround_mark();
+            }
 
             core_state.status = "<down>".to_owned();
-        }
-
-        // right
-        InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
-            key: Key::Right,
-        } => {
-            view.move_marks_forward();
-            //            view.center_arround_mark();
-
-            core_state.status = "<right>".to_owned();
         }
 
         // page_up

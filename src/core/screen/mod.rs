@@ -107,6 +107,7 @@ impl Screen {
         }
 
         if self.first_offset == self.last_offset && self.first_offset == 0 {
+            // forget to clear screen ?
             panic!("");
         }
     }
@@ -417,8 +418,8 @@ impl Screen {
             // TODO: handle line.skip
             for x in 0..l.width() {
                 let cpi = l.get_cpi(x).unwrap();
-                if !cpi.metadata {
-                    break;
+                if cpi.metadata {
+                    continue;
                 }
                 if cpi.offset == offset {
                     return (Some(cpi), x, y);

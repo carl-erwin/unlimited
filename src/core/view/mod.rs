@@ -53,14 +53,87 @@ pub type Id = u64;
 
 pub mod layout;
 
+// TODO: add modes
+// a view can be configured to have a "main mode" "interpreter/presenter"
+// like "text-mode", hex-mode
+// the mode is responsible to manage the view
+// by default the first view wil be in text mode
+//
+// reorg
+// buffer
+// doc list
+// doc -> [list of view]
+// view -> main mode + list of sub mode  (recursive) ?
+// notify all view when doc change
+//
+// any view(doc)
+// we should be able to view a document we different views
+
+// TODO: "virtual" scene graph
+// add recursive View definition:
+// we want a split-able view, with move-able borders/origin point
+// a view is:
+// a "parent" screen + a sorted "by depth ('z')" list of "child" view
+// the depth attribute will be used to route the user input events (x,y,z)
+// we need the "focused" view
+// we "siblings" concepts/query
+//  *) add arbitrary child with constraints fixed (x,y/w,h), attached left/right / % of parent,
+//  *) split vertically
+//  *) split horizontally
+//  *) detect coordinate conflicts
+//  *) move "borders"
+//  *) move "created" sub views
+//  json description ? for save/restore
+// main view+screen
+// +------------------------------------------------------------------------------------------+
+// | +---------------------------------------------------------------------------------------+|
+// | |                                                                                       ||
+// | +---------------------------------------------------------------------------------------+|
+// | +--------------+                                                                      |[]|
+// | |              |                                                                      |[]|
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | |              |                                                                      |  |
+// | +--------------+                                                                      |  |
+// +------------------------------------------------------------------------------------------+
+
+// TODO:
+// add struct to map view["mode(n)"] -> data
+// add struct to map doc["mode(n)"]  -> data: ex: line index
+
 /// The **View** represents a way to represent a given Document.<br/>
 // TODO: find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
 #[derive(Debug)]
 pub struct View<'a> {
     pub id: Id,
+
+    // TODO: add struct to map view["mode(n)"] -> mode(n).data
+    // reorder fields
     pub start_offset: u64,
     pub end_offset: u64,
+    pub center_on_cursor_move: bool,
+
     pub document: Option<Rc<RefCell<Document<'a>>>>,
     pub screen: Box<Screen>,
 
@@ -87,7 +160,8 @@ impl<'a> View<'a> {
         View {
             id,
             start_offset,
-            end_offset: start_offset, // will be recomputed later
+            end_offset: start_offset,     // will be recomputed later
+            center_on_cursor_move: false, // add movement enums and pass it to center fn
             document,
             screen,
             moving_marks,
@@ -364,32 +438,42 @@ impl<'a> View<'a> {
     }
 
     pub fn move_marks_to_previous_line(&mut self) {
-        let mut scroll_needed = false;
+        let mut scroll_needed = true;
         let mut mark_moved = false;
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
-            // if view.is_mark_on_screen(m) {
-            // yes get coordinates
-            let (_, x, y) = self.screen.find_cpi_by_offset(m.offset);
-            if y > 0 {
-                let new_y = y - 1;
-                let l = self.screen.get_line(new_y).unwrap();
-                if l.nb_cells > 0 {
-                    let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                    let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
-                    if !cpi.metadata {
-                        m.offset = cpi.offset;
-                        mark_moved = true;
+            // TODO: if view.is_mark_on_screen(m) -> (bool, x, y) ?
+            match self.screen.find_cpi_by_offset(m.offset) {
+                // offscreen
+                (None, _, _) => {}
+                // mark on first line
+                (Some(_), _, y) if y == 0 => {}
+
+                // onscreen
+                (Some(_), x, y) if y > 0 => {
+                    let new_y = y - 1; // select previous line
+                    let l = self.screen.get_line(new_y).unwrap();
+
+                    // previous line is filled ?
+                    if l.nb_cells > 0 {
+                        let new_x = ::std::cmp::min(x, l.nb_cells - 1);
+                        let cpi = self.screen.get_cpinfo(new_x, new_y).unwrap();
+                        if !cpi.metadata {
+                            m.offset = cpi.offset;
+                            mark_moved = true;
+                            scroll_needed = false;
+                        }
+                    } else {
+                        // ???
                     }
                 }
+
+                // impossible
+                _ => {}
             }
 
+            // offscreen
             if !mark_moved {
-                // mark was on first line or offscreen
-                if self.screen.contains_offset(m.offset) {
-                    scroll_needed = true;
-                }
-
                 // mark is offscren
                 let screen_width = self.screen.width();
                 let screen_height = self.screen.height();
@@ -454,15 +538,21 @@ impl<'a> View<'a> {
                     tmp_mark.offset = line_end_off;
                 }
 
+                // TODO: add some post processing after screen moves
+                // this will avoid custom code in pageup/down
+                // if m.offset < screen.start -> m.offset = start_offset
+                // if m.offset > screen.end -> m.offset = screen.line[last_index].start_offset
+
+                // resync mark to "new" first line offset
                 if tmp_mark.offset < m.offset {
                     m.offset = tmp_mark.offset;
                 }
             }
         }
 
+        // if mark on first line or offscreen
         if scroll_needed {
-            let n = self.screen.height() / 2;
-            self.scroll_up(n);
+            self.scroll_up(1);
         }
     }
 
@@ -476,6 +566,9 @@ impl<'a> View<'a> {
 
         for m in &mut self.moving_marks.borrow_mut().iter_mut() {
             if m.offset == max_offset {
+                if !self.screen.contains_offset(m.offset) {
+                    scroll_needed = true;
+                }
                 continue;
             }
 
@@ -577,7 +670,7 @@ impl<'a> View<'a> {
                 m.offset = tmp_mark.offset;
             }
 
-            if m.offset > self.end_offset {
+            if m.offset >= self.end_offset {
                 scroll_needed = true;
             }
         }
@@ -586,7 +679,7 @@ impl<'a> View<'a> {
             self.scroll_down(1);
         }
 
-        // CEG
+        // TODO: fix one line down
         // self.center_arround_mark();
     }
 
@@ -705,7 +798,35 @@ impl<'a> View<'a> {
         self.move_mark_to_screen_start();
     }
 
+    fn scroll_down_offscren(&mut self, max_offset: u64, nb_lines: usize) {
+        // will be slower than just reading the current screen
+
+        let screen_width = self.screen.width();
+        let screen_height = self.screen.height() + 32;
+
+        let start_offset = self.start_offset;
+        let end_offset = ::std::cmp::min(
+            self.start_offset + (4 * nb_lines * screen_width) as u64,
+            max_offset,
+        );
+
+        let lines =
+            layout::get_lines_offsets(&self, start_offset, end_offset, screen_width, screen_height);
+
+        // find line index and take lines[(index + nb_lines)].0 as new start of view
+        let index = match lines
+            .iter()
+            .position(|e| e.0 <= start_offset && start_offset <= e.1)
+        {
+            None => 0,
+            Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
+        };
+
+        self.start_offset = lines[index].0;
+    }
+
     pub fn scroll_down(&mut self, nb_lines: usize) {
+        // nothing to do :-( ?
         if nb_lines == 0 {
             return;
         }
@@ -715,50 +836,25 @@ impl<'a> View<'a> {
             doc.buffer.size as u64
         };
 
+        // avoid useless scroll
+        if self.screen.contains_offset(max_offset) {
+            return;
+        }
+
         if nb_lines >= self.screen.height() {
-            // will be slower than just reading the current screen
+            // slower : call layout builder to build  nb_lines - screen.height()
+            self.scroll_down_offscren(max_offset, nb_lines);
+            return;
+        }
 
-            let screen_width = self.screen.width();
-            let screen_height = self.screen.height() + 32;
-
-            let start_offset = self.start_offset;
-            let end_offset = ::std::cmp::min(
-                self.start_offset + (4 * nb_lines * screen_width) as u64,
-                max_offset,
-            );
-
-            let lines = layout::get_lines_offsets(
-                &self,
-                start_offset,
-                end_offset,
-                screen_width,
-                screen_height,
-            );
-
-            // find line index and take lines[(index + nb_lines)].0 as new start of view
-            let index = match lines
-                .iter()
-                .position(|e| e.0 <= start_offset && start_offset <= e.1)
-            {
-                None => 0,
-                Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
-            };
-
-            self.start_offset = lines[index].0;
+        // just read the current screen
+        if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
+            if let Some(cpi) = l.get_first_cpi() {
+                // set first offset of screen.line[nb_lines] as next screen start
+                self.start_offset = cpi.offset;
+            }
         } else {
-            if self.screen.contains_offset(max_offset) {
-                return;
-            }
-
-            // just read the current screen
-
-            // get last used line , if contains eof return
-            if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
-                if let Some(cpi) = l.get_first_cpi() {
-                    // set first offset of last used line as next screen start
-                    self.start_offset = cpi.offset;
-                }
-            }
+            panic!();
         }
     }
 
