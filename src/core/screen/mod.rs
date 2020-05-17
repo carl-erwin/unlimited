@@ -179,7 +179,7 @@ impl Screen {
     /// 0-----skip---cur_index----max_height---capacity
 
     /// append
-    pub fn push(&mut self, cpi: CodepointInfo) -> (bool, usize) {
+    pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineIndex) {
         if self.current_line_index == self.height() {
             return (false, self.current_line_index);
         }
@@ -302,7 +302,7 @@ impl Screen {
         }
     }
 
-    pub fn get_last_used_line_index(&self) -> usize {
+    pub fn get_last_used_line_index(&self) -> LineIndex {
         self.current_line_index
     }
 
