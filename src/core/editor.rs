@@ -87,7 +87,7 @@ pub type Id = u64;
 
     keep user argument order, push new files,
     this list is never cleared
-    before insertion the realpath is checked to avoid double open
+    before insertion the real path is checked to avoid double open
 
     document_index: HashMap<String, document::Id>,  document::Id is the position in document_list
 

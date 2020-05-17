@@ -91,7 +91,7 @@ impl BufferOperation {
 
         BufferOperation {
             op,
-            data: self.data.clone(),
+            data: self.data.clone(), // TODO: user Rc<> to share the data, depending on the data.size()
             offset: self.offset,
         }
     }
