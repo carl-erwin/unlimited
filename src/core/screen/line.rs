@@ -235,6 +235,10 @@ impl Line {
         }
     }
 
+    pub fn at(&mut self, index: LineCellIndex) -> Option<&mut CodepointInfo> {
+        self.get_mut_cpi(index)
+    }
+
     pub fn get_used_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
         if index < self.nb_cells {
             self.get_cpi(index)
