@@ -63,7 +63,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(width: LineCellIndex) -> Self {
+    pub fn new(width: usize) -> Self {
         assert_eq!(width > 0, true);
 
         let mut cells = Vec::with_capacity(width);
@@ -121,7 +121,7 @@ impl Line {
         self.max_width
     }
 
-    pub fn resize(&mut self, width: LineCellIndex) {
+    pub fn resize(&mut self, width: usize) {
         self.cells.resize(width, LineCell::new());
         self.nb_cells = 0;
         self.max_width = width;
@@ -139,7 +139,7 @@ impl Line {
     }
 
     /// [ 0 <= start_index < width <= screen.max_width() ]
-    pub fn set_clipping(&mut self, start_index: usize, width: usize) {
+    pub fn set_clipping(&mut self, start_index: LineCellIndex, width: usize) {
         assert!(start_index < self.max_width);
         assert!(width <= self.max_width);
         assert!(start_index + width <= self.max_width);
