@@ -402,6 +402,14 @@ impl Screen {
         }
     }
 
+    pub fn at_xy(&mut self, x: usize, y: usize) -> Option<&mut CodepointInfo> {
+        self.get_mut_cpinfo(x, y)
+    }
+
+    pub fn at_yx(&mut self, y: usize, x: usize) -> Option<&mut CodepointInfo> {
+        self.at_xy(x, y)
+    }
+
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
 

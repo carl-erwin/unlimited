@@ -202,7 +202,6 @@ impl Line {
         }
     }
 
-
     pub fn get_unclipped_cpi(&self, index: LineCellIndex) -> Option<&CodepointInfo> {
         if index < self.max_width() {
             Some(&self.cells[index].cpi)
