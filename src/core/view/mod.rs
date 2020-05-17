@@ -474,7 +474,7 @@ impl<'a> View<'a> {
 
             // offscreen
             if !mark_moved {
-                // mark is offscren
+                // mark is offscreen
                 let screen_width = self.screen.width();
                 let screen_height = self.screen.height();
 
@@ -595,7 +595,7 @@ impl<'a> View<'a> {
             }
 
             if is_offscreen {
-                // mark is offscren
+                // mark is offscreen
                 let screen_width = self.screen.width();
                 let screen_height = self.screen.height();
 
@@ -798,7 +798,7 @@ impl<'a> View<'a> {
         self.move_mark_to_screen_start();
     }
 
-    fn scroll_down_offscren(&mut self, max_offset: u64, nb_lines: usize) {
+    fn scroll_down_offscreen(&mut self, max_offset: u64, nb_lines: usize) {
         // will be slower than just reading the current screen
 
         let screen_width = self.screen.width();
@@ -843,7 +843,7 @@ impl<'a> View<'a> {
 
         if nb_lines >= self.screen.height() {
             // slower : call layout builder to build  nb_lines - screen.height()
-            self.scroll_down_offscren(max_offset, nb_lines);
+            self.scroll_down_offscreen(max_offset, nb_lines);
             return;
         }
 
