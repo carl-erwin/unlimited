@@ -55,7 +55,7 @@ pub type Id = u64;
 
 pub mod layout;
 
-type ModeFunction = fn(trigger: &Vec<InputEvent>, doc: &mut Document, view: &mut View);
+pub type ModeFunction = fn(trigger: &Vec<InputEvent>, view: &mut View) -> (); // () for now
 
 // let ptr : ModeFunction = cancel_input(trigger: &Vec<input_event>, doc: &mut Doc, view: &mut View)
 
@@ -845,12 +845,13 @@ pub fn scroll_to_next_screen(trigger: &Vec<InputEvent>, mut view: &mut View) {
     view.scroll_down(nb);
     move_mark_to_screen_start(&trigger, &mut view);
 }
-pub fn save_document(_trigger: &Vec<InputEvent>, view: &mut View) -> bool {
+
+pub fn save_document(_trigger: &Vec<InputEvent>, view: &mut View) {
     let mut doc = view.document.as_mut().unwrap().borrow_mut();
-    doc.sync_to_disk().is_ok()
+    doc.sync_to_disk().is_ok(); // ->  operation ok
 }
 
-pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, mut view: &mut View) -> bool {
+pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, mut view: &mut View) {
     {
         let mut doc = view.document.as_mut().unwrap().borrow_mut();
 
@@ -865,10 +866,9 @@ pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, mut view: &mut View) -> bo
         assert!(doc.buffer_log.pos > 0);
         view.last_cut_log_index = Some(doc.buffer_log.pos - 1);
     }
-    true
 }
 
-pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) -> bool {
+pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) {
     if let Some(idx) = view.last_cut_log_index {
         let mut doc = view.document.as_mut().unwrap().borrow_mut();
         let tr = doc.buffer_log.data[idx].clone();
@@ -881,9 +881,9 @@ pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) -> bool {
             break;
         }
 
-        true
+    // true
     } else {
-        false
+        // false
     }
 }
 

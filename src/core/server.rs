@@ -27,6 +27,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -654,4 +655,79 @@ fn process_input_events(
             core_state.status = format!(" unhandled event : {:?}", *ev);
         }
     }
+}
+
+fn register_function(
+    map: &mut HashMap<String, view::ModeFunction>,
+    s: &str,
+    func: view::ModeFunction,
+) {
+    map.insert(s.to_string(), func);
+}
+
+fn build_input_map() {
+    let mut map: HashMap<String, view::ModeFunction> = HashMap::new();
+
+    register_function(&mut map, "button-press", view::button_press);
+    register_function(&mut map, "scroll-down", view::scroll_down);
+    register_function(&mut map, "scroll-up", view::scroll_up);
+    register_function(&mut map, "button-release", view::button_release);
+    register_function(&mut map, "center-arround-mark", view::center_arround_mark);
+    register_function(&mut map, "cut-to-end-of-line", view::cut_to_end_of_line);
+    register_function(&mut map, "insert-codepoint", view::insert_codepoint);
+    register_function(&mut map, "insert-codepoint-array", view::insert_codepoint_array);
+    register_function(
+        &mut map,
+        "move-mark-to-beginning-of-file",
+        view::move_mark_to_beginning_of_file,
+    );
+    register_function(
+        &mut map,
+        "move-mark-to-end-of-file",
+        view::move_mark_to_end_of_file,
+    );
+    register_function(&mut map, "move-marks-backward", view::move_marks_backward);
+    register_function(&mut map, "move-marks-forward", view::move_marks_forward);
+    register_function(
+        &mut map,
+        "move-marks-to-beginning-of-line",
+        view::move_marks_to_beginning_of_line,
+    );
+    register_function(
+        &mut map,
+        "move-marks-to-end-of-line",
+        view::move_marks_to_end_of_line,
+    );
+    register_function(
+        &mut map,
+        "move-marks-to-next-line",
+        view::move_marks_to_next_line,
+    );
+    register_function(
+        &mut map,
+        "move-marks-to-previous-line",
+        view::move_marks_to_previous_line,
+    );
+    register_function(&mut map, "paste", view::paste);
+    register_function(&mut map, "redo", view::redo);
+    register_function(&mut map, "remove-codepoint", view::remove_codepoint);
+    register_function(&mut map, "remove-codepoint", view::remove_codepoint);
+    register_function(
+        &mut map,
+        "remove-previous-codepoint",
+        view::remove_previous_codepoint,
+    );
+    register_function(
+        &mut map,
+        "remove-until-end-of-word",
+        view::remove_until_end_of_word,
+    );
+    register_function(&mut map, "save-document", view::save_document);
+    register_function(&mut map, "scroll-to-next-screen", view::scroll_to_next_screen);
+    register_function(
+        &mut map,
+        "scroll-to-previous-screen",
+        view::scroll_to_previous_screen,
+    );
+    register_function(&mut map, "undo", view::undo);
 }
