@@ -1,54 +1,95 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+/// TextStyle holds the displayed attributes flags.
+#[derive(Debug, Default, Hash, Clone, Copy, Eq, PartialEq)]
+pub struct TextStyle {
+    /// The character should blink.
+    pub is_blinking: bool,
+    /// The character is a part of a selection.
+    pub is_selected: bool,
+    /// The fg/bg attributes are reversed (used to simulate cursors/marks).
+    pub is_inverse: bool,
+    /// The character should be displayed as bold.
+    pub is_bold: bool,
+    /// The character should be displayed in italic.
+    pub is_italic: bool,
+    /// rbg tuple for foreground color
+    pub color: (u8, u8, u8), // RGB
+    /// rbg tuple for background color
+    pub bg_color: (u8, u8, u8), // RGB
+}
+
+impl TextStyle {
+    pub fn new() -> Self {
+        TextStyle {
+            is_blinking: false,
+            is_selected: false,
+            is_inverse: false,
+            is_bold: false,
+            is_italic: false,
+            color: Self::default_color(),
+            bg_color: Self::default_bg_color(),
+        }
+    }
+
+    pub fn default_color() -> (u8, u8, u8) {
+        // (192, 192, 192) // White
+        // (128, 128, 128)    // Gray
+        //(177, 177, 177)
+        (160, 160, 160)
+    }
+
+    pub fn default_bg_color() -> (u8, u8, u8) {
+        // (30, 34, 39)
+        //(45, 55, 67)
+        //(40, 44, 49)
+        (39, 40, 54)
+    }
+
+    pub fn default_selected_bg_color() -> (u8, u8, u8) {
+        let sbg = Self::default_bg_color();
+        let add = 25;
+        (sbg.0 + add, sbg.1 + add, sbg.2 + add)
+    }
+
+    pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
+        let sbg = Self::default_bg_color();
+        let add = 5;
+        (sbg.0 + add, sbg.1 + add, sbg.2 + add)
+    }
+}
 
 /// A CodepointInfo contains displayed character attributes.<br/>
 /// The displayed screen is composed of LineCell(s), that contain CodepointInfo(s).
-
 #[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
-    pub metadata: bool, // offset cannot be used
-    pub cp: char,
-    pub displayed_cp: char,
-    pub offset: u64,
-    pub is_selected: bool,
-    pub color: (u8, u8, u8), // (R,G,B)
+    pub used: bool,
+
+    pub metadata: bool, // offset cannot be used, TODO: use enum to tag Eof, Normal
+
+    // pub is_eof ?
+    pub cp: char,            // the real codepoint
+    pub displayed_cp: char,  // the displayed codepoint
+    pub offset: Option<u64>, // TODO: Option<(u64, usize)>, back end size (codec)
+    pub size: usize,         // TODO: Option<(u64, usize)>, back end size (codec)
+
+    pub skip_render: bool,
+
+    // TODO: add n/m fragments ie tabs ?
+    // TODO: add real_size ? in bytes
+    pub style: TextStyle,
 }
 
 impl CodepointInfo {
-    pub fn default_color() -> (u8, u8, u8) {
-        (192, 192, 192)
-    }
-
     pub fn new() -> Self {
         CodepointInfo {
-            metadata: false,
+            used: false,
+            metadata: true,
             cp: ' ',
             displayed_cp: ' ',
-            offset: 0,
-            is_selected: false,
-            color: CodepointInfo::default_color(),
+            offset: None,
+            size: 0,
+            skip_render: false,
+            //
+            style: TextStyle::new(),
         }
     }
 }

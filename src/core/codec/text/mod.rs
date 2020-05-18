@@ -1,32 +1,57 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-
-use std::char;
-
+// mode declaration
+pub mod ascii;
 pub mod utf8;
 
+// std
+use std::char;
+
+// ext
+
+// crate
+
+#[derive(Debug, Clone)]
+pub enum SyncDirection {
+    Backward,
+    Forward,
+}
+
+#[derive(Debug, Clone)]
+pub enum DecodeResult {
+    InvalidInput,
+    NeedMoreInput,
+    ValidCodepoint { cp: char, offset: u64, size: usize },
+}
+
+#[derive(Debug, Clone)]
+pub enum EncodeResult {
+    InvalidInput,
+    NeedMoreOutput,
+    Value { bytes: [u8; 4], size: usize },
+}
+
+// TODO: add new type : editor:: type Offset = u64;
+
+// TODO: add incremental decoder, state in impl
+// fn decode_byte(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<(char, Offset, usize)>
+//
+
+pub trait TextCodec {
+    fn encode_max_size(&self) -> usize;
+
+    // fn decode_byte(&self, direction: SyncDirection, data: u8, data_offset: u64) -> DecodeResult;
+
+    fn decode(&self, direction: SyncDirection, data: &[u8], data_offset: u64)
+        -> (char, u64, usize);
+
+    fn encode(&self, codepoint: u32, out: &mut [u8]) -> usize;
+
+    fn is_sync(&self, byte: u8) -> bool;
+
+    // TODO: return Result<u64, need more|invalid offset|...>
+    fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64>;
+}
+
+#[inline(always)]
 pub fn u32_to_char(codep: u32) -> char {
     unsafe { char::from_u32_unchecked(codep) }
 }

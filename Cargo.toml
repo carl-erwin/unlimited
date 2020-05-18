@@ -2,6 +2,8 @@
 name = "unlimited"
 version = "0.0.5-dev"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
+license = "MIT"
+
 edition = "2018"
 
 [[bin]]
@@ -9,12 +11,22 @@ doc = false
 name = "unlimited"
 path = "src/main.rs"
 
+
 [dependencies]
-libc = "*"
-clap = "*"
+libc = "0.2.*"
+rand = "0.5.0"
+clap = "2.33.*"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+#crossterm = { git = "https://github.com/crossterm-rs/crossterm" , branch = "0.20" }
+crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "fix-input-flush-fcntl" }
+unicode-width = "0.1.8"
+utf8parse = "0.2.0"
+
+# unix only
+[target.'cfg(unix)'.dependencies]
 termion = "*"
-rand = "*"
-ncurses = "*"
+
 
 [profile.release]
 #lto = true
@@ -24,4 +36,4 @@ panic = "abort"
 
 
 [profile.dev]
-panic = "abort"
+#panic = "abort"

@@ -1,16 +1,28 @@
 ## Design
 
-The Design will evolve at will. Suggestions are welcome.
+Unlimited design will evolve at will. Suggestions are welcomed.
 
 - Editor organization
 
-  The editor will be split in two parts:<br/>
+  The editor will be split in two main parts:<br/>
      1. The core : a headless process/thread that handles all the files/computations
-     2. The ui : another process/thread that presents the documents to the user
+     <br/>
+     1. The ui : another process/thread that presents the documents to the user<br/>
+     <br/>
+
+     These two threads communicate using through standard channels (mpsc).<br/>
+     The data sent/received is call an **EventMessage**.<br/>
 
 ------
 
 ### Editor primitives
+
+- **EventMessage**<br/>
+An **EventMessage** main purpose is to encapsulate user inputs.<br/>
+TODO: add time info/ sequence / etc.<br/>
+
+- **Event**<br/>
+An **Event** TODO: describe event sub types.<br/>
 
 - **Document**<br/>
 A **Document** represents a **Buffer** PLUS it's configuration.<br/>
@@ -23,7 +35,6 @@ A **Document** encapsulates:
   - the font configuration (will be moved in the ui)
   - the selections
   - the internal regions
-
 
 
 - **Buffer**<br/>
@@ -55,7 +66,8 @@ Messages sent between the ui and the core
 - **Codec**<br/>
 The codec is responsible of the Buffer interpretation
 
-    eg: TextCodec emits codepoints
+    eg: TextCodec emits codepoints<br/>
+    It convert from/to bytes/codepoints
 
 - **CodecId**<br/>
 a unique 64 bits integer that represents the codec.
@@ -66,8 +78,8 @@ A codec specific data structure
 - **Mark**<br/>
 A Mark represent a position in a Document<br/>
   * The **cursor** is a **Mark**
-  * Marks can be fixed (it is up to the module managing the m
-  * Marks can be "local" to a given View  (wich is attached to a **Document**)
+  * A mark can be fixed (it is up to the module managing the mark
+  * A mark can be "local" to a given View  (wich is attached to a **Document**)
   * Marks can be "shared" by Document(s)
 
 - **Selection**<br/>
@@ -75,12 +87,10 @@ There are 2 kinds of selection:<br/>
   * range selection : from one Mark to an other Mark
   * block selection (visual selection) : represents a rectangular selection depending on the displayed screen
 
-
 - **InputMap**<br/>
 The InputMap, will hold the input sequences the user must enter to trigger an action in the core thread.
 
-  ie: ctrl-s   -> save current document
-
+  TODO: describe json format
 
 ------
 
@@ -107,5 +117,5 @@ We want the Ui (the view) to pilot the Core (model/controller):<br/>
 - run selected ui main loop (in the main thread)<br/>
 
  **Ui main loop**<br>
- - the ui(s) request the list of opened Documents
- - and from there the ui can request layout for a given Document
+ - the ui(s) received a screen from the core
+ - and from there the ui can send input event to core

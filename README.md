@@ -1,23 +1,22 @@
-# unlimitED!
+unlimitED!
 
 
 **unlimitED!** is an experimental editor, and an excuse to learn the **Rust** language.<br/>
-It is based on previous ideas/implementation done in one of my previous c++ project.<br/>
+
 
 ---
 
 ### Features
 
-* basic utf-8 support
-* unlimited undo/redo at the byte level, ie: every inserted character is added to the document's buffer log.
-  This will be used to implement other undo schemes (word, sentence, paragraph).<br/>
-* large file support<br/>
+- [x] basic utf-8 support
+- [x] unlimited undo/redo
+- [x] large file support
 
 ---
 
 ### Compiling
 
-minimum requirement : rust edition 2018 (https://www.rust-lang.org)
+Minimum requirement : rust edition 2018 (https://www.rust-lang.org)
 
 ```
 git clone https://github.com/carl-erwin/unlimited
@@ -37,35 +36,22 @@ by default cargo install puts the compiled program in **${HOME}/.cargo/bin**
 unlimited [FILE1] .. [FILEn]
 ```
 
-#### Keyboard mapping (hard-coded) 
+#### User Input Handling
 
-  * **F1**: select previous file (currently disabled)
-  * **F2**: select next file (currently disabled)
-  * **Any character**: insert the character
-  * **Undo**: ctrl-u
-  * **Redo**: ctrl-r
-  * **Delete previous character**: backspace
-  * **Delete current character**: ctrl-d
-  * **Delete current character**: suppr
-  * **Delete to end of word**: alt+d
-  * **Cut current line**: ctrl-k (from cursor to end of line)
-  * **Paste previous killed line**: ctrl-y
-  * **Save**: ctrl-s
-  * **Quit**: ctrl-q (will quit without saving changes for now)
-  * **Goto beginning of line**: ctrl-a
-  * **Goto end of line**: ctrl-e
-  * **Page Up**: scroll up on screen at time
-  * **Page Down**: scroll down on screen at time
-  * **Goto beginning of file**: ctrl+<
-  * **Goto end of file**: ctrl+>
-  * **Mouse left button**: move cursor to clicked area
-  * **Center arround mark/cursor**: ctrl+l
+  The keyboard/mouse shortcuts are currently hard-coded
+
+  (see res/default_input_map.json)
 
 ---
 
 ### Goals
 
-Ultimately remove all limitations found in common editors. (the file's size being the first)
+Ultimately remove all limitations found in common editors.
+
+ - [x] handle large files
+ - [ ] handle very-long lines
+ - [ ] provide a C API to handle basic primitives
+ - [ ] an interactive "configurator" mode to customize a view
 
 ---
 

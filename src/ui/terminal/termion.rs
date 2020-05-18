@@ -1,28 +1,3 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-
 //
 use std::io::Error;
 use std::io::{self, Stdout, Write};
@@ -31,9 +6,10 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 extern crate libc;
 
@@ -41,6 +17,8 @@ use self::libc::{c_void, read};
 
 //
 extern crate termion;
+
+use crate::dbg_println;
 
 use self::termion::event::parse_event;
 use self::termion::input::MouseTerminal;
@@ -53,11 +31,12 @@ use crate::core::event::Event;
 use crate::core::event::Event::*;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::event::{ButtonEvent, PointerEvent};
+
 use crate::core::screen::Screen;
 
 use crate::core::event::Key;
-
-use crate::core::codepointinfo::CodepointInfo;
+use crate::core::event::KeyModifiers;
 
 //
 use crate::ui::UiState;
@@ -68,10 +47,10 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
     }
 }
 
-pub fn main_loop(
-    ui_rx: &Receiver<EventMessage>,
-    _ui_tx: &Sender<EventMessage>,
-    core_tx: &Sender<EventMessage>,
+pub fn main_loop<'a>(
+    ui_rx: &Receiver<EventMessage<'static>>,
+    _ui_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) {
     let mut seq: usize = 0;
 
@@ -93,21 +72,12 @@ pub fn main_loop(
     // ui state
     let mut ui_state = UiState::new();
 
-    // send first event
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::RequestDocumentList);
-    core_tx.send(msg).unwrap_or(());
-
     // ui ctx : TODO move to struct UiCtx
-    let mut doc_list;
-    let mut current_doc_id = 0;
-    let mut current_view_id = 0;
-    let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
-    let mut view_doc_map = HashMap::new();
-    let mut _prev_screen_rdr_time = Duration::new(0, 0);
-
+    let mut last_screen = Arc::new(RwLock::new(Box::new(Screen::new(1, 1)))); // last screen ?
+    let mut last_screen_rdr_time = Instant::now();
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
 
-    let mut request_layout = false;
+    let mut request_layout = true;
 
     while !ui_state.quit {
         // check terminal size
@@ -116,11 +86,6 @@ pub fn main_loop(
         if ui_state.terminal_width != width || ui_state.terminal_height != height {
             ui_state.terminal_width = width;
             ui_state.terminal_height = height;
-            ui_state.resize_flag = true;
-        }
-
-        // resize ?
-        if ui_state.resize_flag {
             request_layout = true;
         }
 
@@ -128,9 +93,7 @@ pub fn main_loop(
         if request_layout {
             let msg = EventMessage::new(
                 get_next_seq(&mut seq),
-                Event::RequestLayoutEvent {
-                    view_id: current_view_id,
-                    doc_id: current_doc_id,
+                Event::UpdateViewEvent {
                     width: ui_state.terminal_width as usize,
                     height: ui_state.terminal_height as usize,
                 },
@@ -149,72 +112,49 @@ pub fn main_loop(
                     break;
                 }
 
-                // TODO: add Event::OpenDocument / Event::CloseDocument
-                Event::DocumentList { ref list } => {
-                    doc_list = list.clone();
-                    doc_list.sort_by(|a, b| a.0.cmp(&b.0));
-
-                    if !doc_list.is_empty() {
-                        // open first document
-                        current_doc_id = doc_list[0].0;
-
-                        let msg = EventMessage::new(
-                            get_next_seq(&mut seq),
-                            Event::CreateView {
-                                width: ui_state.terminal_width as usize,
-                                height: ui_state.terminal_height as usize,
-                                doc_id: current_doc_id,
-                            },
-                        );
-                        core_tx.send(msg).unwrap_or(());
-                    }
-                }
-
-                Event::ViewCreated {
-                    width,
-                    height,
-                    doc_id,
-                    view_id,
-                } => {
-                    // save mapping between doc_id and view
-                    // remember a document can have multiple view
-                    view_doc_map.insert(view_id, doc_id);
-
-                    let msg = EventMessage::new(
-                        get_next_seq(&mut seq),
-                        Event::RequestLayoutEvent {
-                            view_id,
-                            doc_id,
-                            width,
-                            height,
-                        },
-                    );
-                    core_tx.send(msg).unwrap_or(());
-                }
-
-                BuildLayoutEvent {
-                    view_id,
-                    doc_id,
-                    mut screen,
-                } => {
-                    // pending request ? save view_id
-                    current_doc_id = doc_id;
-                    current_view_id = view_id;
-
+                DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
+                    let mut draw = false;
 
-                    if ui_state.resize_flag {
-                        // clear screen
-                        write!(stdout, "{}", termion::clear::All).unwrap();
-                        ui_state.resize_flag = false;
+                    crate::core::event::pending_render_event_dec(1);
+
+                    let p_input = crate::core::event::pending_input_event_count();
+                    let p_rdr = crate::core::event::pending_render_event_count();
+
+                    dbg_println!("DRAW: crossterm pre rdr : p_input {}\r", p_input);
+                    dbg_println!("DRAW: crossterm pre rdr : p_rdr {}\r", p_rdr);
+
+                    if p_input < 10 && p_rdr < 10 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW frame ----- \r");
                     }
 
-                    draw_view(&mut last_screen, &mut screen, &mut stdout);
+                    let diff = (start - last_screen_rdr_time).as_millis();
+                    dbg_println!("DRAW: crossterm diff {} ----- \r", diff);
+                    if diff >= 1000 / 60 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW timeout frame ----- \r");
+                    }
 
-                    stdout.flush().unwrap();
+                    if draw {
+                        {
+                            let mut screen = screen.write().unwrap();
+                            let mut last_screen = last_screen.write().unwrap();
+                            draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        }
+                        last_screen = screen;
+                        last_screen_rdr_time = Instant::now();
+                    } else {
+                        dbg_println!("DRAW: crossterm SKIP frame ----- \r");
+                    }
+
                     let end = Instant::now();
-                    _prev_screen_rdr_time = end.duration_since(start);
-                    last_screen = screen;
+                    dbg_println!(
+                        "DRAW: crossterm : time to draw view = {} µs\r",
+                        (end - start).as_micros()
+                    );
+                    let p_rdr = crate::core::event::pending_render_event_count();
+                    dbg_println!("DRAW: crossterm post rdr : p_rdr {}\r", p_rdr);
                 }
 
                 _ => {}
@@ -232,83 +172,38 @@ pub fn main_loop(
     // ----}
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
+fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
-    let mut prev_cpi = CodepointInfo::new();
-
-    let check_hash = last_screen.max_width() == screen.max_width()
-        && last_screen.max_height() == screen.max_height();
-
-    prev_cpi.color.0 = 0;
-    prev_cpi.color.1 = 0;
-    prev_cpi.color.2 = 0;
-
-    for l in 0..screen.max_height() {
-        let line = screen.get_mut_unclipped_line(l).unwrap();
+    for l in 0..screen.height() {
+        let line = screen.get_line_mut(l).unwrap();
 
         terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 
-        let mut have_cursor = false;
-        for c in 0..line.max_width() {
-            let cpi = line.get_unclipped_cpi(c).unwrap();
+        for c in line {
+            let cpi = c.cpi;
 
-            if cpi.is_selected {
-                have_cursor = true;
-                break;
-            }
-        }
-
-        if check_hash {
-            // check previous screen line
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            for c in 0..prev_line.width() {
-                let cpi = prev_line.get_unclipped_cpi(c).unwrap();
-                if cpi.is_selected {
-                    have_cursor = true;
-                    write!(stdout, "{}", termion::style::NoBold).unwrap();
-                    break;
-                }
-            }
-        }
-
-        if check_hash && !have_cursor {
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            if prev_line.hash() == line.hash() {
-                // write!(stdout, "SAME ").unwrap();
-                continue;
-            }
-        }
-
-        for c in 0..line.max_width() {
-            let cpi = line.get_unclipped_cpi(c).unwrap();
-
-            if prev_cpi.is_selected != cpi.is_selected {
-                if cpi.is_selected {
-                    write!(stdout, "{}", termion::style::Invert).unwrap();
-                } else {
-                    write!(stdout, "{}", termion::style::NoInvert).unwrap();
-                }
+            if cpi.style.is_inverse {
+                write!(stdout, "{}", termion::style::Invert).unwrap();
+            } else {
+                write!(stdout, "{}", termion::style::NoInvert).unwrap();
             }
 
-            // detect change
-            if prev_cpi.color != cpi.color {
-                write!(
-                    stdout,
-                    "{}",
-                    termion::color::Fg(termion::color::Rgb(cpi.color.0, cpi.color.1, cpi.color.2))
-                )
-                .unwrap();
-            }
+            let fg = &cpi.style.color;
+            let bg = &cpi.style.bg_color;
 
-            write!(stdout, "{}", cpi.displayed_cp).unwrap();
-
-            prev_cpi = *cpi;
+            write!(
+                stdout,
+                "{}{}{}",
+                termion::color::Fg(termion::color::Rgb(fg.0, fg.1, fg.2)),
+                termion::color::Bg(termion::color::Rgb(bg.0, bg.1, bg.2)),
+                cpi.displayed_cp
+            )
+            .unwrap();
         }
     }
-
-    write!(stdout, "{}", termion::style::Reset).unwrap();
+    stdout.flush().unwrap();
 }
 
 /*
@@ -337,133 +232,165 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
         self::termion::event::Event::Key(k) => match k {
             self::termion::event::Key::Ctrl(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::Char(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::Alt(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: true,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: true,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::F(n) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::F(n as usize),
                 };
             }
 
             self::termion::event::Key::Left => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Left,
                 };
             }
             self::termion::event::Key::Right => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Right,
                 };
             }
             self::termion::event::Key::Up => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Up,
                 };
             }
             self::termion::event::Key::Down => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Down,
                 };
             }
             self::termion::event::Key::Backspace => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::BackSpace,
                 };
             }
             self::termion::event::Key::Home => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Home,
                 };
             }
             self::termion::event::Key::End => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::End,
                 };
             }
             self::termion::event::Key::PageUp => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::PageUp,
                 };
             }
             self::termion::event::Key::PageDown => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::PageDown,
                 };
             }
             self::termion::event::Key::Delete => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Delete,
                 };
             }
             self::termion::event::Key::Insert => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Insert,
                 };
             }
             self::termion::event::Key::Esc => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Escape,
                 };
             }
@@ -485,28 +412,66 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 self::termion::event::MouseEvent::Press(mb, x, y) => {
                     let button = termion_mouse_button_to_u32(mb);
 
-                    return InputEvent::ButtonPress {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
+                    if button == 3 {
+                        return InputEvent::WheelUp {
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
+                            x: i32::from(x - 1),
+                            y: i32::from(y - 1),
+                        };
+                    }
+
+                    if button == 4 {
+                        return InputEvent::WheelDown {
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
+                            x: i32::from(x - 1),
+                            y: i32::from(y - 1),
+                        };
+                    }
+
+                    return InputEvent::ButtonPress(ButtonEvent {
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button,
-                    };
+                    });
                 }
 
                 self::termion::event::MouseEvent::Release(x, y) => {
-                    return InputEvent::ButtonRelease {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
+                    return InputEvent::ButtonRelease(ButtonEvent {
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button: 0xff,
-                    };
+                    });
                 }
 
-                self::termion::event::MouseEvent::Hold(_x, _y) => {}
+                self::termion::event::MouseEvent::Hold(x, y) => {
+                    return InputEvent::PointerMotion(PointerEvent {
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
+                        x: i32::from(x - 1),
+                        y: i32::from(y - 1),
+                    });
+                }
             };
         }
 
@@ -528,11 +493,8 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         let nb_read = unsafe { read(0, buf.as_mut_ptr() as *mut c_void, BUF_SIZE) as usize };
         let mut buf2 = Vec::<Result<u8, Error>>::with_capacity(nb_read);
 
-        let mut raw_data = Vec::<u8>::with_capacity(nb_read);
-
         for b in buf.iter().take(nb_read) {
             buf2.push(Ok(*b));
-            raw_data.push(*b);
         }
 
         let mut raw_evt = Vec::<_>::with_capacity(BUF_SIZE);
@@ -555,9 +517,12 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             match evt {
                 InputEvent::KeyPress {
                     key: Key::Unicode(c),
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods:
+                        KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                 } => {
                     codepoints.push(c);
                 }
@@ -566,9 +531,11 @@ fn get_input_events(tx: &Sender<EventMessage>) {
                     if !codepoints.is_empty() {
                         v.push(InputEvent::KeyPress {
                             key: Key::UnicodeArray(codepoints),
-                            ctrl: false,
-                            alt: false,
-                            shift: false,
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
                         });
                         codepoints = Vec::<char>::new();
                     }
@@ -581,20 +548,16 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         if !codepoints.is_empty() {
             v.push(InputEvent::KeyPress {
                 key: Key::UnicodeArray(codepoints),
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             });
         }
 
         if !v.is_empty() {
-            let msg = EventMessage::new(
-                0,
-                Event::InputEvent {
-                    events: v,
-                    raw_data: Some(raw_data),
-                },
-            );
+            let msg = EventMessage::new(0, Event::InputEvents { events: v });
             tx.send(msg).unwrap_or(());
         }
     }

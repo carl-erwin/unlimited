@@ -1,28 +1,3 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-
 use crate::core::mapped_file::FileHandle;
 use crate::core::mapped_file::MappedFile;
 
@@ -31,22 +6,21 @@ pub type Id = u64;
 pub type Offset = u64;
 pub type PageSize = usize;
 
-//
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpenMode {
     ReadOnly = 0,
     ReadWrite = 1,
 }
 
 /// The **Buffer** represents a linear array of bytes.<br/>
-/// it can be in memory only or backed by an on disk file.<br/>
+/// it can be in memory only or backed by a file.<br/>
 /// The editor **Modes** will use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
 pub struct Buffer<'a> {
     pub id: Id,
     /// the name of the file where the data will be synced
-    pub file_name: String,
+    pub file_name: String, // TODO: Option<String>
     /// the current size of the buffer
     pub size: usize,
     /// the number of changes (since last save TODO)
@@ -58,36 +32,60 @@ pub struct Buffer<'a> {
 impl<'a> Buffer<'a> {
     /// Creates a new `Buffer`.
     ///
-    /// file_name param[in] path to the file we want to load in the buffer,
-    /// use "/dev/null" to create empty buffer
+    /// file_name: path to the file we want to load in the buffer,
     /// this function allocate a buffer
     /// if file_name is null the content will be stored in heap
     /// if file_name is non null the the content will be read from the file
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
-    /// the allocated_bid pointer will be filled on successfull open operation
+    /// the allocated_bid pointer will be filled on successful open operation
     pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer<'a>> {
         // TODO: check permission
         // TODO: check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
-        let page_size = 4096 * 256 * 2;
-        let file = match MappedFile::new(file_name.to_owned(), page_size) {
+        if file_name.is_empty() {
+            return Buffer::empty(mode);
+        }
+
+        let file = match MappedFile::new(file_name.to_owned()) {
             Some(file) => file,
             None => {
                 // TODO: return Result
-                // eprintln!("cannot map file '{}'", file_name);
+                // dbg_println!("cannot map file '{}'", file_name);
                 return None;
             }
         };
 
-        let size = file.as_ref().borrow().size() as usize;
+        let size = file.as_ref().read().unwrap().size() as usize;
 
         // println!("'{}' opened size '{}'", file_name, size);
 
         Some(Buffer {
             id: 0,
             file_name: file_name.to_owned(),
+            mode,
+            size,
+            nr_changes: 0,
+            data: file,
+        })
+    }
+
+    pub fn empty(mode: OpenMode) -> Option<Buffer<'a>> {
+        let file = match MappedFile::empty() {
+            Some(file) => file,
+            None => {
+                return None;
+            }
+        };
+
+        let size = file.as_ref().read().unwrap().size() as usize;
+
+        dbg_println!("CEG allocate EMPTY file name");
+
+        Some(Buffer {
+            id: 0,
+            file_name: String::new(),
             mode,
             size,
             nr_changes: 0,
@@ -128,6 +126,7 @@ impl<'a> Buffer<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, mut data: &mut Vec<u8>) -> usize {
+        // TODO: let nr_bytes = data.capacity();
         let mut it = MappedFile::iter_from(&self.data, offset);
         MappedFile::read(&mut it, nr_bytes, &mut data)
     }
@@ -171,6 +170,10 @@ impl<'a> Buffer<'a> {
         nb
     }
 
+    pub fn find(&self, from_offset: u64, data: &Vec<u8>) -> Option<u64> {
+        MappedFile::find(&self.data, from_offset, &data)
+    }
+
     /// can be used to know the number of blocks that compose the buffer,
     /// api to be used by indexer etc...
     pub fn nr_pages(&self) -> u64 {
@@ -188,28 +191,11 @@ impl<'a> Buffer<'a> {
             (0, self.size)
         }
     */
-
-    pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
-        let metadata = ::std::fs::metadata(&self.file_name).unwrap();
-        let perms = metadata.permissions();
-
-        let res = MappedFile::sync_to_disk(
-            &mut self.data.as_ref().borrow_mut(),
-            &tmp_file_name,
-            &self.file_name,
-        );
-
-        // TODO: check result, handle io results properly
-        // set buffer status to : permission denied etc
-        let _ = ::std::fs::set_permissions(&self.file_name, perms);
-
-        res
-    }
 }
 
 #[test]
 fn test_buffer() {
-    let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+    let mut bb = Buffer::empty(OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 

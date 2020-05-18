@@ -1,650 +1,599 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+/* DO NOT SPLIT THIS FILE YET: the filter apis are not stable enough */
 
-use crate::core::codec::text::u32_to_char;
-use crate::core::codec::text::utf8;
+use std::char;
+use std::sync::RwLock;
 
-use crate::core::codepointinfo::CodepointInfo;
-use crate::core::mark::Mark;
+use std::rc::Rc;
+use std::sync::Arc;
+
+//
+
+use crate::dbg_println;
+
 use crate::core::screen::Screen;
+
+use crate::core::editor::Editor;
+use crate::core::editor::EditorEnv;
+
+use crate::core::codepointinfo::TextStyle;
+use crate::core::view;
 use crate::core::view::View;
+use crate::core::view::ViewEvent;
 
-pub struct Filter {}
+// TODO remove this impl details
 
-pub struct FilterContext {}
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum LayoutPass {
+    Content = 1,
+    ScreenOverlay = 2,
+    ContentAndScreenOverlay = 3,
+}
+
+//
+pub struct LayoutEnv<'a> {
+    pub graphic_display: bool,
+    pub quit: bool,
+    pub base_offset: u64,
+    pub max_offset: u64,
+    pub screen: &'a mut Screen,
+    pub focus_vid: view::Id,
+}
+
+// TODO: add ?
+//        doc,
+//        view
+//
+//  input_mime_type() -> &str "" | ""
+//  output_mime_type() -> &str "application/octet-stream"
+
+pub trait ContentFilter<'a> {
+    fn name(&self) -> &'static str;
+
+    fn setup(&mut self, _editor: &Editor<'static>, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+        /* default implementation is empty*/
+    }
+
+    fn run_managed(
+        &mut self,
+        view: &Rc<RwLock<View>>,
+        mut env: &mut LayoutEnv,
+        input: &Vec<FilterIo>,
+        output: &mut Vec<FilterIo>,
+    ) -> () {
+        let mut view = view.read().unwrap();
+        self.run(&mut view, &mut env, input, output);
+    }
+
+    fn run(
+        &mut self,
+        _view: &View,
+        _env: &mut LayoutEnv,
+        _input: &Vec<FilterIo>,
+        _output: &mut Vec<FilterIo>,
+    ) -> () {
+        //*output = input.clone();
+    }
+
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+        // default
+    }
+}
+
+pub trait ScreenOverlayFilter<'a> {
+    fn name(&self) -> &'static str;
+
+    fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+        /* default implementation is empty*/
+    }
+
+    fn run_managed(&mut self, view: &Rc<RwLock<View>>, mut env: &mut LayoutEnv) -> () {
+        let mut view = view.read().unwrap();
+        self.run(&mut view, &mut env);
+    }
+
+    fn run(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+        // default
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Unicode {
+    pub size: u32,
+    pub cp: u32,
+}
 
 // content_type == unicode
 #[derive(Debug, Clone)]
-pub enum FilterData<'a> {
-    ByteArray {
-        array: &'a [u8],
-    },
+pub enum FilterData {
+    EndOfStream,
+    StreamLimitReached, // user custom limit
 
-    Byte {
-        val: u8,
-    },
+    ByteArray { vec: Vec<u8> },
 
-    Unicode {
-        cp: u32,
-        real_cp: u32,
-        cp_index: u64, // be careful used const u64 invalid_cp_index
-        fragment_flag: bool,
-        fragment_count: u32,
-    },
+    UnicodeArray { vec: Vec<Unicode> },
 
-    // codec_change
-    CodecInfo {
-        codec_id: u32,
-        codec_context_id: u64, //
-    },
+    // text array ?
+    TextInfo { real_cp: u32, displayed_cp: u32 },
 }
 
 #[derive(Debug, Clone)]
-pub struct FilterIoData<'a> {
+pub struct FilterIo {
     // general info
-    is_valid: bool,
-    end_of_pipe: bool, // skip
-    quit: bool,        // close pipeline
-
-    is_selected: bool,
-    color: (u8, u8, u8),
-
-    offset: u64,
-    size: usize,
-
-    data: FilterData<'a>,
+    pub metadata: bool,
+    pub style: TextStyle,
+    //
+    pub offset: Option<u64>,
+    pub size: usize, // count(data) ?
+    //
+    pub data: FilterData,
     // TODO: add style infos ?
 }
 
-impl<'a> FilterIoData<'a> {
-    pub fn replace_codepoint(io: &FilterIoData<'a>, new_cp: char) -> FilterIoData<'a> {
-        if let &FilterIoData {
+impl FilterIo {
+    pub fn replace_displayed_codepoint(io: &FilterIo, disp_cp: char) -> FilterIo {
+        if let &FilterIo {
             // general info
-            is_valid,
-            end_of_pipe, // skip
-            quit,        // close pipeline
-            is_selected,
-            color,
+            metadata,
+            style,
             offset: from_offset,
             size: cp_size,
-            data:
-                FilterData::Unicode {
-                    real_cp,
-                    cp_index, // be careful used const u64 invalid_cp_index
-                    fragment_flag,
-                    fragment_count,
-                    ..
-                },
+            data: FilterData::TextInfo { real_cp, .. },
         } = io
         {
-            return FilterIoData {
+            return FilterIo {
                 // general info
-                is_valid,
-                end_of_pipe, // skip
-                quit,        // close pipeline
-                is_selected,
+                metadata,
+                style,
                 offset: from_offset,
-                color,
                 size: cp_size,
-                data: FilterData::Unicode {
-                    cp: new_cp as u32,
+                data: FilterData::TextInfo {
                     real_cp,
-                    cp_index, // be careful used const u64 invalid_cp_index
-                    fragment_flag,
-                    fragment_count,
+                    displayed_cp: disp_cp as u32,
                 },
             };
         }
 
         io.clone()
     }
-}
 
-/// This function computes start/end of lines between start_offset end_offset.<br/>
-/// It (will) run the configured filters/plugins.<br/>
-/// using the build_screen_layout function until end_offset is reached.<br/>
-pub fn get_lines_offsets<'a>(
-    view: &View<'a>,
-    start_offset: u64,
-    end_offset: u64,
-    screen_width: usize,
-    screen_height: usize,
-) -> Vec<(u64, u64)> {
-    let mut v = Vec::<(u64, u64)>::new();
-
-    let mut m = Mark::new(start_offset);
-
-    let doc = view.document.as_ref().unwrap().borrow_mut();
-
-    let screen_width = ::std::cmp::max(1, screen_width);
-    let screen_height = ::std::cmp::max(4, screen_height);
-
-    // get beginning of the line @offset
-    m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
-
-    // and build tmp screens until end_offset if found
-    let mut screen = Screen::new(screen_width, screen_height);
-
-    let max_offset = doc.buffer.size as u64;
-    let max_size = (screen_width * screen_height * 2) as usize;
-
-    loop {
-        // fill screen
-        let mut data = vec![];
-        doc.buffer.read(m.offset, max_size, &mut data);
-
-        let _ = build_screen_layout(&data, m.offset, max_offset, &mut screen);
-
-        if screen.nb_push == 0 {
-            return v;
+    pub fn check_invariants(&self) {
+        if self.size > 0 && self.metadata == true {
+            dbg_println!("INVALID IO [METADATA] {:?}", self);
+            panic!("");
         }
-
-        // push lines offsets
-        // FIXME: find a better way to iterate over the used lines
-        for i in 0..screen.current_line_index {
-            if !v.is_empty() && i == 0 {
-                // do not push line range twice
-                continue;
-            }
-
-            let s = screen.line[i].get_first_cpi().unwrap().offset;
-            let e = screen.line[i].get_last_cpi().unwrap().offset;
-
-            v.push((s, e));
-
-            if s >= end_offset || e == max_offset {
-                return v;
-            }
+        if self.size == 0 && self.metadata == false {
+            dbg_println!("INVALID IO [NON META] {:?}", self);
+            panic!("");
         }
-
-        // eof reached ?
-        // FIXME: the api is not yet READY
-        // we must find a way to cover all filled lines
-        if screen.current_line_index < screen.height() {
-            let s = screen.line[screen.current_line_index]
-                .get_first_cpi()
-                .unwrap()
-                .offset;
-
-            let e = screen.line[screen.current_line_index]
-                .get_last_cpi()
-                .unwrap()
-                .offset;
-            v.push((s, e));
-            return v;
-        }
-
-        // TODO: activate only in debug builds
-        if 0 == 1 {
-            match screen.find_cpi_by_offset(m.offset) {
-                (Some(cpi), x, y) => {
-                    assert_eq!(x, 0);
-                    assert_eq!(y, 0);
-                    assert_eq!(cpi.offset, m.offset);
-                }
-                _ => panic!("implementation error"),
-            }
-        }
-
-        if let Some(l) = screen.get_last_used_line() {
-            if let Some(cpi) = l.get_first_cpi() {
-                m.offset = cpi.offset; // update next screen start
-            }
-        }
-
-        screen.clear(); // prepare next screen
     }
 }
 
-#[derive(Debug, Clone)]
-struct _LayoutPlugin {
-    plugin_id: u32,
-    context_id: u32,
-}
+pub fn run_compositing_stage(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View>>,
+    base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
+    screen: &mut Screen,
+    pass_mask: LayoutPass,
+) {
+    run_compositing_stage_direct(
+        editor,
+        env,
+        &view,
+        base_offset,
+        max_offset,
+        screen,
+        pass_mask,
+    );
 
-// first internal pass : convert raw bytes to vec of FilterIoData::FilterData::ByteArray / Byte
-fn layout_filter_prepare_raw_data<'a>(
-    screen: &Screen,
-    data: &'a [u8],
-    base_offset: u64,
-    max_offset: u64,
-) -> Vec<FilterIoData<'a>> {
-    let mut data_vec: Vec<FilterIoData<'a>> = Vec::with_capacity(screen.width() * screen.height());
-
-    data_vec.push(FilterIoData {
-        is_valid: true,
-        end_of_pipe: false, // skip
-        quit: false,        // close pipeline
-        is_selected: false,
-        color: CodepointInfo::default_color(),
-        offset: base_offset,
-        size: 1,
-        data: FilterData::ByteArray { array: data },
-    });
-
-    /*
-     as byte
-        for (count, b) in data.iter().enumerate() {
-            data_vec.push(FilterIoData {
-                is_valid: true,
-                end_of_pipe: false, // skip
-                quit: false,        // close pipeline
-                is_selected: false,
-                offset: base_offset + count as u64,
-                size: 1,
-                data: FilterData::Byte { val: *b },
-            });
-        }
-    */
-
-    // TODO: only text-mode add special tag end-of-stream, add filter-end-of-stream -> ' '
-    // eof handling -> fake ' ' @ end of stream
-    if base_offset + data.len() as u64 == max_offset {
-        data_vec.push(FilterIoData {
-            is_valid: true,
-            end_of_pipe: false, // skip
-            quit: false,        // close pipeline
-            is_selected: true,
-            color: CodepointInfo::default_color(),
-            offset: base_offset + data.len() as u64,
-            size: 1,
-            data: FilterData::Byte { val: b' ' },
-        });
-    }
-
-    data_vec
-}
-
-struct Utf8FilterCtx<'a, 'b> {
-    from_offset: u64,
-    state: u32,
-    codep: u32,
-    cp_size: usize,
-    cp_index: u64,
-    filter_out: &'a mut Vec<FilterIoData<'b>>,
-}
-
-fn filter_utf8_byte<'a, 'b>(ctx: &mut Utf8FilterCtx<'a, 'b>) {
-    match ctx.state {
-        utf8::UTF8_ACCEPT => {
-            let io = FilterIoData {
-                // general info
-                is_valid: true,
-                end_of_pipe: false, // skip
-                quit: false,        // close pipeline
-                is_selected: false,
-                color: CodepointInfo::default_color(),
-                offset: ctx.from_offset,
-                size: ctx.cp_size,
-                data: FilterData::Unicode {
-                    cp: ctx.codep,
-                    real_cp: ctx.codep,
-                    cp_index: ctx.cp_index, // be carefull used const u64 invalid_cp_index
-                    fragment_flag: false,
-                    fragment_count: 0,
-                },
-            };
-
-            ctx.filter_out.push(io);
-
-            ctx.cp_index += 1;
-            ctx.from_offset += ctx.cp_size as u64;
-
-            ctx.codep = 0;
-            ctx.cp_size = 0;
-        }
-
-        utf8::UTF8_REJECT => {
-            // decode error : invalid sequence
-            let io = FilterIoData {
-                // general info
-                is_valid: true,
-                end_of_pipe: false, // skip
-                quit: false,        // close pipeline
-                is_selected: false,
-                color: CodepointInfo::default_color(),
-
-                offset: ctx.from_offset,
-                size: 1,
-                data: FilterData::Unicode {
-                    cp: 0xfffd,
-                    real_cp: 0xfffd,
-                    cp_index: ctx.cp_index, // be carefull used const u64 invalid_cp_index
-                    fragment_flag: false,
-                    fragment_count: 0,
-                },
-            };
-            ctx.filter_out.push(io);
-
-            // restart @ next byte
-            ctx.cp_index += 1;
-            ctx.from_offset += 1 as u64;
-
-            ctx.codep = 0;
-            ctx.cp_size = 0;
-        }
-        _ => { /* need more data */ }
+    let mut view = view.write().unwrap();
+    if let Some(offset) = screen.last_offset {
+        view.end_offset = offset;
     }
 }
 
-fn layout_filter_utf8<'a>(
-    filter_in: &'a [FilterIoData],
-    mut filter_out: &mut Vec<FilterIoData>,
+fn compose_children(
+    mut editor: &mut Editor<'static>,
+    mut editor_env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View>>,
+    _base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,   // default view.doc.size()   end  -> Option<u64>
+    screen: &mut Screen,
+    pass_mask: LayoutPass,
 ) -> bool {
-    if filter_in.is_empty() {
-        *filter_out = vec![];
-        return true;
-    }
-
-    let mut ctx = Utf8FilterCtx {
-        from_offset: filter_in[0].offset, // start offset
-        state: 0,
-        codep: 0,
-        cp_size: 0,
-        cp_index: 0,
-        filter_out: &mut filter_out,
-    };
-
-    for d in filter_in {
-        match d.data {
-            FilterData::ByteArray { array } => {
-                for val in array {
-                    ctx.cp_size += 1;
-                    ctx.state = utf8::decode_byte(ctx.state, *val, &mut ctx.codep);
-                    filter_utf8_byte(&mut ctx);
-                }
-            }
-
-            FilterData::Byte { val } => {
-                ctx.cp_size += 1;
-                ctx.state = utf8::decode_byte(ctx.state, val, &mut ctx.codep);
-                filter_utf8_byte(&mut ctx);
-            }
-
-            _ => { /* unexpected */ }
-        }
-    }
-
-    true
-}
-
-fn layout_filter_tabulation<'a>(
-    filter_in: &Vec<FilterIoData<'a>>,
-    filter_out: &mut Vec<FilterIoData<'a>>,
-) -> bool {
-    let mut prev_cp = ' ';
-    let mut column_count = 0;
-
-    for io in filter_in.iter() {
-        if let FilterIoData {
-            data: FilterData::Unicode { cp, .. },
-            ..
-        } = &*io
-        {
-            if prev_cp == '\r' || prev_cp == '\n' {
-                column_count = 0;
-            }
-
-            match (prev_cp, u32_to_char(*cp)) {
-                (_, '\t') => {
-                    prev_cp = '\t';
-
-                    let tab_size = 8;
-                    let padding = tab_size - (column_count % tab_size);
-
-                    for _ in 0..padding {
-                        let new_io = FilterIoData::replace_codepoint(io, ' ');
-                        filter_out.push(new_io);
-                        column_count += 1;
-                    }
-                }
-
-                (_, codepoint) => {
-                    prev_cp = codepoint;
-                    filter_out.push(io.clone());
-                    column_count += 1;
-                }
-            }
-        }
-    }
-
-    true
-}
-
-fn layout_keyword_highlighting<'a>(
-    filter_in: &Vec<FilterIoData<'a>>,
-    filter_out: &mut Vec<FilterIoData<'a>>,
-) -> bool {
-    let mut accum = vec![];
-    let mut utf8_word = vec![];
-
-    for io in filter_in {
-        match &*io {
-            FilterIoData {
-                data: FilterData::Unicode { cp, .. },
-                ..
-            } => {
-                let in_word = match u32_to_char(*cp) {
-                    ' ' | '\n' | '\t' => false,
-                    '(' | ')' => false,
-                    '{' | '}' => false,
-                    '[' | ']' => false,
-                    ',' | ';' => false,
-
-                    _ => true,
-                };
-
-                if in_word {
-                    accum.push(io.clone());
-                    let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-                    let nr_bytes = utf8::encode(*cp, &mut utf8_out);
-                    for b in utf8_out.iter().take(nr_bytes) {
-                        utf8_word.push(*b);
-                    }
-                    continue;
-                }
-
-                let mut new_color = (128, 0, 128);
-
-                let word_found = match String::from_utf8(utf8_word.clone()).unwrap().as_ref() {
-                    // some Rust keywords
-                    "use" | "crate" => {
-                        new_color = (255, 0, 0);
-                        true
-                    }
-
-                    // some Rust keywords
-                    "let" | "mut" | "fn" | "impl" | "trait" => {
-                        new_color = (0, 128, 128);
-                        true
-                    }
-
-                    "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64"
-                    | "i128" | "f32" | "f64" => {
-                        new_color = (0, 128, 128);
-                        true
-                    }
-
-                    // C preprocessor
-                    "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#define" => {
-                        new_color = (255, 0, 0);
-                        true
-                    }
-
-                    // C keywords
-                    "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
-                    | "default" | "do" | "double" | "else" | "enum" | "extern" | "float"
-                    | "for" | "goto" | "int" | "long" | "register" | "return" | "short"
-                    | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
-                    | "union" | "unsigned" | "void" | "volatile" | "while" => {
-                        new_color = (0, 128, 128);
-                        true
-                    }
-
-                    // C operators
-                    "." | "->" | "=" | "==" | "!=" | "&&" | "||" | "~" | "^" => {
-                        new_color = (0, 128, 0);
-                        true
-                    }
-
-                    "," | ";" => {
-                        new_color = (0, 128, 0);
-                        true
-                    }
-
-                    _ => {
-                        let mut is_digit = true;
-                        for c in utf8_word.iter() {
-                            if *c < b'0' || *c > b'9' {
-                                is_digit = false;
-                                break;
-                            }
-                        }
-
-                        if is_digit {
-                            new_color = (111, 100, 80);
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                };
-
-                if word_found {
-                    for mut io in accum.iter_mut() {
-                        io.color = new_color;
-                    }
-                }
-
-                // flush
-                if !accum.is_empty() {
-                    filter_out.append(&mut accum);
-                    utf8_word.clear();
-                }
-
-                filter_out.push(io.clone());
-            }
-
-            _ => {}
-        }
-    }
-
-    // flush
-    filter_out.append(&mut accum);
-
-    true
-}
-
-fn layout_fill_screen(filter_in: &Vec<FilterIoData>, max_offset: u64, screen: &mut Screen) -> bool {
-    if filter_in.is_empty() {
+    let view = view.read().unwrap();
+    if view.children.len() == 0 {
         return false;
     }
 
-    // start offset
-    let base_offset = filter_in[0].offset;
+    dbg_println!("COMPOSE CHILDREN OF VID {}", view.id);
 
-    screen.first_offset = base_offset;
-    let mut last_pushed_offset = base_offset;
+    // split direction
+    let layout_dir_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
 
-    for io in filter_in.iter() {
-        if let FilterIoData {
-            offset,
-            data: FilterData::Unicode { cp, .. },
-            color,
-            ..
-        } = &*io
-        {
-            let (push_ok, _) = screen.push(filter_codepoint(u32_to_char(*cp), *offset, *color));
-            if !push_ok {
-                break;
-            }
+    let (width, height) = (screen.width(), screen.height());
+    if width == 0 || height == 0 {
+        return false;
+    }
 
-            last_pushed_offset = *offset;
+    // cache size ?
+    let sizes = if layout_dir_is_vertical {
+        view::compute_layout_sizes(height, &view.layout_ops)
+    } else {
+        view::compute_layout_sizes(width, &view.layout_ops)
+    };
+
+    dbg_println!(
+        "ITER over VID {}, CHILDREN {:?}, size {:?}",
+        view.id,
+        view.children,
+        sizes
+    );
+
+    assert_eq!(view.children.len(), sizes.len());
+
+    let mut compose_idx = vec![];
+    // 1 - compute position and size
+    // 2 - compose based on sibling dependencies/priority
+    let mut x = 0;
+    let mut y = 0;
+    for (idx, vid) in view.children.iter().enumerate() {
+        let mut child_v = editor.view_map.get(vid).unwrap().write().unwrap();
+        let (w, h) = if layout_dir_is_vertical {
+            (width, sizes[idx])
+        } else {
+            (sizes[idx], height)
+        };
+
+        child_v.x = x;
+        child_v.y = y;
+        child_v.width = w;
+        child_v.height = h;
+
+        compose_idx.push((idx, (x, y), (w, h))); // to sort later
+
+        if layout_dir_is_vertical {
+            y += h;
+        } else {
+            x += w;
         }
     }
 
-    screen.doc_max_offset = max_offset;
-    screen.last_offset = last_pushed_offset;
+    // TODO: sort based on depth/priority
+    compose_idx.sort_by(|idxa, idxb| {
+        let vida = view.children[idxa.0];
+        let vidb = view.children[idxb.0];
+
+        let va = Rc::clone(editor.view_map.get(&vida).unwrap());
+        let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
+
+        let pa = va.read().unwrap().compose_priority;
+        let pb = vb.read().unwrap().compose_priority;
+        eprintln!("pa vid {} priority: {:?}", vida, pa);
+        eprintln!("pb vid {} priority: {:?}", vidb, pb);
+        eprintln!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
+
+        pb.cmp(&pa)
+    });
+    //
+
+    eprintln!("COMPOSE sub VIDs indexes {:?}, ", compose_idx);
+
+    for info in &compose_idx {
+        let idx = info.0;
+        let (x, y) = info.1;
+        let (_w, _h) = info.2;
+        if sizes[idx] == 0 {
+            continue;
+        }
+
+        eprintln!("COMPOSE VID index {:?}, ", idx);
+
+        let vid = view.children[idx];
+
+        let child_rc = editor.view_map.get(&vid).clone();
+        let child_rc = child_rc.unwrap().clone();
+
+        let start_offset = {
+            let child_v = child_rc.write().unwrap();
+            child_v.start_offset
+        };
+        {
+            let (w, h) = if layout_dir_is_vertical {
+                (width, sizes[idx])
+            } else {
+                (sizes[idx], height)
+            };
+
+            assert!(w > 0);
+            assert!(h > 0);
+
+            // TODO: resize instead of replace
+            let mut child_screen = Screen::new(w, h);
+            run_compositing_stage_direct(
+                editor,
+                editor_env,
+                &child_rc,
+                start_offset,
+                max_offset,
+                &mut child_screen,
+                pass_mask,
+            );
+
+            {
+                let mut child_v = child_rc.write().unwrap();
+                child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
+            }
+        }
+
+        {
+            let cbs = {
+                let mut child_v = child_rc.write().unwrap();
+                let last_offset = {
+                    let child_screen = child_v.screen.as_ref().read().unwrap();
+                    // composition: copy child to (parent's) output screen
+                    screen.copy_screen_at_xy(&child_screen, x, y);
+                    child_screen.last_offset
+                };
+
+                child_v.end_offset = last_offset.unwrap_or(0);
+                child_v.watcher.clone()
+            };
+
+            //
+            // NB: notify watchers just after composition
+            // use View::compose_priority to order notifications
+            //
+            // NOTE(ceg): currently we do not have event filters
+            {
+                for cb in cbs.iter() {
+                    let mode = cb.0.as_ref();
+                    mode.on_view_event(
+                        &mut editor,
+                        &mut editor_env,
+                        cb.1,
+                        cb.2,
+                        &ViewEvent::PostComposition,
+                    );
+                }
+            }
+        }
+    }
 
     true
 }
 
-/// This function can be considered as the core of the editor.<br/>
-/// It will run the configured filters until the screen is filled or eof is reached.<br/>
-/// the screen is clear first
-/// TODO: pass list of filter function to be applied
-/// 0 - allocate context for each configurred plugin
-/// 1 - utf8 || hexa
-/// 2 - tabulation
-pub fn build_screen_layout(
-    data: &[u8],
-    base_offset: u64,
-    max_offset: u64,
+// This function can be considered as the core of the editor.<br/>
+// It will run the configured filters until the screen is filled or eof is reached.<br/>
+// the screen should be cleared first
+pub fn run_compositing_stage_direct(
+    mut editor: &mut Editor<'static>,
+    mut editor_env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View>>,
+    base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
     mut screen: &mut Screen,
-) -> u64 {
-    screen.clear();
+    pass_mask: LayoutPass,
+) {
+    // check screen size
+    if screen.width() == 0 || screen.height() == 0 {
+        return;
+    }
 
-    let mut filter_in = layout_filter_prepare_raw_data(&screen, data, base_offset, max_offset);
+    // (recursive) children compositing
+    let draw = compose_children(
+        &mut editor,
+        &mut editor_env,
+        &view,
+        base_offset,
+        max_offset,
+        &mut screen,
+        pass_mask,
+    );
+    if draw {
+        return;
+    }
 
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let _ret = layout_filter_utf8(&filter_in, &mut filter_out);
-    filter_in = filter_out;
+    {
+        eprintln!("COMPOSE VID {:?}, ", view.read().unwrap().id);
+    }
 
-    //
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let _ret = layout_filter_tabulation(&filter_in, &mut filter_out);
-    filter_in = filter_out;
-
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let _ret = layout_keyword_highlighting(&filter_in, &mut filter_out);
-    filter_in = filter_out;
-
-    // last pass
-    let _ret = layout_fill_screen(&filter_in, max_offset, &mut screen);
-
-    screen.last_offset
-}
-
-// TODO return array of CodePointInfo  0x7f -> <ESC>
-pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointInfo {
-    let displayed_cp: char = match c {
-        '\r' | '\n' | '\t' => ' ',
-
-        _ if c < ' ' => '�',
-
-        _ if c == 0x7f as char => '�',
-
-        _ => c,
+    // Draw Leaf View
+    let mut layout_env = LayoutEnv {
+        graphic_display: editor_env.graphic_display,
+        quit: false,
+        base_offset,
+        max_offset,
+        screen,
+        focus_vid: editor_env.focus_on,
     };
 
-    CodepointInfo {
-        metadata: false,
-        cp: c,
-        displayed_cp,
-        offset,
-        is_selected: false,
-        color,
+    // screen must be cleared by caller
+    if pass_mask == LayoutPass::Content || pass_mask == LayoutPass::ContentAndScreenOverlay {
+        assert_eq!(0, layout_env.screen.push_count());
     }
+
+    layout_env.screen.check_invariants();
+
+    let mut time_spent: Vec<u128> = vec![];
+
+    if pass_mask == LayoutPass::Content || pass_mask == LayoutPass::ContentAndScreenOverlay {
+        run_content_filters(&editor, &mut time_spent, &view, &mut layout_env);
+    }
+
+    if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ContentAndScreenOverlay {
+        run_screen_overlay_filters(&editor, &mut time_spent, &view, &mut layout_env);
+    }
+}
+
+fn run_content_filters(
+    editor: &Editor<'static>,
+    time_spent: &mut Vec<u128>,
+    view: &Rc<RwLock<View>>,
+    mut layout_env: &mut LayoutEnv,
+) {
+    // setup
+    let (filters, filter_in, filter_out) = {
+        let v = view.read().unwrap();
+        let filter_in = v.filter_in.clone();
+        let filter_out = v.filter_out.clone();
+        let filters = v.compose_content_filters.clone();
+        (filters, filter_in, filter_out)
+    };
+    for f in filters.borrow_mut().iter_mut() {
+        //dbg_println!("setup {}", f.name());
+        f.setup(&editor, &mut layout_env, &view);
+    }
+
+    let mut filters = filters.borrow_mut();
+    if filters.len() == 0 && filters.len() == 0 {
+        layout_env.quit = true;
+    }
+
+    time_spent.resize(filters.len(), 0);
+
+    let mut filter_in = filter_in.borrow_mut();
+    let mut filter_out = filter_out.borrow_mut();
+    filter_in.clear();
+
+    let mut loop_count = 0;
+
+    // is interactive rendering possible ?
+
+    let view = view.read().unwrap();
+    layout_env.quit = false;
+    while layout_env.quit == false {
+        loop_count += 1;
+
+        for (idx, f) in filters.iter_mut().enumerate() {
+            // always clear filter output
+            filter_out.clear();
+
+            if false {
+                dbg_println!(
+                    "run {:32} : filter_in.len() {})\r",
+                    f.name(),
+                    filter_in.len()
+                );
+            }
+            let t0 = std::time::Instant::now();
+
+            f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
+
+            let t1 = std::time::Instant::now();
+
+            if false {
+                dbg_println!(
+                    "run {:32} : filter_out.len() {})\r",
+                    f.name(),
+                    filter_out.len()
+                );
+            }
+
+            let diff = (t1 - t0).as_micros();
+            time_spent[idx] += diff;
+
+            // pre loop stats
+            if false {
+                dbg_println!(
+                    "time spent in {:32} : {:4} µs (inner loop {})\r",
+                    f.name(),
+                    diff,
+                    loop_count
+                );
+            }
+
+            if false {
+                for i in filter_out.iter() {
+                    i.check_invariants();
+                }
+            }
+
+            // swap input/output for next filter
+            // current output is next filter input
+            std::mem::swap(&mut filter_in, &mut filter_out);
+        }
+    }
+
+    for (idx, f) in filters.iter_mut().enumerate() {
+        let t0 = std::time::Instant::now();
+        f.finish(&view, &mut layout_env);
+        let t1 = std::time::Instant::now();
+        let diff = (t1 - t0).as_micros();
+        time_spent[idx] += diff;
+    }
+
+    //    return;
+
+    let mut total_time = 0;
+    for (idx, f) in filters.iter_mut().enumerate() {
+        dbg_println!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
+        total_time += time_spent[idx];
+    }
+
+    dbg_println!(
+        "total time spent in content filter pipeline: {} µs, loop_count {}\r",
+        total_time,
+        loop_count
+    );
+}
+
+fn run_screen_overlay_filters(
+    editor: &Editor<'static>,
+    time_spent: &mut Vec<u128>,
+    view: &Rc<RwLock<View>>,
+    mut layout_env: &mut LayoutEnv,
+) {
+    // setup
+    let filters = {
+        let v = view.read().unwrap();
+        v.compose_screen_overlay_filters.clone()
+    };
+    for f in filters.borrow_mut().iter_mut() {
+        //dbg_println!("setup {}", f.name());
+        f.setup(&editor, &mut layout_env, &view);
+    }
+
+    let mut filters = filters.borrow_mut();
+    if filters.len() == 0 && filters.len() == 0 {
+        layout_env.quit = true;
+    }
+
+    time_spent.resize(filters.len(), 0);
+
+    // is interactive rendering possible ?
+
+    let view = view.read().unwrap();
+
+    for (idx, f) in filters.iter_mut().enumerate() {
+        let t0 = std::time::Instant::now();
+        f.run(&view, &mut layout_env);
+        let t1 = std::time::Instant::now();
+        let diff = (t1 - t0).as_micros();
+        time_spent[idx] += diff;
+    }
+
+    for (idx, f) in filters.iter_mut().enumerate() {
+        let t0 = std::time::Instant::now();
+        f.finish(&view, &mut layout_env);
+        let t1 = std::time::Instant::now();
+        let diff = (t1 - t0).as_micros();
+        time_spent[idx] += diff;
+    }
+
+    //    return;
+
+    let mut total_time = 0;
+    for (idx, f) in filters.iter_mut().enumerate() {
+        dbg_println!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
+        total_time += time_spent[idx];
+    }
+
+    dbg_println!(
+        "total time spent in screen overlay filter pipeline: {} µs\r",
+        total_time
+    );
 }
