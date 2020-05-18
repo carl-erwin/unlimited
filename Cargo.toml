@@ -14,6 +14,7 @@ libc = "*"
 clap = "*"
 termion = "*"
 rand = "*"
+ncurses = "*"
 
 [profile.release]
 #lto = true
