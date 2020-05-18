@@ -46,8 +46,6 @@ use crate::core::screen::Screen;
 
 use crate::core::event::Key;
 
-use crate::core::codepointinfo::CodepointInfo;
-
 //
 use crate::ui::UiState;
 
@@ -240,7 +238,7 @@ fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen) {
     draw_screen(last_screen, &mut screen);
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
+fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen) {
     clear();
 
     for li in 0..screen.height() {
@@ -343,7 +341,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             });
         }
 
-        0...26 => {
+        0..=26 => {
             let mut ctrl = false;
             let c;
 
@@ -371,7 +369,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             });
         }
 
-        27...127 => {
+        27..=127 => {
             /* TODO */
             let k = unsafe { ::std::char::from_u32_unchecked(keycode as u32) };
             v.push(InputEvent::KeyPress {

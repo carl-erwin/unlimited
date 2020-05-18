@@ -41,13 +41,15 @@ use crate::core::event::Key;
 use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
 
+use crate::core::view;
+
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
 pub struct CoreState {
     pending_events: usize,
     quit: bool,
-    status: String,
+    status: String, // TODO: move to test-mode
 }
 
 impl CoreState {
@@ -297,7 +299,7 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
 
 fn process_input_events(
     core_state: &mut CoreState,
-    view: &mut View,
+    mut view: &mut View,
     _ui_tx: &Sender<EventMessage>,
     ev: &InputEvent,
     _raw_data: &Option<Vec<u8>>,
@@ -307,6 +309,9 @@ fn process_input_events(
         core_state.status = "no input event".to_string();
         return;
     }
+
+    //
+    let trigger = vec![(*ev).clone()];
 
     match *ev {
         InputEvent::KeyPress {
@@ -341,7 +346,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('u'),
         } => {
-            view.undo();
+            view::undo(&trigger, &mut view);
             core_state.status = "<undo>".to_string();
         }
 
@@ -351,7 +356,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('r'),
         } => {
-            view.redo();
+            view::redo(&trigger, &mut view);
             core_state.status = "<redo>".to_string();
         }
 
@@ -368,7 +373,7 @@ fn process_input_events(
             shift: false,
             key: Key::Home,
         } => {
-            view.move_marks_to_beginning_of_line();
+            view::move_marks_to_beginning_of_line(&trigger, &mut view);
         }
 
         // ctrl+e
@@ -384,7 +389,7 @@ fn process_input_events(
             shift: false,
             key: Key::End,
         } => {
-            view.move_marks_to_end_of_line();
+            view::move_marks_to_end_of_line(&trigger, &mut view);
         }
 
         // ctrl+d
@@ -394,7 +399,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('d'),
         } => {
-            view.remove_codepoint();
+            view::remove_codepoint(&trigger, &mut view);
         }
 
         // ctrl+s
@@ -404,7 +409,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('s'),
         } => {
-            view.save_document();
+            view::save_document(&trigger, &mut view);
             core_state.status = "<save>".to_string();
         }
 
@@ -415,7 +420,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('k'),
         } => {
-            view.cut_to_end_of_line();
+            view::cut_to_end_of_line(&trigger, &mut view);
         }
 
         // ctrl+y
@@ -425,7 +430,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('y'),
         } => {
-            view.paste();
+            view::paste(&trigger, &mut view);
         }
 
         // ctrl+l
@@ -435,7 +440,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('l'),
         } => {
-            view.center_arround_mark();
+            view::center_arround_mark(&trigger, &mut view);
         }
 
         // ctrl+?
@@ -455,12 +460,7 @@ fn process_input_events(
             shift: false,
             key: Key::Left,
         } => {
-            view.move_marks_backward();
-
-            if view.center_on_cursor_move {
-                view.center_arround_mark();
-            }
-
+            view::move_marks_backward(&trigger, &mut view);
             core_state.status = "<left>".to_owned();
         }
 
@@ -471,11 +471,7 @@ fn process_input_events(
             shift: false,
             key: Key::Right,
         } => {
-            view.move_marks_forward();
-            if view.center_on_cursor_move {
-                view.center_arround_mark();
-            }
-
+            view::move_marks_forward(&trigger, &mut view);
             core_state.status = "<right>".to_owned();
         }
 
@@ -486,11 +482,7 @@ fn process_input_events(
             shift: false,
             key: Key::Up,
         } => {
-            view.move_marks_to_previous_line();
-
-            if view.center_on_cursor_move {
-                view.center_arround_mark();
-            }
+            view::move_marks_to_previous_line(&trigger, &mut view);
 
             core_state.status = "<up>".to_owned();
         }
@@ -502,11 +494,7 @@ fn process_input_events(
             shift: false,
             key: Key::Down,
         } => {
-            view.move_marks_to_next_line();
-
-            if view.center_on_cursor_move {
-                view.center_arround_mark();
-            }
+            view::move_marks_to_next_line(&trigger, &mut view);
 
             core_state.status = "<down>".to_owned();
         }
@@ -518,7 +506,7 @@ fn process_input_events(
             shift: false,
             key: Key::PageUp,
         } => {
-            view.scroll_to_previous_screen();
+            view::scroll_to_previous_screen(&trigger, &mut view);
             core_state.status = "<page_up>".to_owned();
         }
 
@@ -529,7 +517,7 @@ fn process_input_events(
             shift: false,
             key: Key::PageDown,
         } => {
-            view.scroll_to_next_screen();
+            view::scroll_to_next_screen(&trigger, &mut view);
             core_state.status = "<page_down>".to_owned();
         }
 
@@ -540,7 +528,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('<'),
         } => {
-            view.move_mark_to_beginning_of_file();
+            view::move_mark_to_beginning_of_file(&trigger, &mut view);
             core_state.status = "<move to beginning of file>".to_owned();
         }
 
@@ -551,7 +539,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('>'),
         } => {
-            view.move_mark_to_end_of_file();
+            view::move_mark_to_end_of_file(&trigger, &mut view);
             core_state.status = "<move to end of file>".to_owned();
         }
 
@@ -562,7 +550,7 @@ fn process_input_events(
             shift: false,
             key: Key::Delete,
         } => {
-            view.remove_codepoint();
+            view::remove_codepoint(&trigger, &mut view);
             core_state.status = "<del>".to_owned();
         }
 
@@ -573,7 +561,7 @@ fn process_input_events(
             shift: false,
             key: Key::BackSpace,
         } => {
-            view.remove_previous_codepoint();
+            view::remove_previous_codepoint(&trigger, &mut view);
             core_state.status = "<backspace>".to_owned();
         }
 
@@ -584,7 +572,8 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode(cp),
         } => {
-            view.insert_codepoint(cp, core_state.pending_events);
+            view::insert_codepoint(&trigger, &mut view);
+
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
         }
 
@@ -595,7 +584,7 @@ fn process_input_events(
             shift: false,
             key: Key::UnicodeArray(ref v),
         } => {
-            view.insert_codepoint_array(&v);
+            view::insert_codepoint_array(&trigger, &mut view);
 
             if v.len() == 1 {
                 core_state.status = format!("<insert [0x{:x}]>", v[0] as u32);
@@ -609,7 +598,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('d'),
         } => {
-            view.remove_until_end_of_word();
+            view::remove_until_end_of_word(&trigger, &mut view);
         }
 
         // mouse button pressed
@@ -622,15 +611,14 @@ fn process_input_events(
             button,
         } => match button {
             0 | 1 => {
-                let s = view.button_press(button, x, y);
-                core_state.status = format!("<click({},@({},{}))> : {}", button, x, y, s);
+                view::button_press(&trigger, &mut view);
             }
             3 => {
-                view.scroll_up(3);
+                view::scroll_up(&trigger, &mut view);
                 core_state.status = format!("<click({},@({},{}))>", button, x, y);
             }
             4 => {
-                view.scroll_down(3);
+                view::scroll_down(&trigger, &mut view);
                 core_state.status = format!("<click({},@({},{}))>", button, x, y);
             }
 
@@ -657,8 +645,9 @@ fn process_input_events(
             y,
             button,
         } => {
-            view.button_release(button, x, y);
+            view::button_release(&trigger, &mut view);
             core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
+            //
         }
 
         _ => {
