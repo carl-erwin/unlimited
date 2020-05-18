@@ -1,27 +1,22 @@
-// Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+/*
+TODO: remove  *_used_* apis
+we will fill the entire screen with Option<..> where the data is not available
+screen "reader" should scan the line until goo information is found
+
+screen.get_first_cell_with_offset(Direction::Left|Right, x, y) skip offset = None and got in the specified direction
+screen.get_first_offset(Direction::Left|Right, x, y)
+
+screen.at(x,y)
+screen.at_mut(x,y)
+screen.get(x,y)
+screen.get_mut(x,y)
+
+
+*/
+
+extern crate unicode_width;
+
+use unicode_width::UnicodeWidthChar;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -57,15 +52,12 @@ pub struct Line {
     pub start_index: usize,
     width: usize,
     pub read_only: bool,
-    pub metadata: bool,
     hash_cache: u64,
     hash_unclipped_cache: u64,
 }
 
 impl Line {
     pub fn new(width: usize) -> Self {
-        assert_eq!(width > 0, true);
-
         let mut cells = Vec::with_capacity(width);
         for _ in 0..width {
             cells.push(LineCell::new());
@@ -78,7 +70,6 @@ impl Line {
             start_index: 0,
             width,
             read_only: false,
-            metadata: false,
             hash_cache: 0,
             hash_unclipped_cache: 0,
         }
@@ -128,8 +119,8 @@ impl Line {
         self.start_index = 0;
         self.width = width;
         self.read_only = false;
-        self.metadata = false;
         self.hash_cache = 0;
+        self.hash_unclipped_cache = 0;
     }
 
     /// returns (start_index, width) tupple
@@ -155,14 +146,48 @@ impl Line {
         self.set_clipping(0, self.max_width);
     }
 
+    pub fn capacity(&self) -> usize {
+        self.width()
+    }
+
+    pub fn available(&self) -> usize {
+        if self.capacity() >= self.nb_cells {
+            self.capacity() - self.nb_cells
+        } else {
+            0
+        }
+    }
+
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
+        assert!(self.start_index == 0);
+
         if self.nb_cells < self.width() && !self.read_only {
+            let unicode_width = UnicodeWidthChar::width(cpi.cp).unwrap_or(1);
+
+            if self.nb_cells + unicode_width >= self.width() {
+                // TODO: signal no space available
+                self.read_only = true;
+                // NOTE(ceg) full flag ?
+                return (false, self.nb_cells);
+            };
+
+            let offset = cpi.offset;
             self.cells[self.start_index + self.nb_cells].cpi = cpi;
             self.cells[self.start_index + self.nb_cells].is_used = true;
 
-            self.nb_cells += 1;
+            self.nb_cells += unicode_width;
 
-            if self.nb_cells == self.width {
+            if unicode_width > 1 && self.nb_cells < self.width() {
+                //                self.cells[self.start_index + self.nb_cells - 1].cpi = cpi;
+                self.cells[self.start_index + self.nb_cells - 1]
+                    .cpi
+                    .skip_render = true;
+                self.cells[self.start_index + self.nb_cells - 1].cpi.offset = offset;
+                self.cells[self.start_index + self.nb_cells - 1].cpi.size = cpi.size;
+                self.cells[self.start_index + self.nb_cells - 1].is_used = true;
+            }
+
+            if self.nb_cells >= self.width() {
                 self.read_only = true;
             }
 
@@ -181,7 +206,6 @@ impl Line {
         self.hash_cache = 0;
         self.nb_cells = 0;
         self.read_only = false;
-        self.metadata = false;
         self.hash_cache = 0;
     }
 

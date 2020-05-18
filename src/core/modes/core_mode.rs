@@ -1,0 +1,862 @@
+use std::any::Any;
+use std::cell::RefCell;
+
+use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
+use super::Mode;
+
+use crate::core::document::Document;
+use crate::core::editor::register_input_stage_action;
+use crate::core::editor::InputStageActionMap;
+use crate::core::Editor;
+use crate::core::EditorEnv;
+
+use crate::core::event::*;
+
+use crate::core::event::input_map::build_input_event_map;
+use crate::core::view;
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutOperation;
+use crate::core::view::View;
+
+static CORE_INPUT_MAP: &str = r#"
+[
+  {
+    "events": [
+     { "in": [{ "key": "F4"     }],                          "action": "toggle-debug-print" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" }
+    ]
+  }
+]"#;
+
+static CORE_QUIT_ABORT_MAP: &str = r#"
+[
+  {
+    "events": [
+     { "in": [{ "key": "y" } ],    "action": "application:quit-abort-yes" },
+     { "in": [{ "key": "n" } ],    "action": "application:quit-abort-no" },
+     { "default": [],              "action": "application:quit-abort-no" }
+   ]
+  }
+
+]"#;
+
+impl<'a> Mode for CoreMode {
+    fn name(&self) -> &'static str {
+        &"core-mode"
+    }
+
+    fn build_action_map(&self) -> InputStageActionMap<'static> {
+        let mut map = InputStageActionMap::new();
+        Self::register_input_stage_actions(&mut map);
+        map
+    }
+
+    fn alloc_ctx(&self) -> Box<dyn Any> {
+        dbg_println!("alloc core-mode ctx");
+        let ctx = CoreModeContext {};
+        Box::new(ctx)
+    }
+
+    fn configure_view(
+        &self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+    ) {
+        // setup input map for core actions
+        let input_map = build_input_event_map(CORE_INPUT_MAP).unwrap();
+        let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.push(input_map);
+    }
+}
+
+pub struct CoreMode {
+    // add common filed
+}
+pub struct CoreModeContext {
+    // add common filed
+}
+
+impl CoreMode {
+    pub fn new() -> Self {
+        dbg_println!("CoreMode");
+        CoreMode {}
+    }
+
+    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
+        register_input_stage_action(&mut map, "toggle-debug-print", toggle_dgb_print);
+
+        register_input_stage_action(&mut map, "application:quit", application_quit);
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort",
+            application_quit_abort_yes,
+        );
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort-yes",
+            application_quit_abort_yes,
+        );
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort-no",
+            application_quit_abort_no,
+        );
+
+        register_input_stage_action(&mut map, "save-document", save_document); // core ?
+        register_input_stage_action(&mut map, "split-vertically", split_vertically);
+        register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
+        register_input_stage_action(&mut map, "destroy-view", destroy_view);
+
+        register_input_stage_action(&mut map, "increase-left", increase_left);
+        register_input_stage_action(&mut map, "decrease-left", decrease_left);
+        register_input_stage_action(&mut map, "increase-right", increase_right);
+        register_input_stage_action(&mut map, "decrease-right", decrease_right);
+    }
+}
+
+// Mode "core"
+pub fn application_quit(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    // TODO: change this
+    // editor.changed_doc : HashSet<document::Id>
+    // if editor.change_docs.len() != 0
+
+    let doc = { view.borrow().document().unwrap() };
+    let doc = doc.read().unwrap();
+    if !doc.changed {
+        env.quit = true;
+    } else {
+        application_quit_abort_setup(&mut editor, &mut env, &view);
+    }
+}
+
+pub fn application_quit_abort_setup(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let status_vid = view::get_status_view(&editor, view);
+
+    dbg_println!("DOC CHANGED !\n");
+    dbg_println!("STATUS VID = {:?}", status_vid);
+
+    if let Some(svid) = status_vid {
+        let status_view = editor.view_map.get(&svid).unwrap();
+        //
+        let doc = status_view.borrow().document().unwrap();
+        let mut doc = doc.write().unwrap();
+        // clear doc
+        let sz = doc.size();
+        doc.remove(0, sz, None);
+        // set status text
+        let text = "Modified documents exist. Really quit? y/n";
+        let bytes = text.as_bytes();
+        doc.insert(0, bytes.len(), &bytes);
+
+        // push new input map for y/n
+        {
+            let mut v = view.borrow_mut();
+            // lock focus on v
+            // env.focus_locked_on = Some(v.id);
+
+            dbg_println!("configure quit-abort VID {}", v.id);
+            v.input_ctx.stack_pos = None;
+            let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
+            let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push(input_map);
+            // TODO: add lock flag
+            // to not exec lower input level
+        }
+    } else {
+        // TODO: log missing status mode
+    }
+}
+
+pub fn application_quit_abort_yes(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _view: &Rc<RefCell<View>>,
+) {
+    env.quit = true;
+}
+
+pub fn application_quit_abort_no(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    {
+        let v = view.borrow_mut();
+        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.pop();
+        // unlock focus
+        // env.focus_locked_on = None;
+    }
+
+    // reset status view : TODO: view::reset_status_view(&editor, view);
+    let status_vid = view::get_status_view(&editor, view);
+    if let Some(status_vid) = status_vid {
+        let status_view = editor.view_map.get(&status_vid).unwrap();
+        let doc = status_view.borrow().document().unwrap();
+        let mut doc = doc.write().unwrap();
+        // clear buffer
+        let sz = doc.size();
+        doc.remove(0, sz, None);
+    }
+}
+
+pub fn toggle_dgb_print(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    crate::core::toggle_dbg_println();
+}
+
+pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = view.borrow_mut();
+
+    let doc_id = {
+        let doc = v.document().unwrap();
+        {
+            // - needed ? already syncing ? -
+            let doc = doc.read().unwrap();
+            if !doc.changed || doc.is_syncing {
+                // TODO: ensure all over places are checking this flag, all doc....write()
+                // better, some permissions mechanism ?
+                // doc.access_permissions = r-
+                // doc.access_permissions = -w
+                // doc.access_permissions = rw
+                return;
+            }
+        }
+
+        // - set sync flag -
+        {
+            let mut doc = doc.write().unwrap();
+            let doc_id = doc.id;
+            doc.is_syncing = true;
+            doc_id
+        }
+    };
+
+    // - send sync job to worker -
+    //
+    // NB: We must take the doc clone from Editor not View
+    // because of lifetime(editor) > lifetime(view)
+    // and view.doc is a clone from editor.document_map,
+    // doing this let us avoid the use manual lifetime annotations ('static)
+    // and errors like "data from `view` flows into `editor`"
+    let document_map = editor.document_map.clone();
+    let document_map = document_map.read().unwrap();
+
+    if let Some(doc) = document_map.get(&doc_id) {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::SyncTask {
+                doc: Arc::clone(doc),
+            },
+        };
+        editor.worker_tx.send(msg).unwrap_or(());
+    }
+}
+
+pub fn split_with_direction(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    v: &mut View<'static>,
+    width: usize,
+    height: usize,
+    dir: view::LayoutDirection,
+    doc: &Vec<Option<Arc<RwLock<Document<'static>>>>>,
+    modes: &Vec<Vec<String>>,
+) {
+    v.layout_direction = dir;
+    let sizes = if dir == LayoutDirection::Vertical {
+        view::compute_layout_sizes(height, &v.layout_ops) // options ? for ret size == 0
+    } else {
+        view::compute_layout_sizes(width, &v.layout_ops) // options ? for ret size == 0
+    };
+
+    dbg_println!(
+        "SPLIT WITH DIRECTION {:?} = SIZE {:?} NB OPS {}",
+        dir,
+        sizes,
+        v.layout_ops.len()
+    );
+
+    let mut x = v.x;
+    let mut y = v.y;
+
+    for (idx, size) in sizes.iter().enumerate() {
+        let size = std::cmp::max(1, *size); // screen require 1x1 as min
+        let (width, height) = match dir {
+            LayoutDirection::Vertical => (width, size),
+            LayoutDirection::Horizontal => (size, height),
+            _ => {
+                return;
+            }
+        };
+
+        // vertically
+        let mut view = match dir {
+            LayoutDirection::Vertical | LayoutDirection::Horizontal => View::new(
+                &mut editor,
+                &mut env,
+                Some(v.id),
+                x,
+                y,
+                width,
+                height,
+                doc[idx].clone(),
+                &modes[idx],
+                v.start_offset,
+            ),
+
+            _ => {
+                return;
+            }
+        };
+
+        view.layout_index = Some(idx);
+
+        // move this after call
+        // focus on first child ? // check again clipping code
+        if idx == 0 {
+            env.focus_changed_to = Some(view.id); // post input
+        }
+
+        let id = view.id;
+        v.children.push(id);
+        let rc = Rc::new(RefCell::new(view));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        match dir {
+            LayoutDirection::Vertical => {
+                x += size;
+            }
+            LayoutDirection::Horizontal => {
+                y += size;
+            }
+            _ => {
+                return;
+            }
+        }
+    }
+}
+
+pub fn split_vertically(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let mut v = view.borrow_mut();
+
+    // check if already split
+    if v.children.len() != 0 {
+        return;
+    }
+
+    // compute left and right size as current View / 2
+    // get screen
+
+    let (width, height) = {
+        let screen = v.screen.read().unwrap();
+        (screen.width(), screen.height())
+    };
+
+    let document_map = editor.document_map.clone();
+    let document_map = document_map.read().unwrap();
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = document_map.get(&doc_id) {
+                let doc = document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let parent_modes: Vec<String> = v.mode_ctx.iter().map(|(name, _)| name.clone()).collect();
+
+    // children_layout_and_modes
+    let ops_modes = vec![
+        (
+            LayoutOperation::Percent { p: 50.0 },
+            doc.clone(),
+            parent_modes.clone(),
+        ),
+        // separator, will crash no text hard coded in compositing stage
+        // TODO: per view action map
+        (
+            LayoutOperation::Fixed { size: 1 },
+            None,
+            vec!["vsplit-mode".to_owned()],
+        ),
+        (
+            LayoutOperation::RemainPercent { p: 100.0 },
+            doc.clone(),
+            parent_modes.clone(),
+        ),
+    ];
+
+    v.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
+    let docs = ops_modes.iter().map(|e| e.1.clone()).collect();
+    let modes = ops_modes.iter().map(|e| e.2.clone()).collect();
+
+    split_with_direction(
+        &mut editor,
+        &mut env,
+        &mut v,
+        width,
+        height,
+        LayoutDirection::Horizontal,
+        &docs,
+        &modes,
+    );
+
+    /*
+     TODO
+         + swap children[0]
+    */
+}
+
+pub fn split_horizontally(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let mut v = view.borrow_mut();
+
+    // check if already split
+    if v.children.len() != 0 {
+        return;
+    }
+
+    // compute left and right size as current View / 2
+    // get screen
+
+    let (width, height) = {
+        let screen = v.screen.read().unwrap();
+        (screen.width(), screen.height())
+    };
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let document_map = editor.document_map.clone();
+            let document_map = document_map.read().unwrap();
+
+            let doc = v.document().unwrap();
+            let doc_id = doc.read().unwrap().id;
+            if let Some(_doc) = document_map.get(&doc_id) {
+                let doc = document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let parent_modes: Vec<String> = v.mode_ctx.iter().map(|(name, _)| name.clone()).collect();
+
+    // children_layout_and_modes
+    let ops_modes = vec![
+        (
+            LayoutOperation::Percent { p: 50.0 },
+            doc.clone(),
+            parent_modes.clone(),
+        ),
+        // separator, will crash no text hard coded in compositing stage
+        // TODO: per view action map
+        (
+            LayoutOperation::Fixed { size: 1 },
+            None,
+            vec!["hsplit-mode".to_owned()],
+        ),
+        (
+            LayoutOperation::RemainPercent { p: 100.0 },
+            doc.clone(),
+            parent_modes.clone(),
+        ),
+    ];
+
+    v.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
+    let docs = ops_modes.iter().map(|e| e.1.clone()).collect();
+    let modes = ops_modes.iter().map(|e| e.2.clone()).collect();
+
+    split_with_direction(
+        &mut editor,
+        &mut env,
+        &mut v,
+        width,
+        height,
+        LayoutDirection::Vertical,
+        &docs,
+        &modes,
+    );
+}
+
+// quit hack ignoring other children
+pub fn increase_layout_op(
+    op: LayoutOperation,
+    max_size: usize,
+    cur_size: usize,
+    diff: usize,
+) -> LayoutOperation {
+    dbg_println!(
+        "INC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
+        op,
+        max_size,
+        cur_size,
+        diff
+    );
+
+    let new_op = match op {
+        LayoutOperation::Fixed { size } if size < max_size => {
+            LayoutOperation::Fixed { size: size + 1 }
+        }
+        LayoutOperation::Percent { p } => {
+            if cur_size + diff >= max_size {
+                return op;
+            }
+            let expect_p = ((cur_size + diff) as f32 * p) / cur_size as f32;
+            dbg_println!("LAYOUT expect_p = {}", expect_p);
+            LayoutOperation::Percent { p: expect_p }
+        }
+        LayoutOperation::RemainPercent { p } if p < 99.0 => {
+            let unit = max_size as f32 / 100.0;
+            LayoutOperation::RemainPercent { p: p + unit }
+        }
+        LayoutOperation::RemainMinus { minus } => {
+            dbg_println!(
+                "LAYOUT = max_size{} - minus*100{} / 100 = {}",
+                minus * 100,
+                max_size,
+                max_size.saturating_sub(minus * 100) / 100
+            );
+            LayoutOperation::RemainMinus {
+                minus: ((minus * 100 + max_size) / 100) - 1,
+            }
+        }
+        _ => op,
+    };
+
+    dbg_println!("INC LAYOUT NEW OP {:?}", new_op);
+
+    new_op
+}
+
+// quit hack ignoring other children
+pub fn decrease_layout_op(
+    op: LayoutOperation,
+    // TODO: min_size: usize,
+    max_size: usize,
+    cur_size: usize,
+    diff: usize, // decrease amount
+) -> LayoutOperation {
+    dbg_println!(
+        "DEC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
+        op,
+        max_size,
+        cur_size,
+        diff
+    );
+
+    let new_op = match op {
+        LayoutOperation::Fixed { size } if size > diff => {
+            LayoutOperation::Fixed { size: size - diff }
+        }
+        LayoutOperation::Percent { p } => {
+            if cur_size <= diff {
+                return op;
+            }
+
+            let expect_p = ((cur_size - diff) as f32 * p) / cur_size as f32;
+            dbg_println!("LAYOUT expect_p = {}", expect_p);
+            LayoutOperation::Percent { p: expect_p }
+        }
+
+        LayoutOperation::RemainPercent { p } if p > 2.0 => {
+            let unit = (max_size as f32) / 100.0;
+            LayoutOperation::RemainPercent { p: p - unit }
+        }
+        LayoutOperation::RemainMinus { minus } => {
+            dbg_println!(
+                "LAYOUT = minus * 100 {} + max_size {} / 100 = {}",
+                minus * 100,
+                max_size,
+                (minus * 100 + max_size) / 100
+            );
+            if ((minus * 100 + max_size) / 100) + 1 > 100 {
+                return op;
+            }
+            LayoutOperation::RemainMinus {
+                minus: ((minus * 100 + max_size) / 100) + 1,
+            }
+        }
+        _ => op,
+    };
+
+    dbg_println!("DEC LAYOUT NEW OP {:?}", new_op);
+
+    new_op
+}
+
+pub fn increase_left(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx < 2 {
+        return;
+    }
+    let lidx = lidx - 2; // take left sibling
+
+    let max_size = pv.screen.read().unwrap().width();
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, max_size, 1);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn decrease_left(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx < 2 {
+        return;
+    }
+    let lidx = lidx - 2; // take previous sibling
+
+    let max_size = pv.screen.read().unwrap().width();
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn increase_right(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx != 0 {
+        return;
+    }
+
+    let max_size = pv.screen.read().unwrap().width();
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn decrease_right(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx != 0 {
+        return;
+    }
+
+    let max_size = pv.screen.read().unwrap().width();
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
+    pv.layout_ops[lidx] = new_op;
+}
+
+/*
+    TODO: document this function
+*/
+pub fn destroy_view(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    // current view/id
+    let v = view.borrow_mut();
+
+    if v.destroyable == false {
+        return;
+    }
+
+    // check parent
+    if v.parent_id.is_none() {
+        // nothing to do
+        // check root_views presence
+        dbg_println!("No parent, ignore");
+
+        return;
+    }
+
+    // no index in parent : not a split, etc..
+    if v.layout_index.is_none() {
+        dbg_println!("No layout index found, ignore");
+        return;
+    }
+
+    let v_layout_index = v.layout_index.unwrap();
+
+    let mut destroy = vec![];
+
+    // get parent view/id
+    let pvid = *v.parent_id.as_ref().unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap().clone();
+    let mut pv = pv.borrow_mut();
+
+    if pv.children.len() != 3 {
+        dbg_println!(" pv.children.len({}) != 3", pv.children.len());
+        // not handled yet
+        return;
+    }
+
+    if let Some(ppvid) = pv.parent_id {
+        // get grand parent view/id
+        let ppv = editor.view_map.get(&ppvid).unwrap().clone();
+        let mut ppv = ppv.borrow_mut();
+
+        let pv_layout_index = pv.layout_index.unwrap();
+
+        let mut kept_vid = None;
+
+        // TODO: get sibling ids
+        // mark siblings for delete
+        for (idx, view_id) in pv.children.iter().enumerate() {
+            if idx == v_layout_index {
+                dbg_println!("prepare delete of view id {}", *view_id);
+                destroy.push(*view_id);
+            } else if idx == 1 {
+                // separator index
+                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                destroy.push(*view_id);
+            } else {
+                dbg_println!("keep view id {}", *view_id);
+                kept_vid = Some(*view_id);
+            }
+        }
+
+        if let Some(kept_vid) = kept_vid {
+            // replace parent in grand-parent
+            ppv.children[pv_layout_index] = kept_vid;
+            pv.parent_id = Some(ppvid);
+            // update grand parent focus: // TODO: find a better way
+            ppv.focus_to = Some(kept_vid);
+
+            // update link to grand-parent  (new parent)
+            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
+            let mut kept_v = kept_v.borrow_mut();
+            kept_v.parent_id = Some(ppvid);
+            kept_v.layout_index = Some(pv_layout_index);
+
+            kept_v.destroyable = pv.destroyable; // NB: take parent policy
+
+            dbg_println!("prepare delete of view id {} (parent)", pvid);
+            dbg_println!("set focus to view id {}", kept_vid);
+            destroy.push(pvid);
+            env.focus_changed_to = Some(kept_vid); // post input
+        }
+    } else {
+        // TODO: get sibling ids
+        // mark self+siblings for delete
+        let mut kept_vid = None;
+
+        for (idx, view_id) in pv.children.iter().enumerate() {
+            if idx == v_layout_index {
+                dbg_println!("prepare delete of view id {}", *view_id);
+                destroy.push(*view_id);
+            } else if idx == 1 {
+                // separator index
+                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                destroy.push(*view_id);
+            } else {
+                dbg_println!("keep view id {}", *view_id);
+                kept_vid = Some(*view_id);
+            }
+        }
+
+        if let Some(kept_vid) = kept_vid {
+            dbg_println!("root view update");
+            dbg_println!("delete {}", pvid);
+            destroy.push(pvid);
+
+            for i in 0..editor.root_views.len() {
+                if editor.root_views[i] == pvid {
+                    dbg_println!("update root view slot {}", i);
+
+                    editor.root_views[i] = kept_vid;
+                    env.view_id = kept_vid;
+                    break;
+                }
+            }
+
+            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
+            let mut kept_v = kept_v.borrow_mut();
+            kept_v.parent_id = None;
+            kept_v.layout_index = None;
+
+            env.focus_changed_to = Some(kept_vid); // post input
+        }
+    };
+
+    dbg_println!("destroy view(s) {:?}", destroy);
+    for vid in destroy {
+        editor.view_map.remove(&vid);
+    }
+}

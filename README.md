@@ -1,4 +1,4 @@
-# unlimitED!
+unlimitED!
 
 
 **unlimitED!** is an experimental editor, and an excuse to learn the **Rust** language.<br/>
@@ -52,14 +52,14 @@ unlimited [FILE1] .. [FILEn]
   * **Paste previous killed line**: ctrl-y
   * **Save**: ctrl-s
   * **Quit**: ctrl-q (will quit without saving changes for now)
-  * **Goto beginning of line**: ctrl-a
+  * **Goto start of line**: ctrl-a
   * **Goto end of line**: ctrl-e
   * **Page Up**: scroll up on screen at time
   * **Page Down**: scroll down on screen at time
-  * **Goto beginning of file**: ctrl+<
+  * **Goto start of file**: ctrl+<
   * **Goto end of file**: ctrl+>
   * **Mouse left button**: move cursor to clicked area
-  * **Center arround mark/cursor**: ctrl+l
+  * **Center around mark/cursor**: ctrl+l
 
 ---
 

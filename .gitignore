@@ -1,4 +1,13 @@
 Cargo.lock
 target/
 *.bk
+*.bak
 *~
+perf*
+*.cflags
+*.config
+*.creator
+*.cxxflags
+*.files
+*.includes
+*.creator.user

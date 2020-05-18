@@ -36,8 +36,8 @@
 	// leaf <-> leaf ... <-> leaf
 	edge [color=blue]
 
-	n6 -> n5 [constraint=false label=prev]
 	n5 -> n6 [constraint=false label=next]
+	n6 -> n5 [constraint=false label=prev]
 
 	n7-> n6 [constraint=false]
 	n6 -> n7 [constraint=false]
