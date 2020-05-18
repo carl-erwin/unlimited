@@ -51,6 +51,8 @@ pub struct CoreState {
     pending_events: usize,
     quit: bool,
     status: String, // TODO: move to test-mode
+
+    input_map: HashMap<String, view::ModeFunction>,
 }
 
 impl CoreState {
@@ -59,6 +61,7 @@ impl CoreState {
             pending_events: 0,
             quit: false,
             status: String::new(),
+            input_map: build_input_map(),
         }
     }
 }
@@ -347,6 +350,7 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode('u'),
         } => {
+
             view::undo(&trigger, &mut view);
             core_state.status = "<undo>".to_string();
         }
@@ -573,7 +577,10 @@ fn process_input_events(
             shift: false,
             key: Key::Unicode(cp),
         } => {
-            view::insert_codepoint(&trigger, &mut view);
+
+            if let Some(action) =  core_state.input_map.get("insert-codepoint") {
+                action(&trigger, &mut view);
+            }
 
             core_state.status = format!("<insert [0x{:x}]>", cp as u32);
         }
@@ -585,10 +592,8 @@ fn process_input_events(
             shift: false,
             key: Key::UnicodeArray(ref v),
         } => {
-            view::insert_codepoint_array(&trigger, &mut view);
-
-            if v.len() == 1 {
-                core_state.status = format!("<insert [0x{:x}]>", v[0] as u32);
+            if let Some(action) =  core_state.input_map.get("insert-codepoint-array") {
+                action(&trigger, &mut view);
             }
         }
 
@@ -665,7 +670,7 @@ fn register_function(
     map.insert(s.to_string(), func);
 }
 
-fn build_input_map() {
+fn build_input_map() -> HashMap<String, view::ModeFunction> {
     let mut map: HashMap<String, view::ModeFunction> = HashMap::new();
 
     register_function(&mut map, "button-press", view::button_press);
@@ -730,4 +735,6 @@ fn build_input_map() {
         view::scroll_to_previous_screen,
     );
     register_function(&mut map, "undo", view::undo);
+
+    map
 }
