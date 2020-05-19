@@ -667,7 +667,7 @@ fn process_input_events(
                     alt: false,
                     shift: false,
                 },
-            key: Key::UnicodeArray(ref v),
+            key: Key::UnicodeArray(ref _v),
         } => {
             if let Some(action) = core_state.input_map.get("insert-codepoint-array") {
                 action(&trigger, &mut view);

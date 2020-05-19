@@ -852,7 +852,7 @@ pub fn scroll_to_next_screen(trigger: &Vec<InputEvent>, mut view: &mut View) {
 
 pub fn save_document(_trigger: &Vec<InputEvent>, view: &mut View) {
     let mut doc = view.document.as_mut().unwrap().borrow_mut();
-    doc.sync_to_disk().is_ok(); // ->  operation ok
+    let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
 }
 
 pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, mut view: &mut View) {
