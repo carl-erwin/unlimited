@@ -56,6 +56,7 @@ use crate::core::event::InputEvent;
 use crate::core::screen::Screen;
 
 use crate::core::event::Key;
+use crate::core::event::KeyModifiers;
 
 use crate::core::codepointinfo::CodepointInfo;
 
@@ -337,133 +338,165 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
         self::termion::event::Event::Key(k) => match k {
             self::termion::event::Key::Ctrl(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::Char(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::Alt(c) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: true,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: true,
+                        shift: false,
+                    },
                     key: Key::Unicode(c),
                 };
             }
 
             self::termion::event::Key::F(n) => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::F(n as usize),
                 };
             }
 
             self::termion::event::Key::Left => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Left,
                 };
             }
             self::termion::event::Key::Right => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Right,
                 };
             }
             self::termion::event::Key::Up => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Up,
                 };
             }
             self::termion::event::Key::Down => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Down,
                 };
             }
             self::termion::event::Key::Backspace => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::BackSpace,
                 };
             }
             self::termion::event::Key::Home => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Home,
                 };
             }
             self::termion::event::Key::End => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::End,
                 };
             }
             self::termion::event::Key::PageUp => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::PageUp,
                 };
             }
             self::termion::event::Key::PageDown => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::PageDown,
                 };
             }
             self::termion::event::Key::Delete => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Delete,
                 };
             }
             self::termion::event::Key::Insert => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Insert,
                 };
             }
             self::termion::event::Key::Esc => {
                 return InputEvent::KeyPress {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods: KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
                     key: Key::Escape,
                 };
             }
@@ -486,9 +519,11 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     let button = termion_mouse_button_to_u32(mb);
 
                     return InputEvent::ButtonPress {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button,
@@ -497,9 +532,11 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
 
                 self::termion::event::MouseEvent::Release(x, y) => {
                     return InputEvent::ButtonRelease {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button: 0xff,
@@ -555,9 +592,12 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             match evt {
                 InputEvent::KeyPress {
                     key: Key::Unicode(c),
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
+                    mods:
+                        KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
                 } => {
                     codepoints.push(c);
                 }
@@ -566,9 +606,11 @@ fn get_input_events(tx: &Sender<EventMessage>) {
                     if !codepoints.is_empty() {
                         v.push(InputEvent::KeyPress {
                             key: Key::UnicodeArray(codepoints),
-                            ctrl: false,
-                            alt: false,
-                            shift: false,
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
                         });
                         codepoints = Vec::<char>::new();
                     }
@@ -581,9 +623,11 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         if !codepoints.is_empty() {
             v.push(InputEvent::KeyPress {
                 key: Key::UnicodeArray(codepoints),
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             });
         }
 

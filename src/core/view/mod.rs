@@ -50,6 +50,7 @@ use crate::core::codec::text::utf8;
 use crate::core::codepointinfo;
 
 use crate::core::event::InputEvent;
+use crate::core::event::KeyModifiers;
 
 pub type Id = u64;
 
@@ -312,9 +313,12 @@ pub fn scroll_down(_trigger: &Vec<InputEvent>, view: &mut View) {
 pub fn insert_codepoint_array(trigger: &Vec<InputEvent>, mut view: &mut View) {
     let array = match trigger[0] {
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::UnicodeArray(ref v),
         } => v,
 
@@ -890,9 +894,12 @@ pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) {
 pub fn button_press(trigger: &Vec<InputEvent>, view: &mut View) {
     let _codepoint = match trigger[0] {
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode(cp),
         } => cp,
         _ => '\0',
@@ -900,9 +907,12 @@ pub fn button_press(trigger: &Vec<InputEvent>, view: &mut View) {
 
     let (button, x, y) = match trigger[0] {
         InputEvent::ButtonPress {
-            ctrl: _,
-            alt: _,
-            shift: _,
+            mods:
+                KeyModifiers {
+                    ctrl: _,
+                    alt: _,
+                    shift: _,
+                },
             x,
             y,
             button,
@@ -1038,9 +1048,12 @@ pub fn remove_previous_codepoint(_trigger: &Vec<InputEvent>, view: &mut View) {
 pub fn insert_codepoint(trigger: &Vec<InputEvent>, mut view: &mut View) {
     let codepoint = match trigger[0] {
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode(cp),
         } => cp,
         _ => {
@@ -1086,9 +1099,12 @@ pub fn insert_codepoint(trigger: &Vec<InputEvent>, mut view: &mut View) {
 pub fn button_release(trigger: &Vec<InputEvent>, _view: &mut View) {
     match trigger[0] {
         InputEvent::ButtonPress {
-            ctrl: _,
-            alt: _,
-            shift: _,
+            mods:
+                KeyModifiers {
+                    ctrl: _,
+                    alt: _,
+                    shift: _,
+                },
             x: _,
             y: _,
             button,

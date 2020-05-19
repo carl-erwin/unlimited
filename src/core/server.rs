@@ -38,6 +38,7 @@ use crate::core::event::Event::*;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::event::Key;
+use crate::core::event::KeyModifiers;
 
 use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
@@ -319,10 +320,13 @@ fn process_input_events(
 
     match *ev {
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
             key: Key::Unicode('q'),
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
         } => {
             core_state.status = "<quit>".to_string();
 
@@ -336,29 +340,37 @@ fn process_input_events(
         }
 
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::F(4),
         } => {
             core_state.quit = true;
         }
 
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('u'),
         } => {
-
             view::undo(&trigger, &mut view);
             core_state.status = "<undo>".to_string();
         }
 
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('r'),
         } => {
             view::redo(&trigger, &mut view);
@@ -367,15 +379,21 @@ fn process_input_events(
 
         // ctrl+a
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('a'),
         }
         | InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Home,
         } => {
             view::move_marks_to_beginning_of_line(&trigger, &mut view);
@@ -383,15 +401,21 @@ fn process_input_events(
 
         // ctrl+e
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('e'),
         }
         | InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::End,
         } => {
             view::move_marks_to_end_of_line(&trigger, &mut view);
@@ -399,9 +423,12 @@ fn process_input_events(
 
         // ctrl+d
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('d'),
         } => {
             view::remove_codepoint(&trigger, &mut view);
@@ -409,9 +436,12 @@ fn process_input_events(
 
         // ctrl+s
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('s'),
         } => {
             view::save_document(&trigger, &mut view);
@@ -420,9 +450,12 @@ fn process_input_events(
 
         // ctrl+k
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('k'),
         } => {
             view::cut_to_end_of_line(&trigger, &mut view);
@@ -430,9 +463,12 @@ fn process_input_events(
 
         // ctrl+y
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('y'),
         } => {
             view::paste(&trigger, &mut view);
@@ -440,9 +476,12 @@ fn process_input_events(
 
         // ctrl+l
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode('l'),
         } => {
             view::center_arround_mark(&trigger, &mut view);
@@ -450,9 +489,12 @@ fn process_input_events(
 
         // ctrl+?
         InputEvent::KeyPress {
-            ctrl: true,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode(c),
         } => {
             core_state.status = format!("ctrl+<{}>", c);
@@ -460,9 +502,12 @@ fn process_input_events(
 
         // left
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Left,
         } => {
             view::move_marks_backward(&trigger, &mut view);
@@ -471,9 +516,12 @@ fn process_input_events(
 
         // right
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Right,
         } => {
             view::move_marks_forward(&trigger, &mut view);
@@ -482,9 +530,12 @@ fn process_input_events(
 
         // up
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Up,
         } => {
             view::move_marks_to_previous_line(&trigger, &mut view);
@@ -494,9 +545,12 @@ fn process_input_events(
 
         // down
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Down,
         } => {
             view::move_marks_to_next_line(&trigger, &mut view);
@@ -506,9 +560,12 @@ fn process_input_events(
 
         // page_up
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::PageUp,
         } => {
             view::scroll_to_previous_screen(&trigger, &mut view);
@@ -517,9 +574,12 @@ fn process_input_events(
 
         // page_down
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::PageDown,
         } => {
             view::scroll_to_next_screen(&trigger, &mut view);
@@ -528,9 +588,12 @@ fn process_input_events(
 
         // alt+< goto beginning of file
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: true,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: true,
+                    shift: false,
+                },
             key: Key::Unicode('<'),
         } => {
             view::move_mark_to_beginning_of_file(&trigger, &mut view);
@@ -539,9 +602,12 @@ fn process_input_events(
 
         // alt+> goto end of file
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: true,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: true,
+                    shift: false,
+                },
             key: Key::Unicode('>'),
         } => {
             view::move_mark_to_end_of_file(&trigger, &mut view);
@@ -550,9 +616,12 @@ fn process_input_events(
 
         // delete
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Delete,
         } => {
             view::remove_codepoint(&trigger, &mut view);
@@ -561,9 +630,12 @@ fn process_input_events(
 
         // backspace
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::BackSpace,
         } => {
             view::remove_previous_codepoint(&trigger, &mut view);
@@ -572,13 +644,15 @@ fn process_input_events(
 
         // insert text
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::Unicode(cp),
         } => {
-
-            if let Some(action) =  core_state.input_map.get("insert-codepoint") {
+            if let Some(action) = core_state.input_map.get("insert-codepoint") {
                 action(&trigger, &mut view);
             }
 
@@ -587,21 +661,27 @@ fn process_input_events(
 
         // insert text block
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             key: Key::UnicodeArray(ref v),
         } => {
-            if let Some(action) =  core_state.input_map.get("insert-codepoint-array") {
+            if let Some(action) = core_state.input_map.get("insert-codepoint-array") {
                 action(&trigger, &mut view);
             }
         }
 
         // alt+d
         InputEvent::KeyPress {
-            ctrl: false,
-            alt: true,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: true,
+                    shift: false,
+                },
             key: Key::Unicode('d'),
         } => {
             view::remove_until_end_of_word(&trigger, &mut view);
@@ -609,9 +689,12 @@ fn process_input_events(
 
         // mouse button pressed
         InputEvent::ButtonPress {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             x,
             y,
             button,
@@ -632,9 +715,12 @@ fn process_input_events(
         },
 
         InputEvent::ButtonPress {
-            ctrl: false,
-            alt: false,
-            shift: true,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: true,
+                },
             x,
             y,
             button,
@@ -644,9 +730,12 @@ fn process_input_events(
 
         // mouse button released
         InputEvent::ButtonRelease {
-            ctrl: false,
-            alt: false,
-            shift: false,
+            mods:
+                KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
             x,
             y,
             button,
@@ -680,7 +769,11 @@ fn build_input_map() -> HashMap<String, view::ModeFunction> {
     register_function(&mut map, "center-arround-mark", view::center_arround_mark);
     register_function(&mut map, "cut-to-end-of-line", view::cut_to_end_of_line);
     register_function(&mut map, "insert-codepoint", view::insert_codepoint);
-    register_function(&mut map, "insert-codepoint-array", view::insert_codepoint_array);
+    register_function(
+        &mut map,
+        "insert-codepoint-array",
+        view::insert_codepoint_array,
+    );
     register_function(
         &mut map,
         "move-mark-to-beginning-of-file",
@@ -728,7 +821,11 @@ fn build_input_map() -> HashMap<String, view::ModeFunction> {
         view::remove_until_end_of_word,
     );
     register_function(&mut map, "save-document", view::save_document);
-    register_function(&mut map, "scroll-to-next-screen", view::scroll_to_next_screen);
+    register_function(
+        &mut map,
+        "scroll-to-next-screen",
+        view::scroll_to_next_screen,
+    );
     register_function(
         &mut map,
         "scroll-to-previous-screen",

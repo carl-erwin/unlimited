@@ -45,6 +45,7 @@ use crate::core::event::InputEvent;
 use crate::core::screen::Screen;
 
 use crate::core::event::Key;
+use crate::core::event::KeyModifiers;
 
 //
 use crate::ui::UiState;
@@ -290,53 +291,65 @@ fn get_input_events(tx: &Sender<EventMessage>) {
     match keycode {
         KEY_UP => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Up,
             });
         }
 
         KEY_DOWN => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Down,
             });
         }
 
         KEY_LEFT => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Left,
             });
         }
         KEY_RIGHT => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Right,
             });
         }
 
         KEY_PPAGE => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::PageUp,
             });
         }
 
         KEY_NPAGE => {
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::PageDown,
             });
         }
@@ -362,9 +375,11 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             }
 
             v.push(InputEvent::KeyPress {
-                ctrl: ctrl,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: ctrl,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Unicode(c),
             });
         }
@@ -373,9 +388,11 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             /* TODO */
             let k = unsafe { ::std::char::from_u32_unchecked(keycode as u32) };
             v.push(InputEvent::KeyPress {
-                ctrl: false,
-                alt: false,
-                shift: false,
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
                 key: Key::Unicode(k),
             });
         }

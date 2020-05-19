@@ -114,6 +114,13 @@ pub enum Event {
     ApplicationQuitEvent,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyModifiers {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+}
+
 /// Supported input events
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputEvent {
@@ -121,42 +128,30 @@ pub enum InputEvent {
     NoInputEvent,
     KeyPress {
         key: Key,
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
     ButtonPress {
         button: u32,
         x: i32,
         y: i32,
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
     ButtonRelease {
         button: u32,
         x: i32,
         y: i32,
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
     PointerMotion {
         x: i32,
         y: i32,
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
     WheelUp {
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
     WheelDown {
-        ctrl: bool,
-        alt: bool,
-        shift: bool,
+        mods: KeyModifiers,
     },
 }
 
