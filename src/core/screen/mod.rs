@@ -102,14 +102,7 @@ impl Screen {
     }
 
     pub fn check_invariants(&self) {
-        if self.nb_push == 0 {
-            return;
-        }
 
-        if self.first_offset == self.last_offset && self.first_offset == 0 {
-            // forget to clear screen ?
-            panic!("");
-        }
     }
 
     pub fn copy_to(&mut self, x: usize, y: usize, src: &Screen) -> bool {

@@ -259,7 +259,8 @@ fn layout_filter_prepare_raw_data<'a>(
         }
     */
 
-    // eof handling
+    // TODO: only text-mode add special tag end-of-stream, add filter-end-of-stream -> ' '
+    // eof handling -> fake ' ' @ end of stream
     if base_offset + data.len() as u64 == max_offset {
         data_vec.push(FilterIoData {
             is_valid: true,
