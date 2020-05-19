@@ -27,6 +27,30 @@ use crate::core::document;
 use crate::core::screen::Screen;
 use crate::core::view;
 
+/*
+JSON based ?
+{
+// configuration
+
+[
+  {"ambiguous_exec_timeout": 250 },
+  {"events": [ {"keys":   ["ctrl+c"] }, {"keys": ["ctrl+q"] }], "action": "application:quit" },
+  {"events": [ {"keys":   ["ctrl+c"] } ],                       "action": "text-mode:copy" },
+  {"events": [ {"keys":   ["ctrl+x"] } ],                       "action": "text-mode:cut" },
+  {"events": [ {"keys":   ["ctrl+v"] } ],                       "action": "text-mode:paste" },
+  {"events": [ {"system": [ "xxx" ] } ],                        "action": "text-mode:quit" },
+  {"events": [ {"keys": ["a"] } ],                              "action": "text-mode:self-insert" },
+  {"events": [ {"keys": { } ],                  "action": "self-insert" }, // default handler special syntax
+
+  {"events": [ {"button_press": { "button":1} ],                 "action": "self-insert" }, // default handler special syntax
+
+
+
+]
+
+}
+*/
+
 /// Message sent between core and ui threads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventMessage {
@@ -187,3 +211,34 @@ pub enum Key {
     KeypadEnter,
     NoKey,
 }
+
+/*
+
+#[test]
+fn test_event_serde() {
+    let event = Event::InputEvent {
+        events: vec![InputEvent::KeyPress {
+            key: Key::Left,
+            mods: KeyModifiers {
+            ctrl: false,
+            shift: false,
+            alt: false,
+        },
+        }],
+        raw_data: None,
+    };
+
+    // Convert the Point to a JSON string.
+    let serialized = serde_json::to_string(&event).unwrap();
+
+    // Prints serialized = {"x":1,"y":2}
+    println!("serialized = {}", serialized);
+
+    // Convert the JSON string back to a Point.
+    let deserialized: Event = serde_json::from_str(&serialized).unwrap();
+
+    // Prints deserialized = Point { x: 1, y: 2 }
+    println!("deserialized = {:?}", deserialized);
+}
+
+*/
