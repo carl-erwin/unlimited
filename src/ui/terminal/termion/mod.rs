@@ -49,10 +49,12 @@ use self::termion::screen::{AlternateScreen, ToMainScreen};
 use self::termion::terminal_size;
 
 //
+use crate::core::event::ButtonEvent;
 use crate::core::event::Event;
 use crate::core::event::Event::*;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+
 use crate::core::screen::Screen;
 
 use crate::core::event::Key;
@@ -518,7 +520,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 self::termion::event::MouseEvent::Press(mb, x, y) => {
                     let button = termion_mouse_button_to_u32(mb);
 
-                    return InputEvent::ButtonPress {
+                    return InputEvent::ButtonPress(ButtonEvent {
                         mods: KeyModifiers {
                             ctrl: false,
                             alt: false,
@@ -527,11 +529,11 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button,
-                    };
+                    });
                 }
 
                 self::termion::event::MouseEvent::Release(x, y) => {
-                    return InputEvent::ButtonRelease {
+                    return InputEvent::ButtonRelease(ButtonEvent {
                         mods: KeyModifiers {
                             ctrl: false,
                             alt: false,
@@ -540,7 +542,7 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                         x: i32::from(x - 1),
                         y: i32::from(y - 1),
                         button: 0xff,
-                    };
+                    });
                 }
 
                 self::termion::event::MouseEvent::Hold(_x, _y) => {}

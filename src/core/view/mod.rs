@@ -49,6 +49,7 @@ use crate::core::mark::Mark;
 use crate::core::codec::text::utf8;
 use crate::core::codepointinfo;
 
+use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
 use crate::core::event::KeyModifiers;
 
@@ -892,31 +893,20 @@ pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) {
 }
 
 pub fn button_press(trigger: &Vec<InputEvent>, view: &mut View) {
-    let _codepoint = match trigger[0] {
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode(cp),
-        } => cp,
-        _ => '\0',
-    };
-
     let (button, x, y) = match trigger[0] {
-        InputEvent::ButtonPress {
-            mods:
-                KeyModifiers {
-                    ctrl: _,
-                    alt: _,
-                    shift: _,
-                },
-            x,
-            y,
-            button,
-        } => (button, x, y),
+        InputEvent::ButtonPress(ref button_event) => match button_event {
+            ButtonEvent {
+                mods:
+                    KeyModifiers {
+                        ctrl: _,
+                        alt: _,
+                        shift: _,
+                    },
+                x,
+                y,
+                button,
+            } => (*button, *x, *y),
+        },
 
         _ => {
             return;
@@ -1098,28 +1088,30 @@ pub fn insert_codepoint(trigger: &Vec<InputEvent>, mut view: &mut View) {
 
 pub fn button_release(trigger: &Vec<InputEvent>, _view: &mut View) {
     match trigger[0] {
-        InputEvent::ButtonPress {
-            mods:
-                KeyModifiers {
-                    ctrl: _,
-                    alt: _,
-                    shift: _,
-                },
-            x: _,
-            y: _,
-            button,
-        } => {
-            let button = if button == 0xff {
-                // TODO: return last pressed button
-                0xff
-            } else {
-                button
-            };
+        InputEvent::ButtonPress(ref button_event) => match button_event {
+            ButtonEvent {
+                mods:
+                    KeyModifiers {
+                        ctrl: _,
+                        alt: _,
+                        shift: _,
+                    },
+                x: _,
+                y: _,
+                button,
+            } => {
+                let button = if *button == 0xff {
+                    // TODO: return last pressed button
+                    0xff
+                } else {
+                    *button
+                };
 
-            match button {
-                _ => {}
+                match button {
+                    _ => {}
+                }
             }
-        }
+        },
 
         _ => {}
     }

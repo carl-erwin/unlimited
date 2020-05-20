@@ -33,6 +33,7 @@ use std::time::Instant;
 
 use crate::core::document;
 use crate::core::editor::Editor;
+use crate::core::event::ButtonEvent;
 use crate::core::event::Event;
 use crate::core::event::Event::*;
 use crate::core::event::EventMessage;
@@ -319,6 +320,8 @@ fn process_input_events(
     let trigger = vec![(*ev).clone()];
 
     match *ev {
+        InputEvent::PointerMotion(ref _motion) => {}
+
         InputEvent::KeyPress {
             key: Key::Unicode('q'),
             mods:
@@ -688,62 +691,69 @@ fn process_input_events(
         }
 
         // mouse button pressed
-        InputEvent::ButtonPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            x,
-            y,
-            button,
-        } => match button {
-            0 | 1 => {
-                view::button_press(&trigger, &mut view);
-            }
-            3 => {
-                view::scroll_up(&trigger, &mut view);
-                core_state.status = format!("<click({},@({},{}))>", button, x, y);
-            }
-            4 => {
-                view::scroll_down(&trigger, &mut view);
-                core_state.status = format!("<click({},@({},{}))>", button, x, y);
+        InputEvent::ButtonPress(ref button_event) => match button_event {
+            ButtonEvent {
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
+                x,
+                y,
+                button,
+            } => match button {
+                0 | 1 => {
+                    view::button_press(&trigger, &mut view);
+                }
+                3 => {
+                    view::scroll_up(&trigger, &mut view);
+                    core_state.status = format!("<click({},@({},{}))>", button, x, y);
+                }
+                4 => {
+                    view::scroll_down(&trigger, &mut view);
+                    core_state.status = format!("<click({},@({},{}))>", button, x, y);
+                }
+                _ => {}
+            },
+
+            ButtonEvent {
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: true,
+                    },
+                x,
+                y,
+                button,
+            } => {
+                core_state.status = format!("<shift+click({},@({},{}))>", button, x, y);
             }
 
             _ => {}
         },
 
-        InputEvent::ButtonPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: true,
-                },
-            x,
-            y,
-            button,
-        } => {
-            core_state.status = format!("<shift+click({},@({},{}))>", button, x, y);
-        }
-
         // mouse button released
-        InputEvent::ButtonRelease {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            x,
-            y,
-            button,
-        } => {
-            view::button_release(&trigger, &mut view);
-            core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
-            //
-        }
+        InputEvent::ButtonRelease(ref button_event) => match button_event {
+            ButtonEvent {
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
+                x,
+                y,
+                button,
+            } => {
+                view::button_release(&trigger, &mut view);
+                core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
+                //
+            }
+
+            _ => {}
+        },
 
         _ => {
             core_state.status = format!(" unhandled event : {:?}", *ev);
