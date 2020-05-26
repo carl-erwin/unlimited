@@ -42,8 +42,12 @@ pub fn main_loop(
             terminal::ncurses::main_loop(&ui_rx, &ui_tx, &core_tx);
         }
 
-        "termion" | _ => {
+        "termion" => {
             terminal::termion::main_loop(&ui_rx, &ui_tx, &core_tx);
+        }
+
+        "crossterm" | _ => {
+            terminal::crossterm::main_loop(&ui_rx, &ui_tx, &core_tx);
         }
     }
 
