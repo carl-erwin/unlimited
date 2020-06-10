@@ -363,12 +363,13 @@ impl<'a> MappedFile<'a> {
             return None;
         }
 
-        let mut stbuff: libc::stat = unsafe { ::std::mem::zeroed() };
-        unsafe {
+        let stbuff = unsafe {
+            let mut stbuff: libc::stat = ::std::mem::zeroed();
             if fstat(fd, &mut stbuff) != 0 {
                 panic!("cannot get file informations");
             }
-        }
+            stbuff
+        };
 
         if S_IFDIR & stbuff.st_mode != 0 {
             return None;
