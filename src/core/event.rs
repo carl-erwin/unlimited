@@ -319,7 +319,7 @@ mod tests {
 
         println!("{:?}", value);
 
-        let button_event = InputEvent::ButtonPress(ButtonEvent {
+        let button_ref_event = InputEvent::ButtonPress(ButtonEvent {
             button: 0,
             x: 0,
             y: 0,
@@ -331,7 +331,7 @@ mod tests {
         });
 
         h.insert(
-            button_event.clone(),
+            button_ref_event.clone(),
             Box::new(InputEventRule {
                 action: Some("begin-selection".to_string()),
                 children: None,
@@ -350,16 +350,16 @@ mod tests {
         });
         let button_value = h.get(&button_event_user);
 
-        let button_event_hash = input_event_rule_hash(&button_event);
+        let button_event_hash = input_event_rule_hash(&button_ref_event);
         let button_event_user_hash = input_event_rule_hash(&button_event_user);
 
-        println!("button_event_user = {:?}", button_event_hash);
+        println!("button_event_hash      = {:?}", button_event_hash);
         println!("button_event_user_hash = {:?}", button_event_user_hash);
 
         println!("{:?}", button_value);
         println!(
-            "button_event == button_event_user -> {:?}",
-            button_event == button_event_user
+            "button_ref_event == button_event_user -> {:?}",
+            button_ref_event == button_event_user
         );
     }
 
