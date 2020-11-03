@@ -363,8 +363,11 @@ fn process_input_events(
                 },
             key: Key::Unicode('u'),
         } => {
-            view::undo(&trigger, &mut view);
             core_state.status = "<undo>".to_string();
+
+            if let Some(action) = core_state.input_map.get("undo") {
+                action(&trigger, &mut view);
+            }
         }
 
         InputEvent::KeyPress {
@@ -376,7 +379,10 @@ fn process_input_events(
                 },
             key: Key::Unicode('r'),
         } => {
-            view::redo(&trigger, &mut view);
+            if let Some(action) = core_state.input_map.get("redo") {
+                action(&trigger, &mut view);
+            }
+
             core_state.status = "<redo>".to_string();
         }
 
@@ -817,8 +823,8 @@ fn build_input_map() -> HashMap<String, view::ModeFunction> {
         view::move_marks_to_previous_line,
     );
     register_function(&mut map, "paste", view::paste);
+    register_function(&mut map, "undo", view::undo);
     register_function(&mut map, "redo", view::redo);
-    register_function(&mut map, "remove-codepoint", view::remove_codepoint);
     register_function(&mut map, "remove-codepoint", view::remove_codepoint);
     register_function(
         &mut map,
@@ -841,7 +847,6 @@ fn build_input_map() -> HashMap<String, view::ModeFunction> {
         "scroll-to-previous-screen",
         view::scroll_to_previous_screen,
     );
-    register_function(&mut map, "undo", view::undo);
 
     map
 }
