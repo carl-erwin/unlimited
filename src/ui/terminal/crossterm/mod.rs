@@ -257,8 +257,11 @@ fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut
     let _ = draw_screen(last_screen, &mut screen, &mut stdout);
 }
 
-fn _draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) -> Result<()> {
-
+fn _draw_screen_old(
+    _last_screen: &mut Screen,
+    screen: &mut Screen,
+    stdout: &mut std::io::Stdout,
+) -> Result<()> {
     queue!(stdout, ResetColor)?;
 
     for li in 0..screen.height() {
@@ -293,8 +296,11 @@ fn _draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut
     Ok(())
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) -> Result<()> {
-
+fn draw_screen(
+    last_screen: &mut Screen,
+    screen: &mut Screen,
+    stdout: &mut std::io::Stdout,
+) -> Result<()> {
     let mut prev_cpi = CodepointInfo::new();
 
     let check_hash = if last_screen.max_width() != screen.max_width()
