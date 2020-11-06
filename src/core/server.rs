@@ -567,6 +567,34 @@ fn process_input_events(
             core_state.status = "<down>".to_owned();
         }
 
+        // ctrl+up
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Up,
+        } => {
+            // to ctx args for number of lines
+            view.scroll_up(1);
+        }
+
+        // ctrl+down
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Down,
+        } => {
+            // to ctx args for number of lines
+            view.scroll_down(1);
+        }
+
         // page_up
         InputEvent::KeyPress {
             mods:
