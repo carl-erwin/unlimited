@@ -79,14 +79,6 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
     }
 }
 
-fn move_cursor(x: u16, y: u16) {
-    queue!(stdout(), MoveTo(x, y));
-}
-
-fn clear_screen() {
-    queue!(stdout(), Clear(ClearType::All));
-}
-
 pub fn main_loop(
     ui_rx: &Receiver<EventMessage>,
     _ui_tx: &Sender<EventMessage>,
@@ -121,16 +113,18 @@ pub fn main_loop(
 
     let mut request_layout = false;
 
+    let mut stdout = stdout();
+
     crossterm::terminal::enable_raw_mode();
     execute!(
-        stdout(),
+        stdout,
         EnterAlternateScreen,
         EnableMouseCapture,
         Hide,
-        SetAttribute(Attribute::Reset)
+        SetAttribute(Attribute::Reset),
+        Clear(ClearType::All)
     );
 
-    clear_screen();
 
     while !ui_state.quit {
         // check terminal size
@@ -232,7 +226,7 @@ pub fn main_loop(
                         ui_state.resize_flag = false;
                     }
 
-                    draw_view(&mut last_screen, &mut screen);
+                    draw_view(&mut last_screen, &mut screen, &mut stdout);
 
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
@@ -247,10 +241,10 @@ pub fn main_loop(
     }
 
     /* Terminate crossterm */
-    execute!(stdout(), LeaveAlternateScreen, DisableMouseCapture);
+    execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
 
     crossterm::terminal::disable_raw_mode();
-    execute!(stdout(), Show);
+    execute!(stdout, Show);
 
     Ok(())
 }
@@ -261,18 +255,16 @@ pub fn main_loop(
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen) {
-    draw_screen(last_screen, &mut screen);
+fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut std::io::Stdout) {
+    draw_screen(last_screen, &mut screen, &mut stdout);
 }
 
-fn draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen) {
-    let mut stdout = stdout();
+fn draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) {
 
-    // clear_screen();
     queue!(stdout, ResetColor);
 
     for li in 0..screen.height() {
-        move_cursor(0, li as u16);
+        queue!(stdout, MoveTo(0, li as u16));
 
         let line = screen.get_line(li).unwrap();
 
@@ -301,8 +293,7 @@ fn draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen) {
     stdout.flush();
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
-    let mut stdout = stdout();
+fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) {
 
     let mut prev_cpi = CodepointInfo::new();
 
@@ -323,7 +314,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
         };
         queue!(
             stdout,
-            SetAttribute(Attribute::Reset),
+            // SetAttribute(Attribute::Reset),
             SetForegroundColor(color)
         );
     }
@@ -342,7 +333,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
         }
 
         if check_hash {
-            // TODO: check att change
+            // TODO: check attr change
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             for c in 0..prev_line.width() {
                 let cpi = prev_line.get_unclipped_cpi(c).unwrap();
@@ -359,8 +350,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
                 continue;
             }
         }
-
-        move_cursor(0, l as u16);
+        queue!(stdout, MoveTo(0, l as u16));
 
         // draw new content
         for c in 0..line.max_width() {
@@ -400,7 +390,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen) {
         }
     }
 
-    /* Update the screen. */
+    // Update the screen
     stdout.flush();
 }
 
