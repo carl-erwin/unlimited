@@ -29,16 +29,14 @@
 use std::io::{stdout, Write};
 
 use crossterm::{
-    cursor::{DisableBlinking, EnableBlinking, Hide, MoveTo, RestorePosition, SavePosition, Show},
+    cursor::{Hide, MoveTo, Show},
     event,
     event::{DisableMouseCapture, EnableMouseCapture},
     queue,
     style::Styler,
-    style::{
-        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
-    },
+    style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
     terminal::{Clear, ClearType},
-    ExecutableCommand, Result,
+    Result,
 };
 
 use crossterm::{
@@ -115,7 +113,7 @@ pub fn main_loop(
 
     let mut stdout = stdout();
 
-    crossterm::terminal::enable_raw_mode();
+    crossterm::terminal::enable_raw_mode()?;
     execute!(
         stdout,
         EnterAlternateScreen,
@@ -123,7 +121,7 @@ pub fn main_loop(
         Hide,
         SetAttribute(Attribute::Reset),
         Clear(ClearType::All)
-    );
+    )?;
 
 
     while !ui_state.quit {
@@ -241,10 +239,10 @@ pub fn main_loop(
     }
 
     /* Terminate crossterm */
-    execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
+    execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)?;
 
-    crossterm::terminal::disable_raw_mode();
-    execute!(stdout, Show);
+    crossterm::terminal::disable_raw_mode()?;
+    execute!(stdout, Show)?;
 
     Ok(())
 }
@@ -256,15 +254,15 @@ pub fn main_loop(
     3 : use idomatic    func()? style
 */
 fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut std::io::Stdout) {
-    draw_screen(last_screen, &mut screen, &mut stdout);
+    let _ = draw_screen(last_screen, &mut screen, &mut stdout);
 }
 
-fn draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) {
+fn _draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) -> Result<()> {
 
-    queue!(stdout, ResetColor);
+    queue!(stdout, ResetColor)?;
 
     for li in 0..screen.height() {
-        queue!(stdout, MoveTo(0, li as u16));
+        queue!(stdout, MoveTo(0, li as u16))?;
 
         let line = screen.get_line(li).unwrap();
 
@@ -277,23 +275,25 @@ fn draw_screen_old(_last_screen: &mut Screen, screen: &mut Screen, stdout: &mut 
                 g: cpi.color.1,
                 b: cpi.color.2,
             };
-            queue!(stdout, SetForegroundColor(color));
+            queue!(stdout, SetForegroundColor(color))?;
 
             // draw with style
             let s = cpi.displayed_cp.to_string();
             if cpi.is_selected {
-                queue!(stdout, ::crossterm::style::PrintStyledContent(s.reverse()));
+                queue!(stdout, ::crossterm::style::PrintStyledContent(s.reverse()))?;
             } else {
-                queue!(stdout, Print(cpi.displayed_cp));
+                queue!(stdout, Print(cpi.displayed_cp))?;
             }
         }
     }
 
     /* Update the screen. */
-    stdout.flush();
+    stdout.flush()?;
+
+    Ok(())
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) {
+fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::Stdout) -> Result<()> {
 
     let mut prev_cpi = CodepointInfo::new();
 
@@ -316,7 +316,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::
             stdout,
             // SetAttribute(Attribute::Reset),
             SetForegroundColor(color)
-        );
+        )?;
     }
 
     for l in 0..screen.max_height() {
@@ -350,7 +350,7 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::
                 continue;
             }
         }
-        queue!(stdout, MoveTo(0, l as u16));
+        queue!(stdout, MoveTo(0, l as u16))?;
 
         // draw new content
         for c in 0..line.max_width() {
@@ -361,10 +361,10 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::
 
             // default style
             if cpi.is_selected && prev_cpi.is_selected == false {
-                queue!(stdout, SetAttribute(Attribute::Reverse));
+                queue!(stdout, SetAttribute(Attribute::Reverse))?;
             } else {
                 if prev_cpi.is_selected == true {
-                    queue!(stdout, SetAttribute(Attribute::Reset));
+                    queue!(stdout, SetAttribute(Attribute::Reset))?;
                 }
                 set_color = true;
             }
@@ -380,18 +380,20 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::
                     g: cpi.color.1,
                     b: cpi.color.2,
                 };
-                queue!(stdout, SetForegroundColor(color));
+                queue!(stdout, SetForegroundColor(color))?;
             }
 
             // draw character
-            queue!(stdout, Print(cpi.displayed_cp));
+            queue!(stdout, Print(cpi.displayed_cp))?;
 
             prev_cpi = *cpi;
         }
     }
 
     // Update the screen
-    stdout.flush();
+    stdout.flush()?;
+
+    Ok(())
 }
 
 fn translate_crossterm_key_modifier(km: ::crossterm::event::KeyModifiers) -> KeyModifiers {
@@ -573,7 +575,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 });
             }
 
-            ::crossterm::event::MouseEvent::ScrollUp(col, row, mods) => {
+            ::crossterm::event::MouseEvent::ScrollUp(col, row, _mods) => {
                 return InputEvent::ButtonPress(ButtonEvent {
                     mods: empty_key_modifier(),
                     x: i32::from(col),
@@ -582,7 +584,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 });
             }
 
-            ::crossterm::event::MouseEvent::ScrollDown(col, row, mods) => {
+            ::crossterm::event::MouseEvent::ScrollDown(col, row, _mods) => {
                 return InputEvent::ButtonPress(ButtonEvent {
                     mods: empty_key_modifier(),
                     x: i32::from(col),
@@ -591,18 +593,16 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 });
             }
 
-            ::crossterm::event::MouseEvent::Drag(_button, col, row, mods) => {
+            ::crossterm::event::MouseEvent::Drag(_button, col, row, _mods) => {
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: empty_key_modifier(),
                     x: i32::from(col),
                     y: i32::from(row),
                 });
             }
-
-            _ => {}
         },
 
-        ::crossterm::event::Event::Resize(width, height) => {
+        ::crossterm::event::Event::Resize(_width, _height) => {
             // println!("New size {}x{}", width, height)
         }
     }
@@ -612,8 +612,6 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
 fn get_input_events(tx: &Sender<EventMessage>) {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
-
-    let sleep_val = 16;
 
     let mut start = Instant::now();
 
@@ -625,6 +623,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             let evt = translate_crossterm_event(cross_evt);
             accum.push(evt);
 
+            // do not accumulate events more than 16 milliseconds
             if start.elapsed() > Duration::from_millis(16) {
                 break;
             }

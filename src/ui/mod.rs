@@ -47,7 +47,7 @@ pub fn main_loop(
         }
 
         "crossterm" | _ => {
-            terminal::crossterm::main_loop(&ui_rx, &ui_tx, &core_tx);
+            terminal::crossterm::main_loop(&ui_rx, &ui_tx, &core_tx).ok();
         }
     }
 

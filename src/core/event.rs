@@ -238,7 +238,7 @@ struct InputEventRule {
     pub children: Option<HashMap<InputEvent, Box<InputEventRule>>>,
 }
 
-type InputEventMap = HashMap<InputEvent, Box<InputEventRule>>;
+// type InputEventMap = HashMap<InputEvent, Box<InputEventRule>>;
 
 // intermediate hash as key ?
 fn input_event_rule_hash(t: &InputEvent) -> u64 {
@@ -246,7 +246,12 @@ fn input_event_rule_hash(t: &InputEvent) -> u64 {
 
     match t {
         InputEvent::ButtonPress(ref button_event) => match button_event {
-            ButtonEvent { mods, x, y, button } => {
+            ButtonEvent {
+                mods,
+                x: _,
+                y: _,
+                button,
+            } => {
                 "ButtonPress".hash(&mut s);
                 (*button).hash(&mut s);
                 // ignore x y
@@ -257,7 +262,12 @@ fn input_event_rule_hash(t: &InputEvent) -> u64 {
         },
 
         InputEvent::ButtonRelease(ref button_event) => match button_event {
-            ButtonEvent { mods, x, y, button } => {
+            ButtonEvent {
+                mods,
+                x: _,
+                y: _,
+                button,
+            } => {
                 "ButtonRelease".hash(&mut s);
                 (*button).hash(&mut s);
                 // ignore x y

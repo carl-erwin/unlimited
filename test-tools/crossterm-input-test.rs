@@ -1,35 +1,26 @@
 use std::io::{stdout, Write};
 
 use crossterm::{
-    cursor::{DisableBlinking, EnableBlinking, Hide, MoveTo, RestorePosition, SavePosition, Show},
-    event,
-    event::{DisableMouseCapture, EnableMouseCapture},
-    queue,
-    style::Styler,
-    style::{
-        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
-    },
-    terminal::{Clear, ClearType},
-    ExecutableCommand, Result,
+    cursor::Hide,
+    event::EnableMouseCapture,
+    style::{Attribute, SetAttribute},
+    Result,
 };
 
-use crossterm::{
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::{execute, terminal::EnterAlternateScreen};
 
 use std::time::Duration;
 use std::time::Instant;
 
-fn main() {
-    crossterm::terminal::enable_raw_mode();
+fn main() -> Result<()> {
+    crossterm::terminal::enable_raw_mode()?;
     execute!(
         stdout(),
         EnterAlternateScreen,
         EnableMouseCapture,
         Hide,
         SetAttribute(Attribute::Reset)
-    );
+    )?;
 
     println!("crossterm input test");
     print!("\r");
