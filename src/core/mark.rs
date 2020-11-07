@@ -148,6 +148,11 @@ impl Mark {
 
         let mut prev_offset = self.offset;
 
+        // TODO: end_of_buffer().or_return()
+        if prev_offset == max_offset {
+            return;
+        }
+
         loop {
             let mut data = Vec::with_capacity(4);
             buffer.read(prev_offset, data.capacity(), &mut data);
@@ -165,6 +170,85 @@ impl Mark {
             }
             prev_offset += size as u64;
         }
+        self.offset = prev_offset;
+    }
+
+    fn is_word(&mut self, cp: char) -> bool {
+        // TODO: put defintion of word in array of cahr and use any(is_word_vec)
+        match cp {
+            '"' | ' ' | '\r' | '\n' | '\t' | ',' | ';' | '{' | '}' | '(' | ')' => false,
+            _ => true,
+        }
+    }
+
+    pub fn at_end_of_buffer(&self, buffer: &Buffer) -> bool {
+        // TODO: end_of_buffer().or_return()
+        self.offset == buffer.size as u64
+    }
+
+    pub fn move_to_prev_token_start(
+        &mut self,
+        buffer: &Buffer,
+        get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+    ) {
+    }
+
+    //   "hello" , dss
+    pub fn move_to_next_token_end(
+        &mut self,
+        buffer: &Buffer,
+        get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+    ) {
+        if self.at_end_of_buffer(buffer) {
+            return;
+        }
+
+        let max_offset = buffer.size as u64;
+        let mut prev_offset = self.offset;
+
+        //
+        // buffer_get_codepoint(buffer, offset) -> cp
+        let mut data = Vec::with_capacity(4);
+        buffer.read(prev_offset, data.capacity(), &mut data);
+        let (cp, _, size) = get_codepoint(&data, 0);
+        prev_offset += size as u64;
+
+        let start_on_word = self.is_word(cp);
+
+        if start_on_word {
+            loop {
+                // buffer_get_codepoint(buffer, offset) -> cp
+                let mut data = Vec::with_capacity(4);
+                buffer.read(prev_offset, data.capacity(), &mut data);
+                let (cp, _, size) = get_codepoint(&data, 0);
+                if self.at_end_of_buffer(buffer) {
+                    break;
+                }
+
+                if self.is_word(cp) == false {
+                    break;
+                }
+
+                prev_offset += size as u64;
+            }
+        }
+
+        loop {
+            // buffer_get_codepoint(buffer, offset) -> cp
+            let mut data = Vec::with_capacity(4);
+            buffer.read(prev_offset, data.capacity(), &mut data);
+            let (cp, _, size) = get_codepoint(&data, 0);
+            if self.at_end_of_buffer(buffer) {
+                break;
+            }
+
+            if self.is_word(cp) == true {
+                break;
+            }
+
+            prev_offset += size as u64;
+        }
+
         self.offset = prev_offset;
     }
 }

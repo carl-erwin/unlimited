@@ -892,6 +892,32 @@ pub fn paste(_trigger: &Vec<InputEvent>, view: &mut View) {
     }
 }
 
+pub fn move_to_prev_token_start(_trigger: &Vec<InputEvent>, mut view: &mut View) {
+    {
+        let mut doc = view.document.as_mut().unwrap().borrow_mut();
+
+        for m in &mut view.moving_marks.borrow_mut().iter_mut() {
+            let mut end = m.clone();
+            m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
+            break;
+        }
+    }
+}
+
+pub fn move_to_next_token_end(_trigger: &Vec<InputEvent>, mut view: &mut View) {
+    {
+        let mut doc = view.document.as_mut().unwrap().borrow_mut();
+
+        for m in &mut view.moving_marks.borrow_mut().iter_mut() {
+            let mut end = m.clone();
+            m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
+            break;
+        }
+    }
+}
+
+
+
 pub fn button_press(trigger: &Vec<InputEvent>, view: &mut View) {
     let (button, x, y) = match trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {

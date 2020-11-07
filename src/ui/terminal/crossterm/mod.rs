@@ -123,7 +123,6 @@ pub fn main_loop(
         Clear(ClearType::All)
     )?;
 
-
     while !ui_state.quit {
         // check terminal size
         let (width, height) = crossterm::terminal::size().ok().unwrap();

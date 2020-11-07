@@ -523,6 +523,19 @@ fn process_input_events(
             core_state.status = "<left>".to_owned();
         }
 
+        // crtl+left
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Right,
+        } => {
+            view::move_to_prev_token_start(&trigger, &mut view);
+        }
+
         // right
         InputEvent::KeyPress {
             mods:
@@ -535,6 +548,19 @@ fn process_input_events(
         } => {
             view::move_marks_forward(&trigger, &mut view);
             core_state.status = "<right>".to_owned();
+        }
+
+        // crtl+right
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Right,
+        } => {
+            view::move_to_next_token_end(&trigger, &mut view);
         }
 
         // up
