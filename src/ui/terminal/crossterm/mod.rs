@@ -662,7 +662,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
             }
 
             _ => {
-                // flush previous
+                // flush previous codepoints
                 if !codepoints.is_empty() {
                     v.push(InputEvent::KeyPress {
                         key: Key::UnicodeArray(codepoints),

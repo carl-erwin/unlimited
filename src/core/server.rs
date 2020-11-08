@@ -50,7 +50,6 @@ use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
 pub struct CoreState {
-    pending_events: usize,
     quit: bool,
     status: String, // TODO: move to test-mode
 
@@ -60,12 +59,20 @@ pub struct CoreState {
 impl CoreState {
     fn new() -> Self {
         CoreState {
-            pending_events: 0,
             quit: false,
             status: String::new(),
             input_map: build_input_map(),
         }
     }
+}
+
+pub fn build_layout(editor: &mut Editor, mut core_state: &mut CoreState, view_id: u64) {
+    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+
+    let start = Instant::now();
+    fill_screen(&mut core_state, &mut view);
+    let end = Instant::now();
+    view.screen.time_to_build = end.duration_since(start);
 }
 
 pub fn build_layout_and_send_event(
@@ -83,7 +90,27 @@ pub fn build_layout_and_send_event(
 
     let mut new_screen = view.screen.clone();
     new_screen.time_to_build = end.duration_since(start);
-    new_screen.input_size = core_state.pending_events;
+
+    let msg = EventMessage::new(
+        0, // get_next_seq(&mut seq), TODO
+        BuildLayoutEvent {
+            view_id: view_id as u64,
+            doc_id,
+            screen: new_screen,
+        },
+    );
+    ui_tx.send(msg).unwrap_or(());
+}
+
+pub fn send_build_layout_event(
+    editor: &mut Editor,
+    ui_tx: &Sender<EventMessage>,
+    doc_id: u64,
+    view_id: u64,
+) {
+    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+
+    let mut new_screen = view.screen.clone();
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
@@ -195,33 +222,16 @@ pub fn start(
 
                 Event::InputEvent { events, raw_data } => {
                     if !editor.view_map.is_empty() {
-                        {
-                            let view_id = 0 as usize;
-                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-                            core_state.pending_events = events.len();
-                            for ev in &events {
-                                process_input_events(
-                                    &mut core_state,
-                                    &mut view,
-                                    &ui_tx,
-                                    &ev,
-                                    &raw_data,
-                                );
-                                core_state.pending_events -= 1;
-                            }
-                            core_state.pending_events = events.len();
-                        }
+                        let view_id = 0 as usize;
 
-                        // TODO: is view changed only
-                        if true {
-                            build_layout_and_send_event(
-                                &mut editor,
-                                &mut core_state,
-                                ui_tx,
-                                0,
-                                0 as u64,
-                            );
-                        }
+                        process_input_events(
+                            &mut editor,
+                            &mut core_state,
+                            view_id,
+                            &ui_tx,
+                            &events,
+                            &raw_data,
+                        );
                     }
                 }
 
@@ -303,17 +313,18 @@ fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
     }
 }
 
-fn process_input_events(
-    core_state: &mut CoreState,
-    mut view: &mut View,
-    _ui_tx: &Sender<EventMessage>,
+fn process_input_event(
+    editor: &mut Editor,
+    mut core_state: &mut CoreState,
+    view_id: usize,
     ev: &InputEvent,
-    _raw_data: &Option<Vec<u8>>,
-) {
+) -> bool {
+    let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
         core_state.status = "no input event".to_string();
-        return;
+        return false;
     }
 
     //
@@ -509,6 +520,32 @@ fn process_input_events(
             core_state.status = format!("ctrl+<{}>", c);
         }
 
+        // crtl+left
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Left,
+        } => {
+            view::move_to_prev_token_start(&trigger, &mut view);
+        }
+
+        // crtl+right
+        InputEvent::KeyPress {
+            mods:
+                KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            key: Key::Right,
+        } => {
+            view::move_to_next_token_end(&trigger, &mut view);
+        }
+
         // left
         InputEvent::KeyPress {
             mods:
@@ -521,19 +558,6 @@ fn process_input_events(
         } => {
             view::move_marks_backward(&trigger, &mut view);
             core_state.status = "<left>".to_owned();
-        }
-
-        // crtl+left
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Right,
-        } => {
-            view::move_to_prev_token_start(&trigger, &mut view);
         }
 
         // right
@@ -550,19 +574,6 @@ fn process_input_events(
             core_state.status = "<right>".to_owned();
         }
 
-        // crtl+right
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Right,
-        } => {
-            view::move_to_next_token_end(&trigger, &mut view);
-        }
-
         // up
         InputEvent::KeyPress {
             mods:
@@ -574,8 +585,6 @@ fn process_input_events(
             key: Key::Up,
         } => {
             view::move_marks_to_previous_line(&trigger, &mut view);
-
-            core_state.status = "<up>".to_owned();
         }
 
         // down
@@ -589,8 +598,6 @@ fn process_input_events(
             key: Key::Down,
         } => {
             view::move_marks_to_next_line(&trigger, &mut view);
-
-            core_state.status = "<down>".to_owned();
         }
 
         // ctrl+up
@@ -809,7 +816,6 @@ fn process_input_events(
             } => {
                 view::button_release(&trigger, &mut view);
                 core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
-                //
             }
 
             _ => {}
@@ -819,6 +825,28 @@ fn process_input_events(
             core_state.status = format!(" unhandled event : {:?}", *ev);
         }
     }
+
+    true
+}
+
+fn process_input_events(
+    mut editor: &mut Editor,
+    mut core_state: &mut CoreState,
+    view_id: usize,
+    ui_tx: &Sender<EventMessage>,
+    events: &Vec<InputEvent>,
+    _raw_data: &Option<Vec<u8>>, // TODO: remove
+) {
+    for ev in events {
+        let event_processed = process_input_event(&mut editor, &mut core_state, view_id, ev);
+
+        if event_processed {
+            build_layout(&mut editor, &mut core_state, view_id as u64);
+        }
+    }
+
+    // hit
+    send_build_layout_event(&mut editor, ui_tx, 0, 0 as u64);
 }
 
 fn register_function(
