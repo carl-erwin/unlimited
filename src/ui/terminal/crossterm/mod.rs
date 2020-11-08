@@ -615,39 +615,12 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     return InputEvent::NoInputEvent;
 }
 
-fn get_input_events(tx: &Sender<EventMessage>) {
-    let mut accum = Vec::<InputEvent>::with_capacity(4096);
-
-    let mut start = Instant::now();
-
-    loop {
-        if ::crossterm::event::poll(Duration::from_millis(5000)).unwrap_or_default() {
-            // It's guaranteed that the `read()` won't block when the `poll()`
-            // function returns `true`
-            let cross_evt = ::crossterm::event::read().ok().unwrap();
-            let evt = translate_crossterm_event(cross_evt);
-            accum.push(evt);
-
-            // do not accumulate events more than 16 milliseconds
-            if start.elapsed() > Duration::from_millis(16) {
-                break;
-            }
-        } else {
-            // timeout
-            if !accum.is_empty() {
-                // flush
-                break;
-            } else {
-                start = Instant::now();
-            }
-        }
-    }
-
+fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
     let mut v = Vec::<InputEvent>::new();
 
     // merge consecutive characters as "array" of chars
     let mut codepoints = Vec::<char>::new();
-    for evt in &accum {
+    for evt in accum {
         match evt {
             InputEvent::KeyPress {
                 key: Key::Unicode(c),
@@ -711,4 +684,44 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         );
         tx.send(msg).unwrap_or(());
     }
+}
+
+fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
+    let mut accum = Vec::<InputEvent>::with_capacity(4096);
+
+    let mut start = Instant::now();
+
+    loop {
+        if ::crossterm::event::poll(Duration::from_millis(0))? {
+            eprintln!("input data available");
+
+            if let Ok(cross_evt) = ::crossterm::event::read() {
+                let evt = translate_crossterm_event(cross_evt);
+                accum.push(evt);
+
+                if accum.len() > 1024 {
+                    send_input_events(&accum, tx);
+                    accum.clear();
+                }
+
+                if start.elapsed() > Duration::from_millis(16) {
+                    start = Instant::now();
+                    send_input_events(&accum, tx);
+                    accum.clear();
+                }
+            } else {
+                eprintln!("read error ?");
+            }
+        } else {
+            // timeout
+            eprintln!("input timeout");
+            if !accum.is_empty() {
+                // flush
+                break;
+            }
+        }
+    }
+
+    send_input_events(&accum, tx);
+    Ok(())
 }

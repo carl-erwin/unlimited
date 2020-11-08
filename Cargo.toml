@@ -27,7 +27,7 @@ serde_json = "1.0"
 
 termion = "*"
 ncurses = "*"
-crossterm = "0.17"
+crossterm = "0.18.2"
 
 [profile.release]
 #lto = true
