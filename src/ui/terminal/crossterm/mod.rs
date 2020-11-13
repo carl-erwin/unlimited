@@ -319,7 +319,7 @@ fn draw_screen(
         };
         queue!(
             stdout,
-            // SetAttribute(Attribute::Reset),
+            SetAttribute(Attribute::Reset),
             SetForegroundColor(color)
         )?;
     }
