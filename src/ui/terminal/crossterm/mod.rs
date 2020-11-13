@@ -690,24 +690,31 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
 
     let mut start = Instant::now();
+    let mut wait_ms = 1000;
+    let mut flush_ms = 16;
 
     loop {
-        if ::crossterm::event::poll(Duration::from_millis(0))? {
-            eprintln!("input data available");
+        if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
+            // nr pending ?
 
             if let Ok(cross_evt) = ::crossterm::event::read() {
+                // move to send input events ?
                 let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
 
-                if accum.len() > 1024 {
-                    send_input_events(&accum, tx);
-                    accum.clear();
+                if accum.len() > 255 {
+                    flush_ms = ::std::cmp::min(flush_ms + 500, 1000);
+                    wait_ms = flush_ms;
+                    eprintln!("accum.len() > 255 ");
+                } else {
+                    eprintln!("accum.len() <=> 255 ");
+                    wait_ms = 1;
                 }
 
-                if start.elapsed() > Duration::from_millis(16) {
-                    start = Instant::now();
-                    send_input_events(&accum, tx);
-                    accum.clear();
+                let el = start.elapsed();
+                eprintln!("elapsed() = {:?} ", el);
+                if el > Duration::from_millis(flush_ms) {
+                    break;
                 }
             } else {
                 eprintln!("read error ?");
@@ -716,12 +723,15 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
             // timeout
             eprintln!("input timeout");
             if !accum.is_empty() {
-                // flush
                 break;
             }
+            start = Instant::now();
         }
     }
 
-    send_input_events(&accum, tx);
+    if !accum.is_empty() {
+        eprintln!("send_input_event");
+        send_input_events(&accum, tx);
+    }
     Ok(())
 }
