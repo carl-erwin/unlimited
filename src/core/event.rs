@@ -23,6 +23,10 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
+use std::cell::RefCell;
+use std::mem;
+use std::rc::Rc;
+
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -231,17 +235,18 @@ pub enum Key {
     NoKey,
 }
 
+type InputEventHash = u64;
+type InputEventMap = HashMap<InputEventHash, Rc<InputEventRule>>;
+
 #[derive(Debug)]
 struct InputEventRule {
     // range ?
     pub action: Option<String>,
-    pub children: Option<HashMap<InputEvent, Box<InputEventRule>>>,
+    pub children: Option<Rc<RefCell<InputEventMap>>>,
 }
 
-// type InputEventMap = HashMap<InputEvent, Box<InputEventRule>>;
-
 // intermediate hash as key ?
-fn input_event_rule_hash(t: &InputEvent) -> u64 {
+fn input_event_rule_hash(t: &InputEvent) -> InputEventHash {
     let mut s = DefaultHasher::new();
 
     match t {
@@ -292,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_input_map() {
-        let mut h: HashMap<InputEvent, Box<InputEventRule>> = HashMap::new();
+        let mut h: InputEventMap = HashMap::new();
 
         //
         let event = InputEvent::KeyPress {
@@ -309,8 +314,8 @@ mod tests {
         println!("val = {:?}", val);
 
         h.insert(
-            event,
-            Box::new(InputEventRule {
+            input_event_rule_hash(&event),
+            Rc::new(InputEventRule {
                 action: Some("move-forward".to_string()),
                 children: None,
             }),
@@ -325,7 +330,9 @@ mod tests {
             },
         };
 
-        let value = h.get(&event_user);
+        let val = input_event_rule_hash(&event_user);
+
+        let value = h.get(&val);
 
         println!("{:?}", value);
 
@@ -341,8 +348,8 @@ mod tests {
         });
 
         h.insert(
-            button_ref_event.clone(),
-            Box::new(InputEventRule {
+            input_event_rule_hash(&button_ref_event),
+            Rc::new(InputEventRule {
                 action: Some("begin-selection".to_string()),
                 children: None,
             }),
@@ -358,7 +365,10 @@ mod tests {
                 alt: false,
             },
         });
-        let button_value = h.get(&button_event_user);
+
+        let val = input_event_rule_hash(&button_event_user);
+
+        let button_value = h.get(&val);
 
         let button_event_hash = input_event_rule_hash(&button_ref_event);
         let button_event_user_hash = input_event_rule_hash(&button_event_user);
@@ -378,7 +388,7 @@ mod tests {
         struct ParseCtx {
             action: String,
             sequence: Vec<InputEvent>,
-            map: InputEventMap,
+            map: Rc<RefCell<InputEventMap>>,
         }
 
         impl ParseCtx {
@@ -386,17 +396,9 @@ mod tests {
                 ParseCtx {
                     action: String::new(),
                     sequence: Vec::new(),
-                    map: HashMap::new(),
+                    map: Rc::new(RefCell::new(InputEventMap::new())),
                 }
             }
-
-            //struct InputEventRule {
-            //    // range ?
-            //    pub action: String,
-            //    pub children: Option<HashMap<InputEvent, Box<InputEventRule>>>,
-            //}
-
-            // type InputEventMap = HashMap<InputEvent, Box<InputEventRule>>;
 
             fn build_map_entry(&mut self) {
                 println!("building entry for '{}'", self.action);
@@ -413,7 +415,9 @@ mod tests {
                     }
 
                     let e = &sequence[pos];
-                    let rule = &mut map.entry(e.clone()).or_insert(Box::new(InputEventRule {
+                    let event_hash = input_event_rule_hash(&e);
+
+                    let rule = &mut map.entry(event_hash).or_insert(Rc::new(InputEventRule {
                         action: if pos + 1 == sequence.len() {
                             Some(action.clone())
                         } else {
@@ -422,7 +426,7 @@ mod tests {
                         children: if pos + 1 == sequence.len() {
                             None
                         } else {
-                            Some(HashMap::new())
+                            Some(Rc::new(RefCell::new(HashMap::new())))
                         },
                     }));
 
@@ -432,12 +436,12 @@ mod tests {
                         return;
                     }
 
-                    if let Some(ref mut map) = rule.children {
-                        read_sequence(map, sequence, pos + 1, &action);
+                    if let Some(ref mut map) = rule.children.as_ref() {
+                        read_sequence(&mut map.as_ref().borrow_mut(), sequence, pos + 1, &action);
                     }
                 }
 
-                let map = &mut self.map;
+                let map = &mut self.map.as_ref().borrow_mut();
                 read_sequence(map, &self.sequence, 0, &self.action);
 
                 //
@@ -682,9 +686,92 @@ mod tests {
         }
 
         //        let mut hi: HashMap<u64, Box<InputEventRule>> = HashMap::new();
-        //        println!("dat = '{}'", data);
-        for (k, v) in ctx.map {
+        println!("****** print map");
+        for (k, v) in ctx.map.as_ref().borrow().iter() {
             println!("{:?} -> {:?}", k, v);
+        }
+
+        let mut iev = Vec::new();
+
+        iev.push(InputEvent::KeyPress {
+            key: Key::Unicode('x'),
+            mods: KeyModifiers {
+                ctrl: true,
+                alt: false,
+                shift: false,
+            },
+        });
+        iev.push(InputEvent::KeyPress {
+            key: Key::Unicode('c'),
+            mods: KeyModifiers {
+                ctrl: true,
+                alt: false,
+                shift: false,
+            },
+        });
+
+        fn eval_input_event(
+            ev: &InputEvent,
+            input_map: &Rc<RefCell<InputEventMap>>,
+            in_node: &mut Option<Rc<InputEventRule>>,
+            out_node: &mut Option<Rc<InputEventRule>>,
+        ) -> Option<String> {
+            println!("\n\n eval_input_event");
+
+            println!("found in_node {:?}", in_node);
+
+            let event_hash = input_event_rule_hash(ev);
+            println!("event_hash = {}", event_hash);
+
+            // not first level ?
+            if let Some(node) = in_node.as_ref() {
+                if let Some(map) = &node.as_ref().children {
+                    let map = map.as_ref().borrow();
+                    match map.get(&event_hash) {
+                        Some(event) => {
+                            if let Some(action) = &event.as_ref().action {
+                                println!("\n\n eval_input_event");
+                                return Some(action.to_string());
+                            }
+
+                            *out_node = Some(Rc::clone(event));
+
+                            println!("found out_node {:?}", out_node);
+                        }
+                        None => {}
+                    }
+                }
+            } else {
+                match input_map.as_ref().borrow().get(&event_hash) {
+                    Some(event) => {
+                        if let Some(action) = &event.as_ref().action {
+                            println!("found action");
+                            return Some(action.to_string());
+                        }
+
+                        *out_node = Some(Rc::clone(event));
+
+                        println!("found out_node {:?}", out_node);
+                    }
+                    None => {}
+                }
+            };
+
+            None
+        }
+
+        let rc_map = Rc::new(ctx.map);
+
+        let mut current_node: Option<Rc<InputEventRule>> = None;
+        let mut next_node: Option<Rc<InputEventRule>> = None;
+
+        for ev in &iev {
+            let action = eval_input_event(&ev, &rc_map, &mut current_node, &mut next_node);
+            if let Some(action) = action {
+                println!("found action {}", action);
+            } else {
+                std::mem::swap(&mut current_node, &mut next_node);
+            }
         }
 
         Ok(())
