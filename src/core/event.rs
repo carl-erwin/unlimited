@@ -194,6 +194,7 @@ impl PointerEvent {
 pub enum InputEvent {
     InvalidInputEvent,
     NoInputEvent,
+    FallbackEvent, // use to map default action in input table
     KeyPress { key: Key, mods: KeyModifiers },
     ButtonPress(ButtonEvent),
     ButtonRelease(ButtonEvent),
@@ -387,6 +388,7 @@ mod tests {
     fn build_input_map() -> Result<(), serde_json::error::Error> {
         struct ParseCtx {
             action: String,
+            is_default: bool,
             sequence: Vec<InputEvent>,
             map: Rc<RefCell<InputEventMap>>,
         }
@@ -395,6 +397,7 @@ mod tests {
             fn new() -> ParseCtx {
                 ParseCtx {
                     action: String::new(),
+                    is_default: false,
                     sequence: Vec::new(),
                     map: Rc::new(RefCell::new(InputEventMap::new())),
                 }
@@ -405,12 +408,25 @@ mod tests {
 
                 // TODO: user iter instead of index
                 fn read_sequence(
+                    is_default: bool,
                     map: &mut InputEventMap,
                     sequence: &Vec<InputEvent>,
                     pos: usize,
                     action: &String,
                 ) {
                     if pos == sequence.len() {
+                        if is_default {
+                            // TODO: check action
+                            let ev = InputEvent::FallbackEvent;
+                            let event_hash = input_event_rule_hash(&ev);
+                            // TODO: replace
+                            map.remove(&event_hash);
+                            map.entry(event_hash).or_insert(Rc::new(InputEventRule {
+                                action: Some(action.clone()),
+                                children: None,
+                            }));
+                        }
+
                         return;
                     }
 
@@ -437,16 +453,24 @@ mod tests {
                     }
 
                     if let Some(ref mut map) = rule.children.as_ref() {
-                        read_sequence(&mut map.as_ref().borrow_mut(), sequence, pos + 1, &action);
+                        read_sequence(
+                            is_default,
+                            &mut map.as_ref().borrow_mut(),
+                            sequence,
+                            pos + 1,
+                            &action,
+                        );
                     }
                 }
 
                 let map = &mut self.map.as_ref().borrow_mut();
-                read_sequence(map, &self.sequence, 0, &self.action);
+                read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
 
                 //
+                // TODO: self.reset();
                 self.action.clear();
                 self.sequence.clear();
+                self.is_default = false;
             }
         }
 
@@ -533,13 +557,16 @@ mod tests {
                 if let Value::Object(map) = obj {
                     println!("---------- new entry");
                     for (k, v) in map {
-                        // println!("k = {:?}", k);
+                        println!("k = {:?}", k);
                         match k.as_str() {
                             "in" => {
                                 parse_event_entry_input(&mut ctx, k, v);
                             }
                             "action" => {
                                 parse_event_entry_action(&mut ctx, k, v);
+                            }
+                            "default" => {
+                                parse_event_entry_default_action(&mut ctx, k, v);
                             }
 
                             _ => {}
@@ -560,6 +587,15 @@ mod tests {
                 println!("action = '{}'", s);
                 ctx.action = s.clone();
             }
+        }
+
+        fn parse_event_entry_default_action(
+            mut ctx: &mut ParseCtx,
+            name: &String,
+            value: &serde_json::Value,
+        ) {
+            println!("parse_event_entry_default_action = '{}'", value);
+            ctx.is_default = true;
         }
 
         fn parse_event_entry_input(
@@ -694,21 +730,32 @@ mod tests {
         let mut iev = Vec::new();
 
         iev.push(InputEvent::KeyPress {
-            key: Key::Unicode('x'),
+            key: Key::Unicode('€'),
             mods: KeyModifiers {
-                ctrl: true,
+                ctrl: false,
                 alt: false,
                 shift: false,
             },
         });
-        iev.push(InputEvent::KeyPress {
-            key: Key::Unicode('c'),
-            mods: KeyModifiers {
-                ctrl: true,
-                alt: false,
-                shift: false,
-            },
-        });
+
+        /*
+                iev.push(InputEvent::KeyPress {
+                    key: Key::Unicode('x'),
+                    mods: KeyModifiers {
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                    },
+                });
+                iev.push(InputEvent::KeyPress {
+                    key: Key::Unicode('c'),
+                    mods: KeyModifiers {
+                        ctrl: true,
+                        alt: false,
+                        shift: false,
+                    },
+                });
+        */
 
         fn eval_input_event(
             ev: &InputEvent,
@@ -753,7 +800,27 @@ mod tests {
 
                         println!("found out_node {:?}", out_node);
                     }
-                    None => {}
+                    None => {
+                        println!("TODO: look for default action");
+                        let ev = InputEvent::FallbackEvent;
+                        let event_hash = input_event_rule_hash(&ev);
+
+                        match input_map.as_ref().borrow().get(&event_hash) {
+                            Some(event) => {
+                                if let Some(action) = &event.as_ref().action {
+                                    println!("default found action {}", action);
+                                    return Some(action.to_string());
+                                }
+
+                                *out_node = None;
+                                println!("cancel sequence");
+                            }
+                            None => {
+                                println!("no default action defined");
+                                *out_node = None;
+                            }
+                        }
+                    }
                 }
             };
 
