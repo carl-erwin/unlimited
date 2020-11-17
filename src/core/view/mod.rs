@@ -664,22 +664,15 @@ pub fn move_marks_to_next_line(trigger: &Vec<InputEvent>, mut view: &mut View) {
         doc.buffer.size as u64
     };
 
-    eprintln!("----------------------------------------");
-
-    eprintln!("move_marks_to_next_line max_offset = {}", max_offset);
-
     let mut scroll_needed = false;
 
     let mut is_offscreen = true;
     let mut was_on_screen = false;
 
     for m in &mut view.moving_marks.borrow_mut().iter_mut() {
-        eprintln!("m.offset{}", m.offset);
-
         // TODO: m.on_buffer_end() ?
         if m.offset == max_offset {
             if !view.screen.contains_offset(m.offset) {
-                eprintln!("!view.screen.contains_offset(m.offset)");
                 scroll_needed = true;
             }
             continue;
@@ -691,12 +684,8 @@ pub fn move_marks_to_next_line(trigger: &Vec<InputEvent>, mut view: &mut View) {
         if view.screen.contains_offset(m.offset) {
             was_on_screen = true;
 
-            eprintln!("view.screen.contains_offset(m.offset) == true");
-
             // yes get coordinates
             let (_, x, y) = view.screen.find_cpi_by_offset(m.offset);
-            eprintln!("x {}, y {}", x, y);
-            eprintln!("view.screen.height() = {}", view.screen.height());
 
             if y < view.screen.height() - 1 {
                 is_offscreen = false;

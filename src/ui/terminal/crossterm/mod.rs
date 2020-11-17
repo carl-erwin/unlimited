@@ -666,13 +666,6 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
         });
     }
 
-    if false {
-        eprintln!(
-            "InputEvent array.len() {}                                     \n",
-            v.len()
-        );
-    }
-
     // send
     if !v.is_empty() {
         let msg = EventMessage::new(
@@ -705,23 +698,19 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
                 if accum.len() > 255 {
                     flush_ms = ::std::cmp::min(flush_ms + 500, 1000);
                     wait_ms = flush_ms;
-                    eprintln!("accum.len() > 255 ");
                 } else {
-                    eprintln!("accum.len() <=> 255 ");
                     wait_ms = 1;
                 }
 
                 let el = start.elapsed();
-                eprintln!("elapsed() = {:?} ", el);
                 if el > Duration::from_millis(flush_ms) {
                     break;
                 }
             } else {
-                eprintln!("read error ?");
+                // eprintln!("read error ?");
             }
         } else {
             // timeout
-            eprintln!("input timeout");
             if !accum.is_empty() {
                 break;
             }
@@ -730,7 +719,6 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     }
 
     if !accum.is_empty() {
-        eprintln!("send_input_event");
         send_input_events(&accum, tx);
     }
     Ok(())
