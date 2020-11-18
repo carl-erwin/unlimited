@@ -218,12 +218,22 @@ pub fn main_loop(
                     let start = Instant::now();
 
                     if ui_state.resize_flag {
-                        // clear screen
-                        //                        clear();
                         ui_state.resize_flag = false;
                     }
 
-                    draw_view(&mut last_screen, &mut screen, &mut stdout);
+                    let p = crate::core::event::pending_render_event_count();
+                    if p <= 1 {
+                        let s = Instant::now();
+                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        let e = Instant::now();
+                        eprintln!("time to draw view = {}\r", (e - s).as_millis());
+                    }
+
+                    if p > 0 {
+                        crate::core::event::pending_render_event_dec(1);
+                    }
+
+                    eprintln!("pending render events = {}\r", p);
 
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
@@ -254,9 +264,10 @@ pub fn main_loop(
 */
 fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut std::io::Stdout) {
     let _ = draw_screen(last_screen, &mut screen, &mut stdout);
+    //let _ = draw_screen_dumb(last_screen, &mut screen, &mut stdout);
 }
 
-fn _draw_screen_old(
+fn draw_screen_dumb(
     _last_screen: &mut Screen,
     screen: &mut Screen,
     stdout: &mut std::io::Stdout,
@@ -295,6 +306,13 @@ fn _draw_screen_old(
     Ok(())
 }
 
+fn screen_changed(screen0: &Screen, screen1: &Screen) -> bool {
+    !(false
+        || (screen0.nb_push > 0 && screen0.first_offset != screen1.first_offset)
+        || screen0.max_width() != screen1.max_width()
+        || screen0.max_height() != screen1.max_height())
+}
+
 fn draw_screen(
     last_screen: &mut Screen,
     screen: &mut Screen,
@@ -302,13 +320,7 @@ fn draw_screen(
 ) -> Result<()> {
     let mut prev_cpi = CodepointInfo::new();
 
-    let check_hash = if last_screen.max_width() != screen.max_width()
-        || last_screen.max_height() != screen.max_height()
-    {
-        false
-    } else {
-        true
-    };
+    let check_hash = screen_changed(&last_screen, &screen);
 
     // set default color
     {
@@ -668,6 +680,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 
     // send
     if !v.is_empty() {
+        let ev_count = v.len();
         let msg = EventMessage::new(
             0,
             Event::InputEvent {
@@ -675,6 +688,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
                 raw_data: None,
             },
         );
+        crate::core::event::pending_input_event_inc(ev_count);
         tx.send(msg).unwrap_or(());
     }
 }

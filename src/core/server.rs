@@ -29,6 +29,7 @@ use std::sync::mpsc::Sender;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Duration;
 use std::time::Instant;
 
 use crate::core::document;
@@ -837,16 +838,35 @@ fn process_input_events(
     events: &Vec<InputEvent>,
     _raw_data: &Option<Vec<u8>>, // TODO: remove
 ) {
+    let p = crate::core::event::pending_input_event_count();
+
     for ev in events {
         let event_processed = process_input_event(&mut editor, &mut core_state, view_id, ev);
 
         if event_processed {
+            let start = Instant::now();
             build_layout(&mut editor, &mut core_state, view_id as u64);
+            let end = Instant::now();
+            eprintln!("time to build layout = {} ms\r", (end - start).as_millis());
+        }
+
+        if p > 0 {
+            crate::core::event::pending_input_event_dec(1);
         }
     }
 
+    let p = crate::core::event::pending_input_event_count();
+    eprintln!("pending input event = {}\r", p);
+
+    // % last render time
+    if p > 1 && editor.last_rdr_event.elapsed() < Duration::from_millis(1000 / 25) {
+        return;
+    }
+
     // hit
+    crate::core::event::pending_render_event_inc(1);
     send_build_layout_event(&mut editor, ui_tx, 0, 0 as u64);
+    editor.last_rdr_event = Instant::now();
 }
 
 fn register_function(

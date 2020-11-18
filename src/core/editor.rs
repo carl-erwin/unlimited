@@ -27,6 +27,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Instant;
 
 //
 use crate::core::config::Config;
@@ -96,6 +97,7 @@ pub struct Editor<'a> {
     pub config: Config,
     pub document_map: HashMap<document::Id, Rc<RefCell<Document<'a>>>>,
     pub view_map: Vec<(view::Id, Rc<RefCell<View<'a>>>)>,
+    pub last_rdr_event: Instant,
 }
 
 impl<'a> Editor<'a> {
@@ -105,6 +107,7 @@ impl<'a> Editor<'a> {
             config,
             document_map: HashMap::new(),
             view_map: Vec::new(),
+            last_rdr_event: Instant::now(),
         }
     }
 
