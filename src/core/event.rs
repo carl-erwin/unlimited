@@ -35,6 +35,44 @@ use crate::core::document;
 use crate::core::screen::Screen;
 use crate::core::view;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+////////////////
+// TODO: implement functions ti update the counters
+// on send (++) / receive (--)
+// add per Event counters
+//
+
+//
+static GLOBAL_UI_PENDING_INPUT_EVENT_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+pub fn pending_input_event_inc(count: usize) -> usize {
+    GLOBAL_UI_PENDING_INPUT_EVENT_COUNT.fetch_add(count, Ordering::SeqCst)
+}
+
+pub fn pending_input_event_dec(count: usize) -> usize {
+    GLOBAL_UI_PENDING_INPUT_EVENT_COUNT.fetch_sub(count, Ordering::SeqCst)
+}
+
+pub fn pending_input_event_count() -> usize {
+    GLOBAL_UI_PENDING_INPUT_EVENT_COUNT.load(Ordering::SeqCst)
+}
+
+//
+static GLOBAL_UI_PENDING_RENDER_EVENT_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+pub fn pending_render_event_inc(count: usize) -> usize {
+    GLOBAL_UI_PENDING_RENDER_EVENT_COUNT.fetch_add(count, Ordering::SeqCst)
+}
+
+pub fn pending_render_event_dec(count: usize) -> usize {
+    GLOBAL_UI_PENDING_RENDER_EVENT_COUNT.fetch_sub(count, Ordering::SeqCst)
+}
+
+pub fn pending_render_event_count() -> usize {
+    GLOBAL_UI_PENDING_RENDER_EVENT_COUNT.load(Ordering::SeqCst)
+}
+
 /*
 JSON based ?
 {
