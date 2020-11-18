@@ -290,7 +290,7 @@ fn _draw_screen_old(
     }
 
     /* Update the screen. */
-    stdout.flush()?;
+    // stdout.flush()?;
 
     Ok(())
 }
@@ -396,7 +396,7 @@ fn draw_screen(
     }
 
     // Update the screen
-    stdout.flush()?;
+    // stdout.flush()?;
 
     Ok(())
 }
