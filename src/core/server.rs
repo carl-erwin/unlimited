@@ -50,11 +50,13 @@ use crate::core::view;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
+type ActionMap = HashMap<String, view::ModeFunction>;
+
 pub struct CoreState {
     quit: bool,
     status: String, // TODO: move to test-mode
 
-    input_map: HashMap<String, view::ModeFunction>,
+    action_map: ActionMap,
 }
 
 impl CoreState {
@@ -62,7 +64,7 @@ impl CoreState {
         CoreState {
             quit: false,
             status: String::new(),
-            input_map: build_input_map(),
+            action_map: build_action_map(),
         }
     }
 }
@@ -377,7 +379,7 @@ fn process_input_event(
         } => {
             core_state.status = "<undo>".to_string();
 
-            if let Some(action) = core_state.input_map.get("undo") {
+            if let Some(action) = core_state.action_map.get("undo") {
                 action(&trigger, &mut view);
             }
         }
@@ -391,7 +393,7 @@ fn process_input_event(
                 },
             key: Key::Unicode('r'),
         } => {
-            if let Some(action) = core_state.input_map.get("redo") {
+            if let Some(action) = core_state.action_map.get("redo") {
                 action(&trigger, &mut view);
             }
 
@@ -723,7 +725,7 @@ fn process_input_event(
                 },
             key: Key::Unicode(cp),
         } => {
-            if let Some(action) = core_state.input_map.get("insert-codepoint") {
+            if let Some(action) = core_state.action_map.get("insert-codepoint") {
                 action(&trigger, &mut view);
             }
 
@@ -740,7 +742,7 @@ fn process_input_event(
                 },
             key: Key::UnicodeArray(ref _v),
         } => {
-            if let Some(action) = core_state.input_map.get("insert-codepoint-array") {
+            if let Some(action) = core_state.action_map.get("insert-codepoint-array") {
                 action(&trigger, &mut view);
             }
         }
@@ -870,15 +872,15 @@ fn process_input_events(
 }
 
 fn register_function(
-    map: &mut HashMap<String, view::ModeFunction>,
+    map: &mut ActionMap,
     s: &str,
     func: view::ModeFunction,
 ) {
     map.insert(s.to_string(), func);
 }
 
-fn build_input_map() -> HashMap<String, view::ModeFunction> {
-    let mut map: HashMap<String, view::ModeFunction> = HashMap::new();
+fn build_action_map() -> ActionMap {
+    let mut map: ActionMap = HashMap::new();
 
     register_function(&mut map, "button-press", view::button_press);
     register_function(&mut map, "scroll-down", view::scroll_down);
