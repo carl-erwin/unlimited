@@ -76,7 +76,7 @@ use self::libc::{
 #[derive(Debug, Clone)]
 enum Page {
     OnStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
-    InRam(*const u8, usize, usize),           // base, len, capacity
+    InRam(*const u8, usize, usize),              // base, len, capacity
 }
 
 impl Page {

@@ -429,14 +429,6 @@ fn key_modifiers_no_shift(km: ::crossterm::event::KeyModifiers) -> KeyModifiers 
     }
 }
 
-fn empty_key_modifier() -> KeyModifiers {
-    KeyModifiers {
-        ctrl: false,
-        alt: false,
-        shift: false,
-    }
-}
-
 fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> u32 {
     match button {
         ::crossterm::event::MouseButton::Left => 0,
@@ -594,7 +586,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
             ::crossterm::event::MouseEvent::ScrollUp(col, row, _mods) => {
                 return InputEvent::ButtonPress(ButtonEvent {
-                    mods: empty_key_modifier(),
+                    mods: KeyModifiers::new(),
                     x: i32::from(col),
                     y: i32::from(row),
                     button: 3,
@@ -603,7 +595,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
             ::crossterm::event::MouseEvent::ScrollDown(col, row, _mods) => {
                 return InputEvent::ButtonPress(ButtonEvent {
-                    mods: empty_key_modifier(),
+                    mods: KeyModifiers::new(),
                     x: i32::from(col),
                     y: i32::from(row),
                     button: 4,
@@ -612,7 +604,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
             ::crossterm::event::MouseEvent::Drag(_button, col, row, _mods) => {
                 return InputEvent::PointerMotion(PointerEvent {
-                    mods: empty_key_modifier(),
+                    mods: KeyModifiers::new(),
                     x: i32::from(col),
                     y: i32::from(row),
                 });

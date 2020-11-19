@@ -193,6 +193,16 @@ pub struct KeyModifiers {
     pub shift: bool,
 }
 
+impl KeyModifiers {
+    pub fn new() -> KeyModifiers {
+        KeyModifiers {
+            ctrl: false,
+            alt: false,
+            shift: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ButtonEvent {
     pub button: u32,
