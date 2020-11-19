@@ -76,7 +76,7 @@ impl<'a> Buffer<'a> {
             Some(file) => file,
             None => {
                 // TODO: return Result
-                // eprintln!("cannot map file '{}'", file_name);
+                // dbg_println!("cannot map file '{}'", file_name);
                 return None;
             }
         };

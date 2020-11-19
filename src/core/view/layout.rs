@@ -606,23 +606,31 @@ pub fn build_screen_layout(
 ) -> u64 {
     screen.clear();
 
+    //    struct LayoutEnv {
+    //        doc,
+    //        view
+    //        base_offset: u64,
+    //        max_offset: u64,
+    //        screen: &Screen, // for width height
+    //    };
+
+    // setup
     let mut filter_in = layout_filter_prepare_raw_data(&screen, data, base_offset, max_offset);
 
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
+    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len() * 2);
+
     let _ret = layout_filter_utf8(&filter_in, &mut filter_out);
-    filter_in = filter_out;
 
     //
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
-    let _ret = layout_filter_tabulation(&filter_in, &mut filter_out);
-    filter_in = filter_out;
+    filter_in.clear();
+    let _ret = layout_filter_tabulation(&filter_out, &mut filter_in);
 
-    let mut filter_out: Vec<FilterIoData> = Vec::with_capacity(filter_in.len());
+    //
+    filter_out.clear();
     let _ret = layout_keyword_highlighting(&filter_in, &mut filter_out);
-    filter_in = filter_out;
 
     // last pass
-    let _ret = layout_fill_screen(&filter_in, max_offset, &mut screen);
+    let _ret = layout_fill_screen(&filter_out, max_offset, &mut screen);
 
     screen.last_offset
 }

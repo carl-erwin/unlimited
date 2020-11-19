@@ -23,38 +23,15 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
-//
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::Sender;
+#[macro_export]
+#[doc(hidden)]
 
-#[macro_use]
-pub(crate) mod macros;
-
-pub mod buffer;
-pub mod bufferlog;
-pub mod codec;
-pub mod codepointinfo;
-pub mod config;
-pub mod document;
-pub mod editor;
-pub mod event;
-pub mod mapped_file;
-pub mod mark;
-pub mod screen;
-pub mod server;
-pub mod view;
-
-use crate::core::config::Config;
-use crate::core::editor::Editor;
-use crate::core::event::EventMessage;
-
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// This thread is the "❤" of unlimited.
-pub fn start(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
-    let mut editor = Editor::new(config);
-    // editor.setup_default_buffers(); // scratch , debug
-    dbg_println!("XXXX");
-    editor.load_files();
-    server::start(&mut editor, &core_rx, &ui_tx)
+macro_rules! dbg_println {
+    ($($arg:tt)*) => ({
+        let key = "UNLIMITED_DEBUG";
+        match std::env::var(key) {
+            Ok(_) => eprintln!($($arg)*),
+            Err(_) => {},
+        }
+    })
 }

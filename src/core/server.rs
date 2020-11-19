@@ -34,13 +34,11 @@ use std::time::Instant;
 
 use crate::core::document;
 use crate::core::editor::Editor;
-use crate::core::event::ButtonEvent;
 use crate::core::event::Event;
-use crate::core::event::Event::*;
+use crate::core::event::Event::BuildLayoutEvent;
+
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
-use crate::core::event::Key;
-use crate::core::event::KeyModifiers;
 
 use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
@@ -50,21 +48,113 @@ use crate::core::view;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
+use crate::core::event::InputEventMap;
+use crate::core::event::InputEventRule;
+
+use crate::core::event::input_map::build_input_event_map;
+use crate::core::event::input_map::eval_input_event;
+
 type ActionMap = HashMap<String, view::ModeFunction>;
 
+static DEFAULT_INPUT_MAP: &str = r#"[{
+    "events": [
+       { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
+       { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
+       { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
+       { "in": [{ "key": "Down"     }],                        "action": "text-mode:move-marks-to-next-line" },
+       { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
+       { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
+       
+       { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-beginning-of-line" },
+       { "in": [{ "key": "ctrl+e" }],                          "action": "text-mode:move-marks-to-end-of-line" },
+       { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-beginning-of-line" },
+       { "in": [{ "key": "End" }],                             "action": "text-mode:move-marks-to-end-of-line" },
+
+
+       { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-beginning-of-file" },
+       { "in": [{ "key": "alt+>" }],                           "action": "text-mode:move-marks-to-end-of-file" },
+
+       { "in": [{ "key": "ctrl+Home" }],                      "action": "text-mode:move-marks-to-beginning-of-file" },
+       { "in": [{ "key": "ctrl+End" }],                       "action": "text-mode:move-marks-to-end-of-file" },
+
+
+       { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
+       { "in": [{ "key": "ctrl+r" }],                          "action": "text-mode:redo" },
+       { "in": [{ "key": "ctrl+d" }],                          "action": "text-mode:remove-codepoint" },
+       { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
+       { "in": [{ "key": "BackSpace" }],                       "action": "text-mode:remove-previous-codepoint" },
+
+       { "in": [{ "key": "alt+d" }],                           "action": "text-mode:remove-until-end-of-word" },
+       { "in": [{ "key": "ctrl+Delete" }],                     "action": "text-mode:remove-until-end-of-word" },
+
+       { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
+       { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
+
+       { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-arround-mark" },
+
+       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-previous-token-beginning" },
+       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-next-token-end" },
+
+       { "in": [{ "key": "ctrl+Up"    }],                      "action": "text-mode:scroll-up" },
+       { "in": [{ "key": "ctrl+Down"  }],                      "action": "text-mode:scroll-down" },
+
+       { "in": [{ "wheel": "Up"       }],                      "action": "text-mode:scroll-up" },
+       { "in": [{ "wheel": "Down"     }],                      "action": "text-mode:scroll-down" },
+
+
+       { "in": [{ "key": "ctrl+alt+Left"     }],               "action": "text-mode:move-mark-backward-word" },
+       { "in": [{ "key": "ctrl+alt+Right"     }],              "action": "text-mode:move-mark-one-forward" },
+       
+       { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
+       { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
+
+
+       { "in": [{ "key": "ctrl+s" }],                           "action": "save-document" },
+
+       { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
+
+       { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+       { "in": [{ "key": "F4" } ],                             "action": "application:quit-abort" },
+
+       { "in": [{ "system": "SIGTERM" } ],                      "action": "application:quit" },
+
+       { "default": [],                                         "action": "text-mode:self-insert" }
+     ]
+}]"#;
+
+// CoreState -> EditorEnv
+// env.repeat_action_n , api to set repeat
+// ctrl+:  -> minor mode to read repeat count
+// esc -> reset repeat count
+// kbr macro recording
 pub struct CoreState {
     quit: bool,
     status: String, // TODO: move to test-mode
 
     action_map: ActionMap,
+
+    input_map: Rc<RefCell<InputEventMap>>,
+
+    current_node: Option<Rc<InputEventRule>>,
+    next_node: Option<Rc<InputEventRule>>,
 }
 
 impl CoreState {
     fn new() -> Self {
+        let input_map = if let Ok(map) = build_input_event_map(DEFAULT_INPUT_MAP) {
+            map
+        } else {
+            Rc::new(RefCell::new(HashMap::new()))
+        };
+
         CoreState {
             quit: false,
             status: String::new(),
             action_map: build_action_map(),
+            input_map,
+            current_node: None,
+            next_node: None,
         }
     }
 }
@@ -330,503 +420,60 @@ fn process_input_event(
         return false;
     }
 
-    //
+    let action = eval_input_event(
+        &ev,
+        &core_state.input_map,
+        &mut core_state.current_node, // TODO: EvalCtx
+        &mut core_state.next_node,    // TODO: EvalCtx
+    );
+
     let trigger = vec![(*ev).clone()];
 
-    match *ev {
-        InputEvent::PointerMotion(ref _motion) => {}
+    if let Some(action) = action {
+        let start = Instant::now();
+        dbg_println!("found action {} : input ev = {:?}", action, ev);
 
-        InputEvent::KeyPress {
-            key: Key::Unicode('q'),
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-        } => {
-            core_state.status = "<quit>".to_string();
+        match action.as_str() {
+            "application:quit" => {
+                core_state.status = "<quit>".to_string();
 
-            let doc = view.document.as_mut().unwrap().borrow_mut();
-            if doc.changed {
-                core_state.status =
-                    "<quit> : modified buffer exits. type F4 to quit without saving".to_string();
-            } else {
+                let doc = view.document.as_mut().unwrap().borrow_mut();
+                if doc.changed {
+                    core_state.status =
+                        "<quit> : modified buffer exits. type F4 to quit without saving"
+                            .to_string();
+                } else {
+                    core_state.quit = true;
+                }
+            }
+
+            "application:quit-abort" => {
                 core_state.quit = true;
             }
-        }
 
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::F(4),
-        } => {
-            core_state.quit = true;
-        }
-
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('u'),
-        } => {
-            core_state.status = "<undo>".to_string();
-
-            if let Some(action) = core_state.action_map.get("undo") {
-                action(&trigger, &mut view);
-            }
-        }
-
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('r'),
-        } => {
-            if let Some(action) = core_state.action_map.get("redo") {
-                action(&trigger, &mut view);
+            "save-document" => {
+                view::save_document(&trigger, &mut view);
+                core_state.status = "<save>".to_string();
             }
 
-            core_state.status = "<redo>".to_string();
-        }
+            _ => {
+                // TODO: pattern match type of action base on domain or augment mode callbacks cb(e,c,d,v, trigger, env? {k,v}*)
+                // applicatoin:
 
-        // ctrl+a
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('a'),
-        }
-        | InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Home,
-        } => {
-            view::move_marks_to_beginning_of_line(&trigger, &mut view);
-        }
-
-        // ctrl+e
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('e'),
-        }
-        | InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::End,
-        } => {
-            view::move_marks_to_end_of_line(&trigger, &mut view);
-        }
-
-        // ctrl+d
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('d'),
-        } => {
-            view::remove_codepoint(&trigger, &mut view);
-        }
-
-        // ctrl+s
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('s'),
-        } => {
-            view::save_document(&trigger, &mut view);
-            core_state.status = "<save>".to_string();
-        }
-
-        // ctrl+k
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('k'),
-        } => {
-            view::cut_to_end_of_line(&trigger, &mut view);
-        }
-
-        // ctrl+y
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('y'),
-        } => {
-            view::paste(&trigger, &mut view);
-        }
-
-        // ctrl+l
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode('l'),
-        } => {
-            view::center_arround_mark(&trigger, &mut view);
-        }
-
-        // ctrl+?
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode(c),
-        } => {
-            core_state.status = format!("ctrl+<{}>", c);
-        }
-
-        // crtl+left
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Left,
-        } => {
-            view::move_to_prev_token_start(&trigger, &mut view);
-        }
-
-        // crtl+right
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Right,
-        } => {
-            view::move_to_next_token_end(&trigger, &mut view);
-        }
-
-        // left
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Left,
-        } => {
-            view::move_marks_backward(&trigger, &mut view);
-            core_state.status = "<left>".to_owned();
-        }
-
-        // right
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Right,
-        } => {
-            view::move_marks_forward(&trigger, &mut view);
-            core_state.status = "<right>".to_owned();
-        }
-
-        // up
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Up,
-        } => {
-            view::move_marks_to_previous_line(&trigger, &mut view);
-        }
-
-        // down
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Down,
-        } => {
-            view::move_marks_to_next_line(&trigger, &mut view);
-        }
-
-        // ctrl+up
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Up,
-        } => {
-            // to ctx args for number of lines
-            view.scroll_up(1);
-        }
-
-        // ctrl+down
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: true,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Down,
-        } => {
-            // to ctx args for number of lines
-            view.scroll_down(1);
-        }
-
-        // page_up
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::PageUp,
-        } => {
-            view::scroll_to_previous_screen(&trigger, &mut view);
-            core_state.status = "<page_up>".to_owned();
-        }
-
-        // page_down
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::PageDown,
-        } => {
-            view::scroll_to_next_screen(&trigger, &mut view);
-            core_state.status = "<page_down>".to_owned();
-        }
-
-        // alt+< goto beginning of file
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: true,
-                    shift: false,
-                },
-            key: Key::Unicode('<'),
-        } => {
-            view::move_mark_to_beginning_of_file(&trigger, &mut view);
-            core_state.status = "<move to beginning of file>".to_owned();
-        }
-
-        // alt+> goto end of file
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: true,
-                    shift: false,
-                },
-            key: Key::Unicode('>'),
-        } => {
-            view::move_mark_to_end_of_file(&trigger, &mut view);
-            core_state.status = "<move to end of file>".to_owned();
-        }
-
-        // delete
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Delete,
-        } => {
-            view::remove_codepoint(&trigger, &mut view);
-            core_state.status = "<del>".to_owned();
-        }
-
-        // backspace
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::BackSpace,
-        } => {
-            view::remove_previous_codepoint(&trigger, &mut view);
-            core_state.status = "<backspace>".to_owned();
-        }
-
-        // insert text
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::Unicode(cp),
-        } => {
-            if let Some(action) = core_state.action_map.get("insert-codepoint") {
-                action(&trigger, &mut view);
-            }
-
-            core_state.status = format!("<insert [0x{:x}]>", cp as u32);
-        }
-
-        // insert text block
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::UnicodeArray(ref _v),
-        } => {
-            if let Some(action) = core_state.action_map.get("insert-codepoint-array") {
-                action(&trigger, &mut view);
-            }
-        }
-
-        // alt+d
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: true,
-                    shift: false,
-                },
-            key: Key::Unicode('d'),
-        } => {
-            view::remove_until_end_of_word(&trigger, &mut view);
-        }
-
-        // mouse button pressed
-        InputEvent::ButtonPress(ref button_event) => match button_event {
-            ButtonEvent {
-                mods:
-                    KeyModifiers {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
-                    },
-                x,
-                y,
-                button,
-            } => match button {
-                0 | 1 => {
-                    view::button_press(&trigger, &mut view);
+                // else
+                if let Some(action) = core_state.action_map.get(&action) {
+                    action(&trigger, &mut view);
                 }
-                3 => {
-                    view::scroll_up(&trigger, &mut view);
-                    core_state.status = format!("<click({},@({},{}))>", button, x, y);
-                }
-                4 => {
-                    view::scroll_down(&trigger, &mut view);
-                    core_state.status = format!("<click({},@({},{}))>", button, x, y);
-                }
-                _ => {}
-            },
-
-            ButtonEvent {
-                mods:
-                    KeyModifiers {
-                        ctrl: false,
-                        alt: false,
-                        shift: true,
-                    },
-                x,
-                y,
-                button,
-            } => {
-                core_state.status = format!("<shift+click({},@({},{}))>", button, x, y);
             }
-
-            _ => {}
-        },
-
-        // mouse button released
-        InputEvent::ButtonRelease(ref button_event) => match button_event {
-            ButtonEvent {
-                mods:
-                    KeyModifiers {
-                        ctrl: false,
-                        alt: false,
-                        shift: false,
-                    },
-                x,
-                y,
-                button,
-            } => {
-                view::button_release(&trigger, &mut view);
-                core_state.status = format!("<unclick({},@({},{}))>", button, x, y);
-            }
-
-            _ => {}
-        },
-
-        _ => {
-            core_state.status = format!(" unhandled event : {:?}", *ev);
         }
+
+        let end = Instant::now();
+
+        dbg_println!("time to run action {}", (end - start).as_millis());
+    } else {
+        // TODO: move to caller ?
+        // add eval_ctx::new to mask impl of node swapping
+        std::mem::swap(&mut core_state.current_node, &mut core_state.next_node);
     }
 
     true
@@ -849,7 +496,7 @@ fn process_input_events(
             let start = Instant::now();
             build_layout(&mut editor, &mut core_state, view_id as u64);
             let end = Instant::now();
-            eprintln!("time to build layout = {} ms\r", (end - start).as_millis());
+            dbg_println!("time to build layout = {} ms\r", (end - start).as_millis());
         }
 
         if p > 0 {
@@ -858,7 +505,7 @@ fn process_input_events(
     }
 
     let p = crate::core::event::pending_input_event_count();
-    eprintln!("pending input event = {}\r", p);
+    dbg_println!("pending input event = {}\r", p);
 
     // % last render time
     if p > 1 && editor.last_rdr_event.elapsed() < Duration::from_millis(1000 / 25) {
@@ -871,82 +518,130 @@ fn process_input_events(
     editor.last_rdr_event = Instant::now();
 }
 
-fn register_function(
-    map: &mut ActionMap,
-    s: &str,
-    func: view::ModeFunction,
-) {
+fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
     map.insert(s.to_string(), func);
 }
 
 fn build_action_map() -> ActionMap {
-    let mut map: ActionMap = HashMap::new();
+    let mut map: ActionMap = HashMap::new(); // text-mode action map
 
-    register_function(&mut map, "button-press", view::button_press);
-    register_function(&mut map, "scroll-down", view::scroll_down);
-    register_function(&mut map, "scroll-up", view::scroll_up);
-    register_function(&mut map, "button-release", view::button_release);
-    register_function(&mut map, "center-arround-mark", view::center_arround_mark);
-    register_function(&mut map, "cut-to-end-of-line", view::cut_to_end_of_line);
-    register_function(&mut map, "insert-codepoint", view::insert_codepoint);
-    register_function(
+    // TODO: text-mode
+    register_action(
         &mut map,
-        "insert-codepoint-array",
+        "text-mode:self-insert",
         view::insert_codepoint_array,
     );
-    register_function(
+    register_action(
         &mut map,
-        "move-mark-to-beginning-of-file",
-        view::move_mark_to_beginning_of_file,
+        "text-mode:move-marks-backward",
+        view::move_marks_backward,
     );
-    register_function(
+    register_action(
         &mut map,
-        "move-mark-to-end-of-file",
-        view::move_mark_to_end_of_file,
+        "text-mode:move-marks-forward",
+        view::move_marks_forward,
     );
-    register_function(&mut map, "move-marks-backward", view::move_marks_backward);
-    register_function(&mut map, "move-marks-forward", view::move_marks_forward);
-    register_function(
+    register_action(
         &mut map,
-        "move-marks-to-beginning-of-line",
-        view::move_marks_to_beginning_of_line,
-    );
-    register_function(
-        &mut map,
-        "move-marks-to-end-of-line",
-        view::move_marks_to_end_of_line,
-    );
-    register_function(
-        &mut map,
-        "move-marks-to-next-line",
+        "text-mode:move-marks-to-next-line",
         view::move_marks_to_next_line,
     );
-    register_function(
+    register_action(
         &mut map,
-        "move-marks-to-previous-line",
+        "text-mode:move-marks-to-previous-line",
         view::move_marks_to_previous_line,
     );
-    register_function(&mut map, "paste", view::paste);
-    register_function(&mut map, "undo", view::undo);
-    register_function(&mut map, "redo", view::redo);
-    register_function(&mut map, "remove-codepoint", view::remove_codepoint);
-    register_function(
+    /*
+        register_action(
+            &mut map,
+            "text-mode:move-to-previous-token-beginning",
+            view::move_to_next_token_end,
+        );
+    */
+
+    register_action(
         &mut map,
-        "remove-previous-codepoint",
+        "text-mode:move-to-next-token-end",
+        view::move_to_next_token_end,
+    );
+
+    register_action(
+        &mut map,
+        "text-mode:page-up",
+        view::scroll_to_previous_screen,
+    );
+    register_action(&mut map, "text-mode:page-down", view::scroll_to_next_screen);
+
+    register_action(&mut map, "text-mode:scroll-up", view::scroll_up);
+    register_action(&mut map, "text-mode:scroll-down", view::scroll_down);
+
+    register_action(
+        &mut map,
+        "text-mode:move-marks-to-beginning-of-line",
+        view::move_marks_to_beginning_of_line,
+    );
+    register_action(
+        &mut map,
+        "text-mode:move-marks-to-end-of-line",
+        view::move_marks_to_end_of_line,
+    );
+
+    register_action(
+        &mut map,
+        "text-mode:move-marks-to-beginning-of-file",
+        view::move_mark_to_beginning_of_file,
+    );
+    register_action(
+        &mut map,
+        "text-mode:move-marks-to-end-of-file",
+        view::move_mark_to_end_of_file,
+    );
+
+    register_action(&mut map, "text-mode:undo", view::undo);
+    register_action(&mut map, "text-mode:redo", view::redo);
+    register_action(
+        &mut map,
+        "text-mode:remove-codepoint",
+        view::remove_codepoint,
+    );
+    register_action(
+        &mut map,
+        "text-mode:remove-previous-codepoint",
         view::remove_previous_codepoint,
     );
-    register_function(
+
+    register_action(&mut map, "text-mode:button-press", view::button_press);
+    register_action(&mut map, "text-mode:button-release", view::button_release);
+    register_action(
         &mut map,
-        "remove-until-end-of-word",
+        "text-mode:move-mark-to-clicked-area",
+        view::button_press,
+    );
+
+    register_action(
+        &mut map,
+        "text-mode:center-arround-mark",
+        view::center_arround_mark,
+    );
+    register_action(
+        &mut map,
+        "text-mode:cut-to-end-of-line",
+        view::cut_to_end_of_line,
+    );
+
+    register_action(&mut map, "text-mode:paste", view::paste);
+    register_action(
+        &mut map,
+        "text-mode:remove-until-end-of-word",
         view::remove_until_end_of_word,
     );
-    register_function(&mut map, "save-document", view::save_document);
-    register_function(
+    register_action(&mut map, "save-document", view::save_document);
+    register_action(
         &mut map,
         "scroll-to-next-screen",
         view::scroll_to_next_screen,
     );
-    register_function(
+    register_action(
         &mut map,
         "scroll-to-previous-screen",
         view::scroll_to_previous_screen,

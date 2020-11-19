@@ -520,6 +520,30 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                 self::termion::event::MouseEvent::Press(mb, x, y) => {
                     let button = termion_mouse_button_to_u32(mb);
 
+                    if button == 3 {
+                        return InputEvent::WheelUp {
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
+                            x: i32::from(x - 1),
+                            y: i32::from(y - 1),
+                        };
+                    }
+
+                    if button == 4 {
+                        return InputEvent::WheelDown {
+                            mods: KeyModifiers {
+                                ctrl: false,
+                                alt: false,
+                                shift: false,
+                            },
+                            x: i32::from(x - 1),
+                            y: i32::from(y - 1),
+                        };
+                    }
+
                     return InputEvent::ButtonPress(ButtonEvent {
                         mods: KeyModifiers {
                             ctrl: false,

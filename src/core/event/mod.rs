@@ -249,8 +249,8 @@ pub enum InputEvent {
     ButtonPress(ButtonEvent),
     ButtonRelease(ButtonEvent),
     PointerMotion(PointerEvent),
-    WheelUp { mods: KeyModifiers },
-    WheelDown { mods: KeyModifiers },
+    WheelUp { mods: KeyModifiers, x: i32, y: i32 },
+    WheelDown { mods: KeyModifiers, x: i32, y: i32 },
 }
 
 /// List of supported keyboard keys
@@ -286,8 +286,8 @@ pub enum Key {
     NoKey,
 }
 
-type InputEventHash = u64;
-type InputEventMap = HashMap<InputEventHash, Rc<InputEventRule>>;
+pub type InputEventHash = u64;
+pub type InputEventMap = HashMap<InputEventHash, Rc<InputEventRule>>;
 
 #[derive(Debug)]
 pub struct InputEventRule {
@@ -336,6 +336,22 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
                 (*mods).hash(&mut s)
             }
         },
+
+        InputEvent::WheelUp { mods, x, y } => {
+            "WheelUp".hash(&mut s);
+            // ignore x y
+            // (*x).hash(&mut s);
+            // (*y).hash(&mut s);
+            (*mods).hash(&mut s)
+        }
+
+        InputEvent::WheelDown { mods, x, y } => {
+            "WheelDown".hash(&mut s);
+            // ignore x y
+            // (*x).hash(&mut s);
+            // (*y).hash(&mut s);
+            (*mods).hash(&mut s)
+        }
 
         _ => t.hash(&mut s),
     }

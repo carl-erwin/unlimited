@@ -310,6 +310,7 @@ pub fn scroll_down(_trigger: &Vec<InputEvent>, view: &mut View) {
     view.scroll_down(3);
 }
 
+// TODO: rename into insert_input_event
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(trigger: &Vec<InputEvent>, mut view: &mut View) {
     let array = match trigger[0] {
@@ -413,6 +414,7 @@ pub fn remove_codepoint(_trigger: &Vec<InputEvent>, view: &mut View) {
 }
 
 /// Skip blanks (if any) and remove until end of the word.
+/// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
 pub fn remove_until_end_of_word(_trigger: &Vec<InputEvent>, view: &mut View) {
     let mut doc = view.document.as_mut().unwrap().borrow_mut();
 

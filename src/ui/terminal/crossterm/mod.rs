@@ -26,6 +26,8 @@
 //
 // extern crate ncurses;
 
+use crate::dbg_println;
+
 use std::io::{stdout, Write};
 
 use crossterm::{
@@ -113,15 +115,17 @@ pub fn main_loop(
 
     let mut stdout = stdout();
 
-    crossterm::terminal::enable_raw_mode()?;
+    execute!(stdout, EnterAlternateScreen)?;
+
     execute!(
         stdout,
-        EnterAlternateScreen,
         EnableMouseCapture,
         Hide,
         SetAttribute(Attribute::Reset),
         Clear(ClearType::All)
     )?;
+
+    crossterm::terminal::enable_raw_mode()?;
 
     while !ui_state.quit {
         // check terminal size
@@ -226,14 +230,14 @@ pub fn main_loop(
                         let s = Instant::now();
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
                         let e = Instant::now();
-                        eprintln!("time to draw view = {}\r", (e - s).as_millis());
+                        dbg_println!("time to draw view = {}\r", (e - s).as_millis());
                     }
 
                     if p > 0 {
                         crate::core::event::pending_render_event_dec(1);
                     }
 
-                    eprintln!("pending render events = {}\r", p);
+                    dbg_println!("pending render events = {}\r", p);
 
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
@@ -248,10 +252,18 @@ pub fn main_loop(
     }
 
     /* Terminate crossterm */
-    execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)?;
+    /* Terminate crossterm */
+    execute!(
+        stdout,
+        SetAttribute(Attribute::Reset),
+        Clear(ClearType::All),
+        EnableMouseCapture,
+        Show
+    )?;
+
+    execute!(stdout, LeaveAlternateScreen,)?;
 
     crossterm::terminal::disable_raw_mode()?;
-    execute!(stdout, Show)?;
 
     Ok(())
 }
@@ -585,21 +597,19 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
 
             ::crossterm::event::MouseEvent::ScrollUp(col, row, _mods) => {
-                return InputEvent::ButtonPress(ButtonEvent {
+                return InputEvent::WheelUp {
                     mods: KeyModifiers::new(),
                     x: i32::from(col),
                     y: i32::from(row),
-                    button: 3,
-                });
+                };
             }
 
             ::crossterm::event::MouseEvent::ScrollDown(col, row, _mods) => {
-                return InputEvent::ButtonPress(ButtonEvent {
+                return InputEvent::WheelDown {
                     mods: KeyModifiers::new(),
                     x: i32::from(col),
                     y: i32::from(row),
-                    button: 4,
-                });
+                };
             }
 
             ::crossterm::event::MouseEvent::Drag(_button, col, row, _mods) => {
@@ -698,6 +708,7 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
 
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 // move to send input events ?
+                dbg_println!("receive crossterm event {:?}\r", cross_evt);
                 let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
 
@@ -713,7 +724,7 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
                     break;
                 }
             } else {
-                // eprintln!("read error ?");
+                // dbg_println!("read error ?");
             }
         } else {
             // timeout
