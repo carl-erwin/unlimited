@@ -290,7 +290,7 @@ type InputEventHash = u64;
 type InputEventMap = HashMap<InputEventHash, Rc<InputEventRule>>;
 
 #[derive(Debug)]
-struct InputEventRule {
+pub struct InputEventRule {
     // range ?
     pub action: Option<String>,
     pub children: Option<Rc<RefCell<InputEventMap>>>,

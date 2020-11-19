@@ -25,6 +25,397 @@
 
 // cargo test -- --nocapture test_input_map
 
+// cargo test -- --nocapture build_input_map
+
+use serde_json::Value;
+
+use super::*;
+
+static DEFAULT_MAP: &str = r#"[{
+    "events": [
+       { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-mark-backward" },
+       { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-mark-forward" },
+       { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-mark-to-previous-line" },
+       { "in": [{ "key": "Down"     }],                        "action": "text-mode:move-mark-to-next-line" },
+       { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:move-to-previous-screen" },
+       { "in": [{ "key": "PageDown" }],                        "action": "text-mode:move-to-next-screen" },
+
+       { "in": [{ "key": "ctrl+alt+Left"     }],                "action": "text-mode:move-mark-backward-word" },
+       { "in": [{ "key": "ctrl+alt+Right"     }],                "action": "text-mode:move-mark-one-forward" },
+
+       { "in": [{ "key": "ctrl+€"      }],                     "action": "" },
+
+       { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
+       { "in": [{ "key": "ctrl+g"   }],                        "action": "editor:cancel" },
+
+       { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
+
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+b" } ],    "action": "application:quit2" },
+
+       { "in": [{ "system": "SIGTERM" } ],                      "action": "application:quit" },
+
+       { "default": [], "action": "text-mode:self-insert" }
+     ]
+}]"#;
+
+// TODO: map error to editor error
+// unlimited::error::SyntaxError(file, line, col);
+pub fn build_input_event_map(
+    json: &str,
+) -> Result<Rc<RefCell<InputEventMap>>, serde_json::error::Error> {
+    let mut ctx = ParseCtx::new();
+
+    // Parse the string of data into serde_json::Value.
+    let json: Value = serde_json::from_str(json)?;
+    println!("parsing {:?}", json);
+
+    let vec = if let Value::Array(ref vec) = json {
+        vec
+    } else {
+        return Ok(Rc::new(RefCell::new(InputEventMap::new())));
+    };
+
+    // parse 1st level entries
+    for obj in vec {
+        println!("obj = {:?}", obj);
+        if let Value::Object(map) = obj {
+            for (k, v) in map {
+                println!("k = {:?}", k);
+                match k.as_str() {
+                    "events" => {
+                        parse_event_entry(&mut ctx, k, v);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(ctx.map)
+}
+
+struct ParseCtx {
+    action: String,
+    is_default: bool,
+    sequence: Vec<InputEvent>,
+    map: Rc<RefCell<InputEventMap>>,
+}
+
+impl ParseCtx {
+    fn new() -> ParseCtx {
+        ParseCtx {
+            action: String::new(),
+            is_default: false,
+            sequence: Vec::new(),
+            map: Rc::new(RefCell::new(InputEventMap::new())),
+        }
+    }
+
+    fn build_map_entry(&mut self) {
+        println!("building entry for '{}'", self.action);
+
+        // TODO: user iter instead of index
+        fn read_sequence(
+            is_default: bool,
+            map: &mut InputEventMap,
+            sequence: &Vec<InputEvent>,
+            pos: usize,
+            action: &String,
+        ) {
+            if pos == sequence.len() {
+                if is_default {
+                    // TODO: check action
+                    let ev = InputEvent::FallbackEvent;
+                    let event_hash = compute_input_event_hash(&ev);
+                    // TODO: replace
+                    map.remove(&event_hash);
+                    map.entry(event_hash).or_insert(Rc::new(InputEventRule {
+                        action: Some(action.clone()),
+                        children: None,
+                    }));
+                }
+
+                return;
+            }
+
+            let e = &sequence[pos];
+            let event_hash = compute_input_event_hash(&e);
+
+            let rule = &mut map.entry(event_hash).or_insert(Rc::new(InputEventRule {
+                action: if pos + 1 == sequence.len() {
+                    Some(action.clone())
+                } else {
+                    None
+                },
+                children: if pos + 1 == sequence.len() {
+                    None
+                } else {
+                    Some(Rc::new(RefCell::new(HashMap::new())))
+                },
+            }));
+
+            //                    println!("rule = {:?}", rule);
+
+            if pos + 1 == sequence.len() {
+                return;
+            }
+
+            if let Some(ref mut map) = rule.children.as_ref() {
+                read_sequence(
+                    is_default,
+                    &mut map.as_ref().borrow_mut(),
+                    sequence,
+                    pos + 1,
+                    &action,
+                );
+            }
+        }
+
+        let map = &mut self.map.as_ref().borrow_mut();
+        read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
+
+        //
+        // TODO: self.reset();
+        self.action.clear();
+        self.sequence.clear();
+        self.is_default = false;
+    }
+}
+
+fn parse_event_entry_input_key(ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+    let s = if let Value::String(ref s) = value {
+        println!("value = '{}'", s);
+        s
+    } else {
+        // syntax error
+        return;
+    };
+
+    // parse "key" value ctrl+alt+shift+x
+    println!("{{");
+
+    let mut mods = KeyModifiers {
+        ctrl: false,
+        alt: false,
+        shift: false,
+    };
+
+    let mut key = Key::NoKey;
+
+    for k in s.split("+") {
+        println!("key = {:?}", k);
+        match k {
+            "ctrl" => mods.ctrl = true,
+            "alt" => mods.alt = true,
+            "shift" => mods.shift = true,
+            "Clear" => key = Key::Clear,
+            "Pause" => key = Key::Pause,
+            "ScrollLock" => key = Key::ScrollLock,
+            "SysReq" => key = Key::SysReq,
+            "Escape" => key = Key::Escape,
+            "Delete" => key = Key::Delete,
+            "BackSpace" => key = Key::BackSpace,
+            "Insert" => key = Key::Insert,
+            "Home" => key = Key::Home,
+            "Left" => key = Key::Left,
+            "Up" => key = Key::Up,
+            "Right" => key = Key::Right,
+            "Down" => key = Key::Down,
+            "PageUp" => key = Key::PageUp,
+            "PageDown" => key = Key::PageDown,
+            "End" => key = Key::End,
+            "Begin" => key = Key::Begin,
+            "F1" => key = Key::F(1),
+            "F2" => key = Key::F(2),
+            "F3" => key = Key::F(3),
+            "F4" => key = Key::F(4),
+            "F5" => key = Key::F(5),
+            "F6" => key = Key::F(6),
+            "F7" => key = Key::F(7),
+            "F8" => key = Key::F(8),
+            "F9" => key = Key::F(9),
+            "F10" => key = Key::F(10),
+            "F11" => key = Key::F(11),
+            "F12" => key = Key::F(12),
+            "KeypadPlus" => key = Key::KeypadPlus,
+            "KeypadMinus" => key = Key::KeypadMinus,
+            "KeypadMul" => key = Key::KeypadMul,
+            "KeypadDiv" => key = Key::KeypadDiv,
+            "KeypadEnter" => key = Key::KeypadEnter,
+            _ => {
+                if let Some(c) = k.chars().nth(0) {
+                    key = Key::Unicode(c);
+                }
+            }
+        }
+    }
+
+    println!("}}");
+
+    let ev = InputEvent::KeyPress { key, mods };
+
+    println!("built event = {:?}", ev);
+
+    ctx.sequence.push(ev)
+}
+
+fn parse_event_entry_input_click(ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+    if let Value::String(ref s) = value {
+        println!("button = '{}'", s);
+    }
+}
+
+fn parse_event_entry(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+    println!("fount event '{}'", name);
+    let vec = if let Value::Array(ref vec) = value {
+        vec
+    } else {
+        // parse error
+        return;
+    };
+
+    for obj in vec {
+        // println!("obj = {:?}", obj);
+        if let Value::Object(map) = obj {
+            println!("---------- new entry");
+            for (k, v) in map {
+                println!("k = {:?}", k);
+                match k.as_str() {
+                    "in" => {
+                        parse_event_entry_input(&mut ctx, k, v);
+                    }
+                    "action" => {
+                        parse_event_entry_action(&mut ctx, k, v);
+                    }
+                    "default" => {
+                        parse_event_entry_default_action(&mut ctx, k, v);
+                    }
+
+                    _ => {}
+                }
+            }
+            ctx.build_map_entry();
+        }
+    }
+}
+
+fn parse_event_entry_action(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+    // copy string to event
+    if let Value::String(ref s) = value {
+        println!("action = '{}'", s);
+        ctx.action = s.clone();
+    }
+}
+
+fn parse_event_entry_default_action(
+    mut ctx: &mut ParseCtx,
+    name: &String,
+    value: &serde_json::Value,
+) {
+    println!("parse_event_entry_default_action = '{}'", value);
+    ctx.is_default = true;
+}
+
+fn parse_event_entry_input(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+    let vec = if let Value::Array(ref vec) = value {
+        vec
+    } else {
+        // parse error
+        return;
+    };
+
+    for obj in vec {
+        //println!("obj = {:?}", obj);
+        if let Value::Object(map) = obj {
+            for (k, v) in map {
+                //println!("k = {:?}", k);
+                match k.as_str() {
+                    "key" => {
+                        parse_event_entry_input_key(&mut ctx, k, v);
+                    }
+                    "click" => {
+                        parse_event_entry_input_click(&mut ctx, k, v);
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+fn eval_input_event(
+    ev: &InputEvent,
+    input_map: &Rc<RefCell<InputEventMap>>,
+    in_node: &mut Option<Rc<InputEventRule>>,
+    out_node: &mut Option<Rc<InputEventRule>>,
+) -> Option<String> {
+    println!("\n\n eval_input_event");
+
+    println!("found in_node {:?}", in_node);
+
+    let event_hash = compute_input_event_hash(ev);
+    println!("event_hash = {}", event_hash);
+
+    // not first level ?
+    if let Some(node) = in_node.as_ref() {
+        if let Some(map) = &node.as_ref().children {
+            let map = map.as_ref().borrow();
+            match map.get(&event_hash) {
+                Some(event) => {
+                    if let Some(action) = &event.as_ref().action {
+                        println!("\n\n eval_input_event");
+                        return Some(action.to_string());
+                    }
+
+                    *out_node = Some(Rc::clone(event));
+
+                    println!("found out_node {:?}", out_node);
+                }
+                None => {}
+            }
+        }
+    } else {
+        match input_map.as_ref().borrow().get(&event_hash) {
+            Some(event) => {
+                if let Some(action) = &event.as_ref().action {
+                    println!("found action");
+                    return Some(action.to_string());
+                }
+
+                *out_node = Some(Rc::clone(event));
+
+                println!("found out_node {:?}", out_node);
+            }
+            None => {
+                println!("TODO: look for default action");
+                let ev = InputEvent::FallbackEvent;
+                let event_hash = compute_input_event_hash(&ev);
+
+                match input_map.as_ref().borrow().get(&event_hash) {
+                    Some(event) => {
+                        if let Some(action) = &event.as_ref().action {
+                            println!("default found action {}", action);
+                            return Some(action.to_string());
+                        }
+
+                        *out_node = None;
+                        println!("cancel sequence");
+                    }
+                    None => {
+                        println!("no default action defined");
+                        *out_node = None;
+                    }
+                }
+            }
+        }
+    };
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -121,345 +512,12 @@ mod tests {
     }
 
     #[test]
-    fn build_input_map() -> Result<(), serde_json::error::Error> {
-        struct ParseCtx {
-            action: String,
-            is_default: bool,
-            sequence: Vec<InputEvent>,
-            map: Rc<RefCell<InputEventMap>>,
-        }
 
-        impl ParseCtx {
-            fn new() -> ParseCtx {
-                ParseCtx {
-                    action: String::new(),
-                    is_default: false,
-                    sequence: Vec::new(),
-                    map: Rc::new(RefCell::new(InputEventMap::new())),
-                }
-            }
+    fn test_build_input_event_map() -> Result<(), serde_json::error::Error> {
+        let map = build_input_event_map(DEFAULT_MAP)?;
 
-            fn build_map_entry(&mut self) {
-                println!("building entry for '{}'", self.action);
-
-                // TODO: user iter instead of index
-                fn read_sequence(
-                    is_default: bool,
-                    map: &mut InputEventMap,
-                    sequence: &Vec<InputEvent>,
-                    pos: usize,
-                    action: &String,
-                ) {
-                    if pos == sequence.len() {
-                        if is_default {
-                            // TODO: check action
-                            let ev = InputEvent::FallbackEvent;
-                            let event_hash = compute_input_event_hash(&ev);
-                            // TODO: replace
-                            map.remove(&event_hash);
-                            map.entry(event_hash).or_insert(Rc::new(InputEventRule {
-                                action: Some(action.clone()),
-                                children: None,
-                            }));
-                        }
-
-                        return;
-                    }
-
-                    let e = &sequence[pos];
-                    let event_hash = compute_input_event_hash(&e);
-
-                    let rule = &mut map.entry(event_hash).or_insert(Rc::new(InputEventRule {
-                        action: if pos + 1 == sequence.len() {
-                            Some(action.clone())
-                        } else {
-                            None
-                        },
-                        children: if pos + 1 == sequence.len() {
-                            None
-                        } else {
-                            Some(Rc::new(RefCell::new(HashMap::new())))
-                        },
-                    }));
-
-                    //                    println!("rule = {:?}", rule);
-
-                    if pos + 1 == sequence.len() {
-                        return;
-                    }
-
-                    if let Some(ref mut map) = rule.children.as_ref() {
-                        read_sequence(
-                            is_default,
-                            &mut map.as_ref().borrow_mut(),
-                            sequence,
-                            pos + 1,
-                            &action,
-                        );
-                    }
-                }
-
-                let map = &mut self.map.as_ref().borrow_mut();
-                read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
-
-                //
-                // TODO: self.reset();
-                self.action.clear();
-                self.sequence.clear();
-                self.is_default = false;
-            }
-        }
-
-        let mut ctx = ParseCtx::new();
-
-        use serde_json::Value;
-
-        let data = r#"[{
-             "events": [
-                { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-mark-backward" },
-                { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-mark-forward" },
-                { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-mark-to-previous-line" },
-                { "in": [{ "key": "Down"     }],                        "action": "text-mode:move-mark-to-next-line" },
-                { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:move-to-previous-screen" },
-                { "in": [{ "key": "PageDown" }],                        "action": "text-mode:move-to-next-screen" },
-
-                { "in": [{ "key": "ctrl+alt+Left"     }],                "action": "text-mode:move-mark-backward-word" },
-                { "in": [{ "key": "ctrl+alt+Right"     }],                "action": "text-mode:move-mark-one-forward" },
-
-                { "in": [{ "key": "ctrl+€"      }],                     "action": "" },
-
-                { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
-                { "in": [{ "key": "ctrl+g"   }],                        "action": "editor:cancel" },
-
-                { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
-
-                { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-
-                { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+b" } ],    "action": "application:quit2" },
-
-                { "in": [{ "system": "SIGTERM" } ],                      "action": "application:quit" },
-
-                { "default": [], "action": "text-mode:self-insert" }
-              ]
-        }]"#;
-
-        // Parse the string of data into serde_json::Value.
-        let json: Value = serde_json::from_str(data)?;
-        println!("parsing {:?}", json);
-
-        /*
-         enum Value {
-            Null,
-            Bool(bool),
-            Number(Number),
-            String(String),
-            Array(Vec<Value>),
-            Object(Map<String, Value>),
-        }
-        */
-        let vec = if let Value::Array(ref vec) = json {
-            vec
-        } else {
-            return Ok(());
-        };
-
-        // parse 1st level entries
-        for obj in vec {
-            println!("obj = {:?}", obj);
-            if let Value::Object(map) = obj {
-                for (k, v) in map {
-                    println!("k = {:?}", k);
-                    match k.as_str() {
-                        "events" => {
-                            parse_event_entry(&mut ctx, k, v);
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        fn parse_event_entry(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
-            println!("fount event '{}'", name);
-            let vec = if let Value::Array(ref vec) = value {
-                vec
-            } else {
-                // parse error
-                return;
-            };
-
-            for obj in vec {
-                // println!("obj = {:?}", obj);
-                if let Value::Object(map) = obj {
-                    println!("---------- new entry");
-                    for (k, v) in map {
-                        println!("k = {:?}", k);
-                        match k.as_str() {
-                            "in" => {
-                                parse_event_entry_input(&mut ctx, k, v);
-                            }
-                            "action" => {
-                                parse_event_entry_action(&mut ctx, k, v);
-                            }
-                            "default" => {
-                                parse_event_entry_default_action(&mut ctx, k, v);
-                            }
-
-                            _ => {}
-                        }
-                    }
-                    ctx.build_map_entry();
-                }
-            }
-        }
-
-        fn parse_event_entry_action(
-            mut ctx: &mut ParseCtx,
-            name: &String,
-            value: &serde_json::Value,
-        ) {
-            // copy string to event
-            if let Value::String(ref s) = value {
-                println!("action = '{}'", s);
-                ctx.action = s.clone();
-            }
-        }
-
-        fn parse_event_entry_default_action(
-            mut ctx: &mut ParseCtx,
-            name: &String,
-            value: &serde_json::Value,
-        ) {
-            println!("parse_event_entry_default_action = '{}'", value);
-            ctx.is_default = true;
-        }
-
-        fn parse_event_entry_input(
-            mut ctx: &mut ParseCtx,
-            name: &String,
-            value: &serde_json::Value,
-        ) {
-            let vec = if let Value::Array(ref vec) = value {
-                vec
-            } else {
-                // parse error
-                return;
-            };
-
-            for obj in vec {
-                //println!("obj = {:?}", obj);
-                if let Value::Object(map) = obj {
-                    for (k, v) in map {
-                        //println!("k = {:?}", k);
-                        match k.as_str() {
-                            "key" => {
-                                parse_event_entry_input_key(&mut ctx, k, v);
-                            }
-                            "click" => {
-                                parse_event_entry_input_click(&mut ctx, k, v);
-                            }
-
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-
-        fn parse_event_entry_input_key(
-            ctx: &mut ParseCtx,
-            name: &String,
-            value: &serde_json::Value,
-        ) {
-            let s = if let Value::String(ref s) = value {
-                println!("value = '{}'", s);
-                s
-            } else {
-                // syntax error
-                return;
-            };
-
-            // parse "key" value ctrl+alt+shift+x
-            println!("{{");
-
-            let mut mods = KeyModifiers {
-                ctrl: false,
-                alt: false,
-                shift: false,
-            };
-
-            let mut key = Key::NoKey;
-
-            for k in s.split("+") {
-                println!("key = {:?}", k);
-                match k {
-                    "ctrl" => mods.ctrl = true,
-                    "alt" => mods.alt = true,
-                    "shift" => mods.shift = true,
-                    "Clear" => key = Key::Clear,
-                    "Pause" => key = Key::Pause,
-                    "ScrollLock" => key = Key::ScrollLock,
-                    "SysReq" => key = Key::SysReq,
-                    "Escape" => key = Key::Escape,
-                    "Delete" => key = Key::Delete,
-                    "BackSpace" => key = Key::BackSpace,
-                    "Insert" => key = Key::Insert,
-                    "Home" => key = Key::Home,
-                    "Left" => key = Key::Left,
-                    "Up" => key = Key::Up,
-                    "Right" => key = Key::Right,
-                    "Down" => key = Key::Down,
-                    "PageUp" => key = Key::PageUp,
-                    "PageDown" => key = Key::PageDown,
-                    "End" => key = Key::End,
-                    "Begin" => key = Key::Begin,
-                    "F1" => key = Key::F(1),
-                    "F2" => key = Key::F(2),
-                    "F3" => key = Key::F(3),
-                    "F4" => key = Key::F(4),
-                    "F5" => key = Key::F(5),
-                    "F6" => key = Key::F(6),
-                    "F7" => key = Key::F(7),
-                    "F8" => key = Key::F(8),
-                    "F9" => key = Key::F(9),
-                    "F10" => key = Key::F(10),
-                    "F11" => key = Key::F(11),
-                    "F12" => key = Key::F(12),
-                    "KeypadPlus" => key = Key::KeypadPlus,
-                    "KeypadMinus" => key = Key::KeypadMinus,
-                    "KeypadMul" => key = Key::KeypadMul,
-                    "KeypadDiv" => key = Key::KeypadDiv,
-                    "KeypadEnter" => key = Key::KeypadEnter,
-                    _ => {
-                        if let Some(c) = k.chars().nth(0) {
-                            key = Key::Unicode(c);
-                        }
-                    }
-                }
-            }
-
-            println!("}}");
-
-            let ev = InputEvent::KeyPress { key, mods };
-
-            println!("built event = {:?}", ev);
-
-            ctx.sequence.push(ev)
-        }
-
-        fn parse_event_entry_input_click(
-            ctx: &mut ParseCtx,
-            name: &String,
-            value: &serde_json::Value,
-        ) {
-            if let Value::String(ref s) = value {
-                println!("button = '{}'", s);
-            }
-        }
-
-        //        let mut hi: HashMap<u64, Box<InputEventRule>> = HashMap::new();
         println!("****** print map");
-        for (k, v) in ctx.map.as_ref().borrow().iter() {
+        for (k, v) in map.as_ref().borrow().iter() {
             println!("{:?} -> {:?}", k, v);
         }
 
@@ -474,106 +532,39 @@ mod tests {
             },
         });
 
-        /*
-                iev.push(InputEvent::KeyPress {
-                    key: Key::Unicode('x'),
-                    mods: KeyModifiers {
-                        ctrl: true,
-                        alt: false,
-                        shift: false,
-                    },
-                });
-                iev.push(InputEvent::KeyPress {
-                    key: Key::Unicode('c'),
-                    mods: KeyModifiers {
-                        ctrl: true,
-                        alt: false,
-                        shift: false,
-                    },
-                });
-        */
+        // test eval
+        {
+            /*
+                    iev.push(InputEvent::KeyPress {
+                        key: Key::Unicode('x'),
+                        mods: KeyModifiers {
+                            ctrl: true,
+                            alt: false,
+                            shift: false,
+                        },
+                    });
+                    iev.push(InputEvent::KeyPress {
+                        key: Key::Unicode('c'),
+                        mods: KeyModifiers {
+                            ctrl: true,
+                            alt: false,
+                            shift: false,
+                        },
+                    });
+            */
 
-        fn eval_input_event(
-            ev: &InputEvent,
-            input_map: &Rc<RefCell<InputEventMap>>,
-            in_node: &mut Option<Rc<InputEventRule>>,
-            out_node: &mut Option<Rc<InputEventRule>>,
-        ) -> Option<String> {
-            println!("\n\n eval_input_event");
+            let rc_map = Rc::new(map);
 
-            println!("found in_node {:?}", in_node);
+            let mut current_node: Option<Rc<InputEventRule>> = None;
+            let mut next_node: Option<Rc<InputEventRule>> = None;
 
-            let event_hash = compute_input_event_hash(ev);
-            println!("event_hash = {}", event_hash);
-
-            // not first level ?
-            if let Some(node) = in_node.as_ref() {
-                if let Some(map) = &node.as_ref().children {
-                    let map = map.as_ref().borrow();
-                    match map.get(&event_hash) {
-                        Some(event) => {
-                            if let Some(action) = &event.as_ref().action {
-                                println!("\n\n eval_input_event");
-                                return Some(action.to_string());
-                            }
-
-                            *out_node = Some(Rc::clone(event));
-
-                            println!("found out_node {:?}", out_node);
-                        }
-                        None => {}
-                    }
+            for ev in &iev {
+                let action = eval_input_event(&ev, &rc_map, &mut current_node, &mut next_node);
+                if let Some(action) = action {
+                    println!("found action {}", action);
+                } else {
+                    std::mem::swap(&mut current_node, &mut next_node);
                 }
-            } else {
-                match input_map.as_ref().borrow().get(&event_hash) {
-                    Some(event) => {
-                        if let Some(action) = &event.as_ref().action {
-                            println!("found action");
-                            return Some(action.to_string());
-                        }
-
-                        *out_node = Some(Rc::clone(event));
-
-                        println!("found out_node {:?}", out_node);
-                    }
-                    None => {
-                        println!("TODO: look for default action");
-                        let ev = InputEvent::FallbackEvent;
-                        let event_hash = compute_input_event_hash(&ev);
-
-                        match input_map.as_ref().borrow().get(&event_hash) {
-                            Some(event) => {
-                                if let Some(action) = &event.as_ref().action {
-                                    println!("default found action {}", action);
-                                    return Some(action.to_string());
-                                }
-
-                                *out_node = None;
-                                println!("cancel sequence");
-                            }
-                            None => {
-                                println!("no default action defined");
-                                *out_node = None;
-                            }
-                        }
-                    }
-                }
-            };
-
-            None
-        }
-
-        let rc_map = Rc::new(ctx.map);
-
-        let mut current_node: Option<Rc<InputEventRule>> = None;
-        let mut next_node: Option<Rc<InputEventRule>> = None;
-
-        for ev in &iev {
-            let action = eval_input_event(&ev, &rc_map, &mut current_node, &mut next_node);
-            if let Some(action) = action {
-                println!("found action {}", action);
-            } else {
-                std::mem::swap(&mut current_node, &mut next_node);
             }
         }
 
