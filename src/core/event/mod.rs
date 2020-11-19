@@ -23,10 +23,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
-
-
 pub mod input_map;
-
 
 use std::cell::RefCell;
 use std::mem;

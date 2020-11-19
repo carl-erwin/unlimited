@@ -30,14 +30,11 @@ mod tests {
 
     use super::*;
     use crate::core::event::*;
-    
 
     #[test]
     fn test_input_map() {
-        let mut h: InputEventMap = HashMap::new();
-
         //
-        let event = InputEvent::KeyPress {
+        let keypress_event = InputEvent::KeyPress {
             key: Key::Left,
             mods: KeyModifiers {
                 ctrl: false,
@@ -46,19 +43,20 @@ mod tests {
             },
         };
 
-        let val = compute_input_event_hash(&event);
+        let keypress_event_hash = compute_input_event_hash(&keypress_event);
 
-        println!("val = {:?}", val);
+        println!("keypress_event hash = {:?}", keypress_event_hash);
 
+        let mut h: InputEventMap = HashMap::new();
         h.insert(
-            compute_input_event_hash(&event),
+            compute_input_event_hash(&keypress_event),
             Rc::new(InputEventRule {
                 action: Some("move-forward".to_string()),
                 children: None,
             }),
         );
 
-        let event_user = InputEvent::KeyPress {
+        let keypress_event = InputEvent::KeyPress {
             key: Key::Left,
             mods: KeyModifiers {
                 ctrl: false,
@@ -67,11 +65,11 @@ mod tests {
             },
         };
 
-        let val = compute_input_event_hash(&event_user);
+        let keypress_event_hash = compute_input_event_hash(&keypress_event);
 
-        let value = h.get(&val);
+        let rule = h.get(&keypress_event_hash);
 
-        println!("{:?}", value);
+        println!("{:?}", rule);
 
         let button_ref_event = InputEvent::ButtonPress(ButtonEvent {
             button: 0,
@@ -92,7 +90,7 @@ mod tests {
             }),
         );
 
-        let button_event_user = InputEvent::ButtonPress(ButtonEvent {
+        let button_event = InputEvent::ButtonPress(ButtonEvent {
             button: 0,
             x: 123,
             y: 0,
@@ -103,21 +101,23 @@ mod tests {
             },
         });
 
-        let val = compute_input_event_hash(&button_event_user);
+        let val = compute_input_event_hash(&button_event);
 
         let button_value = h.get(&val);
 
-        let button_event_hash = compute_input_event_hash(&button_ref_event);
-        let button_event_user_hash = compute_input_event_hash(&button_event_user);
+        let button_ref_event_hash = compute_input_event_hash(&button_ref_event);
+        let button_event_hash = compute_input_event_hash(&button_event);
 
-        println!("button_event_hash      = {:?}", button_event_hash);
-        println!("button_event_user_hash = {:?}", button_event_user_hash);
+        println!("button_ref_event_hash      = {:?}", button_ref_event_hash);
+        println!("button_event_hash = {:?}", button_event_hash);
 
         println!("{:?}", button_value);
         println!(
             "button_ref_event == button_event_user -> {:?}",
-            button_ref_event == button_event_user
+            button_ref_event == button_event
         );
+
+        assert_eq!(button_ref_event_hash, button_event_hash);
     }
 
     #[test]
