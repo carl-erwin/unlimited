@@ -75,14 +75,14 @@ use self::libc::{
 
 #[derive(Debug, Clone)]
 enum Page {
-    OnDisk(*const u8, size_t, size_t, c_int), // base, len, skip, fd
+    OnStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
     InRam(*const u8, usize, usize),           // base, len, capacity
 }
 
 impl Page {
     fn as_slice<'a>(&self) -> Option<&'a [u8]> {
         Some(match *self {
-            Page::OnDisk(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
+            Page::OnStorage(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
 
             Page::InRam(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
         })
@@ -92,7 +92,7 @@ impl Page {
 impl Drop for Page {
     fn drop(&mut self) {
         match *self {
-            Page::OnDisk(base, len, skip, ..) => {
+            Page::OnStorage(base, len, skip, ..) => {
                 // eprintln!("munmap {:?}", base);
                 let _base =
                     unsafe { munmap(base.offset(-(skip as isize)) as *mut c_void, len + skip) };
@@ -204,7 +204,7 @@ impl Node {
             return None;
         }
 
-        let page = Rc::new(RefCell::new(Page::OnDisk(
+        let page = Rc::new(RefCell::new(Page::OnStorage(
             unsafe { ptr.offset(self.skip as isize) as *const u8 },
             self.size as usize,
             self.skip as usize,
@@ -249,7 +249,7 @@ impl Node {
             }
 
             _ => {
-                panic!("cannot be used on Ondisk page");
+                panic!("cannot be used on OnStorage page");
             }
         }
     }
@@ -847,7 +847,7 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => 0,
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.as_ref().borrow_mut() {
-                    Page::OnDisk { .. } => 0,
+                    Page::OnStorage { .. } => 0,
 
                     Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
                 },
@@ -860,7 +860,7 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.as_ref().borrow_mut() {
-                    Page::OnDisk { .. } => {
+                    Page::OnStorage { .. } => {
                         panic!("trying to write on read only memory");
                     }
 
@@ -1241,7 +1241,7 @@ impl<'a> MappedFile<'a> {
             }
 
             match *file.pool[idx].cow.as_ref().unwrap().as_ref().borrow_mut() {
-                Page::OnDisk { .. } => {
+                Page::OnStorage { .. } => {
                     panic!("trying to write on read only memory");
                 }
 
