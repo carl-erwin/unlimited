@@ -46,12 +46,12 @@ mod tests {
             },
         };
 
-        let val = input_event_rule_hash(&event);
+        let val = compute_input_event_hash(&event);
 
         println!("val = {:?}", val);
 
         h.insert(
-            input_event_rule_hash(&event),
+            compute_input_event_hash(&event),
             Rc::new(InputEventRule {
                 action: Some("move-forward".to_string()),
                 children: None,
@@ -67,7 +67,7 @@ mod tests {
             },
         };
 
-        let val = input_event_rule_hash(&event_user);
+        let val = compute_input_event_hash(&event_user);
 
         let value = h.get(&val);
 
@@ -85,7 +85,7 @@ mod tests {
         });
 
         h.insert(
-            input_event_rule_hash(&button_ref_event),
+            compute_input_event_hash(&button_ref_event),
             Rc::new(InputEventRule {
                 action: Some("begin-selection".to_string()),
                 children: None,
@@ -103,12 +103,12 @@ mod tests {
             },
         });
 
-        let val = input_event_rule_hash(&button_event_user);
+        let val = compute_input_event_hash(&button_event_user);
 
         let button_value = h.get(&val);
 
-        let button_event_hash = input_event_rule_hash(&button_ref_event);
-        let button_event_user_hash = input_event_rule_hash(&button_event_user);
+        let button_event_hash = compute_input_event_hash(&button_ref_event);
+        let button_event_user_hash = compute_input_event_hash(&button_event_user);
 
         println!("button_event_hash      = {:?}", button_event_hash);
         println!("button_event_user_hash = {:?}", button_event_user_hash);
@@ -154,7 +154,7 @@ mod tests {
                         if is_default {
                             // TODO: check action
                             let ev = InputEvent::FallbackEvent;
-                            let event_hash = input_event_rule_hash(&ev);
+                            let event_hash = compute_input_event_hash(&ev);
                             // TODO: replace
                             map.remove(&event_hash);
                             map.entry(event_hash).or_insert(Rc::new(InputEventRule {
@@ -167,7 +167,7 @@ mod tests {
                     }
 
                     let e = &sequence[pos];
-                    let event_hash = input_event_rule_hash(&e);
+                    let event_hash = compute_input_event_hash(&e);
 
                     let rule = &mut map.entry(event_hash).or_insert(Rc::new(InputEventRule {
                         action: if pos + 1 == sequence.len() {
@@ -503,7 +503,7 @@ mod tests {
 
             println!("found in_node {:?}", in_node);
 
-            let event_hash = input_event_rule_hash(ev);
+            let event_hash = compute_input_event_hash(ev);
             println!("event_hash = {}", event_hash);
 
             // not first level ?
@@ -539,7 +539,7 @@ mod tests {
                     None => {
                         println!("TODO: look for default action");
                         let ev = InputEvent::FallbackEvent;
-                        let event_hash = input_event_rule_hash(&ev);
+                        let event_hash = compute_input_event_hash(&ev);
 
                         match input_map.as_ref().borrow().get(&event_hash) {
                             Some(event) => {

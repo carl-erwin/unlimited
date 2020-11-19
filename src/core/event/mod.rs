@@ -294,7 +294,7 @@ struct InputEventRule {
 /// example:
 /// for ButtonEvent we do partial hasing , ie: we ignore the coordinates of the pointer
 /// for other events we relry on #[derive(Hash)]
-fn input_event_rule_hash(t: &InputEvent) -> InputEventHash {
+fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
     let mut s = DefaultHasher::new();
 
     match t {
