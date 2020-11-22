@@ -10,10 +10,10 @@ name = "unlimited"
 path = "src/main.rs"
 
 
-[[bin]]
-doc = false
-name = "crossterm-test"
-path = "test-tools/crossterm-input-test.rs"
+#[[bin]]
+#doc = false
+#name = "crossterm-test"
+#path = "test-tools/crossterm-input-test.rs"
 
 
 [dependencies]

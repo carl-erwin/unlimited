@@ -127,6 +127,8 @@ pub fn main_loop(
 
     crossterm::terminal::enable_raw_mode()?;
 
+    let mut frame_skipped = false;
+
     while !ui_state.quit {
         // check terminal size
         let (width, height) = crossterm::terminal::size().ok().unwrap();
@@ -228,9 +230,12 @@ pub fn main_loop(
                     let p = crate::core::event::pending_render_event_count();
                     if p <= 1 {
                         let s = Instant::now();
-                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        draw_view(&mut last_screen, &mut screen, &mut stdout, frame_skipped);
                         let e = Instant::now();
                         dbg_println!("time to draw view = {}\r", (e - s).as_millis());
+                        frame_skipped = false;
+                    } else {
+                        frame_skipped = true;
                     }
 
                     if p > 0 {
@@ -257,7 +262,7 @@ pub fn main_loop(
         stdout,
         SetAttribute(Attribute::Reset),
         Clear(ClearType::All),
-        EnableMouseCapture,
+        DisableMouseCapture,
         Show
     )?;
 
@@ -274,9 +279,17 @@ pub fn main_loop(
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style
 */
-fn draw_view(last_screen: &mut Screen, mut screen: &mut Screen, mut stdout: &mut std::io::Stdout) {
-    let _ = draw_screen(last_screen, &mut screen, &mut stdout);
-    //let _ = draw_screen_dumb(last_screen, &mut screen, &mut stdout);
+fn draw_view(
+    last_screen: &mut Screen,
+    mut screen: &mut Screen,
+    mut stdout: &mut std::io::Stdout,
+    full_redraw: bool,
+) {
+    if full_redraw {
+        let _ = draw_screen_dumb(last_screen, &mut screen, &mut stdout);
+    } else {
+        let _ = draw_screen(last_screen, &mut screen, &mut stdout);
+    }
 }
 
 fn draw_screen_dumb(
