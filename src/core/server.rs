@@ -40,10 +40,10 @@ use crate::core::event::Event::BuildLayoutEvent;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 
-use crate::core::view::layout::build_screen_layout;
 use crate::core::view::{Id, View};
 
 use crate::core::view;
+use crate::core::view::update_view;
 
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
@@ -123,12 +123,11 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
      ]
 }]"#;
 
-// CoreState -> EditorEnv
 // env.repeat_action_n , api to set repeat
 // ctrl+:  -> minor mode to read repeat count
 // esc -> reset repeat count
 // kbr macro recording
-pub struct CoreState {
+pub struct EditorEnv {
     quit: bool,
     status: String, // TODO: move to test-mode
 
@@ -140,7 +139,7 @@ pub struct CoreState {
     next_node: Option<Rc<InputEventRule>>,
 }
 
-impl CoreState {
+impl EditorEnv {
     fn new() -> Self {
         let input_map = if let Ok(map) = build_input_event_map(DEFAULT_INPUT_MAP) {
             map
@@ -148,7 +147,7 @@ impl CoreState {
             Rc::new(RefCell::new(HashMap::new()))
         };
 
-        CoreState {
+        EditorEnv {
             quit: false,
             status: String::new(),
             action_map: build_action_map(),
@@ -159,35 +158,48 @@ impl CoreState {
     }
 }
 
-pub fn build_layout(editor: &mut Editor, mut core_state: &mut CoreState, view_id: u64) {
-    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+pub fn build_layout(editor: &mut Editor, mut env: &mut EditorEnv, view_id: u64) {
+    let view = editor.view_map[view_id as usize].1.clone();
 
     let start = Instant::now();
-    fill_screen(&mut core_state, &mut view);
+    update_view(&view, &mut env);
     let end = Instant::now();
-    view.screen.time_to_build = end.duration_since(start);
+    view.as_ref().borrow_mut().screen.time_to_build = end.duration_since(start);
 }
 
 pub fn build_layout_and_send_event(
-    editor: &mut Editor,
-    mut core_state: &mut CoreState,
+    mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
     doc_id: u64,
-    view_id: u64,
+    view: Rc<RefCell<View>>,
 ) {
-    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+    let view_id = {
+        let view = view.borrow();
+        view.id
+    };
 
+    // prepare filter
+    // setup filter ctx
+    // push filter vec
+    // s/fill_scren/run_filter/
+
+    // build_layout
     let start = Instant::now();
-    fill_screen(&mut core_state, &mut view);
-    let end = Instant::now();
+    build_layout(&mut editor, &mut env, view_id);
 
-    let mut new_screen = view.screen.clone();
+    // clone view's screen to send
+    let view = view.borrow();
+
+    let mut new_screen = view.screen.clone(); // Rc() ? Cow ?
+    let end = Instant::now();
     new_screen.time_to_build = end.duration_since(start);
 
+    // and send it
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
         BuildLayoutEvent {
-            view_id: view_id as u64,
+            view_id: view.id as u64,
             doc_id,
             screen: new_screen,
         },
@@ -201,9 +213,8 @@ pub fn send_build_layout_event(
     doc_id: u64,
     view_id: u64,
 ) {
-    let mut view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
-
-    let mut new_screen = view.screen.clone();
+    let view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+    let new_screen = view.screen.clone();
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
@@ -216,12 +227,12 @@ pub fn send_build_layout_event(
     ui_tx.send(msg).unwrap_or(());
 }
 
-pub fn start(
+pub fn run(
     mut editor: &mut Editor,
     core_rx: &Receiver<EventMessage>,
     ui_tx: &Sender<EventMessage>,
 ) {
-    let mut core_state = CoreState::new();
+    let mut env = EditorEnv::new();
 
     let mut seq: usize = 0;
 
@@ -230,7 +241,7 @@ pub fn start(
         *seq
     }
 
-    while !core_state.quit {
+    while !env.quit {
         if let Ok(evt) = core_rx.recv() {
             match evt.event {
                 Event::ApplicationQuitEvent => {
@@ -291,21 +302,19 @@ pub fn start(
                     let view_id = view_id as usize;
                     if view_id < editor.view_map.len() {
                         {
-                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                            {
+                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
 
-                            // resize ?
-                            if width != view.screen.width() || height != view.screen.height() {
-                                view.screen = Box::new(Screen::new(width, height));
+                                // resize ?
+                                if width != view.screen.width() || height != view.screen.height() {
+                                    view.screen = Box::new(Screen::new(width, height));
+                                }
                             }
                         }
 
-                        build_layout_and_send_event(
-                            &mut editor,
-                            &mut core_state,
-                            ui_tx,
-                            doc_id,
-                            view_id as u64,
-                        );
+                        let view = editor.view_map[view_id].1.clone();
+
+                        build_layout_and_send_event(&mut editor, &mut env, ui_tx, doc_id, view);
                     }
 
                     // is there a view/screen ?
@@ -319,7 +328,7 @@ pub fn start(
 
                         process_input_events(
                             &mut editor,
-                            &mut core_state,
+                            &mut env,
                             view_id,
                             &ui_tx,
                             &events,
@@ -362,69 +371,25 @@ fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     }
 }
 
-// TODO: test-mode
-// scroll bar: bg color (35, 34, 89)
-// scroll bar: cursor color (192, 192, 192)
-fn fill_screen(_core_state: &mut CoreState, view: &mut View) {
-    if let Some(ref _buf) = view.document {
-        let mut data = vec![];
-        let doc = view.document.as_ref().unwrap().borrow_mut();
-
-        let max_offset = doc.buffer.size as u64;
-
-        let height = view.screen.height();
-        let width = view.screen.max_width();
-
-        let max_size = (width * height * 4) as usize; // 4 is max utf8 encoding size
-        doc.read(view.start_offset, max_size, &mut data);
-
-        view.end_offset =
-            build_screen_layout(&data, view.start_offset, max_offset, &mut view.screen);
-        view.check_invariants();
-
-        // set_render_marks
-        // brute force for now
-        for m in view.moving_marks.borrow().iter() {
-            // TODO: screen.find_line_by_offset(m.offset) -> Option<&mut Line>
-            if m.offset < view.start_offset || m.offset > view.end_offset {
-                continue;
-            }
-
-            for l in 0..view.screen.height() {
-                let line = view.screen.get_mut_line(l).unwrap();
-
-                if line.metadata {
-                    // continue;
-                }
-
-                for c in 0..line.nb_cells {
-                    let cpi = line.get_mut_cpi(c).unwrap();
-                    cpi.is_selected = cpi.offset == m.offset && !cpi.metadata;
-                }
-            }
-        }
-    }
-}
-
 fn process_input_event(
     editor: &mut Editor,
-    mut core_state: &mut CoreState,
+    mut env: &mut EditorEnv,
     view_id: usize,
     ev: &InputEvent,
 ) -> bool {
-    let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+    let mut view = &editor.view_map[view_id].1;
 
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
-        core_state.status = "no input event".to_string();
+        env.status = "no input event".to_string();
         return false;
     }
 
     let action = eval_input_event(
         &ev,
-        &core_state.input_map,
-        &mut core_state.current_node, // TODO: EvalCtx
-        &mut core_state.next_node,    // TODO: EvalCtx
+        &env.input_map,
+        &mut env.current_node, // TODO: EvalCtx
+        &mut env.next_node,    // TODO: EvalCtx
     );
 
     let trigger = vec![(*ev).clone()];
@@ -435,25 +400,25 @@ fn process_input_event(
 
         match action.as_str() {
             "application:quit" => {
-                core_state.status = "<quit>".to_string();
+                env.status = "<quit>".to_string();
 
-                let doc = view.document.as_mut().unwrap().borrow_mut();
-                if doc.changed {
-                    core_state.status =
-                        "<quit> : modified buffer exits. type F4 to quit without saving"
-                            .to_string();
+                let doc = &view.as_ref().borrow();
+                let doc = doc.document.as_ref().unwrap();
+                if doc.borrow().changed {
+                    env.status = "<quit> : modified buffer exits. type F4 to quit without saving"
+                        .to_string();
                 } else {
-                    core_state.quit = true;
+                    env.quit = true;
                 }
             }
 
             "application:quit-abort" => {
-                core_state.quit = true;
+                env.quit = true;
             }
 
             "save-document" => {
-                view::save_document(&trigger, &mut view);
-                core_state.status = "<save>".to_string();
+                view::save_document(&trigger, view);
+                env.status = "<save>".to_string();
             }
 
             _ => {
@@ -461,7 +426,7 @@ fn process_input_event(
                 // applicatoin:
 
                 // else
-                if let Some(action) = core_state.action_map.get(&action) {
+                if let Some(action) = env.action_map.get(&action) {
                     action(&trigger, &mut view);
                 }
             }
@@ -473,7 +438,7 @@ fn process_input_event(
     } else {
         // TODO: move to caller ?
         // add eval_ctx::new to mask impl of node swapping
-        std::mem::swap(&mut core_state.current_node, &mut core_state.next_node);
+        std::mem::swap(&mut env.current_node, &mut env.next_node);
     }
 
     true
@@ -481,7 +446,7 @@ fn process_input_event(
 
 fn process_input_events(
     mut editor: &mut Editor,
-    mut core_state: &mut CoreState,
+    mut env: &mut EditorEnv,
     view_id: usize,
     ui_tx: &Sender<EventMessage>,
     events: &Vec<InputEvent>,
@@ -490,11 +455,11 @@ fn process_input_events(
     let p = crate::core::event::pending_input_event_count();
 
     for ev in events {
-        let event_processed = process_input_event(&mut editor, &mut core_state, view_id, ev);
+        let event_processed = process_input_event(&mut editor, &mut env, view_id, ev);
 
         if event_processed {
             let start = Instant::now();
-            build_layout(&mut editor, &mut core_state, view_id as u64);
+            build_layout(&mut editor, &mut env, view_id as u64);
             let end = Instant::now();
             dbg_println!("time to build layout = {} ms\r", (end - start).as_millis());
         }
@@ -508,7 +473,7 @@ fn process_input_events(
     dbg_println!("pending input event = {}\r", p);
 
     // % last render time
-    if p > 1 && editor.last_rdr_event.elapsed() < Duration::from_millis(1000 / 25) {
+    if p > 1 && editor.last_rdr_event.elapsed() < Duration::from_millis(1000 / 5) {
         return;
     }
 

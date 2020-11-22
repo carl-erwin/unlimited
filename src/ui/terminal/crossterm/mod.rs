@@ -75,7 +75,7 @@ use crate::ui::UiState;
 
 fn stdin_thread(tx: &Sender<EventMessage>) {
     loop {
-        get_input_events(&tx);
+        get_input_events(&tx).unwrap();
     }
 }
 

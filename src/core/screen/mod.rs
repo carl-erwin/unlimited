@@ -24,11 +24,14 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 pub mod line;
-use crate::core::codepointinfo::CodepointInfo;
+
 use std::time::Duration;
+
+use crate::dbg_println;
 
 use self::line::Line;
 use self::line::LineCellIndex;
+use crate::core::codepointinfo::CodepointInfo;
 
 pub type LineIndex = usize;
 
@@ -403,6 +406,9 @@ impl Screen {
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
         // TODO: use dichotomic search
+
+        dbg_println!("screen:;find_cpi_by_offset : if offset {} , self.first_offset {} , self.last_offset {}",
+        offset, self.first_offset, self.last_offset);
 
         if offset < self.first_offset || offset > self.last_offset {
             return (None, 0, 0);

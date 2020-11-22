@@ -51,10 +51,9 @@ use crate::core::event::EventMessage;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// This thread is the "❤" of unlimited.
-pub fn start(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
+pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
     let mut editor = Editor::new(config);
     // editor.setup_default_buffers(); // scratch , debug
-    dbg_println!("XXXX");
     editor.load_files();
-    server::start(&mut editor, &core_rx, &ui_tx)
+    server::run(&mut editor, &core_rx, &ui_tx)
 }

@@ -155,7 +155,7 @@ impl ParseCtx {
     }
 }
 
-fn parse_event_entry_input_key(ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+fn parse_event_entry_input_key(ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     let s = if let Value::String(ref s) = value {
         dbg_println!("value = '{}'", s);
         s
@@ -234,7 +234,7 @@ fn parse_event_entry_input_key(ctx: &mut ParseCtx, name: &String, value: &serde_
 
 fn parse_event_entry_input_button_press(
     ctx: &mut ParseCtx,
-    name: &String,
+    _name: &String,
     value: &serde_json::Value,
 ) {
     let s = if let Value::String(ref s) = value {
@@ -248,7 +248,7 @@ fn parse_event_entry_input_button_press(
     // parse "key" value 0
     dbg_println!("{{");
 
-    let mut mods = KeyModifiers::new();
+    let mods = KeyModifiers::new();
     dbg_println!("button = {:?}", s);
     let button: u32 = match s.as_str() {
         "0" => 0,
@@ -276,7 +276,7 @@ fn parse_event_entry_input_button_press(
 // TODO: refactor with  parse_event_entry_input_button_press
 fn parse_event_entry_input_button_release(
     ctx: &mut ParseCtx,
-    name: &String,
+    _name: &String,
     value: &serde_json::Value,
 ) {
     let s = if let Value::String(ref s) = value {
@@ -290,7 +290,7 @@ fn parse_event_entry_input_button_release(
     // parse "key" value 0
     dbg_println!("{{");
 
-    let mut mods = KeyModifiers::new();
+    let mods = KeyModifiers::new();
     dbg_println!("button = {:?}", s);
     let button: u32 = match s.as_str() {
         "0" => 0,
@@ -315,7 +315,7 @@ fn parse_event_entry_input_button_release(
     ctx.sequence.push(ev)
 }
 
-fn parse_event_entry_input_wheel(ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+fn parse_event_entry_input_wheel(ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     let s = if let Value::String(ref s) = value {
         dbg_println!("value = '{}'", s);
         s
@@ -327,7 +327,7 @@ fn parse_event_entry_input_wheel(ctx: &mut ParseCtx, name: &String, value: &serd
     // parse "key" value 0
     dbg_println!("{{");
 
-    let mut mods = KeyModifiers::new();
+    let mods = KeyModifiers::new();
     dbg_println!("button = {:?}", s);
 
     let ev = match s.as_str() {
@@ -387,7 +387,7 @@ fn parse_event_entry(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::
     }
 }
 
-fn parse_event_entry_action(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+fn parse_event_entry_action(mut ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     // copy string to event
     if let Value::String(ref s) = value {
         dbg_println!("action = '{}'", s);
@@ -397,14 +397,14 @@ fn parse_event_entry_action(mut ctx: &mut ParseCtx, name: &String, value: &serde
 
 fn parse_event_entry_default_action(
     mut ctx: &mut ParseCtx,
-    name: &String,
+    _name: &String,
     value: &serde_json::Value,
 ) {
     dbg_println!("parse_event_entry_default_action = '{}'", value);
     ctx.is_default = true;
 }
 
-fn parse_event_entry_input(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     let vec = if let Value::Array(ref vec) = value {
         vec
     } else {
@@ -519,7 +519,6 @@ pub fn eval_input_event(
 mod tests {
 
     use super::*;
-    use crate::core::event::*;
 
     #[test]
     fn test_input_map() {
@@ -642,7 +641,7 @@ mod tests {
     #[test]
 
     fn test_build_input_event_map() -> Result<(), serde_json::error::Error> {
-        let map = build_input_event_map(DEFAULT_MAP)?;
+        let map = build_input_event_map(TEST_MAP)?;
 
         dbg_println!("****** print map");
         for (k, v) in map.as_ref().borrow().iter() {

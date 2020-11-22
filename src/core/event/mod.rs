@@ -26,7 +26,6 @@
 pub mod input_map;
 
 use std::cell::RefCell;
-use std::mem;
 use std::rc::Rc;
 
 use std::collections::hash_map::DefaultHasher;
@@ -337,7 +336,7 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
             }
         },
 
-        InputEvent::WheelUp { mods, x, y } => {
+        InputEvent::WheelUp { mods, x: _, y: _ } => {
             "WheelUp".hash(&mut s);
             // ignore x y
             // (*x).hash(&mut s);
@@ -345,7 +344,7 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
             (*mods).hash(&mut s)
         }
 
-        InputEvent::WheelDown { mods, x, y } => {
+        InputEvent::WheelDown { mods, x: _, y: _ } => {
             "WheelDown".hash(&mut s);
             // ignore x y
             // (*x).hash(&mut s);

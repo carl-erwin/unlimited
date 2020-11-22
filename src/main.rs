@@ -54,7 +54,7 @@ fn main() {
     let core_th = {
         let ui_tx_clone = ui_tx.clone();
         Some(thread::spawn(move || {
-            core::start(config, &cr_rx, &ui_tx_clone)
+            core::run(config, &cr_rx, &ui_tx_clone)
         }))
     };
 

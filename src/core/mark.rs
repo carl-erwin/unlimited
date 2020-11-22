@@ -188,8 +188,8 @@ impl Mark {
 
     pub fn move_to_prev_token_start(
         &mut self,
-        buffer: &Buffer,
-        get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+        _buffer: &Buffer,
+        _get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) {
     }
 
@@ -203,7 +203,7 @@ impl Mark {
             return;
         }
 
-        let max_offset = buffer.size as u64;
+        let _max_offset = buffer.size as u64;
         let mut prev_offset = self.offset;
 
         //
