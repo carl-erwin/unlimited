@@ -453,7 +453,6 @@ impl HighlightFilter {
             token_type: TokenType::UNKNOWN,
             utf8_token: Vec::new(),
             new_color: CodepointInfo::default_color(),
-            
         }
     }
 }
@@ -461,7 +460,6 @@ impl HighlightFilter {
 // TODO: monitor env.quit
 // to flush
 impl Filter<'_> for HighlightFilter {
-
     fn run(
         &mut self,
         _view: &View,
@@ -751,11 +749,6 @@ pub fn run_view_layout_filters_direct(
         Box::new(ScreenFilter::new(&env)),
     ];
 
-    //    dbg_println!("CEG file {} line {}", file!(), line!());
-
-    // TODO:
-    // add a RawDataFilter to stream the data
-
     // setup
     let mut filter_in = Vec::new();
     let mut filter_out = Vec::new();
@@ -767,8 +760,6 @@ pub fn run_view_layout_filters_direct(
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }
-
-    dbg_println!("END filtering");
 
     env.screen.last_offset
 }

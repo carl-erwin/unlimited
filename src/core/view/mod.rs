@@ -824,8 +824,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
             v.moving_marks.clone()
         };
 
-        dbg_println!("CEG file {} line {}", file!(), line!());
-
         for m in moving_marks.borrow_mut().iter_mut() {
             {
                 let v = &mut view.as_ref().borrow_mut();
@@ -833,18 +831,15 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                 // TODO: if v.is_mark_on_screen(m) -> (bool, x, y) ?
                 match v.screen.find_cpi_by_offset(m.offset) {
                     // offscreen
-                    (None, _, _) => {
-                        dbg_println!("mark is offscreen");
-                    }
+                    (None, _, _) => {}
                     // mark on first line
                     (Some(_), _, y) if y == 0 => {
-                        dbg_println!("mark is on first line");
+                        // previous line is offscreen
                     }
 
                     // onscreen
                     (Some(_), x, y) if y > 0 => {
-                        dbg_println!("mark@(X={},Y={})", x, y);
-
+                        // TODO: refactor code to support screen cell metadata
                         let new_y = y - 1; // select previous line
                         let l = v.screen.get_line(new_y).unwrap();
                         // previous line is filled ?
@@ -858,7 +853,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                             }
                         } else {
                             // ???
-                            dbg_println!("no cells on lines");
                         }
                     }
 
@@ -867,15 +861,11 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                 }
             }
 
-            dbg_println!("mark_move {}", mark_moved);
-
             // offscreen
             if !mark_moved {
                 // mark is offscreen
 
                 scroll_needed = true;
-
-                dbg_println!("CEG file {} line {}", file!(), line!());
 
                 let end_offset = m.offset;
                 let (start_offset, screen_width, screen_height) = {
@@ -899,8 +889,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                     (start_offset, width, height)
                 };
 
-                dbg_println!("CEG file {} line {}", file!(), line!());
-
                 let lines = {
                     let mut view = view.as_ref().borrow_mut();
                     view.get_lines_offsets_direct(
@@ -910,9 +898,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                         screen_height,
                     )
                 };
-                // let lines = get_lines_offsets(view, start_offset, end_offset, screen_width, screen_height);
-
-                dbg_println!("CEG file {} line {}", file!(), line!());
 
                 // find "previous" line index
                 let index = match lines
@@ -922,8 +907,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                     None | Some(0) => continue,
                     Some(i) => i - 1,
                 };
-
-                dbg_println!("CEG file {} line {}", file!(), line!());
 
                 let line_start_off = lines[index].0;
                 let line_end_off = lines[index].1;
@@ -949,8 +932,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                     count
                 };
 
-                dbg_println!("CEG file {} line {}", file!(), line!());
-
                 {
                     let doc = &view.as_ref().borrow();
                     let doc = doc.document.as_ref().unwrap();
@@ -969,16 +950,12 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                 // if m.offset < screen.start -> m.offset = start_offset
                 // if m.offset > screen.end -> m.offset = screen.line[last_index].start_offset
 
-                dbg_println!("CEG file {} line {}", file!(), line!());
-
                 // resync mark to "new" first line offset
                 if tmp_mark.offset < m.offset {
                     m.offset = tmp_mark.offset;
                 }
             }
         }
-
-        dbg_println!("CEG file {} line {}", file!(), line!());
 
         // if mark on first line or offscreen
         if scroll_needed {
@@ -987,14 +964,10 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
         }
     }
 
-    dbg_println!("CEG file {} line {}", file!(), line!());
-
     // post action
     if center_on_cursor_move {
         center_arround_mark(&trigger, &view);
     }
-
-    dbg_println!("CEG file {} line {}", file!(), line!());
 }
 
 // remove multiple borrows

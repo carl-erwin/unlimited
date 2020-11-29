@@ -302,13 +302,11 @@ pub fn run(
                     let view_id = view_id as usize;
                     if view_id < editor.view_map.len() {
                         {
-                            {
-                                let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
+                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
 
-                                // resize ?
-                                if width != view.screen.width() || height != view.screen.height() {
-                                    view.screen = Box::new(Screen::new(width, height));
-                                }
+                            // resize ?
+                            if width != view.screen.width() || height != view.screen.height() {
+                                view.screen = Box::new(Screen::new(width, height));
                             }
                         }
 
