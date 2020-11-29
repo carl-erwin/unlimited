@@ -746,7 +746,7 @@ pub fn run_view_layout_filters_direct(
     let mut filters: Vec<Box<dyn Filter>> = vec![
         Box::new(RawDataFilter::new(&env)),
         Box::new(Utf8Filter::new(&env)),
-        // Box::new(TabFilter::new(&env)),
+        Box::new(TabFilter::new(&env)),
         Box::new(HighlightFilter::new(&env)),
         Box::new(ScreenFilter::new(&env)),
     ];
