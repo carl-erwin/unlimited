@@ -53,13 +53,15 @@ impl Mark {
         &mut self,
         buffer: &Buffer,
         get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
-    ) {
+    ) -> &mut Mark {
         let mut data = Vec::with_capacity(4);
         buffer.read(self.offset, data.capacity(), &mut data);
 
         let size = get_next_codepoint_start(&data, 0);
         self.offset += size;
         // TODO: if '\r\n' must move + 1
+
+        self
     }
 
     // TODO: check multi-byte utf8 sequence
@@ -67,9 +69,9 @@ impl Mark {
         &mut self,
         buffer: &Buffer,
         get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
-    ) {
+    ) -> &mut Mark {
         if self.offset == 0 {
-            return;
+            return self;
         }
 
         let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
@@ -82,15 +84,17 @@ impl Mark {
         let off = get_previous_codepoint_start(&data, relative_offset);
         let delta = relative_offset - off;
         self.offset -= delta as u64;
+
+        self
     }
 
     pub fn move_to_beginning_of_line(
         &mut self,
         buffer: &Buffer,
         get_prev_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
-    ) {
+    ) -> &mut Mark {
         if self.offset == 0 {
-            return;
+            return self;
         }
 
         let mut prev_cp = 0 as char;
@@ -137,20 +141,22 @@ impl Mark {
             prev_cp = cp;
             prev_cp_size = size;
         }
+
+        self
     }
 
     pub fn move_to_end_of_line(
         &mut self,
         buffer: &Buffer,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
-    ) {
+    ) -> &mut Mark {
         let max_offset = buffer.size as u64;
 
         let mut prev_offset = self.offset;
 
         // TODO: end_of_buffer().or_return()
         if prev_offset == max_offset {
-            return;
+            return self;
         }
 
         loop {
@@ -171,6 +177,8 @@ impl Mark {
             prev_offset += size as u64;
         }
         self.offset = prev_offset;
+
+        self
     }
 
     fn is_word(&mut self, cp: char) -> bool {
@@ -190,7 +198,8 @@ impl Mark {
         &mut self,
         _buffer: &Buffer,
         _get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
-    ) {
+    ) -> &mut Mark {
+        self
     }
 
     //   "hello" , dss
@@ -198,9 +207,9 @@ impl Mark {
         &mut self,
         buffer: &Buffer,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
-    ) {
+    ) -> &mut Mark {
         if self.at_end_of_buffer(buffer) {
-            return;
+            return self;
         }
 
         let _max_offset = buffer.size as u64;
@@ -250,6 +259,8 @@ impl Mark {
         }
 
         self.offset = prev_offset;
+
+        self
     }
 }
 
@@ -259,6 +270,7 @@ fn test_marks() {
     use crate::core::codec::text::utf8::get_previous_codepoint_start;
 
     // TODO: move to utf8 tests
+    // add more tests move etc
 
     println!("\n**************** test marks *****************");
 
