@@ -24,7 +24,6 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 //
-// extern crate ncurses;
 
 use crate::dbg_println;
 

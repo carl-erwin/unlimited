@@ -38,9 +38,6 @@ pub fn main_loop(
 ) {
     // TODO: switch ui here
     match ui_name {
-        "ncurses" => {
-            terminal::ncurses::main_loop(&ui_rx, &ui_tx, &core_tx);
-        }
 
         "termion" => {
             terminal::termion::main_loop(&ui_rx, &ui_tx, &core_tx);

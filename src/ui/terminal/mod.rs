@@ -24,5 +24,4 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 pub mod crossterm;
-pub mod ncurses;
 pub mod termion;
