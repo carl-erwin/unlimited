@@ -172,7 +172,7 @@ impl RawDataFilter {
         RawDataFilter {
             pos: env.base_offset,
             max: env.max_offset,
-            read_size: env.screen.width() * env.screen.height(),
+            read_size: env.screen.width() * env.screen.height() / 8,
         }
     }
 }
@@ -228,8 +228,8 @@ impl Filter<'_> for RawDataFilter {
             self.pos += rd as u64;
 
             // increase read size at every call
-            if self.read_size < 1024 * 1024 * 10 {
-                self.read_size *= 2;
+            if self.read_size < 1024 * 1024 {
+                self.read_size += env.screen.width();
             }
         }
     }
@@ -732,8 +732,6 @@ pub fn run_view_layout_filters_direct(
     max_offset: u64,
     screen: &mut Screen,
 ) -> u64 {
-    screen.clear();
-
     let mut env = LayoutEnv {
         quit: false,
         base_offset,

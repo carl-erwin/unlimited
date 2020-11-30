@@ -188,13 +188,41 @@ impl<'a> View<'a> {
         self.screen.check_invariants();
     }
 
+    /* TODO: use nb_lines
+     to compute previous screen height
+     new_h = screen.wheight + (nb_lines * screen.width * max_codec_encode_size)
+    */
     pub fn scroll_up(&mut self, nb_lines: usize) {
-        if self.start_offset == 0 {
+        if self.start_offset == 0 || nb_lines == 0 {
             return;
         }
 
+        // DUMB: version
+        // NEW: first try to check nb_lines in the same area
+        // repeat mark moves
+        if false {
+            let mut tmp = Mark::new(self.start_offset);
+
+            for _ in 0..nb_lines {
+                if tmp.offset == 0 {
+                    break;
+                }
+                tmp.offset -= 1;
+                let doc = self.document.as_mut().unwrap().borrow_mut();
+                tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+            }
+
+            self.start_offset = tmp.offset;
+
+            // TODO: render screen here
+            // if not aligned full rebuild etc...
+            // diff tmp stat > s.width s.height
+            return;
+        }
+
+        ////
         let width = self.screen.width();
-        let height = self.screen.height();
+        let height = self.screen.height() + nb_lines;
 
         // the offset to find is the first screen codepoint
         let offset_to_find = self.start_offset;
@@ -202,8 +230,9 @@ impl<'a> View<'a> {
         // go to N previous physical lines ... here N is height
         // rewind width*height chars
         let mut m = Mark::new(self.start_offset);
-        if m.offset > (width * height) as u64 {
-            m.offset -= (width * height) as u64
+        let diff = (nb_lines * width * 4) as u64; // if ascci only 4 -> 1
+        if m.offset > diff {
+            m.offset -= diff;
         } else {
             m.offset = 0;
         }
@@ -324,7 +353,6 @@ impl<'a> View<'a> {
         let screen_width = ::std::cmp::max(1, screen_width);
         let screen_height = ::std::cmp::max(4, screen_height);
         let mut screen = Screen::new(screen_width, screen_height);
-        let _max_size = (screen_width * screen_height * 2) as usize;
 
         loop {
             let _ = run_view_layout_filters_direct(&self, m.offset, max_offset, &mut screen);
@@ -502,14 +530,14 @@ pub fn update_view(view: &Rc<RefCell<View>>, _env: &mut EditorEnv) {
         // 1st pass raw_data_filter
         let max_offset = { doc.borrow().buffer.size as u64 };
 
-        let mut screen = v.screen.clone();
+        let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
 
         let end_offset =
             run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
 
         // TODO: from env ?
         v.end_offset = end_offset;
-        v.screen = screen;
+        v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
         v.check_invariants();
 
         // TODO: marks_filter
@@ -813,7 +841,6 @@ pub fn move_marks_to_end_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<V
 }
 
 pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
-    let mut scroll_needed = false;
     let mut mark_moved = false;
     let mut center_on_cursor_move = false;
 
@@ -849,7 +876,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                             if !cpi.metadata {
                                 m.offset = cpi.offset;
                                 mark_moved = true;
-                                scroll_needed = false;
                             }
                         } else {
                             // ???
@@ -865,29 +891,50 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
             if !mark_moved {
                 // mark is offscreen
 
-                scroll_needed = true;
-
                 let end_offset = m.offset;
                 let (start_offset, screen_width, screen_height) = {
                     let v = &mut view.as_ref().borrow_mut();
-                    let width = v.screen.width();
-                    let height = v.screen.height();
 
-                    // sync_offset
-                    let start_offset = if end_offset as usize > (width * height) {
+                    let start_offset = {
                         let doc = v.document.as_ref().unwrap();
                         let doc = doc.as_ref().borrow();
 
-                        let off = end_offset - (width * height) as u64;
-                        let mut tmp = Mark::new(off);
+                        // todo: set marks codecs
+                        let mut tmp = m.clone();
+
+                        // goto beginning of current line (mar is on first line of screen)
+                        tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                        // goto end of previous line
+                        tmp.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+                        // goto beginning of previous line
                         tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
                         tmp.offset
-                    } else {
-                        0
+
+                        /*
+                        if m.offset - tmp.offset > (screen.width * screen.height)
+                        {
+                           long line mode
+                        }
+                        else {
+
+                        }
+
+                        */
                     };
+
+                    let width = v.screen.width();
+
+                    let add_height = if width > 0 {
+                        (m.offset - start_offset) as usize / width
+                    } else {
+                        1
+                    };
+                    let height = v.screen.height() + (add_height * 4); // 4 is utf8 max encode size
 
                     (start_offset, width, height)
                 };
+
+                // TODO: loop until m.offset is on screen
 
                 let lines = {
                     let mut view = view.as_ref().borrow_mut();
@@ -910,6 +957,13 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
 
                 let line_start_off = lines[index].0;
                 let line_end_off = lines[index].1;
+
+                // update screen start
+                {
+                    let v = &mut view.as_ref().borrow_mut();
+                    v.start_offset = line_start_off;
+                }
+
                 let mut tmp_mark = Mark::new(line_start_off);
 
                 // compute column
@@ -955,12 +1009,6 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
                     m.offset = tmp_mark.offset;
                 }
             }
-        }
-
-        // if mark on first line or offscreen
-        if scroll_needed {
-            let v = &mut view.as_ref().borrow_mut();
-            v.scroll_up(1);
         }
     }
 
@@ -1149,6 +1197,8 @@ pub fn scroll_to_previous_screen(trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vi
         let nb = ::std::cmp::max(v.screen.height() - 1, 1);
         v.scroll_up(nb);
     }
+
+    // TODO: add hints to trigger mar moves
     move_mark_to_screen_end(&trigger, &view);
 }
 
