@@ -1,27 +1,4 @@
 // Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 //
 use std::io::Error;
@@ -96,21 +73,13 @@ pub fn main_loop(
     // ui state
     let mut ui_state = UiState::new();
 
-    // send first event
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::RequestDocumentList);
-    core_tx.send(msg).unwrap_or(());
-
     // ui ctx : TODO move to struct UiCtx
-    let mut doc_list;
-    let mut current_doc_id = 0;
-    let mut current_view_id = 0;
     let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
-    let mut view_doc_map = HashMap::new();
     let mut _prev_screen_rdr_time = Duration::new(0, 0);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
 
-    let mut request_layout = false;
+    let mut request_layout = true;
 
     while !ui_state.quit {
         // check terminal size
@@ -119,11 +88,6 @@ pub fn main_loop(
         if ui_state.terminal_width != width || ui_state.terminal_height != height {
             ui_state.terminal_width = width;
             ui_state.terminal_height = height;
-            ui_state.resize_flag = true;
-        }
-
-        // resize ?
-        if ui_state.resize_flag {
             request_layout = true;
         }
 
@@ -131,9 +95,7 @@ pub fn main_loop(
         if request_layout {
             let msg = EventMessage::new(
                 get_next_seq(&mut seq),
-                Event::RequestLayoutEvent {
-                    view_id: current_view_id,
-                    doc_id: current_doc_id,
+                Event::UpdateViewEvent {
                     width: ui_state.terminal_width as usize,
                     height: ui_state.terminal_height as usize,
                 },
@@ -152,65 +114,8 @@ pub fn main_loop(
                     break;
                 }
 
-                // TODO: add Event::OpenDocument / Event::CloseDocument
-                Event::DocumentList { ref list } => {
-                    doc_list = list.clone();
-                    doc_list.sort_by(|a, b| a.0.cmp(&b.0));
-
-                    if !doc_list.is_empty() {
-                        // open first document
-                        current_doc_id = doc_list[0].0;
-
-                        let msg = EventMessage::new(
-                            get_next_seq(&mut seq),
-                            Event::CreateView {
-                                width: ui_state.terminal_width as usize,
-                                height: ui_state.terminal_height as usize,
-                                doc_id: current_doc_id,
-                            },
-                        );
-                        core_tx.send(msg).unwrap_or(());
-                    }
-                }
-
-                Event::ViewCreated {
-                    width,
-                    height,
-                    doc_id,
-                    view_id,
-                } => {
-                    // save mapping between doc_id and view
-                    // remember a document can have multiple view
-                    view_doc_map.insert(view_id, doc_id);
-
-                    let msg = EventMessage::new(
-                        get_next_seq(&mut seq),
-                        Event::RequestLayoutEvent {
-                            view_id,
-                            doc_id,
-                            width,
-                            height,
-                        },
-                    );
-                    core_tx.send(msg).unwrap_or(());
-                }
-
-                BuildLayoutEvent {
-                    view_id,
-                    doc_id,
-                    mut screen,
-                } => {
-                    // pending request ? save view_id
-                    current_doc_id = doc_id;
-                    current_view_id = view_id;
-
+                DrawEvent { mut screen } => {
                     let start = Instant::now();
-
-                    if ui_state.resize_flag {
-                        // clear screen
-                        write!(stdout, "{}", termion::clear::All).unwrap();
-                        ui_state.resize_flag = false;
-                    }
 
                     draw_view(&mut last_screen, &mut screen, &mut stdout);
 

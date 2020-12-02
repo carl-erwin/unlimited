@@ -1,27 +1,4 @@
 // Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 /* TODO
 
@@ -41,7 +18,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 //
-use crate::core::server::EditorEnv;
+use crate::core::editor::Editor;
+use crate::core::server::EditorEnv; // TODO: editor
+
 use crate::dbg_println;
 
 use crate::core::document::Document;
@@ -63,9 +42,15 @@ pub type Id = u64;
 
 pub mod layout;
 
-pub type ModeFunction = fn(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) -> (); // () for now
+// TODO: move to editor
+pub type ModeFunction = fn(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) -> (); // () for now
 
-// let ptr : ModeFunction = cancel_input(trigger: &Vec<input_event>, doc: &mut Doc, view: &mut View)
+// let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
 
 // TODO: add modes
 // a view can be configured to have a "main mode" "interpreter/presenter"
@@ -570,14 +555,24 @@ pub fn update_view(view: &Rc<RefCell<View>>, _env: &mut EditorEnv) {
 use crate::core::event::Key;
 
 // CEG
-pub fn scroll_up(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn scroll_up(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
 
     view.as_ref().borrow_mut().scroll_up(3);
 }
 
-pub fn scroll_down(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn scroll_down(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
 
@@ -586,7 +581,12 @@ pub fn scroll_down(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
 
 // TODO: rename into insert_input_event
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
-pub fn insert_codepoint_array(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn insert_codepoint_array(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let array = match trigger[0] {
         InputEvent::KeyPress {
             mods:
@@ -635,12 +635,17 @@ pub fn insert_codepoint_array(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>
     };
 
     if center {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
-pub fn undo(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn undo(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut sync_view = false;
 
     // hack no multicursor for now
@@ -661,12 +666,17 @@ pub fn undo(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     }
 
     if sync_view {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
-pub fn redo(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn redo(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut sync_view = false;
 
     // hack no multicursor for now
@@ -687,12 +697,17 @@ pub fn redo(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     }
 
     if sync_view {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
 /// Remove the current utf8 encoded code point.<br/>
-pub fn remove_codepoint(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn remove_codepoint(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &mut view.as_ref().borrow_mut();
 
     let doc = v.document.as_ref().unwrap();
@@ -708,7 +723,12 @@ pub fn remove_codepoint(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
 
 /// Skip blanks (if any) and remove until end of the word.
 /// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
-pub fn remove_until_end_of_word(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn remove_until_end_of_word(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &mut view.as_ref().borrow_mut();
 
     let doc = v.document.as_ref().unwrap();
@@ -770,7 +790,12 @@ pub fn remove_until_end_of_word(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vi
 }
 
 // TODO: maintain main mark Option<(x,y)>
-pub fn move_marks_backward(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_backward(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut scroll_needed = false;
 
     {
@@ -792,11 +817,16 @@ pub fn move_marks_backward(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) 
     }
 
     if view.as_ref().borrow_mut().center_on_cursor_move {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
-pub fn move_marks_forward(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_forward(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut scroll_needed = false;
 
     {
@@ -818,11 +848,16 @@ pub fn move_marks_forward(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     }
 
     if view.as_ref().borrow_mut().center_on_cursor_move {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
-pub fn move_marks_to_beginning_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_to_beginning_of_line(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &view.as_ref().borrow_mut();
 
     let doc = v.document.as_ref().unwrap().borrow();
@@ -832,7 +867,12 @@ pub fn move_marks_to_beginning_of_line(_trigger: &Vec<InputEvent>, view: &Rc<Ref
     }
 }
 
-pub fn move_marks_to_end_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_to_end_of_line(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap().borrow();
     for m in v.moving_marks.borrow_mut().iter_mut() {
@@ -840,7 +880,12 @@ pub fn move_marks_to_end_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<V
     }
 }
 
-pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_to_previous_line(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut mark_moved = false;
     let mut center_on_cursor_move = false;
 
@@ -1014,12 +1059,17 @@ pub fn move_marks_to_previous_line(trigger: &Vec<InputEvent>, view: &Rc<RefCell<
 
     // post action
     if center_on_cursor_move {
-        center_arround_mark(&trigger, &view);
+        center_arround_mark(editor, env, trigger, &view);
     }
 }
 
 // remove multiple borrows
-pub fn move_marks_to_next_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_marks_to_next_line(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let max_offset = {
         let doc = &view.as_ref().borrow();
         let doc = doc.document.as_ref().unwrap();
@@ -1166,11 +1216,16 @@ pub fn move_marks_to_next_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vie
     }
 
     // if view.as_ref().borrow_mut().center_on_cursor_move {
-    //     center_arround_mark(&trigger, &view);
+    //     center_arround_mark(editor, env, trigger, &view);
     // }
 }
 
-pub fn move_mark_to_screen_start(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_mark_to_screen_start(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = view.as_ref().borrow();
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
@@ -1181,7 +1236,12 @@ pub fn move_mark_to_screen_start(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<V
     }
 }
 
-pub fn move_mark_to_screen_end(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_mark_to_screen_end(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = view.as_ref().borrow();
     for m in v.moving_marks.borrow_mut().iter_mut() {
         // TODO: add main mark check
@@ -1191,7 +1251,12 @@ pub fn move_mark_to_screen_end(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vie
     }
 }
 
-pub fn scroll_to_previous_screen(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn scroll_to_previous_screen(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     {
         let mut v = view.as_ref().borrow_mut();
         let nb = ::std::cmp::max(v.screen.height() - 1, 1);
@@ -1199,10 +1264,15 @@ pub fn scroll_to_previous_screen(trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vi
     }
 
     // TODO: add hints to trigger mar moves
-    move_mark_to_screen_end(&trigger, &view);
+    move_mark_to_screen_end(editor, env, trigger, &view);
 }
 
-pub fn move_mark_to_beginning_of_file(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_mark_to_beginning_of_file(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut v = view.as_ref().borrow_mut();
     for m in v.moving_marks.borrow_mut().iter_mut() {
         m.offset = 0;
@@ -1213,7 +1283,12 @@ pub fn move_mark_to_beginning_of_file(_trigger: &Vec<InputEvent>, view: &Rc<RefC
 }
 
 // TODO: view.center_arrout_offset()
-pub fn center_arround_mark(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn center_arround_mark(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut v = view.as_ref().borrow_mut();
 
     let marks = v.moving_marks.clone();
@@ -1226,7 +1301,12 @@ pub fn center_arround_mark(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>)
     v.scroll_up(h);
 }
 
-pub fn move_mark_to_end_of_file(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_mark_to_end_of_file(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut v = view.as_ref().borrow_mut();
 
     let size = {
@@ -1245,16 +1325,26 @@ pub fn move_mark_to_end_of_file(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vi
     v.scroll_up(h);
 }
 
-pub fn scroll_to_next_screen(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn scroll_to_next_screen(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     {
         let mut v = view.as_ref().borrow_mut();
         let nb = ::std::cmp::max(v.screen.height() - 1, 1);
         v.scroll_down(nb);
     }
-    move_mark_to_screen_start(&trigger, view);
+    move_mark_to_screen_start(editor, env, trigger, view);
 }
 
-pub fn save_document(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn save_document(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = view.as_ref().borrow_mut();
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
@@ -1262,7 +1352,12 @@ pub fn save_document(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
 }
 
-pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn cut_to_end_of_line(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &mut view.as_ref().borrow_mut();
 
     let pos = {
@@ -1284,7 +1379,12 @@ pub fn cut_to_end_of_line(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) 
     v.last_cut_log_index = Some(pos - 1);
 }
 
-pub fn paste(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn paste(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &mut view.as_ref().borrow();
 
     if let Some(idx) = v.last_cut_log_index {
@@ -1307,7 +1407,12 @@ pub fn paste(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     }
 }
 
-pub fn move_to_prev_token_start(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_to_prev_token_start(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     {
         // TODO: factorize macrk action
         // mark.apply(fn); where fn=m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
@@ -1324,7 +1429,12 @@ pub fn move_to_prev_token_start(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<Vi
     }
 }
 
-pub fn move_to_next_token_end(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn move_to_next_token_end(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     {
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
@@ -1338,7 +1448,12 @@ pub fn move_to_next_token_end(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View
     }
 }
 
-pub fn button_press(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn button_press(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let v = &mut view.as_ref().borrow_mut();
 
     let (button, x, y) = match trigger[0] {
@@ -1454,7 +1569,12 @@ pub fn button_press(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     // s // to internal view.as_ref().borrow_mut().state.s
 }
 
-pub fn remove_previous_codepoint(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn remove_previous_codepoint(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let mut scroll_needed = false;
 
     let v = &mut view.as_ref().borrow_mut();
@@ -1487,7 +1607,12 @@ pub fn remove_previous_codepoint(_trigger: &Vec<InputEvent>, view: &Rc<RefCell<V
 }
 
 /// Insert a single unicode code point using hardcoded utf8 codec.<br/>
-pub fn insert_codepoint(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
+pub fn insert_codepoint(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
     let codepoint = match trigger[0] {
         InputEvent::KeyPress {
             mods:
@@ -1538,13 +1663,18 @@ pub fn insert_codepoint(trigger: &Vec<InputEvent>, view: &Rc<RefCell<View>>) {
     if scroll_needed {
         // build args
         // Option<> args = 1
-        scroll_down(&trigger, view);
+        scroll_down(editor, env, trigger, view);
     } else if sync_view {
-        center_arround_mark(&trigger, view);
+        center_arround_mark(editor, env, trigger, view);
     }
 }
 
-pub fn button_release(trigger: &Vec<InputEvent>, _view: &Rc<RefCell<View>>) {
+pub fn button_release(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    _view: &Rc<RefCell<View>>,
+) {
     match trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {
             ButtonEvent {
@@ -1575,6 +1705,33 @@ pub fn button_release(trigger: &Vec<InputEvent>, _view: &Rc<RefCell<View>>) {
     }
 }
 
+pub fn select_next_view(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let max = editor.view_map.len();
+    dbg_println!("view id max {}", max);
+    dbg_println!("env.view_id {}", env.view_id);
+
+    if env.view_id + 1 < max {
+        env.view_id += 1;
+    }
+}
+
+pub fn select_previous_view(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    if env.view_id > 0 {
+        env.view_id -= 1;
+    }
+}
+
+//////////////////////////////////
 // TODO: screen_putstr_with_attr metadat etc ...
 // return array of built &cpi ? to allow attr changes pass ?
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {

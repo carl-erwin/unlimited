@@ -30,7 +30,7 @@ crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "fix-po
 
 
 [profile.release]
-#lto = true
+lto = true
 debug = true
 opt-level = 3
 panic = "abort"

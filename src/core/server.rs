@@ -1,27 +1,4 @@
 // Copyright (c) Carl-Erwin Griffith
-//
-// Permission is hereby granted, free of charge, to any
-// person obtaining a copy of this software and associated
-// documentation files (the "Software"), to deal in the
-// Software without restriction, including without
-// limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software
-// is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice
-// shall be included in all copies or substantial portions
-// of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -32,10 +9,9 @@ use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 
-use crate::core::document;
 use crate::core::editor::Editor;
 use crate::core::event::Event;
-use crate::core::event::Event::BuildLayoutEvent;
+use crate::core::event::Event::DrawEvent;
 
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
@@ -108,6 +84,12 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
 
+       { "in": [{ "key": "ctrl+x+Left"  }],                      "action": "text-mode:move-to-previous-token-beginning" },
+       { "in": [{ "key": "ctrl+x+Right" }],                      "action": "text-mode:move-to-next-token-end" },
+
+
+       { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],    "action": "select-previous-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],   "action": "select-next-view" },
 
        { "in": [{ "key": "ctrl+s" }],                           "action": "save-document" },
 
@@ -137,6 +119,8 @@ pub struct EditorEnv {
 
     current_node: Option<Rc<InputEventRule>>,
     next_node: Option<Rc<InputEventRule>>,
+
+    pub view_id: usize, // doc id in view
 }
 
 impl EditorEnv {
@@ -154,6 +138,8 @@ impl EditorEnv {
             input_map,
             current_node: None,
             next_node: None,
+
+            view_id: 0,
         }
     }
 }
@@ -171,13 +157,9 @@ pub fn build_layout_and_send_event(
     mut editor: &mut Editor,
     mut env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
-    doc_id: u64,
     view: Rc<RefCell<View>>,
 ) {
-    let view_id = {
-        let view = view.borrow();
-        view.id
-    };
+    let view_id = { view.borrow().id };
 
     // prepare filter
     // setup filter ctx
@@ -191,38 +173,25 @@ pub fn build_layout_and_send_event(
     // clone view's screen to send
     let view = view.borrow();
 
-    let mut new_screen = view.screen.clone(); // Rc() ? Cow ?
+    let mut new_screen = view.screen.clone(); // Rc() ? Cow ? // TODO Arc<>
     let end = Instant::now();
     new_screen.time_to_build = end.duration_since(start);
 
     // and send it
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
-        BuildLayoutEvent {
-            view_id: view.id as u64,
-            doc_id,
-            screen: new_screen,
-        },
+        DrawEvent { screen: new_screen },
     );
     ui_tx.send(msg).unwrap_or(());
 }
 
-pub fn send_build_layout_event(
-    editor: &mut Editor,
-    ui_tx: &Sender<EventMessage>,
-    doc_id: u64,
-    view_id: u64,
-) {
+pub fn send_build_layout_event(editor: &mut Editor, ui_tx: &Sender<EventMessage>, view_id: u64) {
     let view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
     let new_screen = view.screen.clone();
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
-        BuildLayoutEvent {
-            view_id: view_id as u64,
-            doc_id,
-            screen: new_screen,
-        },
+        DrawEvent { screen: new_screen },
     );
     ui_tx.send(msg).unwrap_or(());
 }
@@ -248,72 +217,19 @@ pub fn run(
                     break;
                 }
 
-                Event::RequestDocumentList => {
-                    let mut list: Vec<(document::Id, String)> = vec![];
-                    for e in &editor.document_map {
-                        let name = &e.1.as_ref().borrow().name;
-                        list.push((*e.0, name.to_string()));
-                    }
-                    let msg =
-                        EventMessage::new(get_next_seq(&mut seq), Event::DocumentList { list });
-                    ui_tx.send(msg).unwrap_or(());
-                }
-
-                Event::CreateView {
-                    width,
-                    height,
-                    doc_id,
-                } => {
-                    let vid = editor.view_map.len();
-                    let doc = editor.document_map.get(&doc_id);
-                    if let Some(doc) = doc {
-                        let view =
-                            View::new(vid as u64, 0 as u64, width, height, Some(doc.clone()));
-
-                        editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
-
-                        let msg = EventMessage::new(
-                            get_next_seq(&mut seq),
-                            Event::ViewCreated {
-                                width,
-                                height,
-                                doc_id,
-                                view_id: vid as Id,
-                            },
-                        );
-                        ui_tx.send(msg).unwrap_or(());
-                    }
-                }
-
-                /*
-                    <- createView : w, h , doc::id
-                    -> viewCreate : view id, w, h, doc::id
-                */
-                /*
-                    <- destroyView : w, h , doc::id
-                    -> viewDestroyed : view id, w, h, doc::id
-                */
-                Event::RequestLayoutEvent {
-                    view_id,
-                    doc_id,
-                    width,
-                    height,
-                } => {
-                    let view_id = view_id as usize;
-                    if view_id < editor.view_map.len() {
-                        {
-                            let mut view = editor.view_map[view_id].1.as_ref().borrow_mut();
-
-                            // resize ?
-                            if width != view.screen.width() || height != view.screen.height() {
-                                view.screen = Box::new(Screen::new(width, height));
-                            }
+                Event::UpdateViewEvent { width, height } => {
+                    // check size
+                    {
+                        let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
+                        // resize ?
+                        if width != view.screen.width() || height != view.screen.height() {
+                            view.screen = Box::new(Screen::new(width, height));
                         }
-
-                        let view = editor.view_map[view_id].1.clone();
-
-                        build_layout_and_send_event(&mut editor, &mut env, ui_tx, doc_id, view);
                     }
+
+                    let view = editor.view_map[env.view_id].1.clone();
+
+                    build_layout_and_send_event(&mut editor, &mut env, ui_tx, view);
 
                     // is there a view/screen ?
                     // with the correct size ?
@@ -322,16 +238,7 @@ pub fn run(
 
                 Event::InputEvent { events, raw_data } => {
                     if !editor.view_map.is_empty() {
-                        let view_id = 0 as usize;
-
-                        process_input_events(
-                            &mut editor,
-                            &mut env,
-                            view_id,
-                            &ui_tx,
-                            &events,
-                            &raw_data,
-                        );
+                        process_input_events(&mut editor, &mut env, &ui_tx, &events, &raw_data);
                     }
                 }
 
@@ -375,7 +282,7 @@ fn process_input_event(
     view_id: usize,
     ev: &InputEvent,
 ) -> bool {
-    let mut view = &editor.view_map[view_id].1;
+    let mut view = &editor.view_map[view_id].1.clone();
 
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
@@ -393,6 +300,9 @@ fn process_input_event(
     let trigger = vec![(*ev).clone()];
 
     if let Some(action) = action {
+        env.current_node = None;
+        env.next_node = None;
+
         let start = Instant::now();
         dbg_println!("found action {} : input ev = {:?}", action, ev);
 
@@ -415,7 +325,7 @@ fn process_input_event(
             }
 
             "save-document" => {
-                view::save_document(&trigger, view);
+                view::save_document(editor, env, &trigger, view);
                 env.status = "<save>".to_string();
             }
 
@@ -425,7 +335,7 @@ fn process_input_event(
 
                 // else
                 if let Some(action) = env.action_map.get(&action) {
-                    action(&trigger, &mut view);
+                    action(editor, env, &trigger, &mut view);
                 }
             }
         }
@@ -445,21 +355,60 @@ fn process_input_event(
 fn process_input_events(
     mut editor: &mut Editor,
     mut env: &mut EditorEnv,
-    view_id: usize,
     ui_tx: &Sender<EventMessage>,
     events: &Vec<InputEvent>,
     _raw_data: &Option<Vec<u8>>, // TODO: remove
 ) {
     let p = crate::core::event::pending_input_event_count();
 
+    let (w, h) = {
+        let v = &editor.view_map[env.view_id].1.clone();
+        let v = &v.as_ref().borrow();
+        (v.screen.width(), v.screen.height())
+    };
+
+    dbg_println!("ENTER process_input_events : env.view_id {}\r", env.view_id);
+
     for ev in events {
-        let event_processed = process_input_event(&mut editor, &mut env, view_id, ev);
+        let vid = env.view_id;
+        // beforem process
+        let mut event_processed = process_input_event(&mut editor, &mut env, vid, ev);
+
+        let vid_next = env.view_id;
+
+        dbg_println!(
+            "process_input_events -> event_processed {}: env.view_id {}\r",
+            event_processed,
+            env.view_id
+        );
+
+        if vid != vid_next {
+            // func
+            dbg_println!("view change");
+
+            /* check view change */
+            let (w, h) = {
+                let v = &editor.view_map[vid].1.clone();
+                let v = &v.as_ref().borrow();
+                (v.screen.width(), v.screen.height())
+            };
+
+            let v = &editor.view_map[vid_next].1.clone();
+            let v = &mut v.as_ref().borrow_mut();
+            v.screen = Box::new(Screen::new(w, h));
+            event_processed = true;
+        }
 
         if event_processed {
             let start = Instant::now();
-            build_layout(&mut editor, &mut env, view_id as u64);
+            let vid = env.view_id as u64;
+            build_layout(&mut editor, &mut env, vid);
             let end = Instant::now();
-            dbg_println!("time to build layout = {} ms\r", (end - start).as_millis());
+            dbg_println!(
+                "time to build layout vid({})= {} ms\r",
+                vid,
+                (end - start).as_millis()
+            );
         }
 
         if p > 0 {
@@ -476,8 +425,9 @@ fn process_input_events(
     }
 
     // hit
+    dbg_println!("send_build_layout_event view_id {}\r", env.view_id);
     crate::core::event::pending_render_event_inc(1);
-    send_build_layout_event(&mut editor, ui_tx, 0, 0 as u64);
+    send_build_layout_event(&mut editor, ui_tx, env.view_id as u64);
     editor.last_rdr_event = Instant::now();
 }
 
@@ -609,6 +559,10 @@ fn build_action_map() -> ActionMap {
         "scroll-to-previous-screen",
         view::scroll_to_previous_screen,
     );
+
+    register_action(&mut map, "select-next-view", view::select_next_view);
+
+    register_action(&mut map, "select-previous-view", view::select_previous_view);
 
     map
 }
