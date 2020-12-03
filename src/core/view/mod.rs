@@ -194,7 +194,7 @@ impl<'a> View<'a> {
                 }
                 tmp.offset -= 1;
                 let doc = self.document.as_mut().unwrap().borrow_mut();
-                tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
             }
 
             self.start_offset = tmp.offset;
@@ -225,7 +225,7 @@ impl<'a> View<'a> {
         // get start of line
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+            m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
         }
 
         // build tmp screens until first offset of the original screen if found
@@ -329,8 +329,8 @@ impl<'a> View<'a> {
             let doc = self.document.clone();
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().borrow_mut();
-            // get beginning of the line @offset
-            m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+            // get start of the line @offset
+            m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
             doc.buffer.size as u64
         };
 
@@ -428,8 +428,8 @@ pub fn get_lines_offsets(
 
     let mut m = Mark::new(start_offset); // TODO: rename into screen_start
 
-    // get beginning of the line @offset
-    m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+    // get start of the line @offset
+    m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
 
     let max_offset = doc.buffer.size as u64;
 
@@ -852,7 +852,7 @@ pub fn move_marks_forward(
     }
 }
 
-pub fn move_marks_to_beginning_of_line(
+pub fn move_marks_to_start_of_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
@@ -863,7 +863,7 @@ pub fn move_marks_to_beginning_of_line(
     let doc = v.document.as_ref().unwrap().borrow();
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+        m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
     }
 }
 
@@ -947,12 +947,12 @@ pub fn move_marks_to_previous_line(
                         // todo: set marks codecs
                         let mut tmp = m.clone();
 
-                        // goto beginning of current line (mar is on first line of screen)
-                        tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                        // goto start of current line (mar is on first line of screen)
+                        tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
                         // goto end of previous line
                         tmp.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
-                        // goto beginning of previous line
-                        tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                        // goto start of previous line
+                        tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
                         tmp.offset
 
                         /*
@@ -1136,7 +1136,7 @@ pub fn move_marks_to_next_line(
                 let doc = doc.as_ref().borrow();
 
                 let mut tmp = Mark::new(m.offset);
-                tmp.move_to_beginning_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
                 tmp.offset
             };
 
@@ -1267,7 +1267,7 @@ pub fn scroll_to_previous_screen(
     move_mark_to_screen_end(editor, env, trigger, &view);
 }
 
-pub fn move_mark_to_beginning_of_file(
+pub fn move_mark_to_start_of_file(
     _editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
@@ -1394,44 +1394,68 @@ pub fn paste(
     }
 }
 
-pub fn move_to_prev_token_start(
-    _editor: &mut Editor,
+pub fn move_to_token_start(
+    editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    // TODO: factorize macrk action
+    // mark.apply(fn); where fn=m.move_to_token_end(&doc.buffer, utf8::get_codepoint);
+    //
+    let mut sync = false;
+
     {
-        // TODO: factorize macrk action
-        // mark.apply(fn); where fn=m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
-        //
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            let _end = m.clone();
-            m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
-            break;
+            m.move_to_token_start(&doc.buffer, utf8::get_previous_codepoint_start);
+
+            // main mark ?
+            if !v.screen.contains_offset(m.offset) {
+                // TODO: push to post action queue
+                // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+                //
+                sync = true;
+            }
         }
+    }
+
+    if sync {
+        center_arround_mark(editor, env, trigger, view);
     }
 }
 
-pub fn move_to_next_token_end(
-    _editor: &mut Editor,
+pub fn move_to_token_end(
+    editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    let mut sync = false;
+
     {
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            //            let mut end = m.clone();
-            m.move_to_next_token_end(&doc.buffer, utf8::get_codepoint);
-            break;
+            m.move_to_token_end(&doc.buffer, utf8::get_codepoint);
+
+            // main mark ?
+            if !v.screen.contains_offset(m.offset) {
+                // TODO: push to post action queue
+                // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+                //
+                sync = true;
+            }
         }
+    }
+
+    if sync {
+        center_arround_mark(editor, env, trigger, view);
     }
 }
 

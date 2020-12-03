@@ -31,7 +31,7 @@ ctrl+a, ctrl-v,
     // movement
     pub fn move_marks_backward(&mut self);
     pub fn move_marks_forward(&mut self);
-    pub fn move_marks_to_beginning_of_line(&mut self);
+    pub fn move_marks_to_start_of_line(&mut self);
     pub fn move_marks_to_end_of_line(&mut self);
     pub fn move_marks_to_previous_line(&mut self);
     pub fn move_marks_to_next_line(&mut self);
@@ -40,7 +40,7 @@ ctrl+a, ctrl-v,
 
     pub fn scroll_to_previous_screen(&mut self)
     pub fn scroll_up(&mut self, nb_lines: usize);
-    pub fn move_mark_to_beginning_of_file(&mut self);
+    pub fn move_mark_to_start_of_file(&mut self);
     pub fn center_arround_mark(&mut self);
     pub fn scroll_to_next_screen(&mut self);
     pub fn scroll_down_offscreen(&mut self, max_offset: u64, nb_lines: usize);

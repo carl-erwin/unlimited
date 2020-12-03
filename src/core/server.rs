@@ -41,16 +41,16 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
        { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
        
-       { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-beginning-of-line" },
+       { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-start-of-line" },
        { "in": [{ "key": "ctrl+e" }],                          "action": "text-mode:move-marks-to-end-of-line" },
-       { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-beginning-of-line" },
+       { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-start-of-line" },
        { "in": [{ "key": "End" }],                             "action": "text-mode:move-marks-to-end-of-line" },
 
 
-       { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-beginning-of-file" },
+       { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-start-of-file" },
        { "in": [{ "key": "alt+>" }],                           "action": "text-mode:move-marks-to-end-of-file" },
 
-       { "in": [{ "key": "ctrl+Home" }],                       "action": "text-mode:move-marks-to-beginning-of-file" },
+       { "in": [{ "key": "ctrl+Home" }],                       "action": "text-mode:move-marks-to-start-of-file" },
        { "in": [{ "key": "ctrl+End" }],                        "action": "text-mode:move-marks-to-end-of-file" },
 
 
@@ -68,8 +68,8 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-arround-mark" },
 
-       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-previous-token-beginning" },
-       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-next-token-end" },
+       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-token-start" },
+       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-token-end" },
 
        { "in": [{ "key": "ctrl+Up"    }],                      "action": "text-mode:scroll-up" },
        { "in": [{ "key": "ctrl+Down"  }],                      "action": "text-mode:scroll-down" },
@@ -83,10 +83,6 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
-
-       { "in": [{ "key": "ctrl+x+Left"  }],                    "action": "text-mode:move-to-previous-token-beginning" },
-       { "in": [{ "key": "ctrl+x+Right" }],                    "action": "text-mode:move-to-next-token-end" },
-
 
        { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
        { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
@@ -311,7 +307,6 @@ fn process_input_event(
         dbg_println!("found action {} : input ev = {:?}", action, ev);
 
         match action.as_str() {
-
             _ => {
                 // TODO: pattern match type of action base on domain or augment mode callbacks cb(e,c,d,v, trigger, env? {k,v}*)
                 // applicatoin:
@@ -460,13 +455,11 @@ fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
 fn build_action_map() -> ActionMap {
     let mut map: ActionMap = HashMap::new(); // text-mode action map
 
-
     register_action(&mut map, "application:quit", application_quit);
 
     register_action(&mut map, "application:quit-abort", application_quit_abort);
 
     register_action(&mut map, "save-document", save_document);
-
 
     // TODO: text-mode
     register_action(
@@ -494,18 +487,17 @@ fn build_action_map() -> ActionMap {
         "text-mode:move-marks-to-previous-line",
         view::move_marks_to_previous_line,
     );
-    /*
-        register_action(
-            &mut map,
-            "text-mode:move-to-previous-token-beginning",
-            view::move_to_next_token_end,
-        );
-    */
 
     register_action(
         &mut map,
-        "text-mode:move-to-next-token-end",
-        view::move_to_next_token_end,
+        "text-mode:move-to-token-start",
+        view::move_to_token_start,
+    );
+
+    register_action(
+        &mut map,
+        "text-mode:move-to-token-end",
+        view::move_to_token_end,
     );
 
     register_action(
@@ -520,8 +512,8 @@ fn build_action_map() -> ActionMap {
 
     register_action(
         &mut map,
-        "text-mode:move-marks-to-beginning-of-line",
-        view::move_marks_to_beginning_of_line,
+        "text-mode:move-marks-to-start-of-line",
+        view::move_marks_to_start_of_line,
     );
     register_action(
         &mut map,
@@ -531,8 +523,8 @@ fn build_action_map() -> ActionMap {
 
     register_action(
         &mut map,
-        "text-mode:move-marks-to-beginning-of-file",
-        view::move_mark_to_beginning_of_file,
+        "text-mode:move-marks-to-start-of-file",
+        view::move_mark_to_start_of_file,
     );
     register_action(
         &mut map,

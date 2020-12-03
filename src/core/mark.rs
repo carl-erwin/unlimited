@@ -65,7 +65,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_beginning_of_line(
+    pub fn move_to_start_of_line(
         &mut self,
         buffer: &Buffer,
         get_prev_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
@@ -161,8 +161,16 @@ impl Mark {
     fn is_word(&mut self, cp: char) -> bool {
         // TODO: put defintion of word in array of cahr and use any(is_word_vec)
         match cp {
-            '"' | ' ' | '\r' | '\n' | '\t' | ',' | ';' | '{' | '}' | '(' | ')' => false,
+            '"' | ' ' | '\r' | '\n' | '\t' | ',' | ';' | '{' | '}' | '(' | ')' | '-' => false,
             _ => true,
+        }
+    }
+
+    fn is_blank(&mut self, cp: char) -> bool {
+        // TODO: put defintion of word in array of cahr and use any(is_word_vec)
+        match cp {
+            ' ' | '\r' | '\n' | '\t' => true,
+            _ => false,
         }
     }
 
@@ -171,16 +179,15 @@ impl Mark {
         self.offset == buffer.size as u64
     }
 
-    pub fn move_to_prev_token_start(
+    pub fn move_to_token_start(
         &mut self,
         _buffer: &Buffer,
-        _get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+        get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
     ) -> &mut Mark {
         self
     }
 
-    //   "hello" , dss
-    pub fn move_to_next_token_end(
+    pub fn move_to_token_end(
         &mut self,
         buffer: &Buffer,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
@@ -189,7 +196,7 @@ impl Mark {
             return self;
         }
 
-        let _max_offset = buffer.size as u64;
+        let max_offset = buffer.size as u64;
         let mut prev_offset = self.offset;
 
         //
@@ -199,19 +206,18 @@ impl Mark {
         let (cp, _, size) = get_codepoint(&data, 0);
         prev_offset += size as u64;
 
-        let start_on_word = self.is_word(cp);
-
-        if start_on_word {
+        // skip blanks
+        if self.is_blank(cp) {
             loop {
                 // buffer_get_codepoint(buffer, offset) -> cp
                 let mut data = Vec::with_capacity(4);
                 buffer.read(prev_offset, data.capacity(), &mut data);
                 let (cp, _, size) = get_codepoint(&data, 0);
-                if self.at_end_of_buffer(buffer) {
+                if prev_offset == max_offset {
                     break;
                 }
 
-                if self.is_word(cp) == false {
+                if self.is_blank(cp) == false {
                     break;
                 }
 
@@ -219,16 +225,17 @@ impl Mark {
             }
         }
 
+        // skip non blanck
         loop {
             // buffer_get_codepoint(buffer, offset) -> cp
             let mut data = Vec::with_capacity(4);
             buffer.read(prev_offset, data.capacity(), &mut data);
             let (cp, _, size) = get_codepoint(&data, 0);
-            if self.at_end_of_buffer(buffer) {
+            if prev_offset == max_offset {
                 break;
             }
 
-            if self.is_word(cp) == true {
+            if self.is_blank(cp) == true {
                 break;
             }
 
