@@ -149,10 +149,6 @@ pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
     }
 }
 
-pub fn get_next_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
-    let (_, _, size) = get_codepoint(data, from_offset);
-    from_offset + size as u64
-}
 
 pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     let mut state = 0;
