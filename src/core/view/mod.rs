@@ -839,7 +839,7 @@ pub fn move_marks_forward(
                 scroll_needed = true;
             }
 
-            m.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+            m.move_forward(&doc.buffer, utf8::get_codepoint);
         }
     }
 
@@ -1025,7 +1025,7 @@ pub fn move_marks_to_previous_line(
                             break;
                         }
 
-                        s.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                        s.move_forward(&doc.buffer, utf8::get_codepoint);
                         count += 1;
                     }
                     count
@@ -1037,7 +1037,7 @@ pub fn move_marks_to_previous_line(
                     let doc = doc.as_ref().borrow();
 
                     for _ in 0..new_x {
-                        tmp_mark.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                        tmp_mark.move_forward(&doc.buffer, utf8::get_codepoint);
                     }
 
                     if tmp_mark.offset > line_end_off {
@@ -1179,7 +1179,7 @@ pub fn move_marks_to_next_line(
                         break;
                     }
 
-                    s.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                    s.move_forward(&doc.buffer, utf8::get_codepoint);
                     count += 1;
                 }
                 count
@@ -1196,7 +1196,7 @@ pub fn move_marks_to_next_line(
             let doc = doc.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
             for _ in 0..new_x {
-                tmp_mark.move_forward(&doc.buffer, utf8::get_next_codepoint_start);
+                tmp_mark.move_forward(&doc.buffer, utf8::get_codepoint);
             }
 
             if tmp_mark.offset > line_end_off {

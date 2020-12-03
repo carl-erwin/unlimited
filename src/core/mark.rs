@@ -23,9 +23,6 @@ pub fn read_char(
 impl Mark {
     /* TODO: add TextCodec trait
      TextCodec {
-         fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64)
-         fn get_next_codepoint_start(data: &[u8], from_offset: u64) -> u64)
-
          fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
          fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
 
@@ -40,14 +37,12 @@ impl Mark {
     pub fn move_forward(
         &mut self,
         buffer: &Buffer,
-        get_next_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
+        get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
-        let mut data = Vec::with_capacity(4);
-        buffer.read(self.offset, data.capacity(), &mut data);
 
-        let size = get_next_codepoint_start(&data, 0);
-        self.offset += size;
-        // TODO: if '\r\n' must move + 1
+        // TODO: if '\r\n' must move + 1 in codec
+        let (_, _, size) = read_char(&buffer, self.offset, get_codepoint);
+        self.offset += size as u64;
 
         self
     }
@@ -192,9 +187,15 @@ impl Mark {
 
     pub fn move_to_token_start(
         &mut self,
-        _buffer: &Buffer,
+        buffer: &Buffer,
         get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
     ) -> &mut Mark {
+        if self.offset == 0 {
+            return self;
+        }
+
+//        let (cp, _, size) = read_char_backward(&buffer, prev_offset, get_codepoint);
+
         self
     }
 
