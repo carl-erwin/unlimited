@@ -105,6 +105,7 @@ impl<'a> Buffer<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, mut data: &mut Vec<u8>) -> usize {
+        // TODO: let nr_bytes = data.capacity();
         let mut it = MappedFile::iter_from(&self.data, offset);
         MappedFile::read(&mut it, nr_bytes, &mut data)
     }
