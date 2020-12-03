@@ -9,6 +9,17 @@ pub struct Mark {
     pub offset: u64,
 }
 
+// TODO: codec...
+pub fn read_char(
+    buffer: &Buffer,
+    from_offset: u64,
+    get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
+) -> (char, u64, usize) {
+    let mut data = Vec::with_capacity(4);
+    buffer.read(from_offset, data.capacity(), &mut data); // TODO: decode upto capacity ?
+    get_codepoint(&data, 0)
+}
+
 impl Mark {
     /* TODO: add TextCodec trait
      TextCodec {
@@ -199,20 +210,13 @@ impl Mark {
         let max_offset = buffer.size as u64;
         let mut prev_offset = self.offset;
 
-        //
-        // buffer_get_codepoint(buffer, offset) -> cp
-        let mut data = Vec::with_capacity(4);
-        buffer.read(prev_offset, data.capacity(), &mut data);
-        let (cp, _, size) = get_codepoint(&data, 0);
+        let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
         prev_offset += size as u64;
 
         // skip blanks
         if self.is_blank(cp) {
             loop {
-                // buffer_get_codepoint(buffer, offset) -> cp
-                let mut data = Vec::with_capacity(4);
-                buffer.read(prev_offset, data.capacity(), &mut data);
-                let (cp, _, size) = get_codepoint(&data, 0);
+                let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
                 if prev_offset == max_offset {
                     break;
                 }
@@ -227,10 +231,7 @@ impl Mark {
 
         // skip non blanck
         loop {
-            // buffer_get_codepoint(buffer, offset) -> cp
-            let mut data = Vec::with_capacity(4);
-            buffer.read(prev_offset, data.capacity(), &mut data);
-            let (cp, _, size) = get_codepoint(&data, 0);
+            let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
             if prev_offset == max_offset {
                 break;
             }
