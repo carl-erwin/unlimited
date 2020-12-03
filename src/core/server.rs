@@ -50,8 +50,8 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-beginning-of-file" },
        { "in": [{ "key": "alt+>" }],                           "action": "text-mode:move-marks-to-end-of-file" },
 
-       { "in": [{ "key": "ctrl+Home" }],                      "action": "text-mode:move-marks-to-beginning-of-file" },
-       { "in": [{ "key": "ctrl+End" }],                       "action": "text-mode:move-marks-to-end-of-file" },
+       { "in": [{ "key": "ctrl+Home" }],                       "action": "text-mode:move-marks-to-beginning-of-file" },
+       { "in": [{ "key": "ctrl+End" }],                        "action": "text-mode:move-marks-to-end-of-file" },
 
 
        { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
@@ -84,24 +84,28 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
 
-       { "in": [{ "key": "ctrl+x+Left"  }],                      "action": "text-mode:move-to-previous-token-beginning" },
-       { "in": [{ "key": "ctrl+x+Right" }],                      "action": "text-mode:move-to-next-token-end" },
+       { "in": [{ "key": "ctrl+x+Left"  }],                    "action": "text-mode:move-to-previous-token-beginning" },
+       { "in": [{ "key": "ctrl+x+Right" }],                    "action": "text-mode:move-to-next-token-end" },
 
 
-       { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],    "action": "select-previous-view" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],   "action": "select-next-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
 
-       { "in": [{ "key": "ctrl+s" }],                           "action": "save-document" },
+       { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
+       { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
+
+
+       { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
 
        { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
 
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-       { "in": [{ "key": "F4" } ],                             "action": "application:quit-abort" },
+       { "in": [{ "key": "F5" } ],                             "action": "application:quit-abort" },
 
-       { "in": [{ "system": "SIGTERM" } ],                      "action": "application:quit" },
+       { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
 
-       { "default": [],                                         "action": "text-mode:self-insert" }
+       { "default": [],                                        "action": "text-mode:self-insert" }
      ]
 }]"#;
 
@@ -307,27 +311,6 @@ fn process_input_event(
         dbg_println!("found action {} : input ev = {:?}", action, ev);
 
         match action.as_str() {
-            "application:quit" => {
-                env.status = "<quit>".to_string();
-
-                let doc = &view.as_ref().borrow();
-                let doc = doc.document.as_ref().unwrap();
-                if doc.borrow().changed {
-                    env.status = "<quit> : modified buffer exits. type F4 to quit without saving"
-                        .to_string();
-                } else {
-                    env.quit = true;
-                }
-            }
-
-            "application:quit-abort" => {
-                env.quit = true;
-            }
-
-            "save-document" => {
-                view::save_document(editor, env, &trigger, view);
-                env.status = "<save>".to_string();
-            }
 
             _ => {
                 // TODO: pattern match type of action base on domain or augment mode callbacks cb(e,c,d,v, trigger, env? {k,v}*)
@@ -431,12 +414,59 @@ fn process_input_events(
     editor.last_rdr_event = Instant::now();
 }
 
+pub fn application_quit(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    env.status = "<quit>".to_string();
+
+    let doc = &view.as_ref().borrow();
+    let doc = doc.document.as_ref().unwrap();
+    if doc.borrow().changed {
+        env.status = "<quit> : modified buffer exits. type F4 to quit without saving".to_string();
+    } else {
+        env.quit = true;
+    }
+}
+
+pub fn application_quit_abort(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    env.quit = true;
+}
+
+pub fn save_document(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = view.as_ref().borrow_mut();
+    let doc = v.document.as_ref().unwrap();
+    let mut doc = doc.as_ref().borrow_mut();
+
+    let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
+}
+
 fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
     map.insert(s.to_string(), func);
 }
 
 fn build_action_map() -> ActionMap {
     let mut map: ActionMap = HashMap::new(); // text-mode action map
+
+
+    register_action(&mut map, "application:quit", application_quit);
+
+    register_action(&mut map, "application:quit-abort", application_quit_abort);
+
+    register_action(&mut map, "save-document", save_document);
+
 
     // TODO: text-mode
     register_action(
@@ -548,7 +578,6 @@ fn build_action_map() -> ActionMap {
         "text-mode:remove-until-end-of-word",
         view::remove_until_end_of_word,
     );
-    register_action(&mut map, "save-document", view::save_document);
     register_action(
         &mut map,
         "scroll-to-next-screen",

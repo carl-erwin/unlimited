@@ -1339,19 +1339,6 @@ pub fn scroll_to_next_screen(
     move_mark_to_screen_start(editor, env, trigger, view);
 }
 
-pub fn save_document(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    let v = view.as_ref().borrow_mut();
-    let doc = v.document.as_ref().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
-
-    let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
-}
-
 pub fn cut_to_end_of_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
