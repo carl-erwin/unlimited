@@ -514,7 +514,11 @@ impl Filter<'_> for HighlightFilter {
                     }
 
                     // select color
-                    let token_str = String::from_utf8(self.utf8_token.clone()).unwrap();
+                    let token_str = if let Ok(s) = String::from_utf8(self.utf8_token.clone()) {
+                        s
+                    } else {
+                        "�".to_string()
+                    };
 
                     // dbg_println!("TOKEN_STR = '{}'", token_str);
 
@@ -670,9 +674,9 @@ pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointI
     let displayed_cp: char = match c {
         '\r' | '\n' | '\t' => ' ',
 
-        _ if c < ' ' => '�',
+        _ if c < ' ' => '�', // TODO: change color/style '�',
 
-        _ if c == 0x7f as char => '�',
+        _ if c == 0x7f as char => '�', // TODO: change color/style '�',
 
         _ => c,
     };
