@@ -1,5 +1,119 @@
 // Copyright (c) Carl-Erwin Griffith
 
+/*
+  The Dream:
+
+    interactive edition of (de)mux pipeline
+    text
+    audio
+    video
+    output device
+    a special way to describe user input event ? :
+     button/click
+     keypress/ IoData utf-32/16/8
+               special keys combination
+
+    define: simple unit to be used
+       byte
+       pixel
+       audio sample
+       codepoint
+
+    provide basic decoders
+    bits accumlator: bits strings of arbitrary type
+    (u)int{8,16,32,64} f32/f64
+
+    (de)multiplexing
+
+    ex:
+
+    setup:
+        raw | detect type (select out type)
+                                                       ______ audio/ogg
+    decode:                                           /
+        raw | "type decoder" -> vec[IoData] | demux |
+                                                      \_______ video/ogm
+
+    ex:
+     setup:
+        raw | detect type (select out type)
+                                                       audio/ogg  ___________
+    decode:                                          /                        \
+        raw | "type decoder" -> vec[IoData] | demux |                          \_______ mux ___ container
+                                                    \                         /
+                                                      video/ogm  ____________/
+
+    virtually
+    we could create a nes emulator using the right comination of decoder
+
+    user input _____
+                     \
+                      \
+                        \
+                         \               ______ audio
+                          \             /
+    raw | detect(rom) | nes_enum | demux
+                                        \
+                                         \____  video
+
+
+    find a way to script state machine in a decoder/encoder :-)
+
+    -------------------------------------------------------
+    use C abi for ffi
+
+
+    DataType {
+        type : u64, //  crc64 ("text/utf8") ?
+    }
+
+    struct IoData {
+      mime_tpe: MimeType,
+        mime/type u64 crc64 ("text/utf8") ?
+      }
+    }
+
+    binary/raw {
+        vec: Vec<u8>,
+    },
+
+
+    TextCodec (UTF8){
+                // unit: codepoint utf32
+                // frame: array of codepoints
+                // format: impl def
+
+            r_data &u8[4]
+            w_data &u8[4]
+interface:
+            fn read_forward(buffer: , offset)
+            fn read_backward(buffer, offset)
+            fn write_backward(buffer, offset)
+            fn sync_forward(buffer, offset));
+            fn sync_backward((buffer, offset));
+        }
+
+    ImageCodec (PNG){
+            r_data &u8[4]
+            w_data &u8[4]
+
+                // unit: pixel
+                // frame: array of pixel
+                // format:
+    interface:
+            fn read_forward(buffer: , offset)
+            fn read_backward(buffer, offset)
+            fn write_backward(buffer, offset)
+            fn sync_forward(buffer, offset));
+            fn sync_backward((buffer, offset));
+        }
+
+  The Realty:
+      broken utf8 handling
+      no left-to-right , etc ...
+
+*/
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
