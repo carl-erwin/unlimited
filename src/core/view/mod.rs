@@ -194,7 +194,7 @@ impl<'a> View<'a> {
                 }
                 tmp.offset -= 1;
                 let doc = self.document.as_mut().unwrap().borrow_mut();
-                tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
             }
 
             self.start_offset = tmp.offset;
@@ -225,7 +225,7 @@ impl<'a> View<'a> {
         // get start of line
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+            m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
         }
 
         // build tmp screens until first offset of the original screen if found
@@ -260,7 +260,7 @@ impl<'a> View<'a> {
 
         let max_offset = {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            doc.buffer.size as u64
+            doc.size() as u64
         };
 
         // avoid useless scroll
@@ -330,8 +330,8 @@ impl<'a> View<'a> {
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().borrow_mut();
             // get start of the line @offset
-            m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
-            doc.buffer.size as u64
+            m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+            doc.size() as u64
         };
 
         // and build tmp screens until end_offset if found
@@ -429,9 +429,9 @@ pub fn get_lines_offsets(
     let mut m = Mark::new(start_offset); // TODO: rename into screen_start
 
     // get start of the line @offset
-    m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+    m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
 
-    let max_offset = doc.buffer.size as u64;
+    let max_offset = doc.size() as u64;
 
     // and build tmp screens until end_offset if found
     let screen_width = ::std::cmp::max(1, screen_width);
@@ -513,7 +513,7 @@ pub fn update_view(view: &Rc<RefCell<View>>, _env: &mut EditorEnv) {
     // TODO: transform read as filter pass
     if let Some(ref doc) = doc {
         // 1st pass raw_data_filter
-        let max_offset = { doc.borrow().buffer.size as u64 };
+        let max_offset = { doc.borrow().size() as u64 };
 
         let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
 
@@ -557,8 +557,8 @@ use crate::core::event::Key;
 // CEG
 pub fn scroll_up(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     // TODO: 3 is from mode configuration
@@ -569,8 +569,8 @@ pub fn scroll_up(
 
 pub fn scroll_down(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     // TODO: 3 is from mode configuration
@@ -704,8 +704,8 @@ pub fn redo(
 /// Remove the current utf8 encoded code point.<br/>
 pub fn remove_codepoint(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
@@ -715,7 +715,7 @@ pub fn remove_codepoint(
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
         let mut data = Vec::with_capacity(4);
-        doc.buffer.read(m.offset, data.capacity(), &mut data);
+        doc.read(m.offset, data.capacity(), &mut data);
         let (_, _, size) = utf8::get_codepoint(&data, 0);
         doc.remove(m.offset, size as usize, None);
     }
@@ -725,8 +725,8 @@ pub fn remove_codepoint(
 /// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
 pub fn remove_until_end_of_word(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
@@ -742,7 +742,7 @@ pub fn remove_until_end_of_word(
         // skip blanks until any char or end-of-line
         loop {
             data.clear();
-            doc.buffer.read(m.offset, data.capacity(), &mut data);
+            doc.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = utf8::get_codepoint(&data, 0);
 
             if size == 0 {
@@ -762,7 +762,7 @@ pub fn remove_until_end_of_word(
         // skip until blank or end-of-line
         loop {
             data.clear();
-            doc.buffer.read(m.offset, data.capacity(), &mut data);
+            doc.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = utf8::get_codepoint(&data, 0);
 
             if size == 0 {
@@ -808,7 +808,7 @@ pub fn move_marks_backward(
                 scroll_needed = true;
             }
 
-            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+            m.move_backward(&doc, utf8::get_previous_codepoint_start);
         }
     }
 
@@ -839,7 +839,7 @@ pub fn move_marks_forward(
                 scroll_needed = true;
             }
 
-            m.move_forward(&doc.buffer, utf8::get_codepoint);
+            m.move_forward(&doc, utf8::get_codepoint);
         }
     }
 
@@ -854,8 +854,8 @@ pub fn move_marks_forward(
 
 pub fn move_marks_to_start_of_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &view.as_ref().borrow_mut();
@@ -863,20 +863,20 @@ pub fn move_marks_to_start_of_line(
     let doc = v.document.as_ref().unwrap().borrow();
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+        m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
     }
 }
 
 pub fn move_marks_to_end_of_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap().borrow();
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
+        m.move_to_end_of_line(&doc, utf8::get_codepoint);
     }
 }
 
@@ -948,11 +948,11 @@ pub fn move_marks_to_previous_line(
                         let mut tmp = m.clone();
 
                         // goto start of current line (mar is on first line of screen)
-                        tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                        tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
                         // goto end of previous line
-                        tmp.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+                        tmp.move_backward(&doc, utf8::get_previous_codepoint_start);
                         // goto start of previous line
-                        tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                        tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
                         tmp.offset
 
                         /*
@@ -1025,7 +1025,7 @@ pub fn move_marks_to_previous_line(
                             break;
                         }
 
-                        s.move_forward(&doc.buffer, utf8::get_codepoint);
+                        s.move_forward(&doc, utf8::get_codepoint);
                         count += 1;
                     }
                     count
@@ -1037,7 +1037,7 @@ pub fn move_marks_to_previous_line(
                     let doc = doc.as_ref().borrow();
 
                     for _ in 0..new_x {
-                        tmp_mark.move_forward(&doc.buffer, utf8::get_codepoint);
+                        tmp_mark.move_forward(&doc, utf8::get_codepoint);
                     }
 
                     if tmp_mark.offset > line_end_off {
@@ -1066,15 +1066,15 @@ pub fn move_marks_to_previous_line(
 // remove multiple borrows
 pub fn move_marks_to_next_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let max_offset = {
         let doc = &view.as_ref().borrow();
         let doc = doc.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        doc.buffer.size as u64
+        doc.size() as u64
     };
 
     let mut scroll_needed = false;
@@ -1136,7 +1136,7 @@ pub fn move_marks_to_next_line(
                 let doc = doc.as_ref().borrow();
 
                 let mut tmp = Mark::new(m.offset);
-                tmp.move_to_start_of_line(&doc.buffer, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
                 tmp.offset
             };
 
@@ -1179,7 +1179,7 @@ pub fn move_marks_to_next_line(
                         break;
                     }
 
-                    s.move_forward(&doc.buffer, utf8::get_codepoint);
+                    s.move_forward(&doc, utf8::get_codepoint);
                     count += 1;
                 }
                 count
@@ -1196,7 +1196,7 @@ pub fn move_marks_to_next_line(
             let doc = doc.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
             for _ in 0..new_x {
-                tmp_mark.move_forward(&doc.buffer, utf8::get_codepoint);
+                tmp_mark.move_forward(&doc, utf8::get_codepoint);
             }
 
             if tmp_mark.offset > line_end_off {
@@ -1222,8 +1222,8 @@ pub fn move_marks_to_next_line(
 
 pub fn move_mark_to_screen_start(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow();
@@ -1238,8 +1238,8 @@ pub fn move_mark_to_screen_start(
 
 pub fn move_mark_to_screen_end(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow();
@@ -1269,8 +1269,8 @@ pub fn scroll_to_previous_screen(
 
 pub fn move_mark_to_start_of_file(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1285,8 +1285,8 @@ pub fn move_mark_to_start_of_file(
 // TODO: view.center_arrout_offset()
 pub fn center_arround_mark(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1303,8 +1303,8 @@ pub fn center_arround_mark(
 
 pub fn move_mark_to_end_of_file(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1312,7 +1312,7 @@ pub fn move_mark_to_end_of_file(
     let size = {
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        doc.buffer.size
+        doc.size()
     };
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
@@ -1341,8 +1341,8 @@ pub fn scroll_to_next_screen(
 
 pub fn cut_to_end_of_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
@@ -1353,7 +1353,7 @@ pub fn cut_to_end_of_line(
 
         for m in v.moving_marks.borrow().iter() {
             let mut end = m.clone();
-            end.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
+            end.move_to_end_of_line(&doc, utf8::get_codepoint);
             doc.remove(m.offset, (end.offset - m.offset) as usize, None);
             break;
         }
@@ -1368,8 +1368,8 @@ pub fn cut_to_end_of_line(
 
 pub fn paste(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow();
@@ -1382,7 +1382,7 @@ pub fn paste(
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             let mut end = m.clone();
-            end.move_to_end_of_line(&doc.buffer, utf8::get_codepoint);
+            end.move_to_end_of_line(&doc, utf8::get_codepoint);
             doc.insert(m.offset, tr.data.len(), tr.data.as_slice());
             m.offset += tr.data.len() as u64;
             break;
@@ -1401,7 +1401,7 @@ pub fn move_to_token_start(
     view: &Rc<RefCell<View>>,
 ) {
     // TODO: factorize macrk action
-    // mark.apply(fn); where fn=m.move_to_token_end(&doc.buffer, utf8::get_codepoint);
+    // mark.apply(fn); where fn=m.move_to_token_end(&doc, utf8::get_codepoint);
     //
     let mut sync = false;
 
@@ -1411,7 +1411,7 @@ pub fn move_to_token_start(
         let doc = doc.as_ref().borrow();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            m.move_to_token_start(&doc.buffer, utf8::get_previous_codepoint_start);
+            m.move_to_token_start(&doc, utf8::get_previous_codepoint_start);
 
             // main mark ?
             if !v.screen.contains_offset(m.offset) {
@@ -1442,7 +1442,7 @@ pub fn move_to_token_end(
         let doc = doc.as_ref().borrow();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            m.move_to_token_end(&doc.buffer, utf8::get_codepoint);
+            m.move_to_token_end(&doc, utf8::get_codepoint);
 
             // main mark ?
             if !v.screen.contains_offset(m.offset) {
@@ -1460,8 +1460,8 @@ pub fn move_to_token_end(
 }
 
 pub fn button_press(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -1582,8 +1582,8 @@ pub fn button_press(
 
 pub fn remove_previous_codepoint(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut scroll_needed = false;
@@ -1599,10 +1599,10 @@ pub fn remove_previous_codepoint(
                 continue;
             }
 
-            m.move_backward(&doc.buffer, utf8::get_previous_codepoint_start);
+            m.move_backward(&doc, utf8::get_previous_codepoint_start);
 
             let mut data = vec![];
-            doc.buffer.read(m.offset, 4, &mut data);
+            doc.read(m.offset, 4, &mut data);
             let (_, _, size) = utf8::get_codepoint(&data, 0);
             doc.remove(m.offset, size, None);
 
@@ -1681,8 +1681,8 @@ pub fn insert_codepoint(
 }
 
 pub fn button_release(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     _view: &Rc<RefCell<View>>,
 ) {
@@ -1719,8 +1719,8 @@ pub fn button_release(
 pub fn select_next_view(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
+    _trigger: &Vec<InputEvent>,
+    _view: &Rc<RefCell<View>>,
 ) {
     let max = editor.view_map.len();
     dbg_println!("view id max {}", max);
@@ -1732,10 +1732,10 @@ pub fn select_next_view(
 }
 
 pub fn select_previous_view(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
+    _trigger: &Vec<InputEvent>,
+    _view: &Rc<RefCell<View>>,
 ) {
     if env.view_id > 0 {
         env.view_id -= 1;

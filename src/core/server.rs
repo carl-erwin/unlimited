@@ -16,7 +16,7 @@ use crate::core::event::Event::DrawEvent;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 
-use crate::core::view::{Id, View};
+use crate::core::view::View;
 
 use crate::core::view;
 use crate::core::view::update_view;
@@ -97,6 +97,7 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
        { "in": [{ "key": "F5" } ],                             "action": "application:quit-abort" },
 
        { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
@@ -339,7 +340,7 @@ fn process_input_events(
 ) {
     let p = crate::core::event::pending_input_event_count();
 
-    let (w, h) = {
+    let (_w, _h) = {
         let v = &editor.view_map[env.view_id].1.clone();
         let v = &v.as_ref().borrow();
         (v.screen.width(), v.screen.height())
@@ -410,9 +411,9 @@ fn process_input_events(
 }
 
 pub fn application_quit(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     env.status = "<quit>".to_string();
@@ -427,18 +428,18 @@ pub fn application_quit(
 }
 
 pub fn application_quit_abort(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
+    _trigger: &Vec<InputEvent>,
+    _view: &Rc<RefCell<View>>,
 ) {
     env.quit = true;
 }
 
 pub fn save_document(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow_mut();

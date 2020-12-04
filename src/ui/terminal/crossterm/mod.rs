@@ -26,7 +26,6 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 

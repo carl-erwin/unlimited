@@ -1,7 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
 //
-use crate::core::buffer::Buffer;
+use crate::core::document::Document;
 
 //
 #[derive(Debug, Clone)]
@@ -11,12 +11,12 @@ pub struct Mark {
 
 // TODO: codec...
 pub fn read_char(
-    buffer: &Buffer,
+    doc: &Document,
     from_offset: u64,
     get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
 ) -> (char, u64, usize) {
     let mut data = Vec::with_capacity(4);
-    buffer.read(from_offset, data.capacity(), &mut data); // TODO: decode upto capacity ?
+    doc.read(from_offset, data.capacity(), &mut data); // TODO: decode upto capacity ?
     get_codepoint(&data, 0)
 }
 
@@ -54,11 +54,11 @@ impl Mark {
 
     pub fn move_forward(
         &mut self,
-        buffer: &Buffer,
+        doc: &Document,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
         // TODO: if '\r\n' must move + 1 in codec
-        let (_, _, size) = read_char(&buffer, self.offset, get_codepoint);
+        let (_, _, size) = read_char(&doc, self.offset, get_codepoint);
         self.offset += size as u64;
 
         self
@@ -67,7 +67,7 @@ impl Mark {
     // TODO: check multi-byte utf8 sequence
     pub fn move_backward(
         &mut self,
-        buffer: &Buffer,
+        doc: &Document,
         get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
     ) -> &mut Mark {
         if self.offset == 0 {
@@ -78,7 +78,7 @@ impl Mark {
         let relative_offset = self.offset - base_offset;
 
         let mut data = Vec::with_capacity(4);
-        let _ = buffer.read(base_offset, data.capacity(), &mut data) as u64;
+        let _ = doc.read(base_offset, data.capacity(), &mut data) as u64;
 
         // TODO: if '\r\n' must move - 1
         let off = get_previous_codepoint_start(&data, relative_offset);
@@ -90,7 +90,7 @@ impl Mark {
 
     pub fn move_to_start_of_line(
         &mut self,
-        buffer: &Buffer,
+        doc: &Document,
         get_prev_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
         if self.offset == 0 {
@@ -104,11 +104,11 @@ impl Mark {
             let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
             let relative_offset = self.offset - base_offset;
 
-            assert!(self.offset <= buffer.size as u64);
-            assert!(base_offset <= buffer.size as u64);
+            assert!(self.offset <= doc.size() as u64);
+            assert!(base_offset <= doc.size() as u64);
 
             let mut data = Vec::with_capacity(4);
-            let nb = buffer.read(base_offset, data.capacity(), &mut data);
+            let nb = doc.read(base_offset, data.capacity(), &mut data);
 
             assert!(nb <= data.capacity());
             assert!(nb == data.len());
@@ -147,10 +147,10 @@ impl Mark {
 
     pub fn move_to_end_of_line(
         &mut self,
-        buffer: &Buffer,
+        doc: &Document,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
-        let max_offset = buffer.size as u64;
+        let max_offset = doc.size() as u64;
 
         let mut prev_offset = self.offset;
 
@@ -161,7 +161,7 @@ impl Mark {
 
         loop {
             let mut data = Vec::with_capacity(4);
-            buffer.read(prev_offset, data.capacity(), &mut data);
+            doc.read(prev_offset, data.capacity(), &mut data);
             let (cp, _, size) = get_codepoint(&data, 0);
             if prev_offset == max_offset {
                 break;
@@ -197,15 +197,15 @@ impl Mark {
         }
     }
 
-    pub fn at_end_of_buffer(&self, buffer: &Buffer) -> bool {
+    pub fn at_end_of_buffer(&self, doc: &Document) -> bool {
         // TODO: end_of_buffer().or_return()
-        self.offset == buffer.size as u64
+        self.offset == doc.size() as u64
     }
 
     pub fn move_to_token_start(
         &mut self,
-        buffer: &Buffer,
-        get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
+        _doc: &Document,
+        _get_previous_codepoint_start: fn(data: &[u8], from_offset: u64) -> u64,
     ) -> &mut Mark {
         if self.offset == 0 {
             return self;
@@ -218,23 +218,23 @@ impl Mark {
 
     pub fn move_to_token_end(
         &mut self,
-        buffer: &Buffer,
+        doc: &Document,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
-        if self.at_end_of_buffer(buffer) {
+        if self.at_end_of_buffer(doc) {
             return self;
         }
 
-        let max_offset = buffer.size as u64;
+        let max_offset = doc.size() as u64;
         let mut prev_offset = self.offset;
 
-        let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
+        let (cp, _, size) = read_char(&doc, prev_offset, get_codepoint);
         prev_offset += size as u64;
 
         // skip blanks
         if self.is_blank(cp) {
             loop {
-                let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
+                let (cp, _, size) = read_char(&doc, prev_offset, get_codepoint);
                 if prev_offset == max_offset {
                     break;
                 }
@@ -249,7 +249,7 @@ impl Mark {
 
         // skip non blanck
         loop {
-            let (cp, _, size) = read_char(&buffer, prev_offset, get_codepoint);
+            let (cp, _, size) = read_char(&doc, prev_offset, get_codepoint);
             if prev_offset == max_offset {
                 break;
             }
@@ -269,7 +269,9 @@ impl Mark {
 
 #[test]
 fn test_marks() {
-    use crate::core::buffer::OpenMode;
+    use crate::core::document::DocumentBuilder;
+    use crate::core::document::OpenMode;
+
     use crate::core::codec::text::utf8::get_previous_codepoint_start;
 
     // TODO: move to utf8 tests
@@ -278,9 +280,20 @@ fn test_marks() {
     println!("\n**************** test marks *****************");
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+
+        let mut bb = doc.as_ref().borrow_mut();
+
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, 6, &data);
+
         let mut rdata = vec![];
         bb.read(0, data.len(), &mut rdata);
         assert_eq!(rdata, data);
@@ -303,7 +316,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+        let mut bb = doc.as_ref().borrow_mut();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -321,7 +342,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+        let mut bb = doc.as_ref().borrow_mut();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
 
@@ -340,7 +369,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+        let mut bb = doc.as_ref().borrow_mut();
         let data = vec![0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -358,7 +395,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+        let mut bb = doc.as_ref().borrow_mut();
         let data = vec![0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -376,7 +421,15 @@ fn test_marks() {
     }
 
     {
-        let mut bb = Buffer::new("/dev/null", OpenMode::ReadWrite).unwrap();
+        let mut builder = DocumentBuilder::new();
+        let mut doc = builder
+            .document_name("test-1")
+            .file_name("/dev/null")
+            .internal(false)
+            .mode(OpenMode::ReadWrite)
+            .finalize()
+            .unwrap();
+        let mut bb = doc.as_ref().borrow_mut();
         let data = vec![0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];

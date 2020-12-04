@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 //
 use crate::core::buffer::Buffer;
-use crate::core::buffer::OpenMode;
+pub use crate::core::buffer::OpenMode;
 
 //
 use crate::core::bufferlog::BufferLog;
@@ -17,11 +17,12 @@ use crate::core::bufferlog::BufferOperationType;
 pub type Id = u64; // TODO change to usize
 
 ///
-#[derive(Default)]
+#[derive(Debug)]
 pub struct DocumentBuilder {
     internal: bool,
     document_name: String,
     file_name: String,
+    mode: OpenMode,
 }
 
 ///
@@ -32,45 +33,37 @@ impl DocumentBuilder {
             internal: false,
             document_name: String::new(),
             file_name: String::new(),
+            mode: OpenMode::ReadOnly,
         }
     }
 
     ///
-    pub fn internal(&self, flag: bool) -> Self {
-        Self {
-            internal: flag,
-            document_name: self.document_name.clone(),
-            file_name: self.file_name.clone(),
-        }
+    pub fn internal(&mut self, flag: bool) -> &mut Self {
+        self.internal = flag;
+        self
     }
 
     ///
-    pub fn document_name(&self, name: &str) -> Self {
-        let mut s = String::new();
-        s.push_str(name);
-
-        Self {
-            internal: self.internal,
-            document_name: s,
-            file_name: self.file_name.clone(),
-        }
+    pub fn document_name(&mut self, name: &str) -> &mut Self {
+        self.document_name = name.to_string();
+        self
     }
 
     ///
-    pub fn file_name(&self, name: &str) -> Self {
-        let mut s = String::new();
-        s.push_str(name);
+    pub fn file_name(&mut self, name: &str) -> &mut Self {
+        self.file_name = name.to_string();
+        self
+    }
 
-        Self {
-            internal: self.internal,
-            document_name: self.document_name.clone(),
-            file_name: s,
-        }
+    ///
+    pub fn mode(&mut self, mode: OpenMode) -> &mut Self {
+        self.mode = mode;
+        self
     }
 
     ///
     pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
-        let buffer = Buffer::new(&self.file_name, OpenMode::ReadWrite);
+        let buffer = Buffer::new(&self.file_name, self.mode.clone());
         let buffer = match buffer {
             Some(bb) => bb,
             None => return None,
@@ -90,7 +83,7 @@ impl DocumentBuilder {
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
-    pub buffer: Buffer<'a>,
+    buffer: Buffer<'a>,
     pub buffer_log: BufferLog,
     pub changed: bool,
 }
@@ -103,6 +96,13 @@ impl<'a> Document<'a> {
         self.changed = false;
 
         Ok(())
+    }
+
+    /// copy the content of the buffer up to 'nr_bytes' into the data Vec
+    /// the read bytes are appended to the data Vec
+    /// return XXX on error (TODO: use ioresult)
+    pub fn size(&self) -> usize {
+        self.buffer.size
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
@@ -243,7 +243,7 @@ mod tests {
                 off += off_update as u64;
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             println!("start undo test");
             for i in 0..max {
@@ -251,7 +251,7 @@ mod tests {
                 doc.undo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             println!("start redo test");
 
@@ -260,7 +260,7 @@ mod tests {
                 doc.redo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             println!("start undo test (2nd pass)");
             for i in 0..max {
@@ -268,7 +268,7 @@ mod tests {
                 doc.undo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
         }
     }
 
@@ -310,7 +310,7 @@ mod tests {
                 off += off_update as u64;
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
@@ -318,7 +318,7 @@ mod tests {
                 doc.undo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             println!("start redo test");
 
@@ -328,7 +328,7 @@ mod tests {
                 doc.redo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
 
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
@@ -336,7 +336,7 @@ mod tests {
                 doc.undo();
             }
 
-            println!("doc.size = {}", doc.buffer.size());
+            println!("doc.size = {}", doc.size());
         }
     }
 }

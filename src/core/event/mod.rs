@@ -9,9 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use crate::core::document;
 use crate::core::screen::Screen;
-use crate::core::view;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 

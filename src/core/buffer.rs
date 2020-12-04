@@ -8,8 +8,7 @@ pub type Id = u64;
 pub type Offset = u64;
 pub type PageSize = usize;
 
-//
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpenMode {
     ReadOnly = 0,
     ReadWrite = 1,

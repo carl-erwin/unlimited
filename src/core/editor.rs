@@ -90,7 +90,8 @@ impl<'a> Editor<'a> {
 
     ///
     pub fn setup_default_buffers(&mut self) {
-        let builder = DocumentBuilder::new()
+        let mut builder = DocumentBuilder::new();
+        builder
             .document_name("debug-message")
             .file_name("/dev/null")
             .internal(true);
@@ -102,7 +103,8 @@ impl<'a> Editor<'a> {
             self.document_map.insert(id, b);
         }
 
-        let builder = DocumentBuilder::new()
+        let mut builder = DocumentBuilder::new();
+        builder
             .document_name("scratch")
             .file_name("/dev/null")
             .internal(true);
