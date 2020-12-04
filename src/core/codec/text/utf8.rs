@@ -110,6 +110,7 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
     0
 }
 
+// TODO: rename sync_backward
 // TODO: change this with temporary (cp, offset, size) until from_offset
 pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
     assert!(data.len() >= from_offset as usize);
@@ -148,7 +149,6 @@ pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
         from_offset
     }
 }
-
 
 pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     let mut state = 0;

@@ -22,12 +22,30 @@ pub fn read_char(
 
 impl Mark {
     /* TODO: add TextCodec trait
-     TextCodec {
-         fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
-         fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize)
 
-         fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize;
+     RawCodec {
+        encode(Writer: , offset, bytes: vec<u8>)
+        decode(Writer: , offset, bytes: &mut vec<u8>) // n = vec::capacity
+
+        read/write from ll stack (doc/buffer)
+        read(offset, BACKWARD | FORWARD) -> ( IoData(u8), offset', size )
+
+        sync(offset, n, BACKWARD | FORWARD) -> offset' // also used  to skip
+        fn write(codepoint: u32, out: &mut [u8; 4]) -> usize;
      }
+
+
+     TextCodec {
+
+        write(Writer: , offset: enum {cur,abs}, cp: char/u32)
+        read/write from ll stack (doc/buffer)
+        read(offset, BACKWARD | FORWARD) -> (char, offset', encode_size=abs(offset - offset') )
+        sync(offset, n, BACKWARD | FORWARD) -> offset' // also used  to skip
+        fn write(codepoint: u32, out: &mut [u8; 4]) -> usize;
+     }
+
+
+
     */
 
     pub fn new(offset: u64) -> Self {
@@ -39,7 +57,6 @@ impl Mark {
         buffer: &Buffer,
         get_codepoint: fn(data: &[u8], from_offset: u64) -> (char, u64, usize),
     ) -> &mut Mark {
-
         // TODO: if '\r\n' must move + 1 in codec
         let (_, _, size) = read_char(&buffer, self.offset, get_codepoint);
         self.offset += size as u64;
@@ -194,7 +211,7 @@ impl Mark {
             return self;
         }
 
-//        let (cp, _, size) = read_char_backward(&buffer, prev_offset, get_codepoint);
+        //        let (cp, _, size) = read_char_backward(&buffer, prev_offset, get_codepoint);
 
         self
     }
