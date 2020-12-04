@@ -98,7 +98,6 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-       { "in": [{ "key": "F5" } ],                             "action": "application:quit-abort" },
 
        { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
 
