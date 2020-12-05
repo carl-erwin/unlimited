@@ -126,6 +126,12 @@ pub struct EditorEnv {
     next_node: Option<Rc<InputEventRule>>,
 
     pub view_id: usize, // doc id in view
+
+    // move ths to update_action
+    // reset on each event handling
+    pub center: bool,
+    pub scroll: bool,
+    pub scroll_n: usize,
 }
 
 impl EditorEnv {
@@ -145,6 +151,9 @@ impl EditorEnv {
             next_node: None,
 
             view_id: 0,
+            center: false,
+            scroll: false,
+            scroll_n: 0,
         }
     }
 }
@@ -153,7 +162,7 @@ pub fn build_layout(editor: &mut Editor, mut env: &mut EditorEnv, view_id: u64) 
     let view = editor.view_map[view_id as usize].1.clone();
 
     let start = Instant::now();
-    update_view(&view, &mut env);
+    update_view(editor, &mut env, &view);
     let end = Instant::now();
     view.as_ref().borrow_mut().screen.time_to_build = end.duration_since(start);
 }

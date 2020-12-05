@@ -132,7 +132,8 @@ pub struct View<'a> {
     // reorder fields
     pub start_offset: u64,
     pub end_offset: u64,
-    pub center_on_cursor_move: bool,
+    pub center_on_mark_move: bool,
+    pub scroll_on_mark_move: bool,
 
     pub document: Option<Rc<RefCell<Document<'a>>>>,
 
@@ -165,8 +166,9 @@ impl<'a> View<'a> {
         View {
             id,
             start_offset,
-            end_offset: start_offset,     // will be recomputed later
-            center_on_cursor_move: false, // add movement enums and pass it to center fn
+            end_offset: start_offset,   // will be recomputed later
+            center_on_mark_move: false, // add movement enums and pass it to center fn
+            scroll_on_mark_move: true,
             document,
             text_codec: Box::new(utf8::Utf8Codec::new()),
             screen,
@@ -516,47 +518,87 @@ pub fn get_lines_offsets(
 // TODO: test-mode
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
-pub fn update_view(view: &Rc<RefCell<View>>, _env: &mut EditorEnv) {
-    let mut v = view.as_ref().borrow_mut();
+pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    // for a in v.action {}
+    if env.center {
+        env.center = false;
+        let trigger = Vec::new();
+        center_arround_mark(editor, env, &trigger, &view);
+    }
 
-    let doc = v.document.clone();
-    let doc = doc.as_ref();
+    if env.scroll {
+        env.scroll = false;
+        // update view screen start
+        let v = &mut view.as_ref().borrow_mut();
 
-    // TODO: transform read as filter pass
-    if let Some(ref doc) = doc {
-        // 1st pass raw_data_filter
-        let max_offset = { doc.borrow().size() as u64 };
+        let direction = {
+            let marks = v.moving_marks.borrow();
+            let mi = v.mark_index;
+            let offset = marks[mi].offset;
 
-        let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
-
-        let end_offset =
-            run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
-
-        // TODO: from env ?
-        v.end_offset = end_offset;
-        v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
-        v.check_invariants();
-
-        // TODO: marks_filter
-        // set_render_marks
-        // brute force for now
-        let marks = v.moving_marks.clone(); // do not hold v
-        for m in marks.borrow().iter() {
-            dbg_println!("check marks offset({})", m.offset);
-
-            if m.offset < v.start_offset || m.offset > v.end_offset {
-                continue;
+            if offset > v.screen.last_offset {
+                1
+            } else if offset < v.screen.first_offset {
+                -1
+            } else {
+                0
             }
+        };
 
-            for l in 0..v.screen.height() {
-                let line = v.screen.get_mut_line(l).unwrap();
+        match direction {
+            -1 => {
+                v.scroll_up(env.scroll_n);
+            }
+            1 => {
+                v.scroll_down(env.scroll_n);
+            }
+            _ => {}
+        }
+    }
 
-                for c in 0..line.nb_cells {
-                    let cpi = line.get_mut_cpi(c).unwrap();
-                    if cpi.offset == m.offset {
-                        dbg_println!("cpi.offset({}) == m.offset({})", cpi.offset, m.offset);
+    // compute layout
+    {
+        let mut v = view.as_ref().borrow_mut();
 
-                        cpi.is_selected = !cpi.metadata;
+        let doc = v.document.clone();
+        let doc = doc.as_ref();
+
+        // TODO: transform read as filter pass
+        if let Some(ref doc) = doc {
+            // 1st pass raw_data_filter
+            let max_offset = { doc.borrow().size() as u64 };
+
+            let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
+
+            let end_offset =
+                run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
+
+            // TODO: from env ?
+            v.end_offset = end_offset;
+            v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
+            v.check_invariants();
+
+            // TODO: marks_filter
+            // set_render_marks
+            // brute force for now
+            let marks = v.moving_marks.clone(); // do not hold v
+            for m in marks.borrow().iter() {
+                dbg_println!("check marks offset({})", m.offset);
+
+                if m.offset < v.start_offset || m.offset > v.end_offset {
+                    continue;
+                }
+
+                for l in 0..v.screen.height() {
+                    let line = v.screen.get_mut_line(l).unwrap();
+
+                    for c in 0..line.nb_cells {
+                        let cpi = line.get_mut_cpi(c).unwrap();
+                        if cpi.offset == m.offset {
+                            dbg_println!("cpi.offset({}) == m.offset({})", cpi.offset, m.offset);
+
+                            cpi.is_selected = !cpi.metadata;
+                        }
                     }
                 }
             }
@@ -850,7 +892,7 @@ pub fn move_marks_backward(
         view.as_ref().borrow_mut().scroll_up(1);
     }
 
-    if view.as_ref().borrow_mut().center_on_cursor_move {
+    if view.as_ref().borrow_mut().center_on_mark_move {
         center_arround_mark(editor, env, trigger, &view);
     }
 }
@@ -889,7 +931,7 @@ pub fn move_marks_forward(
         view.as_ref().borrow_mut().scroll_down(1);
     }
 
-    if view.as_ref().borrow_mut().center_on_cursor_move {
+    if view.as_ref().borrow_mut().center_on_mark_move {
         center_arround_mark(editor, env, trigger, &view);
     }
 }
@@ -923,12 +965,13 @@ pub fn move_marks_to_end_of_line(
     }
 }
 
-pub fn move_mark_to_previous_line(
+fn move_mark_to_previous_line(
     editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
     m: &mut Mark,
+    is_main_mark: bool,
 ) {
     let mut mark_moved = false;
 
@@ -942,6 +985,10 @@ pub fn move_mark_to_previous_line(
             // mark on first line
             (Some(_), _, y) if y == 0 => {
                 // previous line is offscreen
+                if is_main_mark {
+                    env.scroll = true;
+                    env.scroll_n = 1;
+                }
             }
 
             // onscreen
@@ -1034,12 +1081,6 @@ pub fn move_mark_to_previous_line(
         let line_start_off = lines[index].0;
         let line_end_off = lines[index].1;
 
-        // update screen start
-        {
-            let v = &mut view.as_ref().borrow_mut();
-            v.start_offset = line_start_off;
-        }
-
         let mut tmp_mark = Mark::new(line_start_off);
 
         // compute column
@@ -1095,16 +1136,13 @@ pub fn move_marks_to_previous_line(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let moving_marks = { view.as_ref().borrow().moving_marks.clone() };
+    let (moving_marks, midx) = {
+        let v = view.as_ref().borrow();
+        (v.moving_marks.clone(), v.mark_index)
+    };
 
-    for mut m in moving_marks.borrow_mut().iter_mut() {
-        move_mark_to_previous_line(editor, env, trigger, view, &mut m);
-    }
-
-    // post action
-    if false {
-        /* env.center_on_cursor_move */
-        center_arround_mark(editor, env, trigger, &view);
+    for (idx, m) in moving_marks.borrow_mut().iter_mut().enumerate() {
+        move_mark_to_previous_line(editor, env, trigger, view, m, idx == midx);
     }
 }
 
@@ -1114,8 +1152,9 @@ pub fn move_mark_to_next_line(
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
+    max_offset: u64, // ADD view env ?
     m: &mut Mark,
-    max_offset: u64,
+    is_main_mark: bool,
 ) {
     // TODO: m.on_buffer_end() ?
     if m.offset == max_offset {
@@ -1145,6 +1184,10 @@ pub fn move_mark_to_next_line(
                     m.offset = cpi.offset;
                 }
             }
+        } else {
+            // schedule
+            env.scroll = true;
+            env.scroll_n = 1;
         }
     }
 
@@ -1240,31 +1283,18 @@ pub fn move_marks_to_next_line(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let max_offset = {
-        let doc = &view.as_ref().borrow();
-        let doc = doc.document.as_ref().unwrap();
+    let (max_offset, midx) = {
+        let v = &view.as_ref().borrow();
+        let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        doc.size() as u64
+        (doc.size() as u64, v.mark_index)
     };
 
-    let mut scroll_needed = false;
+    let moving_marks = { view.as_ref().borrow().moving_marks.clone() };
 
-    let mut is_offscreen = true;
-    let mut was_on_screen = false;
-
-    let moving_marks = view.as_ref().borrow_mut().moving_marks.clone();
-
-    for mut m in moving_marks.borrow_mut().iter_mut() {
-        move_mark_to_next_line(editor, env, trigger, view, m, max_offset);
+    for (idx, m) in moving_marks.borrow_mut().iter_mut().enumerate() {
+        move_mark_to_next_line(editor, env, trigger, view, max_offset, m, idx == midx);
     }
-
-    // if is_offscreen && was_on_screen || scroll_needed {
-    //     view.as_ref().borrow_mut().scroll_down(1);
-    // }
-
-    // if view.as_ref().borrow_mut().center_on_cursor_move {
-    //     center_arround_mark(editor, env, trigger, &view);
-    // }
 }
 
 pub fn clone_and_move_mark_to_previous_line(
@@ -1285,7 +1315,7 @@ pub fn clone_and_move_mark_to_previous_line(
     let prev_off = m.offset;
     dbg_println!(" clone move up: prev_offset {}", prev_off);
 
-    move_mark_to_previous_line(editor, env, trigger, view, &mut m);
+    move_mark_to_previous_line(editor, env, trigger, view, &mut m, true);
 
     if m.offset != prev_off {
         // create new mark @ prev_offset
@@ -1320,7 +1350,7 @@ pub fn clone_and_move_mark_to_next_line(
     let prev_off = m.offset;
     dbg_println!(" clone move down: prev_offset {}", prev_off);
 
-    move_mark_to_next_line(editor, env, trigger, view, &mut m, max_offset);
+    move_mark_to_next_line(editor, env, trigger, view, max_offset, &mut m, true);
 
     dbg_println!(" clone move down: prev_offset {}", prev_off);
 
@@ -1335,10 +1365,17 @@ pub fn clone_and_move_mark_to_next_line(
     marks.dedup();
 
     // update main mark
-    {
+    let center = {
         // TODO: ensure there is at leat 1 mark
         let mut v = view.as_ref().borrow_mut();
         v.mark_index = if marks.len() > 0 { marks.len() - 1 } else { 0 };
+        v.center_on_mark_move
+    };
+
+    // for a in v.action {}
+    if center {
+        let trigger = Vec::new();
+        center_arround_mark(editor, env, &trigger, &view);
     }
 }
 
@@ -1414,13 +1451,10 @@ pub fn center_arround_mark(
     let mut v = view.as_ref().borrow_mut();
 
     let marks = v.moving_marks.clone();
-    for m in marks.borrow_mut().iter_mut() {
-        v.start_offset = m.offset;
-        break;
-    }
+    let marks = marks.borrow();
+    let mi = v.mark_index;
 
-    let h = v.screen.height() / 2;
-    v.scroll_up(h);
+    v.center_arround_offset(marks[mi].offset);
 }
 
 pub fn move_mark_to_end_of_file(
