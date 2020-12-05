@@ -8,8 +8,6 @@ use crate::dbg_println;
 use crate::core::codec::text::utf8::SyncDirection;
 use crate::core::codec::text::utf8::TextCodec;
 
-use super::codec::text::utf8::Utf8Codec;
-
 //
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Mark {
@@ -36,7 +34,6 @@ pub fn read_char_forward(
 pub fn read_char_backward(
     doc: &Document,
     from_offset: u64,
-    // regroup in TextCodec
     codec: &dyn TextCodec,
 ) -> (char, u64, usize) {
     if from_offset == 0 {
@@ -50,7 +47,7 @@ pub fn read_char_backward(
 
     // fill buf
     let mut data = Vec::with_capacity(4);
-    let rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+    let _rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
 
@@ -60,7 +57,7 @@ pub fn read_char_backward(
 
 // TODO: codec...
 pub fn read_char(
-    direction: SyncDirection,
+    _direction: SyncDirection,
     codec: &dyn TextCodec,
     doc: &Document,
     from_offset: u64,
@@ -76,7 +73,7 @@ pub fn read_char(
 
     // fill buf
     let mut data = Vec::with_capacity(4);
-    let rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+    let _rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
 
@@ -223,14 +220,6 @@ impl Mark {
         self
     }
 
-    fn is_word(&mut self, cp: char) -> bool {
-        // TODO: put defintion of word in array of cahr and use any(is_word_vec)
-        match cp {
-            '"' | ' ' | '\r' | '\n' | '\t' | ',' | ';' | '{' | '}' | '(' | ')' | '-' => false,
-            _ => true,
-        }
-    }
-
     fn is_blank(&mut self, cp: char) -> bool {
         // TODO: put defintion of word in array of cahr and use any(is_word_vec)
         match cp {
@@ -244,7 +233,7 @@ impl Mark {
         self.offset == doc.size() as u64
     }
 
-    pub fn move_to_token_start(&mut self, _doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_token_start(&mut self, _doc: &Document, _codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }

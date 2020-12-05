@@ -256,7 +256,7 @@ struct _LayoutPlugin {
 pub struct RawDataFilter {
     // data
     pos: u64,
-    max: u64,
+    //max: u64,
     read_size: usize,
 }
 
@@ -270,7 +270,7 @@ impl RawDataFilter {
 
         RawDataFilter {
             pos: env.base_offset,
-            max: env.max_offset,
+            //max: env.max_offset,
             read_size: env.screen.width() * env.screen.height() / 8,
         }
     }
@@ -539,20 +539,20 @@ impl Filter<'_> for TabFilter {
 
 #[derive(Debug, PartialEq)]
 enum TokenType {
-    UNKNOWN,
-    BLANK, // ' ' | '\n' | '\t' : TODO: sepcific END_OF_LINE ?
-    NUM,
-    IDENTIFIER,    // _a-zA-Z unicode // default ?
-    PAREN_OPEN,    // (
-    PAREN_CLOSE,   // )
-    BRACE_OPEN,    // {
-    BRACE_CLOSE,   // }
-    BRACKET_OPEN,  // [
-    BRACKET_CLOSE, // ]
-    COMMA,         // ,
-    SEMICOLON,     // ,
-    EOF,           // END
-                   // TODO: QUOTE SINGLE_QUOTE
+    Unknown,
+    Blank, // ' ' | '\n' | '\t' : TODO: sepcific END_OF_LINE ?
+    // Num,
+    Identifier,   // _a-zA-Z unicode // default ?
+    ParenOpen,    // (
+    ParenClose,   // )
+    BraceOpen,    // {
+    BraceClose,   // }
+    BracketOpen,  // [
+    BracketClose, // ]
+    Comma,        // ,
+    Semicolon,    // ,
+                  // Eof,           // End
+                  // TODO: QUOTE SINGLE_QUOTE
 }
 
 pub struct HighlightFilter {
@@ -566,7 +566,7 @@ impl HighlightFilter {
     fn new(_env: &LayoutEnv) -> Self {
         HighlightFilter {
             token_io: Vec::new(),
-            token_type: TokenType::UNKNOWN,
+            token_type: TokenType::Unknown,
             utf8_token: Vec::new(),
             new_color: CodepointInfo::default_color(),
             utf8_codec: Box::new(utf8::Utf8Codec::new()),
@@ -602,17 +602,17 @@ impl Filter<'_> for HighlightFilter {
                     //                    dbg_println!("parsing char : '{}'", c);
 
                     let token_type = match c {
-                        ' ' | '\n' | '\t' => TokenType::BLANK,
-                        '(' => TokenType::PAREN_OPEN,
-                        ')' => TokenType::PAREN_CLOSE,
-                        '{' => TokenType::BRACE_OPEN,
-                        '}' => TokenType::BRACE_CLOSE,
-                        '[' => TokenType::BRACKET_OPEN,
-                        ']' => TokenType::BRACKET_CLOSE,
-                        ',' => TokenType::COMMA,
-                        ';' => TokenType::SEMICOLON,
+                        ' ' | '\n' | '\t' => TokenType::Blank,
+                        '(' => TokenType::ParenOpen,
+                        ')' => TokenType::ParenClose,
+                        '{' => TokenType::BraceOpen,
+                        '}' => TokenType::BraceClose,
+                        '[' => TokenType::BracketOpen,
+                        ']' => TokenType::BracketClose,
+                        ',' => TokenType::Comma,
+                        ';' => TokenType::Semicolon,
                         // '0'...'9' => TokenType::NUM,
-                        _ => TokenType::IDENTIFIER,
+                        _ => TokenType::Identifier,
                     };
 
                     // need more or accumulae same class

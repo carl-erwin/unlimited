@@ -150,6 +150,8 @@ impl<'a> Editor<'a> {
             }
         }
 
+        dbg_println!("id {}", id);
+
         // create default views
         for doc_id in 0..self.document_map.len() {
             let id = doc_id as u64;

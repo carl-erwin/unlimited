@@ -966,9 +966,9 @@ pub fn move_marks_to_end_of_line(
 }
 
 fn move_mark_to_previous_line(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
     m: &mut Mark,
     is_main_mark: bool,
@@ -1148,13 +1148,13 @@ pub fn move_marks_to_previous_line(
 
 // remove multiple borrows
 pub fn move_mark_to_next_line(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
     max_offset: u64, // ADD view env ?
     m: &mut Mark,
-    is_main_mark: bool,
+    _is_main_mark: bool,
 ) {
     // TODO: m.on_buffer_end() ?
     if m.offset == max_offset {
