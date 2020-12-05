@@ -14,6 +14,14 @@ pub struct Mark {
     pub offset: u64,
 }
 
+fn is_blank(cp: char) -> bool {
+    // TODO: put defintion of word in array of cahr and use any(is_word_vec)
+    match cp {
+        ' ' | '\r' | '\n' | '\t' => true,
+        _ => false,
+    }
+}
+
 // TODO: codec...
 pub fn read_char_forward(
     doc: &Document,
@@ -220,25 +228,106 @@ impl Mark {
         self
     }
 
-    fn is_blank(&mut self, cp: char) -> bool {
-        // TODO: put defintion of word in array of cahr and use any(is_word_vec)
-        match cp {
-            ' ' | '\r' | '\n' | '\t' => true,
-            _ => false,
-        }
-    }
-
     pub fn at_end_of_buffer(&self, doc: &Document) -> bool {
         // TODO: end_of_buffer().or_return()
         self.offset == doc.size() as u64
     }
 
-    pub fn move_to_token_start(&mut self, _doc: &Document, _codec: &dyn TextCodec) -> &mut Mark {
+    // skip_class(&mut self, direction, fn class_match, doc, codec)
+    // class_match(char) -> bool
+    pub fn skip_blanks_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+        let mut prev_offset = self.offset;
+        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+
+        // skip_backward blanks
+        if is_blank(cp) {
+            while prev_offset > 0 {
+                let ret = read_char_backward(&doc, prev_offset, codec);
+                prev_offset -= ret.2 as u64;
+                if is_blank(ret.0) == false {
+                    break;
+                }
+            }
+            self.offset = prev_offset;
+        }
+
+        self
+    }
+
+    pub fn skip_non_blanks_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+        let mut prev_offset = self.offset;
+        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+
+        if is_blank(cp) == false {
+            while prev_offset > 0 {
+                let ret = read_char_backward(&doc, prev_offset, codec);
+                if is_blank(ret.0) == true {
+                    prev_offset = ret.1;
+                    break;
+                }
+                prev_offset -= ret.2 as u64;
+            }
+            self.offset = prev_offset;
+        }
+
+        self
+    }
+
+    pub fn move_to_token_start(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
 
-        //        let (cp, _, size) = read_char_forward_backward(&buffer, prev_offset, codec);
+        let (cp, _, _) = read_char_forward(&doc, self.offset, codec);
+        if !is_blank(cp) {
+            self.skip_non_blanks_backward(doc, codec);
+        }
+
+        self.skip_blanks_backward(doc, codec);
+        self.skip_non_blanks_backward(doc, codec);
+        let (cp, _, _) = read_char_forward(&doc, self.offset, codec);
+        if is_blank(cp) {
+            self.move_forward(doc, codec);
+        }
+
+        self
+    }
+
+    pub fn skip_blanks_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+        let max_offset = doc.size() as u64;
+        let mut prev_offset = self.offset;
+        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+
+        // skip blanks
+        if is_blank(cp) {
+            while prev_offset < max_offset {
+                let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
+                if is_blank(cp) == false {
+                    break;
+                }
+                prev_offset += size as u64;
+            }
+            self.offset = prev_offset;
+        }
+
+        self
+    }
+
+    pub fn skip_non_blanks_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+        let max_offset = doc.size() as u64;
+        let mut prev_offset = self.offset;
+        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+
+        if is_blank(cp) == false {
+            while prev_offset < max_offset {
+                let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
+                if is_blank(cp) == true {
+                    break;
+                }
+                prev_offset += size as u64;
+            }
+            self.offset = prev_offset;
+        }
 
         self
     }
@@ -247,45 +336,9 @@ impl Mark {
         if self.at_end_of_buffer(doc) {
             return self;
         }
-
-        let max_offset = doc.size() as u64;
-        let mut prev_offset = self.offset;
-
-        let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
-        prev_offset += size as u64;
-
         // skip blanks
-        if self.is_blank(cp) {
-            loop {
-                let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
-                if prev_offset == max_offset {
-                    break;
-                }
-
-                if self.is_blank(cp) == false {
-                    break;
-                }
-
-                prev_offset += size as u64;
-            }
-        }
-
-        // skip non blanck
-        loop {
-            let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
-            if prev_offset == max_offset {
-                break;
-            }
-
-            if self.is_blank(cp) == true {
-                break;
-            }
-
-            prev_offset += size as u64;
-        }
-
-        self.offset = prev_offset;
-
+        self.skip_blanks_forward(doc, codec);
+        self.skip_non_blanks_forward(doc, codec);
         self
     }
 }
