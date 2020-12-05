@@ -36,8 +36,13 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
     "events": [
        { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
+
        { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
-       { "in": [{ "key": "Down"     }],                        "action": "text-mode:move-marks-to-next-line" },
+       { "in": [{ "key": "alt+shift+Up" }],                  "action": "text-mode:clone-and-move-mark-to-previous-line" },
+
+       { "in": [{ "key": "Down" }],                            "action": "text-mode:move-marks-to-next-line" },
+       { "in": [{ "key": "alt+shift+Down" }],                  "action": "text-mode:clone-and-move-mark-to-next-line" },
+
        { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
        { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
        
@@ -584,6 +589,17 @@ fn build_action_map() -> ActionMap {
     register_action(&mut map, "select-next-view", view::select_next_view);
 
     register_action(&mut map, "select-previous-view", view::select_previous_view);
+
+    register_action(
+        &mut map,
+        "text-mode:clone-and-move-mark-to-previous-line",
+        view::clone_and_move_mark_to_previous_line,
+    );
+    register_action(
+        &mut map,
+        "text-mode:clone-and-move-mark-to-next-line",
+        view::clone_and_move_mark_to_next_line,
+    );
 
     map
 }

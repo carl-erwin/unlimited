@@ -11,7 +11,7 @@ use crate::core::codec::text::utf8::TextCodec;
 use super::codec::text::utf8::Utf8Codec;
 
 //
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Mark {
     pub offset: u64,
 }
@@ -138,11 +138,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_start_of_line(
-        &mut self,
-        doc: &Document,
-        codec: &dyn TextCodec,
-    ) -> &mut Mark {
+    pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
