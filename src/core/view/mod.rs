@@ -30,6 +30,8 @@ use crate::core::screen::Screen;
 use crate::core::mark::Mark;
 
 use crate::core::codec::text::utf8;
+use crate::core::codec::text::utf8::SyncDirection; // TODO: remove
+
 use crate::core::codepointinfo;
 
 use crate::core::event::ButtonEvent;
@@ -123,7 +125,6 @@ pub type ModeFunction = fn(
 /// The **View** represents a way to represent a given Document.<br/>
 // TODO: find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
-#[derive(Debug)]
 pub struct View<'a> {
     pub id: Id,
 
@@ -134,6 +135,9 @@ pub struct View<'a> {
     pub center_on_cursor_move: bool,
 
     pub document: Option<Rc<RefCell<Document<'a>>>>,
+
+    pub text_codec: Box<dyn utf8::TextCodec>,
+
     pub screen: Box<Screen>,
 
     pub moving_marks: Rc<RefCell<Vec<Mark>>>,
@@ -162,6 +166,7 @@ impl<'a> View<'a> {
             end_offset: start_offset,     // will be recomputed later
             center_on_cursor_move: false, // add movement enums and pass it to center fn
             document,
+            text_codec: Box::new(utf8::Utf8Codec::new()),
             screen,
             moving_marks,
             fixed_marks: Rc::new(RefCell::new(Vec::new())),
@@ -194,7 +199,7 @@ impl<'a> View<'a> {
                 }
                 tmp.offset -= 1;
                 let doc = self.document.as_mut().unwrap().borrow_mut();
-                tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc, self.text_codec.as_ref());
             }
 
             self.start_offset = tmp.offset;
@@ -225,7 +230,7 @@ impl<'a> View<'a> {
         // get start of line
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+            m.move_to_start_of_line(&doc, self.text_codec.as_ref());
         }
 
         // build tmp screens until first offset of the original screen if found
@@ -330,7 +335,7 @@ impl<'a> View<'a> {
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().borrow_mut();
             // get start of the line @offset
-            m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+            m.move_to_start_of_line(&doc, self.text_codec.as_ref());
             doc.size() as u64
         };
 
@@ -423,13 +428,18 @@ pub fn get_lines_offsets(
     let doc = &view.as_ref().borrow();
     let doc = doc.document.as_ref().unwrap();
     let doc = doc.as_ref().borrow_mut();
+  
 
     let mut v = Vec::<(u64, u64)>::new();
 
     let mut m = Mark::new(start_offset); // TODO: rename into screen_start
 
     // get start of the line @offset
-    m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+    {
+        let v = &view.as_ref().borrow();
+        let codec = v.text_codec.as_ref();
+        m.move_to_start_of_line(&doc, codec);
+    }
 
     let max_offset = doc.size() as u64;
 
@@ -603,31 +613,29 @@ pub fn insert_codepoint_array(
         }
     };
 
-    let mut utf8 = Vec::with_capacity(array.len());
-    for codepoint in array {
-        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
-        let data_size = utf8::encode(*codepoint as u32, &mut data);
-        for d in data.iter().take(data_size) {
-            utf8.push(*d);
-        }
-    }
-
-    let mut offset: u64 = 0;
-
-    {
-        let v = view.as_ref().borrow_mut();
+    let center = {
+        let v = view.as_ref().borrow();
         let mut doc = v.document.as_ref().unwrap().borrow_mut();
 
-        for m in v.moving_marks.borrow_mut().iter_mut() {
+        let codec = v.text_codec.as_ref();
+        let mut utf8 = Vec::with_capacity(array.len());
+
+        for codepoint in array {
+            let mut data: &mut [u8] = &mut [0, 0, 0, 0];
+            let data_size = codec.encode(*codepoint as u32, &mut data);
+            for d in data.iter().take(data_size) {
+                utf8.push(*d);
+            }
+        }
+
+        let mut offset: u64 = 0;
+
+        for m in v.moving_marks.borrow_mut().iter_mut().rev() {
             doc.insert(m.offset, utf8.len(), &utf8);
             m.offset += utf8.len() as u64;
             offset = m.offset;
-            break;
         }
-    }
 
-    let center = {
-        let v = view.as_ref().borrow();
         // move to upper layer
         offset < v.screen.first_offset
             || offset > v.screen.last_offset
@@ -712,11 +720,12 @@ pub fn remove_codepoint(
 
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
+    let codec = v.text_codec.as_ref();
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
         let mut data = Vec::with_capacity(4);
         doc.read(m.offset, data.capacity(), &mut data);
-        let (_, _, size) = utf8::get_codepoint(&data, 0);
+        let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
         doc.remove(m.offset, size as usize, None);
     }
 }
@@ -733,6 +742,7 @@ pub fn remove_until_end_of_word(
 
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
+    let codec = v.text_codec.as_ref();
 
     for m in v.moving_marks.borrow_mut().iter_mut() {
         let start = m.clone();
@@ -743,7 +753,7 @@ pub fn remove_until_end_of_word(
         loop {
             data.clear();
             doc.read(m.offset, data.capacity(), &mut data);
-            let (cp, _, size) = utf8::get_codepoint(&data, 0);
+            let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
 
             if size == 0 {
                 break;
@@ -763,7 +773,7 @@ pub fn remove_until_end_of_word(
         loop {
             data.clear();
             doc.read(m.offset, data.capacity(), &mut data);
-            let (cp, _, size) = utf8::get_codepoint(&data, 0);
+            let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
 
             if size == 0 {
                 break;
@@ -801,6 +811,7 @@ pub fn move_marks_backward(
     {
         let v = &view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap().borrow();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             // TODO: add main mark check
@@ -808,7 +819,7 @@ pub fn move_marks_backward(
                 scroll_needed = true;
             }
 
-            m.move_backward(&doc, utf8::get_previous_codepoint_start);
+            m.move_backward(&doc, codec);
         }
     }
 
@@ -832,6 +843,7 @@ pub fn move_marks_forward(
     {
         let v = &view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap().borrow();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             // TODO: add main mark check
@@ -839,7 +851,7 @@ pub fn move_marks_forward(
                 scroll_needed = true;
             }
 
-            m.move_forward(&doc, utf8::get_codepoint);
+            m.move_forward(&doc, codec);
         }
     }
 
@@ -861,9 +873,9 @@ pub fn move_marks_to_start_of_line(
     let v = &view.as_ref().borrow_mut();
 
     let doc = v.document.as_ref().unwrap().borrow();
-
+    let codec = v.text_codec.as_ref();
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+        m.move_to_start_of_line(&doc, codec);
     }
 }
 
@@ -875,8 +887,9 @@ pub fn move_marks_to_end_of_line(
 ) {
     let v = view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap().borrow();
+    let codec = v.text_codec.as_ref();
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.move_to_end_of_line(&doc, utf8::get_codepoint);
+        m.move_to_end_of_line(&doc, codec);
     }
 }
 
@@ -943,16 +956,17 @@ pub fn move_marks_to_previous_line(
                     let start_offset = {
                         let doc = v.document.as_ref().unwrap();
                         let doc = doc.as_ref().borrow();
+                        let codec = v.text_codec.as_ref();
 
                         // todo: set marks codecs
                         let mut tmp = m.clone();
 
                         // goto start of current line (mar is on first line of screen)
-                        tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+                        tmp.move_to_start_of_line(&doc, codec);
                         // goto end of previous line
-                        tmp.move_backward(&doc, utf8::get_previous_codepoint_start);
+                        tmp.move_backward(&doc, codec);
                         // goto start of previous line
-                        tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+                        tmp.move_to_start_of_line(&doc, codec);
                         tmp.offset
 
                         /*
@@ -1013,9 +1027,10 @@ pub fn move_marks_to_previous_line(
 
                 // compute column
                 let new_x = {
-                    let doc = &view.as_ref().borrow();
-                    let doc = doc.document.as_ref().unwrap();
+                    let v = &mut view.as_ref().borrow();
+                    let doc = v.document.as_ref().unwrap();
                     let doc = doc.as_ref().borrow();
+                    let codec = v.text_codec.as_ref();
 
                     let mut s = Mark::new(lines[index + 1].0);
                     let e = Mark::new(lines[index + 1].1);
@@ -1025,19 +1040,20 @@ pub fn move_marks_to_previous_line(
                             break;
                         }
 
-                        s.move_forward(&doc, utf8::get_codepoint);
+                        s.move_forward(&doc, codec);
                         count += 1;
                     }
                     count
                 };
 
                 {
-                    let doc = &view.as_ref().borrow();
-                    let doc = doc.document.as_ref().unwrap();
+                    let v = &view.as_ref().borrow();
+                    let doc = v.document.as_ref().unwrap();
                     let doc = doc.as_ref().borrow();
+                    let codec = v.text_codec.as_ref();
 
                     for _ in 0..new_x {
-                        tmp_mark.move_forward(&doc, utf8::get_codepoint);
+                        tmp_mark.move_forward(&doc, codec);
                     }
 
                     if tmp_mark.offset > line_end_off {
@@ -1131,12 +1147,12 @@ pub fn move_marks_to_next_line(
 
             // get start_of_line(m.offset) -> u64
             let start_offset = {
-                let doc = &view.as_ref().borrow();
-                let doc = doc.document.as_ref().unwrap();
+                let v = &view.as_ref().borrow();
+                let doc = v.document.as_ref().unwrap();
                 let doc = doc.as_ref().borrow();
-
+                let codec = v.text_codec.as_ref();
                 let mut tmp = Mark::new(m.offset);
-                tmp.move_to_start_of_line(&doc, utf8::get_prev_codepoint);
+                tmp.move_to_start_of_line(&doc, codec);
                 tmp.offset
             };
 
@@ -1167,9 +1183,10 @@ pub fn move_marks_to_next_line(
 
             // compute column
             let new_x = {
-                let doc = &view.as_ref().borrow();
-                let doc = doc.document.as_ref().unwrap();
+                let v = &view.as_ref().borrow();
+                let doc = v.document.as_ref().unwrap();
                 let doc = doc.as_ref().borrow();
+                let codec = v.text_codec.as_ref();
 
                 let mut s = Mark::new(lines[index].0);
                 let e = Mark::new(lines[index].1);
@@ -1179,7 +1196,7 @@ pub fn move_marks_to_next_line(
                         break;
                     }
 
-                    s.move_forward(&doc, utf8::get_codepoint);
+                    s.move_forward(&doc, codec);
                     count += 1;
                 }
                 count
@@ -1192,11 +1209,12 @@ pub fn move_marks_to_next_line(
 
             let mut tmp_mark = Mark::new(line_start_off);
 
-            let doc = &view.as_ref().borrow();
-            let doc = doc.document.as_ref().unwrap();
+            let v = &view.as_ref().borrow();
+            let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
+            let codec = v.text_codec.as_ref();
             for _ in 0..new_x {
-                tmp_mark.move_forward(&doc, utf8::get_codepoint);
+                tmp_mark.move_forward(&doc, codec);
             }
 
             if tmp_mark.offset > line_end_off {
@@ -1350,10 +1368,11 @@ pub fn cut_to_end_of_line(
     let pos = {
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow().iter() {
             let mut end = m.clone();
-            end.move_to_end_of_line(&doc, utf8::get_codepoint);
+            end.move_to_end_of_line(&doc, codec);
             doc.remove(m.offset, (end.offset - m.offset) as usize, None);
             break;
         }
@@ -1377,12 +1396,13 @@ pub fn paste(
     if let Some(idx) = v.last_cut_log_index {
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let codec = v.text_codec.as_ref();
 
         let tr = doc.buffer_log.data[idx].clone();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             let mut end = m.clone();
-            end.move_to_end_of_line(&doc, utf8::get_codepoint);
+            end.move_to_end_of_line(&doc, codec);
             doc.insert(m.offset, tr.data.len(), tr.data.as_slice());
             m.offset += tr.data.len() as u64;
             break;
@@ -1401,7 +1421,7 @@ pub fn move_to_token_start(
     view: &Rc<RefCell<View>>,
 ) {
     // TODO: factorize macrk action
-    // mark.apply(fn); where fn=m.move_to_token_end(&doc, utf8::get_codepoint);
+    // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
     //
     let mut sync = false;
 
@@ -1409,9 +1429,10 @@ pub fn move_to_token_start(
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            m.move_to_token_start(&doc, utf8::get_previous_codepoint_start);
+            m.move_to_token_start(&doc, codec);
 
             // main mark ?
             if !v.screen.contains_offset(m.offset) {
@@ -1440,9 +1461,10 @@ pub fn move_to_token_end(
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
-            m.move_to_token_end(&doc, utf8::get_codepoint);
+            m.move_to_token_end(&doc, codec);
 
             // main mark ?
             if !v.screen.contains_offset(m.offset) {
@@ -1593,17 +1615,18 @@ pub fn remove_previous_codepoint(
         let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let codec = v.text_codec.as_ref();
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             if m.offset == 0 {
                 continue;
             }
 
-            m.move_backward(&doc, utf8::get_previous_codepoint_start);
+            m.move_backward(&doc, codec);
 
             let mut data = vec![];
             doc.read(m.offset, 4, &mut data);
-            let (_, _, size) = utf8::get_codepoint(&data, 0);
+            let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
             doc.remove(m.offset, size, None);
 
             if m.offset < v.start_offset {
@@ -1643,14 +1666,15 @@ pub fn insert_codepoint(
     let mut sync_view = false;
 
     {
-        let mut data: &mut [u8; 4] = &mut [0, 0, 0, 0];
-        let data_size = utf8::encode(codepoint as u32, &mut data);
-
         let v = &mut view.as_ref().borrow(); // TODO: we can remove borrow_mut()
 
         let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let codec = v.text_codec.as_ref();
+
+        let mut data: &mut [u8] = &mut [0, 0, 0, 0];
+        let data_size = codec.encode(codepoint as u32, &mut data);
 
         for m in v.moving_marks.borrow_mut().iter_mut() {
             // TODO: add main mark check
@@ -1747,7 +1771,7 @@ pub fn select_previous_view(
 // return array of built &cpi ? to allow attr changes pass ?
 pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     for c in s.chars() {
-        let ok = screen_putchar(&mut screen, c, 0xffff_ffff_ffff_ffff);
+        let ok = screen_putchar(&mut screen, c, 0xffff_ffff_ffff_ffff, false);
         if !ok {
             return false;
         }
@@ -1756,10 +1780,11 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
     true
 }
 
-pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64) -> bool {
+pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64, is_selected: bool) -> bool {
     let (ok, _) = screen.push(layout::filter_codepoint(
         c,
         offset,
+        is_selected,
         codepointinfo::CodepointInfo::default_color(),
     ));
     ok

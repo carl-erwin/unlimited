@@ -50,6 +50,7 @@ pub fn decode_byte(state: u32, byte: u8, codep: &mut u32) -> u32 {
 
 // } end-of-derived code
 
+// rename is_sync()
 #[inline]
 pub fn is_codepoint_start(byte: u8) -> bool {
     if byte < 0x80 {
@@ -80,10 +81,19 @@ pub fn is_codepoint_start(byte: u8) -> bool {
 }
 
 // return 0 on error, or the number of written bytes
-pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
+// do encode_unchecked and remove test
+pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
+    if out.len() < 1 {
+        return 0;
+    }
+
     if codepoint < 0x80 {
         out[0] = codepoint as u8;
         return 1;
+    }
+
+    if out.len() < 2 {
+        return 0;
     }
 
     if codepoint < 0x800 {
@@ -92,11 +102,19 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
         return 2;
     }
 
+    if out.len() < 3 {
+        return 0;
+    }
+
     if codepoint < 0xFFFF {
         out[0] = 0xE0 | (codepoint >> 12) as u8;
         out[1] = 0x80 | (codepoint >> 6) as u8;
         out[2] = 0x80 | (codepoint & 0x3F) as u8;
         return 3;
+    }
+
+    if out.len() < 4 {
+        return 0;
     }
 
     if codepoint < 0x0010_FFFF {
@@ -112,7 +130,9 @@ pub fn encode(codepoint: u32, out: &mut [u8; 4]) -> usize {
 
 // TODO: rename sync_backward
 // TODO: change this with temporary (cp, offset, size) until from_offset
-pub fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
+// TODO: rename in sync(BACKWARD, offset) -> offset
+// get_previous
+fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
     assert!(data.len() >= from_offset as usize);
 
     //                 cp    size   offset
@@ -181,10 +201,111 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     )
 }
 
-pub fn get_prev_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
-    let offset = get_previous_codepoint_start(data, from_offset);
-    get_codepoint(data, offset)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub enum SyncDirection {
+    Backward,
+    Forward,
 }
+
+//TODO: move upper to code/text/mods.rs
+//
+pub trait TextCodec {
+    fn encode_max_size(&self) -> usize;
+
+    fn decode(&self, direction: SyncDirection, data: &[u8], data_offset: u64)
+        -> (char, u64, usize);
+
+    fn encode(&self, codepoint: u32, out: &mut [u8]) -> usize;
+
+    fn is_sync(&self, byte: u8) -> bool;
+
+    // TODO: return Result<u64, need more|invalid offset|...>
+    fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64>;
+}
+
+#[derive(Debug)]
+pub struct Utf8Codec {}
+
+impl Utf8Codec {
+    pub fn new() -> Self {
+        Utf8Codec {}
+    }
+}
+
+impl TextCodec for Utf8Codec {
+    fn encode_max_size(&self) -> usize {
+        4
+    }
+
+    fn decode(
+        &self,
+        direction: SyncDirection,
+        data: &[u8],
+        data_offset: u64,
+    ) -> (char, u64, usize) {
+        match direction {
+            SyncDirection::Backward => {
+                dbg_println!("SyncDirection::Backward data_offset {}", data_offset);
+                let offset = get_previous_codepoint_start(data, data_offset);
+
+                dbg_println!(" get_previous_codepoint_start offset {}", offset);
+
+                let ret = get_codepoint(data, offset);
+                dbg_println!(" ret  {:?}", ret);
+
+                ret
+            }
+
+            SyncDirection::Forward => get_codepoint(data, data_offset),
+        }
+    }
+
+    fn encode(&self, codepoint: u32, out: &mut [u8]) -> usize {
+        encode(codepoint, out)
+    }
+
+    fn is_sync(&self, byte: u8) -> bool {
+        is_codepoint_start(byte)
+    }
+
+    // TODO: return Result<u64, need more|invalid offset|...>
+    fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64> {
+        let data_offset = data_offset as usize;
+
+        let data_len = data.len();
+        if data_offset > data_len {
+            return None;
+        }
+
+        if !self.is_sync(data[data_offset]) {
+            return Some(data_offset as u64);
+        }
+
+        match direction {
+            SyncDirection::Backward => {
+                for i in (0..data_offset).rev() {
+                    if self.is_sync(data[i]) {
+                        return Some(i as u64);
+                    }
+                }
+                return None;
+            }
+
+            SyncDirection::Forward => {
+                for i in data_offset..data_len {
+                    if self.is_sync(data[i]) {
+                        return Some(i as u64);
+                    }
+                }
+                return None;
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_codec_encode() {

@@ -138,6 +138,8 @@ pub struct LayoutEnv<'a> {
 }
 
 pub trait Filter<'a> {
+    fn name(&self) -> &'static str;
+
     fn run_managed(
         &mut self,
         view: &Rc<RefCell<View>>,
@@ -275,6 +277,10 @@ impl RawDataFilter {
 }
 
 impl Filter<'_> for RawDataFilter {
+    fn name(&self) -> &'static str {
+        &"RawDataFilter"
+    }
+
     fn run(
         &mut self,
         view: &View,
@@ -293,18 +299,20 @@ impl Filter<'_> for RawDataFilter {
 
             let rd = doc.borrow().read(self.pos, self.read_size, &mut raw_data);
 
-            (*filter_out).push(FilterIoData {
-                is_valid: true,
-                end_of_pipe: false,
-                quit: false, // close pipeline
-                is_selected: false,
-                color: CodepointInfo::default_color(),
-                offset: self.pos,
-                size: 1,
-                data: FilterData::ByteArray { vec: raw_data },
-            });
+            dbg_println!("READ {} / {} bytes", rd, self.read_size);
 
-            dbg_println!("READ {} bytes", rd);
+            if rd > 0 {
+                (*filter_out).push(FilterIoData {
+                    is_valid: true,
+                    end_of_pipe: false,
+                    quit: false, // close pipeline
+                    is_selected: false,
+                    color: CodepointInfo::default_color(),
+                    offset: self.pos,
+                    size: 1,
+                    data: FilterData::ByteArray { vec: raw_data },
+                });
+            }
 
             if rd < self.read_size {
                 env.quit = true;
@@ -417,6 +425,10 @@ impl Utf8Filter {
 }
 
 impl Filter<'_> for Utf8Filter {
+    fn name(&self) -> &'static str {
+        &"Utf8Filter"
+    }
+
     fn run(
         &mut self,
         _view: &View,
@@ -479,6 +491,10 @@ impl TabFilter {
 }
 
 impl Filter<'_> for TabFilter {
+    fn name(&self) -> &'static str {
+        &"TabFilter"
+    }
+
     fn run(
         &mut self,
         _view: &View,
@@ -544,6 +560,7 @@ pub struct HighlightFilter {
     token_type: TokenType,
     utf8_token: Vec<u8>,
     new_color: (u8, u8, u8),
+    utf8_codec: Box<dyn utf8::TextCodec>, // internal token representation is utf8
 }
 impl HighlightFilter {
     fn new(_env: &LayoutEnv) -> Self {
@@ -552,6 +569,7 @@ impl HighlightFilter {
             token_type: TokenType::UNKNOWN,
             utf8_token: Vec::new(),
             new_color: CodepointInfo::default_color(),
+            utf8_codec: Box::new(utf8::Utf8Codec::new()),
         }
     }
 }
@@ -559,6 +577,10 @@ impl HighlightFilter {
 // TODO: monitor env.quit
 // to flush
 impl Filter<'_> for HighlightFilter {
+    fn name(&self) -> &'static str {
+        &"HighlightFilter"
+    }
+
     fn run(
         &mut self,
         _view: &View,
@@ -595,8 +617,12 @@ impl Filter<'_> for HighlightFilter {
 
                     // need more or accumulae same class
                     if self.token_io.len() == 0 {
-                        self.token_io.push(io.clone());
-                        self.token_type = token_type;
+                        if eof {
+                            filter_out.push(io.clone());
+                        } else {
+                            self.token_io.push(io.clone());
+                            self.token_type = token_type;
+                        }
                         continue;
                     }
 
@@ -616,7 +642,7 @@ impl Filter<'_> for HighlightFilter {
                                 ..
                             } => {
                                 let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-                                let nr_bytes = utf8::encode(cp, &mut utf8_out);
+                                let nr_bytes = self.utf8_codec.encode(cp, &mut utf8_out);
                                 for b in utf8_out.iter().take(nr_bytes) {
                                     self.utf8_token.push(*b);
                                 }
@@ -685,7 +711,7 @@ impl Filter<'_> for HighlightFilter {
 
                     self.token_type = token_type;
 
-                    // set color
+                    // flush token: set color
                     for mut io in self.token_io.iter_mut() {
                         io.color = self.new_color;
                     }
@@ -725,6 +751,10 @@ impl ScreenFilter {
 }
 
 impl Filter<'_> for ScreenFilter {
+    fn name(&self) -> &'static str {
+        &"ScreenFilter"
+    }
+
     fn run(
         &mut self,
         _view: &View,
@@ -750,13 +780,17 @@ impl Filter<'_> for ScreenFilter {
             if let FilterIoData {
                 offset,
                 data: FilterData::Unicode { cp, .. },
+                is_selected,
                 color,
                 ..
             } = &*io
             {
-                let (push_ok, _) =
-                    env.screen
-                        .push(filter_codepoint(u32_to_char(*cp), *offset, *color));
+                let (push_ok, _) = env.screen.push(filter_codepoint(
+                    u32_to_char(*cp),
+                    *offset,
+                    *is_selected,
+                    *color,
+                ));
                 if !push_ok {
                     env.quit = true;
                     break;
@@ -784,7 +818,12 @@ impl Filter<'_> for ScreenFilter {
 //    };
 
 // TODO return array of CodePointInfo  0x7f -> <ESC>
-pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointInfo {
+pub fn filter_codepoint(
+    c: char,
+    offset: u64,
+    is_selected: bool,
+    color: (u8, u8, u8),
+) -> CodepointInfo {
     let displayed_cp: char = match c {
         '\r' | '\n' | '\t' => ' ',
 
@@ -800,7 +839,7 @@ pub fn filter_codepoint(c: char, offset: u64, color: (u8, u8, u8)) -> CodepointI
         cp: c,
         displayed_cp,
         offset,
-        is_selected: false,
+        is_selected,
         color,
     }
 }
@@ -857,7 +896,9 @@ pub fn run_view_layout_filters_direct(
     while env.quit == false {
         for f in &mut filters {
             filter_out.clear();
+            dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut env, &filter_in, &mut filter_out);
+            dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }
