@@ -247,14 +247,8 @@ impl TextCodec for Utf8Codec {
     ) -> (char, u64, usize) {
         match direction {
             SyncDirection::Backward => {
-                dbg_println!("SyncDirection::Backward data_offset {}", data_offset);
                 let offset = get_previous_codepoint_start(data, data_offset);
-
-                dbg_println!(" get_previous_codepoint_start offset {}", offset);
-
                 let ret = get_codepoint(data, offset);
-                dbg_println!(" ret  {:?}", ret);
-
                 ret
             }
 

@@ -271,7 +271,7 @@ impl RawDataFilter {
         RawDataFilter {
             pos: env.base_offset,
             //max: env.max_offset,
-            read_size: env.screen.width() * env.screen.height() / 8,
+            read_size: env.screen.width() * env.screen.height(),
         }
     }
 }
@@ -896,9 +896,9 @@ pub fn run_view_layout_filters_direct(
     while env.quit == false {
         for f in &mut filters {
             filter_out.clear();
-            dbg_println!("running {} : in({})", f.name(), filter_in.len());
+            //            dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut env, &filter_in, &mut filter_out);
-            dbg_println!("        {} : out({})", f.name(), filter_out.len());
+            //            dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }

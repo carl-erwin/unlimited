@@ -129,9 +129,7 @@ pub struct EditorEnv {
 
     // move ths to update_action
     // reset on each event handling
-    pub center: bool,
-    pub scroll: bool,
-    pub scroll_n: usize,
+    pub view_action: Vec<view::Action>,
 }
 
 impl EditorEnv {
@@ -151,9 +149,7 @@ impl EditorEnv {
             next_node: None,
 
             view_id: 0,
-            center: false,
-            scroll: false,
-            scroll_n: 0,
+            view_action: Vec::new(),
         }
     }
 }
@@ -201,7 +197,7 @@ pub fn build_layout_and_send_event(
 
 pub fn send_build_layout_event(editor: &mut Editor, ui_tx: &Sender<EventMessage>, view_id: u64) {
     let view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
-    let new_screen = view.screen.clone();
+    let new_screen = view.screen.clone(); // Rc ?
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
@@ -409,19 +405,21 @@ fn process_input_events(
         }
     }
 
-    let p = crate::core::event::pending_input_event_count();
+    let p_input = crate::core::event::pending_input_event_count();
+    let p_rdr = crate::core::event::pending_input_event_count();
+
     dbg_println!("pending input event = {}\r", p);
+    dbg_println!("pending render events = {}\r", p_rdr);
 
     // % last render time
-    if p > 1 && editor.last_rdr_event.elapsed() < Duration::from_millis(1000 / 5) {
-        return;
+    if (p_input <= 1 && p_rdr <= 2)
+        || editor.last_rdr_event.elapsed() > Duration::from_millis(1000 / 5)
+    {
+        // hit
+        crate::core::event::pending_render_event_inc(1);
+        send_build_layout_event(&mut editor, ui_tx, env.view_id as u64);
+        editor.last_rdr_event = Instant::now();
     }
-
-    // hit
-    dbg_println!("send_build_layout_event view_id {}\r", env.view_id);
-    crate::core::event::pending_render_event_inc(1);
-    send_build_layout_event(&mut editor, ui_tx, env.view_id as u64);
-    editor.last_rdr_event = Instant::now();
 }
 
 pub fn application_quit(

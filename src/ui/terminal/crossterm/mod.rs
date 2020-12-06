@@ -94,7 +94,8 @@ pub fn main_loop(
 
     crossterm::terminal::enable_raw_mode()?;
 
-    let mut full_redraw = false;
+    let mut full_redraw = true;
+    let mut last_draw_time = Instant::now();
 
     while !ui_state.quit {
         // check terminal size
@@ -132,21 +133,30 @@ pub fn main_loop(
                 DrawEvent { mut screen } => {
                     let start = Instant::now();
                     let p = crate::core::event::pending_render_event_count();
-                    if p <= 1 {
+                    let mut drop = false;
+
+                    if p <= 2 || last_draw_time.elapsed() > Duration::from_millis(1000 / 5) {
+                        // draw
+                    } else {
+                        drop = true;
+                    }
+
+                    if !drop {
                         let s = Instant::now();
                         draw_view(&mut last_screen, &mut screen, &mut stdout, full_redraw);
-                        let e = Instant::now();
-                        dbg_println!("time to draw view = {}\r", (e - s).as_millis());
+                        last_draw_time = Instant::now();
+                        dbg_println!("time to draw view = {}\r", (last_draw_time - s).as_millis());
                         full_redraw = false;
-                    } else {
-                        full_redraw = true;
                     }
 
                     if p > 0 {
                         crate::core::event::pending_render_event_dec(1);
                     }
 
-                    dbg_println!("pending render events = {}\r", p);
+                    dbg_println!(
+                        "pending render events = {}\r",
+                        crate::core::event::pending_render_event_count()
+                    );
 
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
@@ -245,6 +255,14 @@ fn screen_changed(screen0: &Screen, screen1: &Screen) -> bool {
         || screen0.max_height() != screen1.max_height())
 }
 
+fn screen_width_change(screen0: &Screen, screen1: &Screen) -> bool {
+    screen0.max_width() != screen1.max_width()
+}
+
+fn screen_height_change(screen0: &Screen, screen1: &Screen) -> bool {
+    screen0.max_height() != screen1.max_height()
+}
+
 fn draw_screen(
     last_screen: &mut Screen,
     screen: &mut Screen,
@@ -253,6 +271,10 @@ fn draw_screen(
     let mut prev_cpi = CodepointInfo::new();
 
     let check_hash = screen_changed(&last_screen, &screen);
+    let _width_change = screen_width_change(&last_screen, &screen);
+    let _height_change = screen_height_change(&last_screen, &screen);
+
+    let column_change = true; // width_change;
 
     // set default color
     {
@@ -268,73 +290,105 @@ fn draw_screen(
         )?;
     }
 
-    dbg_println!("check_hash = {}", check_hash);
+    if check_hash == false {
+        queue!(stdout, Clear(ClearType::All))?;
+    }
 
-    let mut count: usize = 0;
+    // dbg_println!("check_hash = {}", check_hash);
 
     // current style
     for l in 0..screen.max_height() {
-
+        queue!(stdout, MoveTo(0, l as u16))?;
 
         let line = screen.get_mut_unclipped_line(l).unwrap();
 
         if check_hash {
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
-                dbg_println!("line[{}] SKIP ...", l);
+                // dbg_println!("line[{}] SKIP ...", l);
                 continue;
             }
         }
-
-        queue!(stdout, MoveTo(0, l as u16))?;
 
         /////////////////////
         // draw line
         /////////////////////
 
-        dbg_println!("line[{}] DRAW *** ", l);
         let mut set_style = true;
         let mut set_color = true;
 
+        let mut nb_draw_char = 0;
+        let mut nb_skip_char = 0;
 
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
+
+            let mut change = false;
+            let mut skip_draw = false;
 
             // default style
             if cpi.is_selected != prev_cpi.is_selected {
                 set_style = true;
                 set_color = true;
+                change = true;
             }
 
             // detect color change
             if prev_cpi.color != cpi.color {
                 set_color = true;
+                change = true;
             }
 
-            if set_style {
-               set_style = false;
-                if cpi.is_selected  {
-                    queue!(stdout, SetAttribute(Attribute::Reverse))?;
-               } else {
-                    queue!(stdout, SetAttribute(Attribute::Reset))?;
-               }
+            if !column_change && !change {
+                if let Some(prev_line) = last_screen.get_mut_unclipped_line(l) {
+                    if let Some(prev_screen_cpi) = prev_line.get_unclipped_cpi(c) {
+                        if cpi.displayed_cp == prev_screen_cpi.displayed_cp
+                            && cpi.is_selected == prev_screen_cpi.is_selected
+                        {
+                            skip_draw = true;
+                        }
+                    }
+                }
             }
 
-            if set_color {
-                set_color = false;
-                let color = Color::Rgb {
-                    r: cpi.color.0,
-                    g: cpi.color.1,
-                    b: cpi.color.2,
-                };
-                queue!(stdout, SetForegroundColor(color))?;
-            }
+            if skip_draw {
+                queue!(stdout, MoveTo((c + 1) as u16, l as u16))?;
+                nb_skip_char += 1;
+            } else {
+                nb_draw_char += 1;
 
-            // draw character
-            queue!(stdout, Print(cpi.displayed_cp))?;
+                if set_style {
+                    set_style = false;
+                    if cpi.is_selected {
+                        queue!(stdout, SetAttribute(Attribute::Reverse))?;
+                    } else {
+                        queue!(stdout, SetAttribute(Attribute::Reset))?;
+                    }
+                }
+
+                if set_color {
+                    set_color = false;
+                    let color = Color::Rgb {
+                        r: cpi.color.0,
+                        g: cpi.color.1,
+                        b: cpi.color.2,
+                    };
+                    queue!(stdout, SetForegroundColor(color))?;
+                }
+
+                // draw character
+                queue!(stdout, Print(cpi.displayed_cp))?;
+            }
 
             prev_cpi = *cpi;
         }
+
+        // dbg_println!(
+        //    "line[{}] DRAW : real({}) skip({}) *** ",
+        //    l,
+        //    nb_draw_char,
+        //    nb_skip_char
+        //);
     }
 
     // Update the screen
@@ -626,7 +680,7 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
 
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 // move to send input events ?
-                dbg_println!("receive crossterm event {:?}\r", cross_evt);
+                // dbg_println!("receive crossterm event {:?}\r", cross_evt);
                 let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
 
