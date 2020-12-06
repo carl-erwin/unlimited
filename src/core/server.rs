@@ -130,6 +130,7 @@ pub struct EditorEnv {
     // move ths to update_action
     // reset on each event handling
     pub view_action: Vec<view::Action>,
+    pub center_offset: u64,
 }
 
 impl EditorEnv {
@@ -150,6 +151,7 @@ impl EditorEnv {
 
             view_id: 0,
             view_action: Vec::new(),
+            center_offset: 0,
         }
     }
 }

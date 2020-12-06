@@ -425,7 +425,7 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn center_arround_offset(&mut self, offset: u64) {
+    fn center_arround_offset(&mut self, offset: u64) {
         // TODO use env.center_offset
         self.start_offset = offset;
         let h = self.screen.height() / 2;
@@ -552,6 +552,7 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
                 Action::CenterArround { offset } => {
                     // TODO:
                     let trigger = Vec::new();
+                    env.center_offset = *offset;
                     center_arround_mark(editor, env, &trigger, &view);
                 }
                 Action::MoveMarksToNextLine => {}
@@ -1461,6 +1462,22 @@ pub fn center_arround_mark(
     let mi = v.mark_index;
 
     v.center_arround_offset(marks[mi].offset);
+}
+
+pub fn center_arround_offset(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let mut v = view.as_ref().borrow_mut();
+    let offset = {
+        let doc = v.document.as_ref().unwrap();
+        let doc = doc.as_ref().borrow();
+        ::std::cmp::min(doc.size() as u64, env.center_offset)
+    };
+
+    v.center_arround_offset(offset);
 }
 
 pub fn move_mark_to_end_of_file(
