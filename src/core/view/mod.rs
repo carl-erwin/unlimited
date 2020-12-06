@@ -528,86 +528,132 @@ pub fn get_lines_offsets(
     }
 }
 
+pub fn run_view_action(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+    actions: &Vec<Action>,
+) {
+    for a in actions.iter() {
+        match a {
+            Action::ScrollUp { n } => {
+                let v = &mut view.as_ref().borrow_mut();
+                v.scroll_up(*n);
+            }
+            Action::ScrollDown { n } => {
+                let v = &mut view.as_ref().borrow_mut();
+                v.scroll_down(*n);
+            }
+            Action::CenterArroundMainMark => {
+                let trigger = Vec::new();
+                center_arround_mark(editor, env, &trigger, &view);
+            }
+            Action::CenterArround { offset } => {
+                // TODO:
+                let trigger = Vec::new();
+                env.center_offset = Some(*offset);
+                center_arround_mark(editor, env, &trigger, &view);
+            }
+            Action::MoveMarksToNextLine => {
+                let trigger = Vec::new();
+                move_marks_to_next_line(editor, env, &trigger, &view);
+            }
+            Action::MoveMarksToPreviousLine => {}
+            Action::MoveMarkToNextLine { idx } => {
+                let marks = { view.as_ref().borrow().moving_marks.clone() };
+                let mut marks = marks.borrow_mut();
+                let mut m = &mut marks[*idx];
+                env.cur_mark_index = Some(*idx);
+                move_mark_to_next_line(env, view, &mut m);
+                env.cur_mark_index = None;
+            }
+            Action::MoveMarkToPreviousLine { idx: usize } => {}
+        }
+    }
+}
+
+pub fn refresh_view_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    // compute layout
+
+    let mut v = view.as_ref().borrow_mut();
+
+    // TODO: marks_filter
+    // set_render_marks
+    // brute force for now
+    let marks = v.moving_marks.clone(); // do not hold v
+    for m in marks.borrow().iter() {
+        if m.offset < v.start_offset || m.offset > v.end_offset {
+            continue;
+        }
+
+        for l in 0..v.screen.height() {
+            let line = v.screen.get_mut_line(l).unwrap();
+
+            for c in 0..line.nb_cells {
+                let cpi = line.get_mut_cpi(c).unwrap();
+
+                if cpi.offset == m.offset {
+                    cpi.is_selected = !cpi.metadata;
+                }
+            }
+        }
+    }
+}
+
+pub fn compute_view_layout(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    // compute layout
+
+    let mut v = view.as_ref().borrow_mut();
+
+    let doc = v.document.clone();
+    let doc = doc.as_ref();
+
+    // TODO: transform read as filter pass
+    if let Some(ref doc) = doc {
+        // 1st pass raw_data_filter
+        let max_offset = { doc.borrow().size() as u64 };
+
+        let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
+
+        let end_offset =
+            run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
+
+        // TODO: from env ?
+        v.end_offset = end_offset;
+        v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
+        v.check_invariants();
+    }
+}
+
 // TODO: test-mode
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
 pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    // refresh some env vars
     {
-        let actions = env.view_action.clone();
-        env.view_action.clear();
-        for a in actions.iter() {
-            match a {
-                Action::ScrollUp { n } => {
-                    let v = &mut view.as_ref().borrow_mut();
-                    v.scroll_up(*n);
-                }
-                Action::ScrollDown { n } => {
-                    let v = &mut view.as_ref().borrow_mut();
-                    v.scroll_down(*n);
-                }
-                Action::CenterArroundMainMark => {
-                    let trigger = Vec::new();
-                    center_arround_mark(editor, env, &trigger, &view);
-                }
-                Action::CenterArround { offset } => {
-                    // TODO:
-                    let trigger = Vec::new();
-                    env.center_offset = *offset;
-                    center_arround_mark(editor, env, &trigger, &view);
-                }
-                Action::MoveMarksToNextLine => {}
-                Action::MoveMarksToPreviousLine => {}
-                Action::MoveMarkToNextLine { idx: usize } => {}
-                Action::MoveMarkToPreviousLine { idx: usize } => {}
-            }
-        }
+        let v = &mut view.as_ref().borrow();
+        let doc = v.document.as_ref().unwrap();
+        let doc = doc.as_ref().borrow();
+        env.max_offset = doc.size() as u64;
     }
 
-    // compute layout
+    // pre layout action
     {
-        let mut v = view.as_ref().borrow_mut();
-
-        let doc = v.document.clone();
-        let doc = doc.as_ref();
-
-        // TODO: transform read as filter pass
-        if let Some(ref doc) = doc {
-            // 1st pass raw_data_filter
-            let max_offset = { doc.borrow().size() as u64 };
-
-            let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
-
-            let end_offset =
-                run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
-
-            // TODO: from env ?
-            v.end_offset = end_offset;
-            v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
-            v.check_invariants();
-
-            // TODO: marks_filter
-            // set_render_marks
-            // brute force for now
-            let marks = v.moving_marks.clone(); // do not hold v
-            for m in marks.borrow().iter() {
-                if m.offset < v.start_offset || m.offset > v.end_offset {
-                    continue;
-                }
-
-                for l in 0..v.screen.height() {
-                    let line = v.screen.get_mut_line(l).unwrap();
-
-                    for c in 0..line.nb_cells {
-                        let cpi = line.get_mut_cpi(c).unwrap();
-
-                        if cpi.offset == m.offset {
-                            cpi.is_selected = !cpi.metadata;
-                        }
-                    }
-                }
-            }
-        }
+        let actions = env.view_pre_render.clone();
+        env.view_pre_render.clear();
+        run_view_action(editor, env, view, &actions);
     }
+
+    compute_view_layout(editor, env, view);
+
+    // post layout action
+    {
+        let actions = env.view_post_render.clone();
+        env.view_post_render.clear();
+        run_view_action(editor, env, view, &actions);
+    }
+
+    refresh_view_marks(editor, env, view);
 }
 
 ///
@@ -622,7 +668,7 @@ pub fn scroll_up(
 ) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    env.view_action.push(Action::ScrollUp { n: 3 });
+    env.view_pre_render.push(Action::ScrollUp { n: 3 });
 }
 
 pub fn scroll_down(
@@ -633,7 +679,7 @@ pub fn scroll_down(
 ) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    env.view_action.push(Action::ScrollDown { n: 3 });
+    env.view_pre_render.push(Action::ScrollDown { n: 3 });
 }
 
 // TODO: rename into insert_input_event
@@ -695,7 +741,7 @@ pub fn insert_codepoint_array(
     };
 
     if center {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     };
 }
 
@@ -726,7 +772,7 @@ pub fn undo(
     }
 
     if sync_view {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
 
@@ -757,7 +803,7 @@ pub fn redo(
     }
 
     if sync_view {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
 
@@ -875,7 +921,7 @@ pub fn move_marks_backward(
         for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
             // TODO: add main mark check
             if idx == midx && m.offset <= v.start_offset {
-                env.view_action.push(Action::ScrollUp { n: 1 });
+                env.view_pre_render.push(Action::ScrollUp { n: 1 });
             }
 
             m.move_backward(&doc, codec);
@@ -890,7 +936,7 @@ pub fn move_marks_backward(
     }
 
     if view.as_ref().borrow_mut().center_on_mark_move {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
 
@@ -910,7 +956,7 @@ pub fn move_marks_forward(
         for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
             // TODO: add main mark check
             if idx == midx && m.offset >= v.end_offset {
-                env.view_action.push(Action::ScrollDown { n: 1 });
+                env.view_pre_render.push(Action::ScrollDown { n: 1 });
             }
 
             m.move_forward(&doc, codec);
@@ -924,7 +970,7 @@ pub fn move_marks_forward(
     }
 
     // if view.as_ref().borrow_mut().center_on_mark_move {
-    //     // env.view_action.push(Action::CenterArroundMainMark);
+    //     // env.view_pre_render.push(Action::CenterArroundMainMark);
     // }
 }
 
@@ -978,7 +1024,7 @@ fn move_mark_to_previous_line(
             (Some(_), _, y) if y == 0 => {
                 // previous line is offscreen
                 if is_main_mark {
-                    env.view_action.push(Action::ScrollUp { n: 1 });
+                    env.view_pre_render.push(Action::ScrollUp { n: 1 });
                 }
             }
 
@@ -1138,59 +1184,52 @@ pub fn move_marks_to_previous_line(
 }
 
 // remove multiple borrows
-pub fn move_mark_to_next_line(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-    max_offset: u64, // ADD view env ?
-    m: &mut Mark,
-    is_main_mark: bool,
-) {
+pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: &mut Mark) {
     // TODO: m.on_buffer_end() ?
+    let max_offset = env.max_offset;
+
     if m.offset == max_offset {
         return;
     }
 
     let mut is_offscreen = true;
 
-    let mut known_start = None;
+    {
+        let v = view.as_ref().borrow_mut();
+        if v.screen.contains_offset(m.offset) {
+            // yes get coordinates
+            let (_, x, y) = v.screen.find_cpi_by_offset(m.offset);
+            let screen_height = v.screen.height();
 
-    if view.as_ref().borrow_mut().screen.contains_offset(m.offset) {
-        // yes get coordinates
-        let (_, x, y) = view
-            .as_ref()
-            .borrow_mut()
-            .screen
-            .find_cpi_by_offset(m.offset);
+            dbg_println!("m.offset screen (X({}), Y({}))", x, y);
+            dbg_println!("screen_height {}", screen_height);
 
-        let screen_height = view.as_ref().borrow_mut().screen.height();
+            if y < screen_height - 1 {
+                is_offscreen = false;
 
-        dbg_println!("m.offset screen (X({}), Y({}))", x, y);
-        dbg_println!("screen_height {}", screen_height);
-
-        if y < screen_height - 1 {
-            is_offscreen = false;
-
-            let new_y = y + 1;
-            let v = view.as_ref().borrow_mut();
-            let l = v.screen.get_line(new_y).unwrap();
-            if l.nb_cells > 0 {
-                let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                let cpi = v.screen.get_cpinfo(new_x, new_y).unwrap();
-                if !cpi.metadata {
-                    m.offset = cpi.offset;
+                let new_y = y + 1;
+                let l = v.screen.get_line(new_y).unwrap();
+                if l.nb_cells > 0 {
+                    let new_x = ::std::cmp::min(x, l.nb_cells - 1);
+                    let cpi = v.screen.get_cpinfo(new_x, new_y).unwrap();
+                    if !cpi.metadata {
+                        m.offset = cpi.offset;
+                    }
                 }
-            }
-        } else {
-            // schedule
-            if (y == screen_height - 1) && is_main_mark == true {
-                env.view_action.push(Action::ScrollDown { n: 1 });
 
-                let v = view.as_ref().borrow();
-                let cpi = v.screen.get_cpinfo(0, 1).unwrap();
-                if !cpi.metadata {
-                    known_start = Some(cpi.offset);
+            //dbg_println!("MARK ON SCREEN RETURN");
+            //return;
+            } else {
+                // schedule
+                if y == screen_height - 1 {
+                    if let Some(idx) = env.cur_mark_index {
+                        if v.mark_index == idx {
+                            env.view_pre_render.push(Action::ScrollDown { n: 1 });
+                            env.view_post_render
+                                .push(Action::MoveMarkToNextLine { idx });
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -1291,17 +1330,11 @@ pub fn move_marks_to_next_line(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let (max_offset, midx) = {
-        let v = &view.as_ref().borrow();
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
-        (doc.size() as u64, v.mark_index)
-    };
-
     let moving_marks = { view.as_ref().borrow().moving_marks.clone() };
 
     for (idx, m) in moving_marks.borrow_mut().iter_mut().enumerate() {
-        move_mark_to_next_line(editor, env, trigger, view, max_offset, m, idx == midx);
+        env.cur_mark_index = Some(idx);
+        move_mark_to_next_line(env, view, m);
     }
 }
 
@@ -1358,7 +1391,9 @@ pub fn clone_and_move_mark_to_next_line(
     let prev_off = m.offset;
     dbg_println!(" clone move down: prev_offset {}", prev_off);
 
-    move_mark_to_next_line(editor, env, trigger, view, max_offset, &mut m, true);
+    env.cur_mark_index = Some(mi);
+    env.max_offset = max_offset;
+    move_mark_to_next_line(env, view, &mut m);
 
     dbg_println!(" clone move down: prev_offset {}", prev_off);
 
@@ -1380,9 +1415,8 @@ pub fn clone_and_move_mark_to_next_line(
         v.center_on_mark_move
     };
 
-    // for a in v.action {}
     if center {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     };
 }
 
@@ -1470,14 +1504,16 @@ pub fn center_arround_offset(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
-    let offset = {
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
-        ::std::cmp::min(doc.size() as u64, env.center_offset)
-    };
+    if let Some(center_offset) = env.center_offset {
+        let mut v = view.as_ref().borrow_mut();
+        let offset = {
+            let doc = v.document.as_ref().unwrap();
+            let doc = doc.as_ref().borrow();
+            ::std::cmp::min(doc.size() as u64, center_offset)
+        };
 
-    v.center_arround_offset(offset);
+        v.center_arround_offset(offset);
+    }
 }
 
 pub fn move_mark_to_end_of_file(
@@ -1510,14 +1546,9 @@ pub fn scroll_to_next_screen(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    {
-        let mut v = view.as_ref().borrow_mut();
-        let n = ::std::cmp::max(v.screen.height() - 1, 1);
-        env.view_action.push(Action::ScrollDown { n });
-    }
-
-    // TODO
-    // move_mark_to_screen_start(editor, env, trigger, view);
+    let v = view.as_ref().borrow_mut();
+    let n = ::std::cmp::max(v.screen.height() - 1, 1);
+    env.view_pre_render.push(Action::ScrollDown { n });
 }
 
 /*
@@ -1609,7 +1640,7 @@ pub fn move_to_token_start(
                     // TODO: push to post action queue
                     // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                     //
-                    env.view_action.push(Action::CenterArroundMainMark);
+                    env.view_pre_render.push(Action::CenterArroundMainMark);
                 }
             }
         }
@@ -1644,7 +1675,7 @@ pub fn move_to_token_end(
     }
 
     if sync {
-        env.view_action.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
 
@@ -1824,7 +1855,7 @@ pub fn remove_previous_codepoint(
             shrink += nr_removed as u64;
 
             if m.offset < v.start_offset {
-                env.view_action.push(Action::ScrollUp { n: 1 });
+                env.view_pre_render.push(Action::ScrollUp { n: 1 });
             }
         }
 
@@ -1894,9 +1925,9 @@ pub fn insert_codepoint(
     }
 
     if scroll_needed {
-        env.view_action.push(Action::ScrollDown { n: 1 });
+        env.view_pre_render.push(Action::ScrollDown { n: 1 });
     } else if center {
-        env.view_action.push(Action::CenterArround {
+        env.view_pre_render.push(Action::CenterArround {
             offset: center_offset,
         });
     }

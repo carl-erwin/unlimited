@@ -127,10 +127,15 @@ pub struct EditorEnv {
 
     pub view_id: usize, // doc id in view
 
+    // ADD view env ? TODO: refresh env after input_proessing
+
     // move ths to update_action
     // reset on each event handling
-    pub view_action: Vec<view::Action>,
-    pub center_offset: u64,
+    pub view_pre_render: Vec<view::Action>,
+    pub view_post_render: Vec<view::Action>,
+    pub center_offset: Option<u64>,
+    pub cur_mark_index: Option<usize>,
+    pub max_offset: u64,
 }
 
 impl EditorEnv {
@@ -150,8 +155,11 @@ impl EditorEnv {
             next_node: None,
 
             view_id: 0,
-            view_action: Vec::new(),
-            center_offset: 0,
+            view_pre_render: Vec::new(),
+            view_post_render: Vec::new(),
+            center_offset: None,
+            cur_mark_index: None,
+            max_offset: 0,
         }
     }
 }
