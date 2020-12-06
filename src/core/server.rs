@@ -125,6 +125,8 @@ pub struct EditorEnv {
     current_node: Option<Rc<InputEventRule>>,
     next_node: Option<Rc<InputEventRule>>,
 
+    pub width: usize,
+    pub height: usize,
     pub view_id: usize, // doc id in view
 
     // ADD view env ? TODO: refresh env after input_proessing
@@ -154,6 +156,8 @@ impl EditorEnv {
             current_node: None,
             next_node: None,
 
+            width: 0,
+            height: 0,
             view_id: 0,
             view_pre_render: Vec::new(),
             view_post_render: Vec::new(),
@@ -164,49 +168,30 @@ impl EditorEnv {
     }
 }
 
-pub fn build_layout(editor: &mut Editor, mut env: &mut EditorEnv, view_id: u64) {
-    let view = editor.view_map[view_id as usize].1.clone();
-
-    let start = Instant::now();
-    update_view(editor, &mut env, &view);
-    let end = Instant::now();
-    view.as_ref().borrow_mut().screen.time_to_build = end.duration_since(start);
+pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
+    let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
+    // resize ?
+    if env.width != view.screen.width() || env.height != view.screen.height() {
+        view.screen = Box::new(Screen::new(env.width, env.height));
+    }
 }
 
-pub fn build_layout_and_send_event(
+pub fn update_view_and_send_draw_event(
     mut editor: &mut Editor,
     mut env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
-    view: Rc<RefCell<View>>,
 ) {
-    let view_id = { view.borrow().id };
+    // check size
+    check_view_dimension(editor, env);
 
-    // prepare filter
-    // setup filter ctx
-    // push filter vec
-    // s/fill_scren/run_filter/
+    let view = editor.view_map[env.view_id].1.clone();
 
-    // build_layout
-    let start = Instant::now();
-    build_layout(&mut editor, &mut env, view_id);
-
-    // clone view's screen to send
-    let view = view.borrow();
-
-    let mut new_screen = view.screen.clone(); // Rc() ? Cow ? // TODO Arc<>
-    let end = Instant::now();
-    new_screen.time_to_build = end.duration_since(start);
-
-    // and send it
-    let msg = EventMessage::new(
-        0, // get_next_seq(&mut seq), TODO
-        DrawEvent { screen: new_screen },
-    );
-    ui_tx.send(msg).unwrap_or(());
+    update_view(&mut editor, &mut env, &view);
+    send_draw_event(&mut editor, ui_tx, &view);
 }
 
-pub fn send_build_layout_event(editor: &mut Editor, ui_tx: &Sender<EventMessage>, view_id: u64) {
-    let view = editor.view_map[view_id as usize].1.as_ref().borrow_mut();
+pub fn send_draw_event(_editor: &mut Editor, ui_tx: &Sender<EventMessage>, view: &Rc<RefCell<View>>) {
+    let view = view.as_ref().borrow();
     let new_screen = view.screen.clone(); // Rc ?
 
     let msg = EventMessage::new(
@@ -238,22 +223,9 @@ pub fn run(
                 }
 
                 Event::UpdateViewEvent { width, height } => {
-                    // check size
-                    {
-                        let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
-                        // resize ?
-                        if width != view.screen.width() || height != view.screen.height() {
-                            view.screen = Box::new(Screen::new(width, height));
-                        }
-                    }
-
-                    let view = editor.view_map[env.view_id].1.clone();
-
-                    build_layout_and_send_event(&mut editor, &mut env, ui_tx, view);
-
-                    // is there a view/screen ?
-                    // with the correct size ?
-                    // alloc/resize screen
+                    env.width = width;
+                    env.height = height;
+                    update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
                 }
 
                 Event::InputEvent { events, raw_data } => {
@@ -313,8 +285,8 @@ fn process_input_event(
     let action = eval_input_event(
         &ev,
         &env.input_map,
-        &mut env.current_node, // TODO: EvalCtx
-        &mut env.next_node,    // TODO: EvalCtx
+        &mut env.current_node, // TODO: EvalEnv
+        &mut env.next_node,    // TODO: EvalEnv
     );
 
     let trigger = vec![(*ev).clone()];
@@ -328,10 +300,6 @@ fn process_input_event(
 
         match action.as_str() {
             _ => {
-                // TODO: pattern match type of action base on domain or augment mode callbacks cb(e,c,d,v, trigger, env? {k,v}*)
-                // applicatoin:
-
-                // else
                 if let Some(action) = env.action_map.get(&action) {
                     action(editor, env, &trigger, &mut view);
                 }
@@ -339,7 +307,6 @@ fn process_input_event(
         }
 
         let end = Instant::now();
-
         dbg_println!("time to run action {}", (end - start).as_millis());
     } else {
         // TODO: move to caller ?
@@ -359,55 +326,25 @@ fn process_input_events(
 ) {
     let p = crate::core::event::pending_input_event_count();
 
-    let (_w, _h) = {
-        let v = &editor.view_map[env.view_id].1.clone();
-        let v = &v.as_ref().borrow();
-        (v.screen.width(), v.screen.height())
-    };
-
-    dbg_println!("ENTER process_input_events : env.view_id {}\r", env.view_id);
+    dbg_println!("process_input_events : env.view_id {}\r", env.view_id);
 
     for ev in events {
         let vid = env.view_id;
-        // beforem process
         let mut event_processed = process_input_event(&mut editor, &mut env, vid, ev);
 
-        let vid_next = env.view_id;
-
-        dbg_println!(
-            "process_input_events -> event_processed {}: env.view_id {}\r",
-            event_processed,
-            env.view_id
-        );
-
         // to check_focus_change()
-        if vid != vid_next {
-            // func
-            dbg_println!("view change");
-
-            /* check view change */
-            let (w, h) = {
-                let v = &editor.view_map[vid].1.clone();
-                let v = &v.as_ref().borrow();
-                (v.screen.width(), v.screen.height())
-            };
-
-            let v = &editor.view_map[vid_next].1.clone();
-            let v = &mut v.as_ref().borrow_mut();
-            v.screen = Box::new(Screen::new(w, h));
+        if vid != env.view_id {
+            dbg_println!("view change {} ->  {}", vid, env.view_id);
+            check_view_dimension(editor, env);
             event_processed = true;
         }
 
         if event_processed {
             let start = Instant::now();
-            let vid = env.view_id as u64;
-            build_layout(&mut editor, &mut env, vid);
+            let view = editor.view_map[env.view_id].1.clone();
+            update_view(&mut editor, &mut env, &view);
             let end = Instant::now();
-            dbg_println!(
-                "time to build layout vid({})= {} ms\r",
-                vid,
-                (end - start).as_millis()
-            );
+            dbg_println!("update view time {}\r", (end - start).as_millis());
         }
 
         if p > 0 {
@@ -427,7 +364,8 @@ fn process_input_events(
     {
         // hit
         crate::core::event::pending_render_event_inc(1);
-        send_build_layout_event(&mut editor, ui_tx, env.view_id as u64);
+        let view = &editor.view_map[env.view_id].1.clone();
+        send_draw_event(&mut editor, ui_tx, &view);
         editor.last_rdr_event = Instant::now();
     }
 }

@@ -16,6 +16,7 @@
 //
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 //
 use crate::core::editor::Editor;
@@ -567,12 +568,12 @@ pub fn run_view_action(
                 move_mark_to_next_line(env, view, &mut m);
                 env.cur_mark_index = None;
             }
-            Action::MoveMarkToPreviousLine { idx: usize } => {}
+            Action::MoveMarkToPreviousLine { idx: _usize } => {}
         }
     }
 }
 
-pub fn refresh_view_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // compute layout
 
     let mut v = view.as_ref().borrow_mut();
@@ -600,7 +601,7 @@ pub fn refresh_view_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
     }
 }
 
-pub fn compute_view_layout(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn compute_view_layout(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // compute layout
 
     let mut v = view.as_ref().borrow_mut();
@@ -629,6 +630,9 @@ pub fn compute_view_layout(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
 pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    
+    let _start = Instant::now();
+   
     // refresh some env vars
     {
         let v = &mut view.as_ref().borrow();
@@ -654,6 +658,10 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
     }
 
     refresh_view_marks(editor, env, view);
+
+    let _end = Instant::now();
+    // env.time_to_build_screen = end.duration_since(start);
+
 }
 
 ///
@@ -685,7 +693,7 @@ pub fn scroll_down(
 // TODO: rename into insert_input_event
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
@@ -747,9 +755,9 @@ pub fn insert_codepoint_array(
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
 pub fn undo(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut sync_view = false;
@@ -778,9 +786,9 @@ pub fn undo(
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
 pub fn redo(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut sync_view = false;
@@ -906,9 +914,9 @@ pub fn remove_until_end_of_word(
 
 // TODO: maintain main mark Option<(x,y)>
 pub fn move_marks_backward(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     {
@@ -941,9 +949,9 @@ pub fn move_marks_backward(
 }
 
 pub fn move_marks_forward(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     {
@@ -1325,9 +1333,9 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: 
 
 // remove multiple borrows
 pub fn move_marks_to_next_line(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let moving_marks = { view.as_ref().borrow().moving_marks.clone() };
@@ -1370,9 +1378,9 @@ pub fn clone_and_move_mark_to_previous_line(
 }
 
 pub fn clone_and_move_mark_to_next_line(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let (marks, mi, max_offset) = {
@@ -1541,9 +1549,9 @@ pub fn move_mark_to_end_of_file(
 }
 
 pub fn scroll_to_next_screen(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow_mut();
@@ -1615,9 +1623,9 @@ pub fn paste(
 }
 
 pub fn move_to_token_start(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     // TODO: factorize macrk action
@@ -1648,9 +1656,9 @@ pub fn move_to_token_start(
 }
 
 pub fn move_to_token_end(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+    _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let mut sync = false;
@@ -1871,7 +1879,7 @@ pub fn remove_previous_codepoint(
 
 /// Insert a single unicode code point using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint(
-    editor: &mut Editor,
+    _editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
