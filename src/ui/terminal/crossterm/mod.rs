@@ -269,53 +269,41 @@ fn draw_screen(
         )?;
     }
 
+    dbg_println!("check_hash = {}", check_hash);
+
+    let mut count: usize = 0;
+
+    // current style
     for l in 0..screen.max_height() {
+
+
         let line = screen.get_mut_unclipped_line(l).unwrap();
 
-        let mut have_cursor = false;
-        for c in 0..line.max_width() {
-            let cpi = line.get_unclipped_cpi(c).unwrap();
-
-            if cpi.is_selected {
-                have_cursor = true;
-                break;
-            }
-        }
-
         if check_hash {
-            // TODO: check attr change
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            for c in 0..prev_line.width() {
-                let cpi = prev_line.get_unclipped_cpi(c).unwrap();
-                if cpi.is_selected {
-                    have_cursor = true;
-                    break;
-                }
-            }
-        }
-
-        if check_hash && !have_cursor {
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
+                dbg_println!("line[{}] SKIP ...", l);
                 continue;
             }
         }
+
         queue!(stdout, MoveTo(0, l as u16))?;
 
-        // draw new content
+        /////////////////////
+        // draw line
+        /////////////////////
+
+        dbg_println!("line[{}] DRAW *** ", l);
+        let mut set_style = true;
+        let mut set_color = true;
+
+
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
 
-            // color
-            let mut set_color = false;
-
             // default style
-            if cpi.is_selected && prev_cpi.is_selected == false {
-                queue!(stdout, SetAttribute(Attribute::Reverse))?;
-            } else {
-                if prev_cpi.is_selected == true {
-                    queue!(stdout, SetAttribute(Attribute::Reset))?;
-                }
+            if cpi.is_selected != prev_cpi.is_selected {
+                set_style = true;
                 set_color = true;
             }
 
@@ -324,7 +312,17 @@ fn draw_screen(
                 set_color = true;
             }
 
+            if set_style {
+               set_style = false;
+                if cpi.is_selected  {
+                    queue!(stdout, SetAttribute(Attribute::Reverse))?;
+               } else {
+                    queue!(stdout, SetAttribute(Attribute::Reset))?;
+               }
+            }
+
             if set_color {
+                set_color = false;
                 let color = Color::Rgb {
                     r: cpi.color.0,
                     g: cpi.color.1,
