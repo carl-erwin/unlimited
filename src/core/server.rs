@@ -374,6 +374,7 @@ fn process_input_events(
             env.view_id
         );
 
+        // to check_focus_change()
         if vid != vid_next {
             // func
             dbg_println!("view change");

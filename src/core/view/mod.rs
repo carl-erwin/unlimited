@@ -583,7 +583,7 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
             // brute force for now
             let marks = v.moving_marks.clone(); // do not hold v
             for m in marks.borrow().iter() {
-                dbg_println!("check marks offset({})", m.offset);
+                dbg_println!("--- check mark offset({})", m.offset);
 
                 if m.offset < v.start_offset || m.offset > v.end_offset {
                     continue;
@@ -594,6 +594,7 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
 
                     for c in 0..line.nb_cells {
                         let cpi = line.get_mut_cpi(c).unwrap();
+
                         if cpi.offset == m.offset {
                             dbg_println!("cpi.offset({}) == m.offset({})", cpi.offset, m.offset);
 
@@ -602,6 +603,8 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
                     }
                 }
             }
+
+            dbg_println!("MARKS = {:?}", marks);
         }
     }
 }
@@ -1775,18 +1778,25 @@ pub fn remove_previous_codepoint(
                 continue;
             }
 
+            dbg_println!("before shrink m.offset= {}", m.offset);
             m.offset -= shrink;
+            dbg_println!("after shrink m.offset= {}", m.offset);
             if m.offset == 0 {
                 continue;
             }
 
             m.move_backward(&doc, codec);
+            dbg_println!("after move.backward m.offset= {}", m.offset);
 
             let mut data = vec![];
             doc.read(m.offset, 4, &mut data);
             let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
-            let nr_removed = doc.remove(m.offset, size, None);
+            dbg_println!("read {} bytes", size);
 
+            let nr_removed = doc.remove(m.offset, size, None);
+            dbg_println!("nr_removed {} bytes", nr_removed);
+
+            dbg_println!("shrink({}) + nr_rm({}) = {}", shrink, nr_removed, shrink + nr_removed as u64);
             shrink += nr_removed as u64;
 
             if m.offset < v.start_offset {
@@ -1794,11 +1804,14 @@ pub fn remove_previous_codepoint(
             }
         }
 
-        // update main mark
+        dbg_println!("\nBEFORE Marks = {:?}", v.moving_marks.borrow_mut());
+        // TODO: mus fix  main mark updates
         v.moving_marks.borrow_mut().sort();
         v.moving_marks.borrow_mut().dedup();
         let nr_marks = v.moving_marks.borrow().len();
         v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
+        dbg_println!("\nAFTER Marks = {:?}", v.moving_marks.borrow_mut());
+
     }
 }
 

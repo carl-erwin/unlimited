@@ -422,7 +422,7 @@ pub fn eval_input_event(
     in_node: &mut Option<Rc<InputEventRule>>,
     out_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
-    dbg_println!("\n\n eval_input_event");
+    dbg_println!("\n\n -------------------------- eval_input_event --------------------------");
 
     dbg_println!("found in_node {:?}", in_node);
 
