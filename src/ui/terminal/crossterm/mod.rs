@@ -23,11 +23,14 @@ use crossterm::{
 };
 
 use std::thread;
+
 use std::time::Duration;
 use std::time::Instant;
 
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 //
 //
@@ -69,18 +72,20 @@ pub fn main_loop(
     let core_tx_clone = core_tx.clone();
     thread::spawn(move || {
         stdin_thread(&core_tx_clone);
+        return;
     });
 
     // ui state
     let mut ui_state = UiState::new();
 
     // ui ctx : TODO move to struct UiCtx
-    let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
-    let mut _prev_screen_rdr_time = Duration::new(0, 0);
+    let mut last_screen = Box::new(Screen::new(1, 1));
+    let mut last_screen_rdr_time = Instant::now();
 
     let mut request_layout = true;
 
-    let mut stdout = stdout();
+    let stdout = stdout();
+    let mut stdout = stdout.lock();
 
     execute!(stdout, EnterAlternateScreen)?;
 
@@ -93,9 +98,6 @@ pub fn main_loop(
     )?;
 
     crossterm::terminal::enable_raw_mode()?;
-
-    let mut full_redraw = true;
-    let mut last_draw_time = Instant::now();
 
     while !ui_state.quit {
         // check terminal size
@@ -120,7 +122,7 @@ pub fn main_loop(
             request_layout = false;
         }
 
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(100)) {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(1000)) {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
@@ -130,37 +132,46 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent { mut screen } => {
+                DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
-                    let p = crate::core::event::pending_render_event_count();
-                    let mut drop = false;
+                    let mut draw = false;
 
-                    if p <= 2 || last_draw_time.elapsed() > Duration::from_millis(1000 / 5) {
-                        // draw
+                    let p_input = crate::core::event::pending_input_event_count();
+                    let p_rdr = crate::core::event::pending_render_event_count();
+
+                    dbg_println!("DRAW: crossterm pre rdr : p_input {}\r", p_input);
+                    dbg_println!("DRAW: crossterm pre rdr : p_rdr {}\r", p_rdr);
+
+                    if p_input < 25 && p_rdr < 25 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW frame ----- \r");
+                    }
+
+                    let diff = (start - last_screen_rdr_time).as_millis();
+                    dbg_println!("DRAW: crossterm diff {} ----- \r", diff);
+                    if diff >= 1000 / 60 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW timeout frame ----- \r");
+                    }
+
+                    if draw {
+                        let screen = screen.read().unwrap();
+                        let mut screen = screen.clone();
+                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        // draw_screen_dumb(&screen, &mut stdout);
+                        last_screen = screen;
+                        last_screen_rdr_time = Instant::now();
                     } else {
-                        drop = true;
+                        dbg_println!("DRAW: crossterm SKIP frame ----- \r");
                     }
-
-                    if !drop {
-                        let s = Instant::now();
-                        draw_view(&mut last_screen, &mut screen, &mut stdout, full_redraw);
-                        last_draw_time = Instant::now();
-                        dbg_println!("time to draw view = {}\r", (last_draw_time - s).as_millis());
-                        full_redraw = false;
-                    }
-
-                    if p > 0 {
-                        crate::core::event::pending_render_event_dec(1);
-                    }
-
-                    dbg_println!(
-                        "pending render events = {}\r",
-                        crate::core::event::pending_render_event_count()
-                    );
 
                     let end = Instant::now();
-                    _prev_screen_rdr_time = end.duration_since(start);
-                    last_screen = screen;
+                    dbg_println!(
+                        "DRAW: crossterm : time to draw view = {}\r",
+                        (end - start).as_millis()
+                    );
+                    let p_rdr = crate::core::event::pending_render_event_dec(1);
+                    dbg_println!("DRAW: crossterm post rdr : p_rdr {}\r", p_rdr);
                 }
 
                 _ => {}
@@ -194,23 +205,14 @@ pub fn main_loop(
     3 : use idomatic    func()? style
 */
 fn draw_view(
-    last_screen: &mut Screen,
+    mut last_screen: &mut Screen,
     mut screen: &mut Screen,
-    mut stdout: &mut std::io::Stdout,
-    full_redraw: bool,
+    mut stdout: &mut std::io::StdoutLock,
 ) {
-    if full_redraw {
-        let _ = draw_screen_dumb(last_screen, &mut screen, &mut stdout);
-    } else {
-        let _ = draw_screen(last_screen, &mut screen, &mut stdout);
-    }
+    let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
 }
 
-fn draw_screen_dumb(
-    _last_screen: &mut Screen,
-    screen: &mut Screen,
-    stdout: &mut std::io::Stdout,
-) -> Result<()> {
+fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
     queue!(stdout, ResetColor)?;
 
     for li in 0..screen.height() {
@@ -249,10 +251,11 @@ fn draw_screen_dumb(
 }
 
 fn screen_changed(screen0: &Screen, screen1: &Screen) -> bool {
-    !(false
-        || (screen0.nb_push > 0 && screen0.first_offset != screen1.first_offset)
-        || screen0.max_width() != screen1.max_width()
-        || screen0.max_height() != screen1.max_height())
+    let nbp = screen0.nb_push != screen1.nb_push;
+    let o = screen0.first_offset != screen1.first_offset;
+    let w = screen0.max_width() != screen1.max_width();
+    let h = screen0.max_height() != screen1.max_height();
+    nbp || o || w || h
 }
 
 fn screen_width_change(screen0: &Screen, screen1: &Screen) -> bool {
@@ -263,18 +266,30 @@ fn screen_height_change(screen0: &Screen, screen1: &Screen) -> bool {
     screen0.max_height() != screen1.max_height()
 }
 
+fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
+    // pub metadata: bool, // offset cannot be used
+    // pub cp: char,
+    let dcp = a.displayed_cp == b.displayed_cp;
+    // pub offset: u64,
+    let s = a.is_selected == b.is_selected;
+    let c = a.color == b.color;
+
+    dcp && s && c
+}
+
 fn draw_screen(
     last_screen: &mut Screen,
     screen: &mut Screen,
-    stdout: &mut std::io::Stdout,
+    stdout: &mut std::io::StdoutLock,
 ) -> Result<()> {
     let mut prev_cpi = CodepointInfo::new();
 
-    let check_hash = screen_changed(&last_screen, &screen);
-    let _width_change = screen_width_change(&last_screen, &screen);
+    let screen_change = screen_changed(&last_screen, &screen);
+    let width_change = screen_width_change(&last_screen, &screen);
     let _height_change = screen_height_change(&last_screen, &screen);
 
-    let column_change = true; // width_change;
+    let check_hash = !screen_change;
+    let column_change = width_change;
 
     // set default color
     {
@@ -290,10 +305,6 @@ fn draw_screen(
         )?;
     }
 
-    if check_hash == false {
-        queue!(stdout, Clear(ClearType::All))?;
-    }
-
     // dbg_println!("check_hash = {}", check_hash);
 
     // current style
@@ -305,7 +316,7 @@ fn draw_screen(
         if check_hash {
             let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
             if prev_line.hash() == line.hash() {
-                // dbg_println!("line[{}] SKIP ...", l);
+                //dbg_println!("line[{}] SKIP ...", l);
                 continue;
             }
         }
@@ -323,8 +334,12 @@ fn draw_screen(
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
 
-            let mut change = false;
-            let mut skip_draw = false;
+            let mut change = c == 0;
+
+            if change {
+                set_style = true;
+                set_color = true;
+            }
 
             // default style
             if cpi.is_selected != prev_cpi.is_selected {
@@ -339,30 +354,30 @@ fn draw_screen(
                 change = true;
             }
 
+            prev_cpi = *cpi;
+
             if !column_change && !change {
                 if let Some(prev_line) = last_screen.get_mut_unclipped_line(l) {
                     if let Some(prev_screen_cpi) = prev_line.get_unclipped_cpi(c) {
-                        if cpi.displayed_cp == prev_screen_cpi.displayed_cp
-                            && cpi.is_selected == prev_screen_cpi.is_selected
-                        {
-                            skip_draw = true;
+                        if cpis_have_same_style(cpi, prev_screen_cpi) {
+                            queue!(stdout, MoveTo((c + 1) as u16, l as u16))?;
+                            nb_skip_char += 1;
+                            continue;
                         }
                     }
                 }
             }
 
-            if skip_draw {
-                queue!(stdout, MoveTo((c + 1) as u16, l as u16))?;
-                nb_skip_char += 1;
-            } else {
-                nb_draw_char += 1;
+            nb_draw_char += 1;
 
+            // draw
+            {
                 if set_style {
                     set_style = false;
                     if cpi.is_selected {
                         queue!(stdout, SetAttribute(Attribute::Reverse))?;
                     } else {
-                        queue!(stdout, SetAttribute(Attribute::Reset))?;
+                        queue!(stdout, SetAttribute(Attribute::NoReverse))?;
                     }
                 }
 
@@ -379,16 +394,17 @@ fn draw_screen(
                 // draw character
                 queue!(stdout, Print(cpi.displayed_cp))?;
             }
-
-            prev_cpi = *cpi;
         }
 
-        // dbg_println!(
-        //    "line[{}] DRAW : real({}) skip({}) *** ",
-        //    l,
-        //    nb_draw_char,
-        //    nb_skip_char
-        //);
+        if false {
+            // env.screen.debug ?
+            dbg_println!(
+                "line[{}] DRAW : real({}) skip({}) *** ",
+                l,
+                nb_draw_char,
+                nb_skip_char
+            );
+        }
     }
 
     // Update the screen

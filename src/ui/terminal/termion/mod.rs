@@ -10,6 +10,8 @@ use std::time::Instant;
 
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 extern crate libc;
 
@@ -73,7 +75,7 @@ pub fn main_loop(
     let mut ui_state = UiState::new();
 
     // ui ctx : TODO move to struct UiCtx
-    let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
+    let mut last_screen = Arc::new(RwLock::new(Box::new(Screen::new(1, 1)))); // last screen ?
     let mut _prev_screen_rdr_time = Duration::new(0, 0);
 
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
@@ -113,15 +115,20 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent { mut screen } => {
+                DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
+                    {
+                        let mut last_screen = last_screen.write().unwrap();
+                        let mut screen = screen.write().unwrap();
 
-                    draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                    }
+                    last_screen = screen;
 
                     stdout.flush().unwrap();
                     let end = Instant::now();
                     _prev_screen_rdr_time = end.duration_since(start);
-                    last_screen = screen;
+                    crate::core::event::pending_render_event_dec(1);
                 }
 
                 _ => {}

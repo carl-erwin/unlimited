@@ -10,7 +10,7 @@
     output device
     a special way to describe user input event ? :
      button/click
-     keypress/ IoData utf-32/16/8
+     keypress/ IoData utf-32/16/8utf8
                special keys combination
 
     define: simple unit to be used
@@ -126,6 +126,7 @@ use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::screen::Screen;
 
+use crate::core::server::EditorEnv;
 use crate::core::view::View;
 
 pub struct FilterContext {}
@@ -852,13 +853,14 @@ pub fn filter_codepoint(
 /// 1 - utf8 || hexa
 /// 2 - tabulation
 pub fn run_view_layout_filters(
+    env: &EditorEnv,
     view: &Rc<RefCell<View>>,
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
 ) -> u64 {
     let view = view.as_ref().borrow();
-    run_view_layout_filters_direct(&view, base_offset, max_offset, screen)
+    run_view_layout_filters_direct(env, &view, base_offset, max_offset, screen)
 }
 
 /// This function can be considered as the core of the editor.<br/>
@@ -869,39 +871,46 @@ pub fn run_view_layout_filters(
 /// 1 - utf8 || hexa
 /// 2 - tabulation
 pub fn run_view_layout_filters_direct(
+    editor_env: &EditorEnv,
     view: &View,
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
 ) -> u64 {
-    let mut env = LayoutEnv {
+    let mut layout_env = LayoutEnv {
         quit: false,
         base_offset,
         max_offset,
         screen,
     };
 
-    let mut filters: Vec<Box<dyn Filter>> = vec![
-        Box::new(RawDataFilter::new(&env)),
-        Box::new(Utf8Filter::new(&env)),
-        Box::new(TabFilter::new(&env)),
-        Box::new(HighlightFilter::new(&env)),
-        Box::new(ScreenFilter::new(&env)),
-    ];
+    let mut filters: Vec<Box<dyn Filter>> = vec![];
+
+    filters.push(Box::new(RawDataFilter::new(&layout_env)));
+    filters.push(Box::new(Utf8Filter::new(&layout_env)));
+    filters.push(Box::new(TabFilter::new(&layout_env)));
+
+    /* if editor_env.pending_events <= 1 */
+    {
+        // TODO: schedule refresh on idle
+        filters.push(Box::new(HighlightFilter::new(&layout_env)));
+    }
+    filters.push(Box::new(ScreenFilter::new(&layout_env)));
 
     // setup
     let mut filter_in = Vec::new();
     let mut filter_out = Vec::new();
 
-    while env.quit == false {
+    while layout_env.quit == false {
         for f in &mut filters {
             filter_out.clear();
             //            dbg_println!("running {} : in({})", f.name(), filter_in.len());
-            f.run(&view, &mut env, &filter_in, &mut filter_out);
+            f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
             //            dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }
 
-    env.screen.last_offset
+    // remove this
+    layout_env.screen.last_offset
 }

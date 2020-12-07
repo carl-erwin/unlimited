@@ -16,6 +16,9 @@
 //
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use std::time::Instant;
 
 //
@@ -152,7 +155,7 @@ pub struct View<'a> {
 
     pub text_codec: Box<dyn utf8::TextCodec>,
 
-    pub screen: Box<Screen>,
+    pub screen: Arc<RwLock<Box<Screen>>>,
 
     pub moving_marks: Rc<RefCell<Vec<Mark>>>,
     pub mark_index: usize,
@@ -171,7 +174,7 @@ impl<'a> View<'a> {
         height: usize,
         document: Option<Rc<RefCell<Document>>>,
     ) -> View {
-        let screen = Box::new(Screen::new(width, height));
+        let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
 
         // TODO: in future version will be stored in buffer meta data
         let moving_marks = Rc::new(RefCell::new(vec![Mark { offset: 0 }]));
@@ -193,30 +196,33 @@ impl<'a> View<'a> {
     }
 
     pub fn check_invariants(&self) {
-        self.screen.check_invariants();
+        self.screen.read().unwrap().check_invariants();
     }
 
     /* TODO: use nb_lines
      to compute previous screen height
      new_h = screen.wheight + (nb_lines * screen.width * max_codec_encode_size)
     */
-    pub fn scroll_up(&mut self, nb_lines: usize) {
+    pub fn scroll_up(&mut self, env: &EditorEnv, nb_lines: usize) {
         if self.start_offset == 0 || nb_lines == 0 {
             return;
         }
 
-        // DUMB: version
+        // TODO: DUMB version
         // NEW: first try to check nb_lines in the same area
         // repeat mark moves
-        if false {
-            let mut tmp = Mark::new(self.start_offset);
+        // we can read backward self.screen.read().unwrap().width() chars
+        // if we find '\n' or \r we stop
+        // and take the next char offset -> self.start_offset
+        if nb_lines == 1 {
+            let doc = self.document.as_mut().unwrap().borrow_mut();
 
+            let mut tmp = Mark::new(self.start_offset);
             for _ in 0..nb_lines {
                 if tmp.offset == 0 {
                     break;
                 }
                 tmp.offset -= 1;
-                let doc = self.document.as_mut().unwrap().borrow_mut();
                 tmp.move_to_start_of_line(&doc, self.text_codec.as_ref());
             }
 
@@ -229,8 +235,8 @@ impl<'a> View<'a> {
         }
 
         ////
-        let width = self.screen.width();
-        let height = self.screen.height() + nb_lines;
+        let width = self.screen.read().unwrap().width();
+        let height = self.screen.read().unwrap().height() + nb_lines;
 
         // the offset to find is the first screen codepoint
         let offset_to_find = self.start_offset;
@@ -255,7 +261,7 @@ impl<'a> View<'a> {
         // build_screen from this offset
         // the window MUST cover to screen => height * 2
         // TODO: always in last index ?
-        let lines = self.get_lines_offsets_direct(m.offset, offset_to_find, width, height);
+        let lines = self.get_lines_offsets_direct(env, m.offset, offset_to_find, width, height);
 
         // find line index
         let index = match lines
@@ -275,7 +281,7 @@ impl<'a> View<'a> {
         self.start_offset = lines[index].0;
     }
 
-    pub fn scroll_down(&mut self, nb_lines: usize) {
+    pub fn scroll_down(&mut self, env: &EditorEnv, nb_lines: usize) {
         // nothing to do :-( ?
         if nb_lines == 0 {
             return;
@@ -287,18 +293,18 @@ impl<'a> View<'a> {
         };
 
         // avoid useless scroll
-        if self.screen.contains_offset(max_offset) {
+        if self.screen.read().unwrap().contains_offset(max_offset) {
             return;
         }
 
-        if nb_lines >= self.screen.height() {
+        if nb_lines >= self.screen.read().unwrap().height() {
             // slower : call layout builder to build  nb_lines - screen.height()
-            self.scroll_down_offscreen(max_offset, nb_lines);
+            self.scroll_down_offscreen(env, max_offset, nb_lines);
             return;
         }
 
         // just read the current screen
-        if let (Some(l), _) = self.screen.get_used_line_clipped(nb_lines) {
+        if let (Some(l), _) = self.screen.write().unwrap().get_used_line_clipped(nb_lines) {
             if let Some(cpi) = l.get_first_cpi() {
                 // set first offset of screen.line[nb_lines] as next screen start
                 self.start_offset = cpi.offset;
@@ -308,11 +314,11 @@ impl<'a> View<'a> {
         }
     }
 
-    fn scroll_down_offscreen(&mut self, max_offset: u64, nb_lines: usize) {
+    fn scroll_down_offscreen(&mut self, env: &EditorEnv, max_offset: u64, nb_lines: usize) {
         // will be slower than just reading the current screen
 
-        let screen_width = self.screen.width();
-        let screen_height = self.screen.height() + 32;
+        let screen_width = self.screen.read().unwrap().width();
+        let screen_height = self.screen.read().unwrap().height() + 32;
 
         let start_offset = self.start_offset;
         let end_offset = ::std::cmp::min(
@@ -320,8 +326,13 @@ impl<'a> View<'a> {
             max_offset,
         );
 
-        let lines =
-            self.get_lines_offsets_direct(start_offset, end_offset, screen_width, screen_height);
+        let lines = self.get_lines_offsets_direct(
+            env,
+            start_offset,
+            end_offset,
+            screen_width,
+            screen_height,
+        );
 
         // find line index and take lines[(index + nb_lines)].0 as new start of view
         let index = match lines
@@ -340,6 +351,7 @@ impl<'a> View<'a> {
     /// using the run_view_layout_filters function until end_offset is reached.<br/>
     pub fn get_lines_offsets_direct(
         &mut self,
+        env: &EditorEnv,
         start_offset: u64,
         end_offset: u64,
         screen_width: usize,
@@ -363,7 +375,7 @@ impl<'a> View<'a> {
         let mut screen = Screen::new(screen_width, screen_height);
 
         loop {
-            let _ = run_view_layout_filters_direct(&self, m.offset, max_offset, &mut screen);
+            let _ = run_view_layout_filters_direct(env, &self, m.offset, max_offset, &mut screen);
 
             if screen.nb_push == 0 {
                 return v;
@@ -426,11 +438,11 @@ impl<'a> View<'a> {
         }
     }
 
-    fn center_arround_offset(&mut self, offset: u64) {
+    fn center_arround_offset(&mut self, env: &EditorEnv, offset: u64) {
         // TODO use env.center_offset
         self.start_offset = offset;
-        let h = self.screen.height() / 2;
-        self.scroll_up(h);
+        let h = self.screen.read().unwrap().height() / 2;
+        self.scroll_up(env, h);
     }
 } // View
 
@@ -438,6 +450,7 @@ impl<'a> View<'a> {
 /// It (will) run the configured filters/plugins.<br/>
 /// using the run_view_layout_filters function until end_offset is reached.<br/>
 pub fn get_lines_offsets(
+    env: &EditorEnv,
     view: &Rc<RefCell<View>>,
     start_offset: u64,
     end_offset: u64,
@@ -467,7 +480,7 @@ pub fn get_lines_offsets(
     let mut screen = Screen::new(screen_width, screen_height);
 
     loop {
-        let _ = run_view_layout_filters(&view, m.offset, max_offset, &mut screen);
+        let _ = run_view_layout_filters(env, &view, m.offset, max_offset, &mut screen);
         if screen.nb_push == 0 {
             return v;
         }
@@ -539,11 +552,11 @@ pub fn run_view_action(
         match a {
             Action::ScrollUp { n } => {
                 let v = &mut view.as_ref().borrow_mut();
-                v.scroll_up(*n);
+                v.scroll_up(env, *n);
             }
             Action::ScrollDown { n } => {
                 let v = &mut view.as_ref().borrow_mut();
-                v.scroll_down(*n);
+                v.scroll_down(env, *n);
             }
             Action::CenterArroundMainMark => {
                 let trigger = Vec::new();
@@ -576,7 +589,7 @@ pub fn run_view_action(
 pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // compute layout
 
-    let mut v = view.as_ref().borrow_mut();
+    let v = view.as_ref().borrow_mut();
 
     // TODO: marks_filter
     // set_render_marks
@@ -587,8 +600,9 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
             continue;
         }
 
-        for l in 0..v.screen.height() {
-            let line = v.screen.get_mut_line(l).unwrap();
+        let mut screen = v.screen.write().unwrap();
+        for l in 0..screen.height() {
+            let line = screen.get_mut_line(l).unwrap();
 
             for c in 0..line.nb_cells {
                 let cpi = line.get_mut_cpi(c).unwrap();
@@ -601,7 +615,7 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     }
 }
 
-pub fn compute_view_layout(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn compute_view_layout(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // compute layout
 
     let mut v = view.as_ref().borrow_mut();
@@ -614,14 +628,17 @@ pub fn compute_view_layout(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
         // 1st pass raw_data_filter
         let max_offset = { doc.borrow().size() as u64 };
 
-        let mut screen = Box::new(Screen::new(v.screen.width(), v.screen.height()));
+        let mut screen = Box::new(Screen::new(
+            v.screen.read().unwrap().width(),
+            v.screen.read().unwrap().height(),
+        ));
 
         let end_offset =
-            run_view_layout_filters_direct(&v, v.start_offset, max_offset, &mut screen);
+            run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
         // TODO: from env ?
         v.end_offset = end_offset;
-        v.screen = screen; // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
+        v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
         v.check_invariants();
     }
 }
@@ -630,9 +647,8 @@ pub fn compute_view_layout(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
 pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    
     let _start = Instant::now();
-   
+
     // refresh some env vars
     {
         let v = &mut view.as_ref().borrow();
@@ -661,7 +677,6 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
 
     let _end = Instant::now();
     // env.time_to_build_screen = end.duration_since(start);
-
 }
 
 ///
@@ -743,9 +758,10 @@ pub fn insert_codepoint_array(
         }
 
         // offscreen
-        offset < v.screen.first_offset
-            || offset > v.screen.last_offset
-            || array.len() > v.screen.width() * v.screen.height()
+        let screen = v.screen.read().unwrap();
+        offset < screen.first_offset
+            || offset > screen.last_offset
+            || array.len() > screen.width() * screen.height()
     };
 
     if center {
@@ -775,7 +791,7 @@ pub fn undo(
                 break;
             }
 
-            sync_view = !v.screen.contains_offset(off);
+            sync_view = !v.screen.read().unwrap().contains_offset(off);
         }
     }
 
@@ -806,7 +822,7 @@ pub fn redo(
                 break;
             }
 
-            sync_view = !v.screen.contains_offset(off);
+            sync_view = !v.screen.read().unwrap().contains_offset(off);
         }
     }
 
@@ -1024,8 +1040,9 @@ fn move_mark_to_previous_line(
     {
         let v = &mut view.as_ref().borrow_mut();
 
+        let screen = v.screen.read().unwrap();
         // TODO: if v.is_mark_on_screen(m) -> (bool, x, y) ?
-        match v.screen.find_cpi_by_offset(m.offset) {
+        match screen.find_cpi_by_offset(m.offset) {
             // offscreen
             (None, _, _) => {}
             // mark on first line
@@ -1040,11 +1057,11 @@ fn move_mark_to_previous_line(
             (Some(_), x, y) if y > 0 => {
                 // TODO: refactor code to support screen cell metadata
                 let new_y = y - 1; // select previous line
-                let l = v.screen.get_line(new_y).unwrap();
+                let l = screen.get_line(new_y).unwrap();
                 // previous line is filled ?
                 if l.nb_cells > 0 {
                     let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                    let cpi = v.screen.get_cpinfo(new_x, new_y).unwrap();
+                    let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                     if !cpi.metadata {
                         m.offset = cpi.offset;
                         mark_moved = true;
@@ -1095,14 +1112,14 @@ fn move_mark_to_previous_line(
                 */
             };
 
-            let width = v.screen.width();
+            let width = v.screen.read().unwrap().width();
 
             let add_height = if width > 0 {
                 (m.offset - start_offset) as usize / width
             } else {
                 1
             };
-            let height = v.screen.height() + (add_height * 4); // 4 is utf8 max encode size
+            let height = v.screen.read().unwrap().height() + (add_height * 4); // 4 is utf8 max encode size
 
             (start_offset, width, height)
         };
@@ -1111,7 +1128,13 @@ fn move_mark_to_previous_line(
 
         let lines = {
             let mut view = view.as_ref().borrow_mut();
-            view.get_lines_offsets_direct(start_offset, end_offset, screen_width, screen_height)
+            view.get_lines_offsets_direct(
+                env,
+                start_offset,
+                end_offset,
+                screen_width,
+                screen_height,
+            )
         };
 
         // find "previous" line index
@@ -1204,10 +1227,11 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: 
 
     {
         let v = view.as_ref().borrow_mut();
-        if v.screen.contains_offset(m.offset) {
+        let screen = v.screen.read().unwrap();
+        if screen.contains_offset(m.offset) {
             // yes get coordinates
-            let (_, x, y) = v.screen.find_cpi_by_offset(m.offset);
-            let screen_height = v.screen.height();
+            let (_, x, y) = screen.find_cpi_by_offset(m.offset);
+            let screen_height = screen.height();
 
             dbg_println!("m.offset screen (X({}), Y({}))", x, y);
             dbg_println!("screen_height {}", screen_height);
@@ -1216,10 +1240,10 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: 
                 is_offscreen = false;
 
                 let new_y = y + 1;
-                let l = v.screen.get_line(new_y).unwrap();
+                let l = screen.get_line(new_y).unwrap();
                 if l.nb_cells > 0 {
                     let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-                    let cpi = v.screen.get_cpinfo(new_x, new_y).unwrap();
+                    let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                     if !cpi.metadata {
                         m.offset = cpi.offset;
                     }
@@ -1245,8 +1269,11 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: 
 
     if is_offscreen {
         // mark is offscreen
-        let screen_width = view.as_ref().borrow_mut().screen.width();
-        let screen_height = view.as_ref().borrow_mut().screen.height();
+        let (screen_width, screen_height) = {
+            let view = view.as_ref().borrow_mut();
+            let screen = view.screen.read().unwrap();
+            (screen.width(), screen.height())
+        };
 
         // get start_of_line(m.offset) -> u64
         let start_offset = {
@@ -1267,7 +1294,13 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, m: 
         // get lines start, end offset
         let lines = {
             let mut view = view.as_ref().borrow_mut();
-            view.get_lines_offsets_direct(start_offset, end_offset, screen_width, screen_height)
+            view.get_lines_offsets_direct(
+                env,
+                start_offset,
+                end_offset,
+                screen_width,
+                screen_height,
+            )
         };
 
         dbg_println!("GET {} lines ", lines.len());
@@ -1467,8 +1500,8 @@ pub fn scroll_to_previous_screen(
 ) {
     {
         let mut v = view.as_ref().borrow_mut();
-        let nb = ::std::cmp::max(v.screen.height() - 1, 1);
-        v.scroll_up(nb);
+        let nb = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
+        v.scroll_up(env, nb);
     }
 
     // TODO: add hints to trigger mar moves
@@ -1493,7 +1526,7 @@ pub fn move_mark_to_start_of_file(
 // TODO: view.center_arrout_offset()
 pub fn center_arround_mark(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -1503,7 +1536,7 @@ pub fn center_arround_mark(
     let marks = marks.borrow();
     let mi = v.mark_index;
 
-    v.center_arround_offset(marks[mi].offset);
+    v.center_arround_offset(env, marks[mi].offset);
 }
 
 pub fn center_arround_offset(
@@ -1520,13 +1553,13 @@ pub fn center_arround_offset(
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_arround_offset(offset);
+        v.center_arround_offset(env, offset);
     }
 }
 
 pub fn move_mark_to_end_of_file(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -1544,8 +1577,8 @@ pub fn move_mark_to_end_of_file(
     }
 
     v.start_offset = size as u64;
-    let h = v.screen.height() / 2;
-    v.scroll_up(h);
+    let h = v.screen.read().unwrap().height() / 2;
+    v.scroll_up(env, h);
 }
 
 pub fn scroll_to_next_screen(
@@ -1555,7 +1588,7 @@ pub fn scroll_to_next_screen(
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow_mut();
-    let n = ::std::cmp::max(v.screen.height() - 1, 1);
+    let n = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
     env.view_pre_render.push(Action::ScrollDown { n });
 }
 
@@ -1644,7 +1677,7 @@ pub fn move_to_token_start(
 
             // main mark ?
             if idx == midx {
-                if !v.screen.contains_offset(m.offset) {
+                if !v.screen.read().unwrap().contains_offset(m.offset) {
                     // TODO: push to post action queue
                     // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                     //
@@ -1673,7 +1706,7 @@ pub fn move_to_token_end(
             m.move_to_token_end(&doc, codec);
 
             // main mark ?
-            if !v.screen.contains_offset(m.offset) {
+            if !v.screen.read().unwrap().contains_offset(m.offset) {
                 // TODO: push to post action queue
                 // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                 //
@@ -1717,7 +1750,10 @@ pub fn button_press(
 
     let mut s = String::new();
 
-    s.push_str(&format!("clip : {:?}", v.screen.clip_rect()));
+    s.push_str(&format!(
+        "clip : {:?}",
+        v.screen.read().unwrap().clip_rect()
+    ));
 
     match button {
         0 => {}
@@ -1744,44 +1780,47 @@ pub fn button_press(
 
     */
 
+    let screen = v.screen.clone();
+    let screen = screen.read().unwrap();
+
     // move cursor to (x,y)
     let (mut x, mut y) = (x as usize, y as usize);
 
     // 0 <= x < screen.width()
-    if x < v.screen.clip_rect().x {
+    if x < screen.clip_rect().x {
         x = 0;
-    } else if x >= v.screen.clip_rect().x + v.screen.clip_rect().width {
-        x = v.screen.clip_rect().width - 1;
+    } else if x >= screen.clip_rect().x + screen.clip_rect().width {
+        x = screen.clip_rect().width - 1;
     } else {
-        x -= v.screen.clip_rect().x;
+        x -= screen.clip_rect().x;
     }
 
     // 0 <= y < screen.height()
-    if y < v.screen.clip_rect().y {
+    if y < screen.clip_rect().y {
         y = 0;
         s.push_str(", y case 1");
-    } else if y > v.screen.clip_rect().y + v.screen.clip_rect().height {
-        y = v.screen.clip_rect().height - 1;
+    } else if y > screen.clip_rect().y + screen.clip_rect().height {
+        y = screen.clip_rect().height - 1;
         s.push_str(", y case 2");
     } else {
-        y -= v.screen.clip_rect().y;
+        y -= screen.clip_rect().y;
         s.push_str(", y case 3");
     }
 
     //
-    let _max_offset = v.screen.doc_max_offset;
+    let _max_offset = screen.doc_max_offset;
 
-    let last_li = v.screen.get_last_used_line_index();
+    let last_li = screen.get_last_used_line_index();
     if y >= last_li {
-        if last_li >= v.screen.height() {
-            y = v.screen.height() - 1;
+        if last_li >= screen.height() {
+            y = screen.height() - 1;
         } else {
             y = last_li;
         }
         s.push_str(", y >= last_li");
     }
 
-    if let Some(l) = v.screen.get_line(y) {
+    if let Some(l) = screen.get_line(y) {
         s.push_str(&format!(", get line ok , x:{}, nbcells:{}", x, l.nb_cells));
 
         if l.nb_cells > 0 && x > l.nb_cells {
@@ -1795,7 +1834,7 @@ pub fn button_press(
 
     s.push_str(&format!(", new (x:{},y:{})", x, y));
 
-    if let Some(cpi) = v.screen.get_used_cpinfo(x, y) {
+    if let Some(cpi) = screen.get_used_cpinfo(x, y) {
         if !cpi.metadata {
             // update main mark
             v.mark_index = {
@@ -1917,8 +1956,8 @@ pub fn insert_codepoint(
 
         for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
             // TODO: add main mark check
-            let (_, _, y) = v.screen.find_cpi_by_offset(m.offset);
-            if y == v.screen.height() - 1 && codepoint == '\n' {
+            let (_, _, y) = v.screen.read().unwrap().find_cpi_by_offset(m.offset);
+            if y == v.screen.read().unwrap().height() - 1 && codepoint == '\n' {
                 if idx == midx {
                     scroll_needed = true;
                     center_offset = m.offset;
@@ -1928,7 +1967,7 @@ pub fn insert_codepoint(
             doc.insert(m.offset, data_size, data);
             m.offset += data_size as u64;
 
-            center = !v.screen.contains_offset(m.offset);
+            center = !v.screen.read().unwrap().contains_offset(m.offset);
         }
     }
 

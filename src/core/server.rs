@@ -6,6 +6,9 @@ use std::sync::mpsc::Sender;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use std::time::Duration;
 use std::time::Instant;
 
@@ -125,6 +128,9 @@ pub struct EditorEnv {
     current_node: Option<Rc<InputEventRule>>,
     next_node: Option<Rc<InputEventRule>>,
 
+    pub pending_events: usize,
+
+    //
     pub width: usize,
     pub height: usize,
     pub view_id: usize, // doc id in view
@@ -155,7 +161,7 @@ impl EditorEnv {
             input_map,
             current_node: None,
             next_node: None,
-
+            pending_events: 0,
             width: 0,
             height: 0,
             view_id: 0,
@@ -171,9 +177,14 @@ impl EditorEnv {
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
     let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
     // resize ?
-    if env.width != view.screen.width() || env.height != view.screen.height() {
-        view.screen = Box::new(Screen::new(env.width, env.height));
+    {
+        let screen = view.screen.read().unwrap();
+        if env.width == screen.width() && env.height == screen.height() {
+            return;
+        }
     }
+
+    view.screen = Arc::new(RwLock::new(Box::new(Screen::new(env.width, env.height))));
 }
 
 pub fn update_view_and_send_draw_event(
@@ -190,14 +201,23 @@ pub fn update_view_and_send_draw_event(
     send_draw_event(&mut editor, ui_tx, &view);
 }
 
-pub fn send_draw_event(_editor: &mut Editor, ui_tx: &Sender<EventMessage>, view: &Rc<RefCell<View>>) {
+pub fn send_draw_event(
+    _editor: &mut Editor,
+    ui_tx: &Sender<EventMessage>,
+    view: &Rc<RefCell<View>>,
+) {
     let view = view.as_ref().borrow();
-    let new_screen = view.screen.clone(); // Rc ?
+    let new_screen = Arc::clone(&view.screen);
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
-        DrawEvent { screen: new_screen },
+        DrawEvent {
+            screen: new_screen,
+            time: Instant::now(),
+        },
     );
+
+    crate::core::event::pending_render_event_inc(1);
     ui_tx.send(msg).unwrap_or(());
 }
 
@@ -324,10 +344,9 @@ fn process_input_events(
     events: &Vec<InputEvent>,
     _raw_data: &Option<Vec<u8>>, // TODO: remove
 ) {
-    let p = crate::core::event::pending_input_event_count();
+    env.pending_events = crate::core::event::pending_input_event_count();
 
-    dbg_println!("process_input_events : env.view_id {}\r", env.view_id);
-
+    let start = Instant::now();
     for ev in events {
         let vid = env.view_id;
         let mut event_processed = process_input_event(&mut editor, &mut env, vid, ev);
@@ -344,26 +363,28 @@ fn process_input_events(
             let view = editor.view_map[env.view_id].1.clone();
             update_view(&mut editor, &mut env, &view);
             let end = Instant::now();
-            dbg_println!("update view time {}\r", (end - start).as_millis());
+            dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
         }
 
-        if p > 0 {
-            crate::core::event::pending_input_event_dec(1);
+        if env.pending_events > 0 {
+            env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
     }
 
-    let p_input = crate::core::event::pending_input_event_count();
-    let p_rdr = crate::core::event::pending_input_event_count();
+    let end = Instant::now();
+    dbg_println!("EVAL: input process time {}\r", (end - start).as_millis());
 
-    dbg_println!("pending input event = {}\r", p);
-    dbg_println!("pending render events = {}\r", p_rdr);
+    //
+    let p_input = crate::core::event::pending_input_event_count();
+    let p_rdr = crate::core::event::pending_render_event_count();
+
+    dbg_println!("EVAL: pending input event = {}\r", p_input);
+    dbg_println!("EVAL: pending render events = {}\r", p_rdr);
 
     // % last render time
-    if (p_input <= 1 && p_rdr <= 2)
-        || editor.last_rdr_event.elapsed() > Duration::from_millis(1000 / 5)
-    {
+    // TODO: receive FPS form ui in Event ?
+    if (p_input <= 60) || editor.last_rdr_event.elapsed() > Duration::from_millis(1000 / 10) {
         // hit
-        crate::core::event::pending_render_event_inc(1);
         let view = &editor.view_map[env.view_id].1.clone();
         send_draw_event(&mut editor, ui_tx, &view);
         editor.last_rdr_event = Instant::now();

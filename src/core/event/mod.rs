@@ -4,6 +4,10 @@ pub mod input_map;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
+use std::time::Instant;
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -74,7 +78,7 @@ JSON based ?
 */
 
 /// Message sent between core and ui threads.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct EventMessage {
     /// sequence number. should be reused in corresponding answer.
     pub seq: usize,
@@ -89,7 +93,7 @@ impl EventMessage {
 }
 
 /// Events sent between core and ui threads via EventMesssage encapsulation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Event {
     /// Sent by ui thread. Request the rendering of a given view.
     UpdateViewEvent {
@@ -99,7 +103,8 @@ pub enum Event {
 
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     DrawEvent {
-        screen: Box<Screen>,
+        screen: Arc<RwLock<Box<Screen>>>,
+        time: Instant,
     },
 
     /// Sent by ui thread. contains user input information.
