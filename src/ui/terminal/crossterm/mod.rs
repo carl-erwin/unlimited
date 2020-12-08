@@ -29,8 +29,6 @@ use std::time::Instant;
 
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 //
 //
@@ -43,9 +41,9 @@ use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::screen::Screen;
 
-use crate::core::event::InputEvent::*;
+//use crate::core::event::InputEvent::*;
 use crate::core::event::Key;
-use crate::core::event::Key::*;
+//use crate::core::event::Key::*;
 
 use crate::core::event::KeyModifiers;
 

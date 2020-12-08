@@ -1,5 +1,6 @@
 // Copyright (c) Carl-Erwin Griffith
 
+use std::rc::Rc;
 use std::vec::Vec;
 
 /// The **BufferLog** holds all modifications applied to a given buffer
@@ -11,15 +12,16 @@ pub struct BufferLog {
 
 #[derive(Debug, Clone)]
 pub struct BufferOperation {
-    pub op: BufferOperationType,
-    pub data: Vec<u8>,
+    pub op_type: BufferOperationType,
+    pub data: Option<Rc<Vec<u8>>>,
     pub offset: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BufferOperationType {
     Insert,
     Remove,
+    Tag { marks: Vec<u64> },
 }
 
 impl BufferLog {
@@ -27,8 +29,17 @@ impl BufferLog {
         Default::default()
     }
 
-    pub fn add(&mut self, offset: u64, op: BufferOperationType, data: Vec<u8>) -> usize {
-        let op = BufferOperation { op, data, offset };
+    pub fn add(
+        &mut self,
+        offset: u64,
+        op_type: BufferOperationType,
+        data: Option<Rc<Vec<u8>>>,
+    ) -> usize {
+        let op = BufferOperation {
+            op_type,
+            data,
+            offset,
+        };
 
         if self.pos < self.data.len() {
             // commit inverted operations
@@ -39,6 +50,7 @@ impl BufferLog {
 
         self.data.push(op);
         self.pos = self.data.len();
+
         self.pos
     }
 
@@ -61,13 +73,16 @@ impl BufferLog {
 
 impl BufferOperation {
     pub fn invert(&self) -> BufferOperation {
-        let op = match self.op {
+        let op_type = match &self.op_type {
             BufferOperationType::Insert => BufferOperationType::Remove,
             BufferOperationType::Remove => BufferOperationType::Insert,
+            BufferOperationType::Tag { marks } => BufferOperationType::Tag {
+                marks: marks.clone(),
+            },
         };
 
         BufferOperation {
-            op,
+            op_type,
             data: self.data.clone(), // TODO: user Rc<> to share the data, depending on the data.size()
             offset: self.offset,
         }

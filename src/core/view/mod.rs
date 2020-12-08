@@ -27,6 +27,7 @@ use crate::core::server::EditorEnv; // TODO: editor
 
 use crate::dbg_println;
 
+use crate::core::document::BufferOperation;
 use crate::core::document::Document;
 
 use crate::core::screen::Screen;
@@ -598,16 +599,22 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     let marks = v.moving_marks.clone(); // do not hold v
                                         // sort mark here ?
 
-    dbg_println!(" refresh_view_marks {:?}", marks);
-    {
+    // dbg_println!(" refresh_view_marks {:?}", marks);
+    if false {
         let mut marks = marks.borrow_mut();
         marks.sort();
         marks.dedup();
         let len = marks.len();
-        if v.mark_index >= len {
-            v.mark_index = len - 1;
+        if len > 0 {
+            if v.mark_index >= len {
+                v.mark_index = len - 1;
+            }
+        } else {
+            marks.push(Mark { offset: 0 });
+            v.mark_index = 0;
         }
     }
+
     for m in marks.borrow().iter() {
         dbg_println!(" checking m.offset {}", m.offset);
 
@@ -702,6 +709,8 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
 ///
 use crate::core::event::Key;
 
+use super::document::BufferOperationType;
+
 // CEG
 pub fn scroll_up(
     _editor: &mut Editor,
@@ -767,6 +776,9 @@ pub fn insert_codepoint_array(
         let mut offset: u64 = 0;
         let mut grow: u64 = 0;
 
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+
         for m in v.moving_marks.borrow_mut().iter_mut() {
             m.offset += grow;
             doc.insert(m.offset, utf8.len(), &utf8);
@@ -777,7 +789,11 @@ pub fn insert_codepoint_array(
             grow += utf8.len() as u64;
         }
 
+        // sort / dedup ?
         env.max_offset = doc.size() as u64;
+        //
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
 
         // offscreen
         let screen = v.screen.read().unwrap();
@@ -807,18 +823,26 @@ pub fn undo(
     // collect/recreate marks @ undo result
     {
         let v = &mut view.as_ref().borrow_mut();
-
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let mut marks = v.moving_marks.borrow_mut();
 
-        if let Some(off) = doc.undo() {
-            for m in v.moving_marks.borrow_mut().iter_mut() {
-                m.offset = off;
-                break;
+        doc.undo_until_tag();
+        doc.undo_until_tag();
+        if let Some(marks_offsets) = doc.get_tag_offset() {
+            dbg_println!("restore marks {:?}", marks_offsets);
+            marks.clear();
+            for offset in marks_offsets {
+                marks.push(Mark { offset });
             }
-
-            sync_view = !v.screen.read().unwrap().contains_offset(off);
         }
+
+        //    sync_view = !v.screen.read().unwrap().contains_offset(off);
+    }
+
+    {
+        let v = &mut view.as_ref().borrow_mut();
+        v.mark_index = 0;
     }
 
     if sync_view {
@@ -838,17 +862,20 @@ pub fn redo(
     // hack no multicursor for now
     {
         let v = &mut view.as_ref().borrow_mut();
+        v.mark_index = 0;
 
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
+        let mut marks = v.moving_marks.borrow_mut();
 
-        if let Some(off) = doc.redo() {
-            for m in v.moving_marks.borrow_mut().iter_mut() {
-                m.offset = off;
-                break;
+        doc.redo_until_tag();
+        doc.redo_until_tag();
+        if let Some(marks_offsets) = doc.get_tag_offset() {
+            dbg_println!("restore marks {:?}", marks_offsets);
+            marks.clear();
+            for offset in marks_offsets {
+                marks.push(Mark { offset });
             }
-
-            sync_view = !v.screen.read().unwrap().contains_offset(off);
         }
     }
 
@@ -870,9 +897,12 @@ pub fn remove_codepoint(
     let mut doc = doc.as_ref().borrow_mut();
     let codec = v.text_codec.as_ref();
 
+    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    doc.tag(env.max_offset, marks_offsets);
+
     let mut shrink = 0;
     for m in v.moving_marks.borrow_mut().iter_mut() {
-        if m.offset > shrink {
+        if m.offset >= shrink {
             m.offset -= shrink;
         }
 
@@ -885,13 +915,16 @@ pub fn remove_codepoint(
     }
 
     env.max_offset = doc.size() as u64;
+
+    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    doc.tag(env.max_offset, marks_offsets);
 }
 
 /// Skip blanks (if any) and remove until end of the word.
 /// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
 pub fn remove_until_end_of_word(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -901,7 +934,16 @@ pub fn remove_until_end_of_word(
     let mut doc = doc.as_ref().borrow_mut();
     let codec = v.text_codec.as_ref();
 
+    let size = doc.size() as u64;
+    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    doc.tag(size, marks_offsets);
+
+    let mut shrink: u64 = 0;
     for m in v.moving_marks.borrow_mut().iter_mut() {
+        if m.offset >= shrink {
+            m.offset -= shrink;
+        }
+
         let start = m.clone();
 
         let mut data = Vec::with_capacity(4);
@@ -949,11 +991,17 @@ pub fn remove_until_end_of_word(
         }
 
         // remove [start, m[
-        doc.remove(start.offset, (m.offset - start.offset) as usize, None);
+        let nr_removed = doc.remove(start.offset, (m.offset - start.offset) as usize, None);
+
+        shrink += nr_removed as u64;
 
         m.offset = start.offset;
-        break; // no multicursor
     }
+
+    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+
+    env.max_offset = doc.size() as u64;
+    doc.tag(env.max_offset, marks_offsets);
 }
 
 // TODO: maintain main mark Option<(x,y)>
@@ -1680,8 +1728,10 @@ pub fn paste(
         for m in v.moving_marks.borrow_mut().iter_mut() {
             let mut end = m.clone();
             end.move_to_end_of_line(&doc, codec);
-            doc.insert(m.offset, tr.data.len(), tr.data.as_slice());
-            m.offset += tr.data.len() as u64;
+            if let Some(ref data) = tr.data {
+                doc.insert(m.offset, data.len(), data.as_slice());
+                m.offset += data.len() as u64;
+            }
         }
 
     // true
@@ -1895,6 +1945,9 @@ pub fn remove_previous_codepoint(
         let mut doc = doc.as_ref().borrow_mut();
         let codec = v.text_codec.as_ref();
 
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+
         let mut shrink = 0;
         for m in v.moving_marks.borrow_mut().iter_mut() {
             if m.offset == 0 {
@@ -1941,6 +1994,9 @@ pub fn remove_previous_codepoint(
         let nr_marks = v.moving_marks.borrow().len();
         v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
         dbg_println!("\nAFTER Marks = {:?}", v.moving_marks.borrow_mut());
+
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
     }
 }
 

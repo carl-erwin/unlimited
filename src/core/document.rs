@@ -5,13 +5,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 //
+use crate::dbg_println;
+
 use crate::core::buffer::Buffer;
 pub use crate::core::buffer::OpenMode;
 
 //
 use crate::core::bufferlog::BufferLog;
-use crate::core::bufferlog::BufferOperation;
-use crate::core::bufferlog::BufferOperationType;
+pub use crate::core::bufferlog::BufferOperation;
+pub use crate::core::bufferlog::BufferOperationType;
 
 //
 pub type Id = u64; // TODO change to usize
@@ -69,13 +71,18 @@ impl DocumentBuilder {
             None => return None,
         };
 
-        Some(Rc::new(RefCell::new(Document {
+        let mut doc = Document {
             id: 0,
             name: self.document_name.clone(),
             buffer,
             buffer_log: BufferLog::new(),
             changed: false,
-        })))
+        };
+        // TODO: move to view
+        // first tag at @
+        doc.tag(0, vec![0]);
+
+        Some(Rc::new(RefCell::new(doc)))
     }
 }
 
@@ -105,11 +112,43 @@ impl<'a> Document<'a> {
         self.buffer.size
     }
 
+    pub fn nr_changes(&self) -> usize {
+        self.buffer.nr_changes() as usize
+    }
+
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO: use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         self.buffer.read(offset, nr_bytes, data)
+    }
+
+    pub fn tag(&mut self, offset: u64, marks: Vec<u64>) {
+        dbg_println!("doc.tag(..) offsets = {:?}", marks);
+        self.buffer_log
+            .add(offset, BufferOperationType::Tag { marks }, None);
+    }
+
+    pub fn get_tag_offset(&mut self) -> Option<Vec<u64>> {
+        let dlen = self.buffer_log.data.len();
+        if dlen == 0 {
+            return None;
+        }
+
+        let pos = if self.buffer_log.pos == dlen {
+            self.buffer_log.pos - 1
+        } else {
+            self.buffer_log.pos
+        };
+
+        // get inverted operation
+        let op = &self.buffer_log.data[pos];
+        match op.op_type {
+            BufferOperationType::Tag { ref marks } => {
+                Some(marks.clone()) // TODO: Rc<Vec<u64>>
+            }
+            _ => None,
+        }
     }
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
@@ -120,7 +159,7 @@ impl<'a> Document<'a> {
         ins_data.extend(&data[..nr_bytes]);
 
         self.buffer_log
-            .add(offset, BufferOperationType::Insert, ins_data);
+            .add(offset, BufferOperationType::Insert, Some(Rc::new(ins_data)));
 
         let sz = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
         if sz > 0 {
@@ -147,7 +186,7 @@ impl<'a> Document<'a> {
         }
 
         self.buffer_log
-            .add(offset, BufferOperationType::Remove, rm_data);
+            .add(offset, BufferOperationType::Remove, Some(Rc::new(rm_data)));
         if nr_bytes_removed > 0 {
             self.changed = true;
         }
@@ -156,19 +195,33 @@ impl<'a> Document<'a> {
 
     fn apply_log_operation(&mut self, op: &BufferOperation) -> Option<u64> {
         // apply op
-        let mark_offset = match op.op {
+        let mark_offset = match op.op_type {
             BufferOperationType::Insert => {
                 // TODO: check i/o errors
-                self.buffer.insert(op.offset, op.data.len(), &op.data);
-                self.changed = true;
-
-                op.offset + op.data.len() as u64
+                let added = if let Some(data) = &op.data {
+                    self.buffer.insert(op.offset, data.len(), &data);
+                    self.changed = true;
+                    data.len() as u64
+                } else {
+                    0
+                };
+                op.offset + added
             }
             BufferOperationType::Remove => {
                 // TODO: check i/o errors
-                self.buffer.remove(op.offset, op.data.len(), None);
-                self.changed = true;
+                let _removed = if let Some(data) = &op.data {
+                    let rm = self.buffer.remove(op.offset, data.len(), None);
+                    self.changed = true;
+                    assert_eq!(rm, data.len());
+                    rm
+                } else {
+                    0
+                };
 
+                op.offset
+            }
+            BufferOperationType::Tag { marks: _ } => {
+                /* nothing */
                 op.offset
             }
         };
@@ -200,6 +253,81 @@ impl<'a> Document<'a> {
         let op = self.buffer_log.data[pos].clone();
         self.buffer_log.pos += 1;
         self.apply_log_operation(&op)
+    }
+
+    pub fn undo_until_tag(&mut self) -> Vec<BufferOperation> {
+        // read current log position
+        let mut ops = Vec::new();
+        loop {
+            if self.buffer_log.pos == 0 {
+                dbg_println!("bufflog: undo self.buffer_log.pos == 0");
+                break;
+            }
+
+            self.buffer_log.pos -= 1;
+            let pos = self.buffer_log.pos;
+
+            // get inverted operation
+            let op = &self.buffer_log.data[pos];
+            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
+            match op.op_type {
+                BufferOperationType::Tag { .. } => {
+                    break;
+                }
+                _ => {}
+            }
+
+            // replay
+            let inverted_op = op.invert();
+            self.apply_log_operation(&inverted_op);
+            //
+            ops.push(inverted_op);
+        }
+
+        dbg_println!(
+            "bufflog: undo until tag END : self.buffer_log.pos == {}",
+            self.buffer_log.pos
+        );
+
+        ops
+    }
+
+    pub fn redo_until_tag(&mut self) -> Vec<BufferOperation> {
+        let mut ops = Vec::new();
+
+        loop {
+            // read current log position
+            if self.buffer_log.pos == self.buffer_log.data.len() {
+                break;
+            }
+            // skip tag ?
+            self.buffer_log.pos += 1;
+
+            if self.buffer_log.pos == self.buffer_log.data.len() {
+                break;
+            }
+
+            let pos = self.buffer_log.pos;
+            // replay previous op
+            let op = self.buffer_log.data[pos].clone();
+            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
+            match op.op_type {
+                BufferOperationType::Tag { .. } => {
+                    break;
+                }
+                _ => {}
+            }
+
+            self.apply_log_operation(&op);
+            ops.push(op);
+        }
+
+        dbg_println!(
+            "bufflog: redo until tag END : self.buffer_log.pos == {}",
+            self.buffer_log.pos
+        );
+
+        ops
     }
 }
 
