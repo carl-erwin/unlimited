@@ -263,7 +263,6 @@ pub fn run(
     ui_tx.send(msg).unwrap_or(());
 }
 
-
 fn process_input_event(
     editor: &mut Editor,
     mut env: &mut EditorEnv,

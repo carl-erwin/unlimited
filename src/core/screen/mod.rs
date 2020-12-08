@@ -424,8 +424,6 @@ impl Screen {
     }
 }
 
-
-
 fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     let mut nb_push = 0;
     for c in s.chars().take(screen.width()) {
@@ -451,9 +449,6 @@ fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
         screen.push(cpi);
     }
 }
-
-
-
 
 #[test]
 fn test_screen() {
