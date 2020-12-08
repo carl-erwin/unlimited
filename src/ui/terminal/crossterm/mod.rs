@@ -43,7 +43,10 @@ use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::screen::Screen;
 
+use crate::core::event::InputEvent::*;
 use crate::core::event::Key;
+use crate::core::event::Key::*;
+
 use crate::core::event::KeyModifiers;
 
 use crate::core::codepointinfo::CodepointInfo;
@@ -52,10 +55,17 @@ use crate::core::codepointinfo::CodepointInfo;
 use crate::ui::UiState;
 
 fn stdin_thread(tx: &Sender<EventMessage>) {
+    // TODO: generate_test from logs grep | awk >>
+    //    let v = autotest_0001();
+    //    send_input_events(&v, &tx);
+
     loop {
         get_input_events(&tx).unwrap();
     }
 }
+
+// fn autotest_0001() -> Vec<InputEvent> {
+// }
 
 pub fn main_loop(
     ui_rx: &Receiver<EventMessage>,
