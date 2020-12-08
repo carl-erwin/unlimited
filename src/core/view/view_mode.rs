@@ -48,8 +48,6 @@ ctrl+a, ctrl-v,
 
     // change
     pub fn insert_codepoint_array(&mut self, array: &[char]);
-    pub fn insert_codepoint(&mut self, codepoint: char, nr_pending_events: usize);
-    pub fn remove_codepoint(&mut self);
     pub fn remove_until_end_of_word(&mut self);
     pub fn remove_previous_codepoint(&mut self);
 
