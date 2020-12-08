@@ -424,6 +424,37 @@ impl Screen {
     }
 }
 
+
+
+fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
+    let mut nb_push = 0;
+    for c in s.chars().take(screen.width()) {
+        let mut cpi = CodepointInfo::new();
+        cpi.metadata = true;
+        cpi.is_selected = true;
+        cpi.cp = c;
+        cpi.displayed_cp = c;
+        cpi.color = color;
+        screen.push(cpi);
+        nb_push += 1;
+    }
+
+    // fill line
+    for _ in nb_push..screen.width() {
+        let mut cpi = CodepointInfo::new();
+        cpi.metadata = true;
+        cpi.is_selected = true;
+
+        cpi.cp = ' ';
+        cpi.displayed_cp = ' ';
+        cpi.color = color;
+        screen.push(cpi);
+    }
+}
+
+
+
+
 #[test]
 fn test_screen() {
     let mut scr = Screen::new(640, 480);
