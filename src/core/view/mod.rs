@@ -801,6 +801,10 @@ pub fn undo(
     let mut sync_view = false;
 
     // hack no multicursor for now
+    // TODO: add transaction
+    // undo/redo . use self.buffer_log.pos as tag
+    // destroy all marks
+    // collect/recreate marks @ undo result
     {
         let v = &mut view.as_ref().borrow_mut();
 
