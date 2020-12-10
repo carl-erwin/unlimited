@@ -755,15 +755,11 @@ impl Filter<'_> for HighlightFilter {
 pub struct ScreenFilter {
     // data
     first_offset: Option<u64>,
-    last_pushed_offset: u64,
 }
 
 impl ScreenFilter {
     fn new(_env: &LayoutEnv) -> Self {
-        ScreenFilter {
-            first_offset: None,
-            last_pushed_offset: 0,
-        }
+        ScreenFilter { first_offset: None }
     }
 }
 
@@ -790,8 +786,6 @@ impl Filter<'_> for ScreenFilter {
             env.screen.first_offset = base_offset;
             self.first_offset = Some(base_offset);
         }
-
-        self.last_pushed_offset = base_offset;
 
         let mut cpis_vec = Vec::new();
 
@@ -831,24 +825,10 @@ impl Filter<'_> for ScreenFilter {
             }
         }
 
-        for cpi in &cpis_vec {
-            // TODO: add screen.push_count()    ?
-            // TODO: add screen.push_capacity() ?
-            // self.last_pushed_offset = cpi.offset;
-            let (push_ok, _) = env.screen.push(*cpi);
-            if !push_ok {
-                env.quit = true;
-                break;
-            }
-            self.last_pushed_offset = cpi.offset;
+        let (n, _, last_offset) = env.screen.append(&cpis_vec);
+        if n < cpis_vec.len() {
+            env.quit = true;
         }
-
-        /*
-             let n = env.screen.append(cps: &Vec<Codepoint>);
-             if  n < cps.len() {
-                env.quit = true;;
-             }
-        */
 
         // TODO: add filter.setup(env)
         // TODO: add filter.run(env)
@@ -856,7 +836,6 @@ impl Filter<'_> for ScreenFilter {
 
         // remove this: add filter.finish() pass
         env.screen.doc_max_offset = env.max_offset;
-        env.screen.last_offset = self.last_pushed_offset;
     }
 }
 

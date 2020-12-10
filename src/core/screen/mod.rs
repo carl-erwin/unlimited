@@ -194,6 +194,7 @@ impl Screen {
         let (ok, _) = line.push(cpi);
 
         if ok {
+            self.last_offset = cpi.offset;
             self.push_count += 1;
             if cp == '\n' || cp == '\r' {
                 // dbg_println!("detected enf of line = line[{}] available is {}", self.current_line_index, line.available());
@@ -210,6 +211,16 @@ impl Screen {
             }
         }
         (ok, self.current_line_index)
+    }
+
+    pub fn append(&mut self, cpi_vec: &Vec<CodepointInfo>) -> (usize, LineIndex, u64) {
+        for (idx, cpi) in cpi_vec.iter().enumerate() {
+            let ret = self.push(*cpi);
+            if ret.0 == false {
+                return (idx, ret.1, self.last_offset);
+            }
+        }
+        (cpi_vec.len(), self.current_line_index, self.last_offset)
     }
 
     pub fn clear(&mut self) {
