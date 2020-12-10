@@ -691,18 +691,30 @@ impl Filter<'_> for HighlightFilter {
                         "," | ";" => (0, 128, 0),
 
                         _ => {
-                            // identifier
-                            let mut is_digit = true;
+                            let mut non_alnum = 0;
+                            let mut digit_count = 0;
+
                             for c in self.utf8_token.iter() {
                                 //dbg_println!("*c = {} b'0' {}", *c as u32, b'0' as u32);
                                 //dbg_println!("*c = {} b'9' {}", *c as u32, b'9' as u32);
-                                if *c < b'0' || *c > b'9' {
-                                    is_digit = false;
-                                    break;
+                                if *c >= b'0' && *c <= b'9' {
+                                    digit_count += 1;
+                                    continue;
                                 }
+
+                                if *c >= b'a' && *c <= b'f' {
+                                    continue;
+                                }
+
+                                if *c >= b'A' && *c <= b'F' {
+                                    continue;
+                                }
+
+                                non_alnum += 1;
+                                break;
                             }
 
-                            if is_digit {
+                            if non_alnum == 0 && digit_count != 0 {
                                 (111, 100, 80)
                             } else {
                                 self.new_color
