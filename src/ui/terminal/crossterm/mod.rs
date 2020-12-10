@@ -259,7 +259,7 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
 }
 
 fn screen_changed(screen0: &Screen, screen1: &Screen) -> bool {
-    let nbp = screen0.nb_push != screen1.nb_push;
+    let nbp = screen0.push_count != screen1.push_count;
     let o = screen0.first_offset != screen1.first_offset;
     let w = screen0.max_width() != screen1.max_width();
     let h = screen0.max_height() != screen1.max_height();

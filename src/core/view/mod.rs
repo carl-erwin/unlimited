@@ -378,7 +378,7 @@ impl<'a> View<'a> {
         loop {
             let _ = run_view_layout_filters_direct(env, &self, m.offset, max_offset, &mut screen);
 
-            if screen.nb_push == 0 {
+            if screen.push_count == 0 {
                 return v;
             }
 
@@ -482,7 +482,7 @@ pub fn get_lines_offsets(
 
     loop {
         let _ = run_view_layout_filters(env, &view, m.offset, max_offset, &mut screen);
-        if screen.nb_push == 0 {
+        if screen.push_count == 0 {
             return v;
         }
 

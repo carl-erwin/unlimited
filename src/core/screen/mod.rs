@@ -36,7 +36,7 @@ pub struct Screen {
     /// maximum number of lines the screen can hold
     max_height: usize,
     /// the number of elements pushed in the screen
-    pub nb_push: usize,
+    pub push_count: usize,
     // the maximum number of elements the screen can hold
     pub push_capacity: usize,
     /// placeholder to record the offset of the first pushed CodepointInfo (used by View)
@@ -73,7 +73,7 @@ impl Screen {
             },
             max_width: width,
             max_height: height,
-            nb_push: 0,
+            push_count: 0,
             push_capacity,
             first_offset: 0,
             last_offset: 0,
@@ -150,7 +150,7 @@ impl Screen {
         self.set_clipping(0, 0, width, height);
 
         self.current_line_index = 0;
-        self.nb_push = 0;
+        self.push_count = 0;
         self.first_offset = 0;
         self.last_offset = 0;
         self.doc_max_offset = 0;
@@ -158,15 +158,15 @@ impl Screen {
     }
 
     pub fn push_available(&self) -> usize {
-        if self.push_capacity() >= self.nb_push {
-            self.push_capacity() - self.nb_push
+        if self.push_capacity() >= self.push_count {
+            self.push_capacity() - self.push_count
         } else {
             0
         }
     }
 
     pub fn push_count(&self) -> usize {
-        self.nb_push
+        self.push_count
     }
 
     pub fn push_capacity(&self) -> usize {
@@ -194,7 +194,7 @@ impl Screen {
         let (ok, _) = line.push(cpi);
 
         if ok {
-            self.nb_push += 1;
+            self.push_count += 1;
             if cp == '\n' || cp == '\r' {
                 // dbg_println!("detected enf of line = line[{}] available is {}", self.current_line_index, line.available());
                 // dbg_println!("detected enf of line = line[{}] capacity is {}", self.current_line_index, line.capacity());
@@ -217,7 +217,7 @@ impl Screen {
             self.line[h].clear();
         }
         self.current_line_index = 0;
-        self.nb_push = 0;
+        self.push_count = 0;
         self.push_capacity = self.max_width * self.max_height;
         self.first_offset = 0;
         self.last_offset = 0;
@@ -279,7 +279,7 @@ impl Screen {
         (self.get_used_line(index), index)
     }
 
-    // improve this: loop over line nb_push > 0
+    // improve this: loop over line push_count > 0
     pub fn get_used_line(&self, index: usize) -> Option<&Line> {
         if index >= self.height() {
             return None;
@@ -454,7 +454,7 @@ impl Screen {
 }
 
 fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
-    let mut nb_push = 0;
+    let mut push_count = 0;
     for c in s.chars().take(screen.width()) {
         let mut cpi = CodepointInfo::new();
         cpi.metadata = true;
@@ -463,11 +463,11 @@ fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
         cpi.displayed_cp = c;
         cpi.color = color;
         screen.push(cpi);
-        nb_push += 1;
+        push_count += 1;
     }
 
     // fill line
-    for _ in nb_push..screen.width() {
+    for _ in push_count..screen.width() {
         let mut cpi = CodepointInfo::new();
         cpi.metadata = true;
         cpi.is_selected = true;
