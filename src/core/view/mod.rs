@@ -1629,12 +1629,11 @@ pub fn move_mark_to_start_of_file(
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
-    for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.offset = 0;
-        break;
-    }
-
     v.start_offset = 0;
+
+    let mut moving_marks = v.moving_marks.borrow_mut();
+    moving_marks.clear();
+    moving_marks.push(Mark { offset: 0 });
 }
 
 // TODO: view.center_arrout_offset()
@@ -1679,20 +1678,21 @@ pub fn move_mark_to_end_of_file(
 ) {
     let mut v = view.as_ref().borrow_mut();
 
-    let size = {
+    let offset = {
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        doc.size()
+        doc.size() as u64
     };
 
-    for m in v.moving_marks.borrow_mut().iter_mut() {
-        m.offset = size as u64;
-        break;
-    }
+    v.start_offset = offset;
 
-    v.start_offset = size as u64;
-    let h = v.screen.read().unwrap().height() / 2;
-    v.scroll_up(env, h);
+    let mut marks = v.moving_marks.borrow_mut();
+    marks.clear();
+    marks.push(Mark { offset });
+
+    //
+    let n = v.screen.read().unwrap().height() / 2;
+    env.view_pre_render.push(Action::ScrollUp { n })
 }
 
 pub fn scroll_to_next_screen(
