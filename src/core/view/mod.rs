@@ -600,7 +600,7 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
                                         // sort mark here ?
 
     for m in marks.borrow().iter() {
-        dbg_println!(" checking m.offset {}", m.offset);
+        //dbg_println!(" checking m.offset {}", m.offset);
 
         if m.offset < v.start_offset {
             continue;
@@ -814,7 +814,7 @@ pub fn undo(
         doc.undo_until_tag();
         doc.undo_until_tag();
         if let Some(marks_offsets) = doc.get_tag_offset() {
-            dbg_println!("restore marks {:?}", marks_offsets);
+            //dbg_println!("restore marks {:?}", marks_offsets);
             marks.clear();
             for offset in marks_offsets {
                 marks.push(Mark { offset });
@@ -855,7 +855,7 @@ pub fn redo(
         doc.redo_until_tag();
         doc.redo_until_tag();
         if let Some(marks_offsets) = doc.get_tag_offset() {
-            dbg_println!("restore marks {:?}", marks_offsets);
+            //dbg_println!("restore marks {:?}", marks_offsets);
             marks.clear();
             for offset in marks_offsets {
                 marks.push(Mark { offset });
