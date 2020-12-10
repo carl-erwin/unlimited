@@ -260,7 +260,7 @@ impl<'a> Document<'a> {
         let mut ops = Vec::new();
         loop {
             if self.buffer_log.pos == 0 {
-                dbg_println!("bufflog: undo self.buffer_log.pos == 0");
+                //dbg_println!("bufflog: undo self.buffer_log.pos == 0");
                 break;
             }
 
@@ -269,7 +269,7 @@ impl<'a> Document<'a> {
 
             // get inverted operation
             let op = &self.buffer_log.data[pos];
-            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
+            //dbg_println!("bufflog: op[{}] = {:?}", pos, op);
             match op.op_type {
                 BufferOperationType::Tag { .. } => {
                     break;
@@ -284,10 +284,10 @@ impl<'a> Document<'a> {
             ops.push(inverted_op);
         }
 
-        dbg_println!(
-            "bufflog: undo until tag END : self.buffer_log.pos == {}",
-            self.buffer_log.pos
-        );
+        //dbg_println!(
+        //    "bufflog: undo until tag END : self.buffer_log.pos == {}",
+        //    self.buffer_log.pos
+        //);
 
         ops
     }
@@ -310,7 +310,7 @@ impl<'a> Document<'a> {
             let pos = self.buffer_log.pos;
             // replay previous op
             let op = self.buffer_log.data[pos].clone();
-            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
+            //dbg_println!("bufflog: op[{}] = {:?}", pos, op);
             match op.op_type {
                 BufferOperationType::Tag { .. } => {
                     break;
@@ -322,10 +322,10 @@ impl<'a> Document<'a> {
             ops.push(op);
         }
 
-        dbg_println!(
-            "bufflog: redo until tag END : self.buffer_log.pos == {}",
-            self.buffer_log.pos
-        );
+        //dbg_println!(
+        //    "bufflog: redo until tag END : self.buffer_log.pos == {}",
+        //    self.buffer_log.pos
+        //);
 
         ops
     }
