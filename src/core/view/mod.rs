@@ -599,22 +599,6 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     let marks = v.moving_marks.clone(); // do not hold v
                                         // sort mark here ?
 
-    // dbg_println!(" refresh_view_marks {:?}", marks);
-    if false {
-        let mut marks = marks.borrow_mut();
-        marks.sort();
-        marks.dedup();
-        let len = marks.len();
-        if len > 0 {
-            if v.mark_index >= len {
-                v.mark_index = len - 1;
-            }
-        } else {
-            marks.push(Mark { offset: 0 });
-            v.mark_index = 0;
-        }
-    }
-
     for m in marks.borrow().iter() {
         dbg_println!(" checking m.offset {}", m.offset);
 
