@@ -35,9 +35,10 @@ pub struct Screen {
     max_width: usize,
     /// maximum number of lines the screen can hold
     max_height: usize,
-
     /// the number of elements pushed in the screen
     pub nb_push: usize,
+    // the maximum number of elements the screen can hold
+    pub push_capacity: usize,
     /// placeholder to record the offset of the first pushed CodepointInfo (used by View)
     pub first_offset: u64,
     /// placeholder to record the offset of the last pushed CodepointInfo (used by View)
@@ -60,6 +61,7 @@ impl Screen {
             line.push(Line::new(width));
         }
 
+        let push_capacity = width * height;
         Screen {
             line,
             current_line_index: 0,
@@ -71,8 +73,8 @@ impl Screen {
             },
             max_width: width,
             max_height: height,
-
             nb_push: 0,
+            push_capacity,
             first_offset: 0,
             last_offset: 0,
             doc_max_offset: 0,
@@ -155,6 +157,22 @@ impl Screen {
         self.input_size = 0;
     }
 
+    pub fn push_available(&self) -> usize {
+        if self.push_capacity() >= self.nb_push {
+            self.push_capacity() - self.nb_push
+        } else {
+            0
+        }
+    }
+
+    pub fn push_count(&self) -> usize {
+        self.nb_push
+    }
+
+    pub fn push_capacity(&self) -> usize {
+        self.push_capacity
+    }
+
     /// 0-----skip---cur_index----max_height---capacity
 
     /// append
@@ -178,7 +196,17 @@ impl Screen {
         if ok {
             self.nb_push += 1;
             if cp == '\n' || cp == '\r' {
+                // dbg_println!("detected enf of line = line[{}] available is {}", self.current_line_index, line.available());
+                // dbg_println!("detected enf of line = line[{}] capacity is {}", self.current_line_index, line.capacity());
+                // dbg_println!("detected enf of line = push capacity is {}", self.push_capacity);
+
                 line.read_only = true;
+                // substract skipped columns
+                if self.push_capacity >= line.available() {
+                    self.push_capacity -= line.available();
+                } else {
+                    self.push_capacity = 0;
+                }
             }
         }
         (ok, self.current_line_index)
@@ -190,6 +218,7 @@ impl Screen {
         }
         self.current_line_index = 0;
         self.nb_push = 0;
+        self.push_capacity = self.max_width * self.max_height;
         self.first_offset = 0;
         self.last_offset = 0;
         self.doc_max_offset = 0;

@@ -132,6 +132,18 @@ impl Line {
         self.set_clipping(0, self.max_width);
     }
 
+    pub fn capacity(&self) -> usize {
+        self.width()
+    }
+
+    pub fn available(&self) -> usize {
+        if self.capacity() >= self.nb_cells {
+            self.capacity() - self.nb_cells
+        } else {
+            0
+        }
+    }
+
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
         if self.nb_cells < self.width() && !self.read_only {
             self.cells[self.start_index + self.nb_cells].cpi = cpi;

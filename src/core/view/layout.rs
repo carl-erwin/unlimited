@@ -138,6 +138,10 @@ pub struct LayoutEnv<'a> {
     pub screen: &'a mut Screen,
 }
 
+// TODO: add ?
+//        doc,
+//        view
+
 pub trait Filter<'a> {
     fn name(&self) -> &'static str;
 
@@ -272,7 +276,7 @@ impl RawDataFilter {
         RawDataFilter {
             pos: env.base_offset,
             //max: env.max_offset,
-            read_size: env.screen.width() * env.screen.height(),
+            read_size: env.screen.width(), // * env.screen.height(),
         }
     }
 }
@@ -789,7 +793,24 @@ impl Filter<'_> for ScreenFilter {
 
         self.last_pushed_offset = base_offset;
 
-        for io in filter_in.iter() {
+        let mut cpis_vec = Vec::new();
+
+        dbg_println!("ScreenFilter : in len = {}", filter_in.len());
+
+        dbg_println!(
+            "screen.push_available({}) + screen.push_count({}) == screen.push_capacity({})",
+            env.screen.push_available(),
+            env.screen.push_count(),
+            env.screen.push_capacity()
+        );
+
+        let remain = env.screen.push_available();
+        dbg_println!(
+            "ScreenFilter :  env.screen.push_available(); {}",
+            env.screen.push_available()
+        );
+        // env.quit = true;
+        for (idx, io) in filter_in.iter().enumerate() {
             if let FilterIoData {
                 offset,
                 data: FilterData::Unicode { cp, .. },
@@ -798,37 +819,46 @@ impl Filter<'_> for ScreenFilter {
                 ..
             } = &*io
             {
-                let (push_ok, _) = env.screen.push(filter_codepoint(
-                    u32_to_char(*cp),
-                    *offset,
-                    *is_selected,
-                    *color,
-                ));
-                if !push_ok {
-                    env.quit = true;
+                // screen.push_available() + screen.push_count() == screen.push_capacity()
+                let cp = filter_codepoint(u32_to_char(*cp), *offset, *is_selected, *color);
+
+                cpis_vec.push(cp);
+
+                if idx == remain {
+                    dbg_println!("ScreenFilter : screen eof reached !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     break;
                 }
-
-                self.last_pushed_offset = *offset;
             }
         }
+
+        for cpi in &cpis_vec {
+            // TODO: add screen.push_count()    ?
+            // TODO: add screen.push_capacity() ?
+            // self.last_pushed_offset = cpi.offset;
+            let (push_ok, _) = env.screen.push(*cpi);
+            if !push_ok {
+                env.quit = true;
+                break;
+            }
+            self.last_pushed_offset = cpi.offset;
+        }
+
+        /*
+             let n = env.screen.append(cps: &Vec<Codepoint>);
+             if  n < cps.len() {
+                env.quit = true;;
+             }
+        */
 
         // TODO: add filter.setup(env)
         // TODO: add filter.run(env)
         // TODO: add filter.finish(env)
 
+        // remove this: add filter.finish() pass
         env.screen.doc_max_offset = env.max_offset;
         env.screen.last_offset = self.last_pushed_offset;
     }
 }
-
-//    struct LayoutEnv {
-//        doc,
-//        view
-//        base_offset: u64,
-//        max_offset: u64,
-//        screen: &Screen, // for width height
-//    };
 
 // TODO return array of CodePointInfo  0x7f -> <ESC>
 pub fn filter_codepoint(
