@@ -133,6 +133,7 @@ pub enum Action {
     MoveMarksToPreviousLine,
     MoveMarkToNextLine { idx: usize },
     MoveMarkToPreviousLine { idx: usize },
+    CheckMarks,
 }
 
 // TODO:
@@ -583,6 +584,17 @@ pub fn run_view_action(
                 env.cur_mark_index = None;
             }
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
+
+            Action::CheckMarks => {
+                let v = &mut view.as_ref().borrow_mut();
+                dbg_println!("\nAFTER Marks = {:?}", v.moving_marks.borrow_mut());
+                {
+                    v.moving_marks.borrow_mut().dedup();
+                    let nr_marks = v.moving_marks.borrow().len();
+                    v.mark_index = if nr_marks != 0 { nr_marks - 1 } else { 0 };
+                    dbg_println!("\nAFTER Marks = {:?}", v.moving_marks.borrow_mut());
+                }
+            }
         }
     }
 }
@@ -989,30 +1001,23 @@ pub fn move_marks_backward(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    {
-        let v = &mut view.as_ref().borrow_mut();
-        let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap().borrow();
-        let codec = v.text_codec.as_ref();
-        let midx = v.mark_index;
+    let v = &mut view.as_ref().borrow_mut();
+    let doc = v.document.clone();
+    let doc = doc.as_ref().unwrap().borrow();
+    let codec = v.text_codec.as_ref();
+    let midx = v.mark_index;
 
-        for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
-            // TODO: add main mark check
-            if idx == midx && m.offset <= v.start_offset {
-                env.view_pre_render.push(Action::ScrollUp { n: 1 });
-            }
-
-            m.move_backward(&doc, codec);
+    for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
+        if idx == midx && m.offset <= v.start_offset {
+            env.view_pre_render.push(Action::ScrollUp { n: 1 });
         }
 
-        v.moving_marks.borrow_mut().dedup();
-
-        // update main mark
-        let nr_marks = v.moving_marks.borrow_mut().len();
-        v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
+        m.move_backward(&doc, codec);
     }
 
-    if view.as_ref().borrow_mut().center_on_mark_move {
+    env.view_pre_render.push(Action::CheckMarks);
+
+    if v.center_on_mark_move {
         env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
@@ -1044,11 +1049,9 @@ pub fn move_marks_forward(
         //           env.view_pre_render.push(Action::CenterArroundMainMark);
         //      }
 
-        // when the marks reach eof
-        v.moving_marks.borrow_mut().sort();
-        v.moving_marks.borrow_mut().dedup();
+        env.view_pre_render.push(Action::CheckMarks);
         // update main mark
-        let nr_marks = v.moving_marks.borrow_mut().len();
+        let nr_marks = v.moving_marks.borrow().len();
         v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
     }
 }
@@ -1059,7 +1062,7 @@ pub fn move_marks_to_start_of_line(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let v = &view.as_ref().borrow_mut();
+    let v = &mut view.as_ref().borrow();
 
     let doc = v.document.as_ref().unwrap().borrow();
     let codec = v.text_codec.as_ref();
@@ -1073,6 +1076,8 @@ pub fn move_marks_to_start_of_line(
             env.view_pre_render.push(Action::CenterArroundMainMark);
         }
     }
+
+    env.view_pre_render.push(Action::CheckMarks);
 }
 
 pub fn move_marks_to_end_of_line(
@@ -1081,7 +1086,7 @@ pub fn move_marks_to_end_of_line(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let v = &view.as_ref().borrow_mut();
+    let v = &view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap().borrow();
     let codec = v.text_codec.as_ref();
     let midx = v.mark_index;
@@ -1094,6 +1099,8 @@ pub fn move_marks_to_end_of_line(
             env.view_pre_render.push(Action::CenterArroundMainMark);
         }
     }
+
+    env.view_pre_render.push(Action::CheckMarks);
 }
 
 fn move_mark_to_previous_line(
@@ -1293,6 +1300,8 @@ pub fn move_marks_to_previous_line(
             }
         }
     }
+
+    env.view_pre_render.push(Action::CheckMarks);
 }
 
 // remove multiple borrows
@@ -2016,14 +2025,7 @@ pub fn remove_previous_codepoint(
         }
 
         env.max_offset = doc.size() as u64;
-
-        dbg_println!("\nBEFORE Marks = {:?}", v.moving_marks.borrow_mut());
-        // TODO: mus fix  main mark updates
-        v.moving_marks.borrow_mut().sort();
-        v.moving_marks.borrow_mut().dedup();
-        let nr_marks = v.moving_marks.borrow().len();
-        v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
-        dbg_println!("\nAFTER Marks = {:?}", v.moving_marks.borrow_mut());
+        env.view_pre_render.push(Action::CheckMarks);
 
         let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
         doc.tag(env.max_offset, marks_offsets);
