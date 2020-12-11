@@ -23,6 +23,7 @@ pub struct Rect {
 /// A Screen is composed of Line(s).<br/>
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Screen {
+    pub is_off_screen: bool, // Hints
     /// the underlying lines storage
     pub line: Vec<Line>,
     /// the index of the line filled with the push method
@@ -63,6 +64,7 @@ impl Screen {
 
         let push_capacity = width * height;
         Screen {
+            is_off_screen: false,
             line,
             current_line_index: 0,
             clip: Rect {
@@ -303,26 +305,32 @@ impl Screen {
         }
     }
 
-    /// there must be 2 lines a least
     pub fn get_first_used_line(&self) -> Option<&Line> {
-        if 0 < self.current_line_index {
-            Some(&self.line[self.clip.y])
-        } else {
+        if self.push_count() == 0 {
             None
+        } else {
+            Some(&self.line[self.clip.y])
         }
     }
 
-    /// there must be 2 line a least
     pub fn get_last_used_line(&self) -> Option<&Line> {
-        if self.current_line_index > 0 {
+        if self.push_count() == 0 {
+            return None;
+        }
+
+        if self.current_line_index == self.height() {
             Some(&self.line[self.clip.y + self.current_line_index - 1])
         } else {
-            None
+            Some(&self.line[self.clip.y + self.current_line_index])
         }
     }
 
     pub fn get_last_used_line_index(&self) -> LineIndex {
-        self.current_line_index
+        if self.current_line_index == self.height() {
+            self.current_line_index - 1
+        } else {
+            self.current_line_index
+        }
     }
 
     pub fn get_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
@@ -422,33 +430,39 @@ impl Screen {
     }
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
-        // TODO: use dichotomic search
-
-        dbg_println!("screen:;find_cpi_by_offset : if offset {} , self.first_offset {} , self.last_offset {}",
-        offset, self.first_offset, self.last_offset);
-
         if offset < self.first_offset || offset > self.last_offset {
             return (None, 0, 0);
         }
 
-        for y in 0..self.height() {
-            let l = self.get_line(y).unwrap();
-            if l.nb_cells == 0 {
-                // continue; // TODO clipping ....
-            }
+        let mut max = self.current_line_index;
 
-            // TODO: handle line.skip
-            for x in 0..l.width() {
-                let cpi = l.get_cpi(x).unwrap();
-                if cpi.metadata {
-                    continue;
+        let mut min = 0;
+        while min <= max {
+            let idx = min + (max - min) / 2;
+            let l = self.get_line(idx).unwrap();
+            let f_cpi = l.get_first_cpi().unwrap();
+            let l_cpi = l.get_last_cpi().unwrap();
+            if offset >= f_cpi.offset && offset <= l_cpi.offset {
+                // TODO: handle line.skip / used
+                for x in 0..l.width() {
+                    let cpi = l.get_cpi(x).unwrap();
+                    if cpi.metadata {
+                        continue;
+                    }
+                    if cpi.offset == offset {
+                        return (Some(cpi), x, idx);
+                    }
                 }
-                if cpi.offset == offset {
-                    return (Some(cpi), x, y);
-                }
+
+                panic!(""); // TODO: handle meta data
+            } else if offset > l_cpi.offset {
+                min = idx + 1;
+            } else {
+                max = idx - 1;
             }
         }
-        (None, 0, 0)
+
+        panic!("");
     }
 
     pub fn contains_offset(&self, offset: u64) -> bool {

@@ -132,12 +132,12 @@ impl Mark {
     // TODO: check multi-byte utf8 sequence
     pub fn move_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let (_, offset, size) = read_char_backward(&doc, self.offset, codec);
-        dbg_println!(
-            "self.offset({}) = offset({}), size({})",
-            self.offset,
-            offset,
-            size
-        );
+        //dbg_println!(
+        //    "self.offset({}) = offset({}), size({})",
+        //    self.offset,
+        //    offset,
+        //    size
+        //);
         self.offset = offset;
 
         self

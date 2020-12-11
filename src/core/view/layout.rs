@@ -276,7 +276,7 @@ impl RawDataFilter {
         RawDataFilter {
             pos: env.base_offset,
             //max: env.max_offset,
-            read_size: env.screen.width(), // * env.screen.height(),
+            read_size: env.screen.width() * env.screen.height(),
         }
     }
 }
@@ -905,14 +905,15 @@ pub fn run_view_layout_filters_direct(
         screen,
     };
 
+    // move in mode init
     let mut filters: Vec<Box<dyn Filter>> = vec![];
 
     filters.push(Box::new(RawDataFilter::new(&layout_env)));
     filters.push(Box::new(Utf8Filter::new(&layout_env)));
     filters.push(Box::new(TabFilter::new(&layout_env)));
 
-    /* if editor_env.pending_events <= 1 */
-    {
+    if layout_env.screen.is_off_screen == false {
+        /* || editor_env.pending_events <= 1 || */
         // TODO: schedule refresh on idle
         filters.push(Box::new(HighlightFilter::new(&layout_env)));
     }

@@ -124,7 +124,7 @@ impl<'a> Document<'a> {
     }
 
     pub fn tag(&mut self, offset: u64, marks: Vec<u64>) {
-        dbg_println!("doc.tag(..) offsets = {:?}", marks);
+        //dbg_println!("doc.tag(..) offsets = {:?}", marks);
         self.buffer_log
             .add(offset, BufferOperationType::Tag { marks }, None);
     }
