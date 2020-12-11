@@ -481,7 +481,7 @@ pub fn get_lines_offsets(
     let mut screen = Screen::new(screen_width, screen_height);
 
     loop {
-        let _ = run_view_layout_filters(env, &view, m.offset, max_offset, &mut screen);
+        run_view_layout_filters(env, &view, m.offset, max_offset, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
@@ -642,11 +642,10 @@ pub fn compute_view_layout(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
             v.screen.read().unwrap().height(),
         ));
 
-        let end_offset =
-            run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
+        run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
         // TODO: from env ?
-        v.end_offset = end_offset;
+        v.end_offset = screen.last_offset;
         v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
         v.check_invariants();
     }

@@ -879,7 +879,7 @@ pub fn run_view_layout_filters(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
-) -> u64 {
+) {
     let view = view.as_ref().borrow();
     run_view_layout_filters_direct(env, &view, base_offset, max_offset, screen)
 }
@@ -897,7 +897,7 @@ pub fn run_view_layout_filters_direct(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
-) -> u64 {
+) {
     let mut layout_env = LayoutEnv {
         quit: false,
         base_offset,
@@ -922,16 +922,17 @@ pub fn run_view_layout_filters_direct(
     let mut filter_in = Vec::new();
     let mut filter_out = Vec::new();
 
+    // for f in filters { f.setup(); }
+
     while layout_env.quit == false {
         for f in &mut filters {
             filter_out.clear();
-            //            dbg_println!("running {} : in({})", f.name(), filter_in.len());
+            // dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
-            //            dbg_println!("        {} : out({})", f.name(), filter_out.len());
+            // dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }
 
-    // remove this
-    layout_env.screen.last_offset
+    // for f in filters { f.finish(); }
 }
