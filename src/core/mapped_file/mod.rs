@@ -50,6 +50,12 @@ use self::libc::{
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq)]
+enum PageSource {
+    FromStorage,
+    FromRam,
+}
+
 #[derive(Debug, Clone)]
 enum Page {
     OnStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
@@ -125,7 +131,7 @@ struct Node {
 
     // data
     size: u64,
-    on_disk_offset: u64,
+    storage_offset: Option<u64>,
     skip: u64,
 
     page: Weak<RefCell<Page>>,
@@ -144,7 +150,7 @@ impl Node {
         self.prev = None;
         self.next = None;
         self.size = 0;
-        self.on_disk_offset = 0xffff_ffff_ffff_ffff as u64;
+        self.storage_offset = None;
         self.skip = 0;
         self.page = Weak::new();
         self.cow = None;
@@ -161,6 +167,12 @@ impl Node {
             return Some(page);
         }
 
+        if self.storage_offset.is_none() {
+            panic!("mapped_file internal error: invalid storage offset");
+        }
+
+        let storage_offset = self.storage_offset.as_ref().unwrap();
+
         // do map
         let ptr = unsafe {
             mmap(
@@ -169,14 +181,14 @@ impl Node {
                 PROT_READ,
                 MAP_PRIVATE,
                 self.fd,
-                self.on_disk_offset as i64,
+                *storage_offset as i64,
             )
         };
 
         if ptr == MAP_FAILED {
             eprintln!(
                 "mmap error : disk_offset = {}, size = {}",
-                self.on_disk_offset, self.size
+                *storage_offset, self.size
             );
             return None;
         }
@@ -335,6 +347,8 @@ impl<'a> MappedFile<'a> {
     pub fn new(path: String, page_size: usize) -> Option<FileHandle<'a>> {
         let path = CString::new(path).unwrap();
 
+        // TODO: check page size % 4096 // sysconfig
+
         let fd = unsafe { open(path.as_ptr(), O_RDONLY) };
         if fd < 0 {
             return None;
@@ -385,7 +399,7 @@ impl<'a> MappedFile<'a> {
             next: None,
             page: Weak::new(),
             cow: None,
-            on_disk_offset: 0,
+            storage_offset: None,
             skip: 0,
         };
 
@@ -396,6 +410,7 @@ impl<'a> MappedFile<'a> {
 
         let mut leaves = Vec::new();
         MappedFile::build_tree(
+            PageSource::FromStorage,
             &mut file.pool,
             fd,
             &mut leaves,
@@ -417,7 +432,7 @@ impl<'a> MappedFile<'a> {
                 let rc = Rc::new(RefCell::new(p));
                 file.pool[idx as usize].page = Rc::downgrade(&rc);
                 file.pool[idx as usize].cow = Some(rc);
-                file.pool[idx as usize].on_disk_offset = 0xffff_ffff_ffff_ffff;
+                file.pool[idx as usize].storage_offset = None;
             }
             */
         }
@@ -499,13 +514,14 @@ impl<'a> MappedFile<'a> {
                     n.right,
                     n.prev,
                     n.next,
-                    n.size, // n.on_disk_offset
+                    n.size, // n.storage_offset
                 )
             }
         }
     }
 
     fn build_tree(
+        source: PageSource,
         pool: &mut FreeListAllocator<Node>,
         fd: i32,
         leaves: &mut Vec<NodeIndex>,
@@ -534,7 +550,9 @@ impl<'a> MappedFile<'a> {
             match leaf {
                 Some(idx) => {
                     let idx = idx as usize;
-                    pool[idx].on_disk_offset = base_offset;
+                    if source == PageSource::FromStorage {
+                        pool[idx].storage_offset = Some(base_offset);
+                    }
                     leaves.push(idx);
                 }
                 _ => panic!("internal error"),
@@ -555,7 +573,7 @@ impl<'a> MappedFile<'a> {
         let r_sz = node_size - l_sz;
 
         // create leaves : TODO: use default() ?
-        // TODO: None::new(fd, parent, size, on_disk_offset)
+        // TODO: None::new(fd, parent, size, storage_offset)
         let left_node = Node {
             used: true,
             to_delete: false,
@@ -569,12 +587,12 @@ impl<'a> MappedFile<'a> {
             next: None,
             page: Weak::new(),
             cow: None,
-            on_disk_offset: base_offset,
+            storage_offset: None,
             skip: 0,
         };
         let (l, _) = pool.allocate(left_node, &MappedFile::assert_node_is_unused);
 
-        // TODO: None::new(fd, parent, size, on_disk_offset)
+        // TODO: None::new(fd, parent, size, storage_offset)
         let right_node = Node {
             used: true,
             to_delete: false,
@@ -588,15 +606,35 @@ impl<'a> MappedFile<'a> {
             next: None,
             page: Weak::new(),
             cow: None,
-            on_disk_offset: base_offset + l_sz,
+            storage_offset: None,
             skip: 0,
         };
 
         let (r, _) = pool.allocate(right_node, &MappedFile::assert_node_is_unused);
 
         // build children
-        MappedFile::build_tree(pool, fd, leaves, Some(l), pg_size, l_sz, b_off);
-        MappedFile::build_tree(pool, fd, leaves, Some(r), pg_size, r_sz, b_off + l_sz);
+        // left
+        MappedFile::build_tree(
+            source.clone(),
+            pool,
+            fd,
+            leaves,
+            Some(l),
+            pg_size,
+            l_sz,
+            b_off,
+        );
+        // right
+        MappedFile::build_tree(
+            source.clone(),
+            pool,
+            fd,
+            leaves,
+            Some(r),
+            pg_size,
+            r_sz,
+            b_off + l_sz,
+        );
 
         // link to parent
         if let Some(idx) = parent {
@@ -692,7 +730,13 @@ impl<'a> MappedFile<'a> {
 
     pub fn iter_from(file_: &FileHandle<'a>, offset: u64) -> FileIterator<'a> {
         let mut file = file_.borrow_mut();
-        let pair = file.find_node_by_offset(offset);
+
+        let pair = if file.size() == 0 {
+            (None, 0, 0)
+        } else {
+            file.find_node_by_offset(offset)
+        };
+
         match pair {
             (Some(node_idx), node_size, local_offset) => {
                 let page = file.pool[node_idx as usize].map().unwrap();
@@ -710,7 +754,7 @@ impl<'a> MappedFile<'a> {
             }
 
             (None, _, _) => {
-                // eprintln!("ITER FROM END !!!!!");
+                eprintln!("ITER FROM END !!!!!");
                 MappedFileIterator::End(Rc::clone(file_))
             }
         }
@@ -872,11 +916,12 @@ impl<'a> MappedFile<'a> {
             return 0;
         }
 
+        // check iterator type
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
             MappedFileIterator::End(ref rcfile) => {
                 let mut file = rcfile.as_ref().borrow_mut();
 
-                MappedFile::print_all_used_nodes(&file, "BEFORE INSERT");
+                MappedFile::print_all_used_nodes(&file, "BEFORE INSERT - @ eof");
 
                 let file_size = file.size();
                 if file_size > 0 {
@@ -914,6 +959,11 @@ impl<'a> MappedFile<'a> {
         /////// in place insert ?
 
         if available >= data_len {
+            if DEBUG {
+                eprintln!("available({})>= data_len({})", available, data_len);
+                eprintln!("insert in place");
+            }
+
             // insert in current node
             MappedFile::insert_in_place(it_, data);
 
@@ -936,11 +986,15 @@ impl<'a> MappedFile<'a> {
         ////////////////////////////////////////////////
         // new subtree
 
+        if DEBUG {
+            eprintln!("allocate new subtree");
+        }
+
         let rcfile = it_.get_file();
         let mut file = rcfile.as_ref().borrow_mut();
 
         let base_offset = match node_to_split {
-            Some(idx) => file.pool[idx as usize].on_disk_offset,
+            Some(idx) => file.pool[idx as usize].storage_offset.unwrap_or(0),
             None => 0,
         };
 
@@ -951,6 +1005,7 @@ impl<'a> MappedFile<'a> {
                 file.pool[idx].parent,
             )
         } else {
+            assert_eq!(file.size(), 0);
             (None, None, None)
         };
 
@@ -962,8 +1017,10 @@ impl<'a> MappedFile<'a> {
 
         // TODO: provide user apis to tweak allocations
         let sub_page_min_size = sub_page_size as usize;
-        let new_page_size = ::std::cmp::min(new_size / sub_page_min_size, sub_page_min_size);
-        let new_page_size = ::std::cmp::max(new_page_size, sub_page_min_size);
+        //let new_page_size = ::std::cmp::min(new_size / sub_page_min_size, sub_page_min_size);
+        //let new_page_size = ::std::cmp::max(new_page_size, sub_page_min_size);
+        //let new_page_size = new_page_size / 2;
+        let new_page_size = sub_page_min_size;
 
         if DEBUG {
             eprintln!("new_size {}", new_size);
@@ -983,7 +1040,7 @@ impl<'a> MappedFile<'a> {
             next: None,
             page: Weak::new(),
             cow: None,
-            on_disk_offset: 0xffff_ffff_ffff_ffff, // base_offset,
+            storage_offset: None,
             skip: 0,
         };
 
@@ -995,13 +1052,14 @@ impl<'a> MappedFile<'a> {
         if DEBUG {
             eprintln!(
                 "create new tree with room for {} bytes \
-                 inserts subroot_index({}), base_offset({})",
+                 inserts subroot_index({}), base_offset({:?})",
                 new_size, subroot_idx, base_offset
             );
         }
 
         let mut leaves = Vec::new();
         MappedFile::build_tree(
+            PageSource::FromRam,
             &mut file.pool,
             fd,
             &mut leaves,
@@ -1046,6 +1104,12 @@ impl<'a> MappedFile<'a> {
         let mut prev_idx = prev_idx;
         let mut remain = new_size;
         for idx in &leaves {
+            if DEBUG {
+                eprintln!("copy data",);
+                eprintln!("node_size = {}", node_size);
+                eprintln!("local_offset = {}", local_offset);
+            }
+
             // alloc+fill node
             {
                 let mut n = &mut file.pool[*idx];
@@ -1065,6 +1129,8 @@ impl<'a> MappedFile<'a> {
                 let rc = Rc::new(RefCell::new(p));
                 n.page = Rc::downgrade(&rc);
                 n.cow = Some(rc);
+
+                assert_eq!(n.storage_offset, None);
             }
 
             // link leaves
@@ -1200,7 +1266,7 @@ impl<'a> MappedFile<'a> {
                 let rc = Rc::new(RefCell::new(page));
                 file.pool[idx].page = Rc::downgrade(&rc);
                 file.pool[idx].cow = Some(rc);
-                file.pool[idx].on_disk_offset = 0xffff_ffff_ffff_ffff;
+                file.pool[idx].storage_offset = None;
                 file.pool[idx].skip = 0;
             }
 
@@ -1734,7 +1800,7 @@ impl<'a> MappedFile<'a> {
             n = file.pool[idx].next;
         }
 
-        // patch on_disk_offset, and file descriptor
+        // patch storage_offset, and file descriptor
         let mut count: u64 = 0;
         let mut offset = 0;
         let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
@@ -1747,20 +1813,20 @@ impl<'a> MappedFile<'a> {
                 let align_offset = 4096 * (offset / 4096);
                 let skip = offset % 4096;
 
-                file.pool[idx].on_disk_offset = align_offset;
+                file.pool[idx].storage_offset = Some(align_offset);
                 file.pool[idx].skip = skip;
             } else {
-                file.pool[idx].on_disk_offset = 0xffff_ffff_ffff_ffff;
+                file.pool[idx].storage_offset = None;
                 file.pool[idx].skip = 0;
             }
 
             if false {
                 eprintln!(
-                    "offset {}, page {}, size {} disk_offset {}, skip {}",
+                    "offset {}, page {}, size {} disk_offset {:?}, skip {}",
                     offset,
                     count,
                     file.pool[idx].size,
-                    file.pool[idx].on_disk_offset,
+                    file.pool[idx].storage_offset,
                     file.pool[idx].skip,
                 );
             }
@@ -1902,7 +1968,7 @@ mod tests {
             next: None,
             page: Weak::new(),
             cow: None,
-            on_disk_offset: 0,
+            storage_offset: None,
             skip: 0,
         };
 
@@ -1910,6 +1976,7 @@ mod tests {
 
         let mut leaves = Vec::new();
         MappedFile::build_tree(
+            PageSource::FromRam,
             &mut pool,
             fd,
             &mut leaves,
@@ -1924,15 +1991,24 @@ mod tests {
             prev_idx = Some(*idx);
         }
 
-        eprintln!("file_size : {}", file_size);
-        eprintln!("page_size : {}", page_size);
+        eprintln!("file_size : bytes {}", file_size);
+        eprintln!("file_size : Kib {}", file_size >> 10);
+        eprintln!("file_size : Mib {}", file_size >> 20);
+        eprintln!("file_size : Gib {}", file_size >> 30);
+        eprintln!("file_size : Tib {}", file_size >> 40);
+
+        eprintln!("page_size : bytes {}", page_size);
+        eprintln!("page_size : Kib {}", page_size >> 10);
+        eprintln!("page_size : Mib {}", page_size >> 20);
+        eprintln!("page_size : Gib {}", page_size >> 30);
+
         eprintln!("number of leaves : {}", leaves.len());
         eprintln!("number of nodes : {}", pool.slot.len());
 
         let node_ram_size = ::std::mem::size_of::<Node>();
-        eprintln!("node_ram_size : bytes {}", node_ram_size);
+        eprintln!("size_of::<Node> : {}", node_ram_size);
 
-        let ram = pool.slot.len() * node_ram_size;
+        let ram = pool.slot.capacity() * node_ram_size;
         eprintln!("ram : bytes {}", ram);
         eprintln!("ram : Kib {}", ram >> 10);
         eprintln!("ram : Mib {}", ram >> 20);
@@ -2010,6 +2086,7 @@ mod tests {
         let page_size = 4096 * 256;
 
         let filename = "/tmp/playground_insert_test".to_owned();
+        let _ = fs::remove_file("/tmp/playground_insert_test");
         File::create(&filename).unwrap();
 
         eprintln!("-- mapping the test file");
@@ -2018,12 +2095,15 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().borrow_mut().sub_page_size = 4096 * 4;
-        file.as_ref().borrow_mut().sub_page_reserve = 1024;
+        file.as_ref().borrow_mut().sub_page_size = 1024 * 128;
+        file.as_ref().borrow_mut().sub_page_reserve = 1024 * 4;
 
-        for _ in 0..1_000_000 {
-            let mut it = MappedFile::iter_from(&file, 0);
-            MappedFile::insert(&mut it, &['A' as u8]);
+        for i in 0..1_000_000 {
+            {
+                eprintln!("-- test loop {}", i);
+                let mut it = MappedFile::iter_from(&file, 0);
+                MappedFile::insert(&mut it, &['A' as u8]);
+            }
         }
 
         eprintln!("-- file.size() {}", file.as_ref().borrow().size());
@@ -2062,7 +2142,6 @@ mod tests {
             }
             file.write_all(slc.as_slice()).unwrap();
             file.sync_all().unwrap();
-            drop(slc);
         }
 
         eprintln!("-- mapping the test file");
@@ -2075,9 +2154,15 @@ mod tests {
         file.as_ref().borrow_mut().sub_page_reserve = 10;
 
         for i in 0..5 {
+            eprintln!("-- insert loop {}", i);
             let i = i * 2;
-            let mut it = MappedFile::iter_from(&file, i + i * 4096);
-            MappedFile::insert(&mut it, &['A' as u8]);
+            eprintln!("-- build it @ {}", i + i * 4096);
+            {
+                let mut it = MappedFile::iter_from(&file, i + i * 4096);
+                eprintln!("--  sub insert 1");
+                // TODO: change interface to consume iterator on insert to show that it is invalid
+                MappedFile::insert(&mut it, &['\n' as u8]);
+            }
         }
 
         MappedFile::sync_to_disk(
