@@ -1628,7 +1628,12 @@ impl<'a> MappedFile<'a> {
         MappedFile::check_tree(&mut visited, pool.slot[idx].right, &pool);
     }
 
+    // This function can be very slow O(n)
     fn check_all_nodes(file: &MappedFile) {
+        if !DEBUG {
+            return;
+        }
+
         if DEBUG {
             eprintln!("check_all_nodes");
         }
