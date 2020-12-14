@@ -814,6 +814,71 @@ pub fn insert_codepoint_array(
     };
 }
 
+
+pub fn remove_previous_codepoint(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = &mut view.as_ref().borrow_mut();
+    {
+        let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
+        let doc = doc.as_ref().clone().unwrap();
+        let mut doc = doc.as_ref().borrow_mut();
+        let codec = v.text_codec.as_ref();
+
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+
+        let mut shrink = 0;
+        for m in v.moving_marks.borrow_mut().iter_mut() {
+            if m.offset == 0 {
+                continue;
+            }
+
+            dbg_println!("before shrink m.offset= {}", m.offset);
+            m.offset -= shrink;
+            dbg_println!("after shrink m.offset= {}", m.offset);
+            if m.offset == 0 {
+                continue;
+            }
+
+            m.move_backward(&doc, codec);
+            dbg_println!("after move.backward m.offset= {}", m.offset);
+
+            let mut data = vec![];
+            doc.read(m.offset, 4, &mut data);
+            let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
+            dbg_println!("read {} bytes", size);
+
+            let nr_removed = doc.remove(m.offset, size, None);
+            dbg_println!("nr_removed {} bytes", nr_removed);
+
+            dbg_println!(
+                "shrink({}) + nr_rm({}) = {}",
+                shrink,
+                nr_removed,
+                shrink + nr_removed as u64
+            );
+            shrink += nr_removed as u64;
+
+            if m.offset < v.start_offset {
+                env.view_pre_render.push(Action::ScrollUp { n: 1 });
+            }
+        }
+
+        env.max_offset = doc.size() as u64;
+        env.view_pre_render.push(Action::CheckMarks);
+
+        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+    }
+}
+
+
+
+
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
 pub fn undo(
     _editor: &mut Editor,
@@ -2058,67 +2123,6 @@ pub fn button_press(
     }
 
     // s // to internal view.as_ref().borrow_mut().state.s
-}
-
-pub fn remove_previous_codepoint(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    let v = &mut view.as_ref().borrow_mut();
-    {
-        let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
-        let doc = doc.as_ref().clone().unwrap();
-        let mut doc = doc.as_ref().borrow_mut();
-        let codec = v.text_codec.as_ref();
-
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
-
-        let mut shrink = 0;
-        for m in v.moving_marks.borrow_mut().iter_mut() {
-            if m.offset == 0 {
-                continue;
-            }
-
-            dbg_println!("before shrink m.offset= {}", m.offset);
-            m.offset -= shrink;
-            dbg_println!("after shrink m.offset= {}", m.offset);
-            if m.offset == 0 {
-                continue;
-            }
-
-            m.move_backward(&doc, codec);
-            dbg_println!("after move.backward m.offset= {}", m.offset);
-
-            let mut data = vec![];
-            doc.read(m.offset, 4, &mut data);
-            let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
-            dbg_println!("read {} bytes", size);
-
-            let nr_removed = doc.remove(m.offset, size, None);
-            dbg_println!("nr_removed {} bytes", nr_removed);
-
-            dbg_println!(
-                "shrink({}) + nr_rm({}) = {}",
-                shrink,
-                nr_removed,
-                shrink + nr_removed as u64
-            );
-            shrink += nr_removed as u64;
-
-            if m.offset < v.start_offset {
-                env.view_pre_render.push(Action::ScrollUp { n: 1 });
-            }
-        }
-
-        env.max_offset = doc.size() as u64;
-        env.view_pre_render.push(Action::CheckMarks);
-
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
-    }
 }
 
 pub fn button_release(
