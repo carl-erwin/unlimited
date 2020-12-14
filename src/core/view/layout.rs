@@ -920,8 +920,8 @@ pub fn run_view_layout_filters_direct(
     filters.push(Box::new(ScreenFilter::new(&layout_env)));
 
     // setup
-    let mut filter_in = Vec::new();
-    let mut filter_out = Vec::new();
+    let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
+    let mut filter_out = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
 
     // for f in filters { f.setup(); }
 
