@@ -163,6 +163,8 @@ pub struct View<'a> {
     pub moving_marks: Rc<RefCell<Vec<Mark>>>,
     pub mark_index: usize,
 
+    pub select_point: Option<Mark>,
+
     pub fixed_marks: Rc<RefCell<Vec<Mark>>>,
     // use for cut and paste
     pub last_cut_log_index: Option<usize>,
@@ -193,6 +195,7 @@ impl<'a> View<'a> {
             screen,
             moving_marks,
             mark_index: 0,
+            select_point: None,
             fixed_marks: Rc::new(RefCell::new(Vec::new())),
             last_cut_log_index: None,
         }
