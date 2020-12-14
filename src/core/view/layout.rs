@@ -910,13 +910,14 @@ pub fn run_view_layout_filters_direct(
 
     filters.push(Box::new(RawDataFilter::new(&layout_env)));
     filters.push(Box::new(Utf8Filter::new(&layout_env)));
-    filters.push(Box::new(TabFilter::new(&layout_env)));
 
     if layout_env.screen.is_off_screen == false {
         /* || editor_env.pending_events <= 1 || */
         // TODO: schedule refresh on idle
         filters.push(Box::new(HighlightFilter::new(&layout_env)));
     }
+
+    filters.push(Box::new(TabFilter::new(&layout_env)));
     filters.push(Box::new(ScreenFilter::new(&layout_env)));
 
     // setup
