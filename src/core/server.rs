@@ -92,6 +92,8 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
 
+       { "in": [{ "pointer-motion": "" }],                   "action": "text-mode:pointer-motion" },
+
        { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
        { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
 
@@ -552,6 +554,8 @@ fn build_action_map() -> ActionMap {
         "text-mode:clone-and-move-mark-to-next-line",
         view::clone_and_move_mark_to_next_line,
     );
+
+    register_action(&mut map, "text-mode:pointer-motion", view::pointer_motion);
 
     map
 }

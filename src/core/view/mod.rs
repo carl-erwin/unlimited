@@ -2157,6 +2157,15 @@ pub fn button_release(
     }
 }
 
+// TODO:
+pub fn pointer_motion(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+}
+
 pub fn select_next_view(
     editor: &mut Editor,
     env: &mut EditorEnv,

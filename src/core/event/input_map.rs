@@ -330,6 +330,37 @@ fn parse_event_entry_input_wheel(ctx: &mut ParseCtx, _name: &String, value: &ser
     ctx.sequence.push(ev)
 }
 
+fn parse_event_entry_input_pointer_motion(
+    ctx: &mut ParseCtx,
+    _name: &String,
+    value: &serde_json::Value,
+) {
+    let s = if let Value::String(ref s) = value {
+        dbg_println!("value = '{}'", s);
+        s
+    } else {
+        // syntax error
+        return;
+    };
+
+    // parse "key" value 0
+    dbg_println!("{{");
+
+    let mods = KeyModifiers::new();
+
+    let ev = InputEvent::PointerMotion(PointerEvent {
+        x: 0,
+        y: 0,
+        mods: mods,
+    });
+
+    dbg_println!("}}");
+
+    dbg_println!("building pointer motion event = {:?}", ev);
+
+    ctx.sequence.push(ev)
+}
+
 fn parse_event_entry(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
     dbg_println!("fount event '{}'", name);
     let vec = if let Value::Array(ref vec) = value {
@@ -407,6 +438,10 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
 
                     "wheel" => {
                         parse_event_entry_input_wheel(&mut ctx, k, v);
+                    }
+
+                    "pointer-motion" => {
+                        parse_event_entry_input_pointer_motion(&mut ctx, k, v);
                     }
 
                     _ => {}

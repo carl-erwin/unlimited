@@ -283,6 +283,14 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
             (*mods).hash(&mut s)
         }
 
+        InputEvent::PointerMotion(PointerEvent { mods, x: _, y: _ }) => {
+            "PointerMotion".hash(&mut s);
+            // ignore x y
+            // (*x).hash(&mut s);
+            // (*y).hash(&mut s);
+            (*mods).hash(&mut s)
+        }
+
         _ => t.hash(&mut s),
     }
 
