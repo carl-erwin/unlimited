@@ -42,6 +42,7 @@ use crate::core::codepointinfo;
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
 use crate::core::event::KeyModifiers;
+use crate::core::event::PointerEvent;
 
 use crate::core::view::layout::{run_view_layout_filters, run_view_layout_filters_direct};
 
@@ -617,14 +618,14 @@ pub fn run_view_action(
 }
 
 pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let mut v = view.as_ref().borrow_mut();
+
+    let v = view.as_ref().borrow_mut();
 
     // TODO: marks_filter
     // set_render_marks
     // brute force for now
 
     let marks = v.moving_marks.clone(); // do not hold v
-                                        // sort mark here ?
 
     for m in marks.borrow().iter() {
         //dbg_println!(" checking m.offset {}", m.offset);
@@ -644,6 +645,10 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
 
             for c in 0..line.nb_cells {
                 let cpi = line.get_mut_cpi(c).unwrap();
+
+                if cpi.offset == m.offset {
+                    cpi.is_selected = !cpi.metadata;
+                }
 
                 if cpi.offset == m.offset {
                     cpi.is_selected = !cpi.metadata;
@@ -814,7 +819,6 @@ pub fn insert_codepoint_array(
     };
 }
 
-
 pub fn remove_previous_codepoint(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -875,9 +879,6 @@ pub fn remove_previous_codepoint(
         doc.tag(env.max_offset, marks_offsets);
     }
 }
-
-
-
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
 pub fn undo(
@@ -1792,6 +1793,7 @@ pub fn move_mark_to_start_of_file(
 ) {
     let mut v = view.as_ref().borrow_mut();
     v.start_offset = 0;
+    v.mark_index = 0;
 
     let mut moving_marks = v.moving_marks.borrow_mut();
     moving_marks.clear();
@@ -1847,6 +1849,7 @@ pub fn move_mark_to_end_of_file(
     };
 
     v.start_offset = offset;
+    v.mark_index = 0;
 
     let mut marks = v.moving_marks.borrow_mut();
     marks.clear();
@@ -2040,6 +2043,7 @@ pub fn button_press(
         }
     }
 
+    // TODO: new function clip screen.coordinates(x,y) -> (x, y)
     /*
       (0,0) --------------------- max_width
                  clip.x
@@ -2114,6 +2118,9 @@ pub fn button_press(
 
     if let Some(cpi) = screen.get_used_cpinfo(x, y) {
         if !cpi.metadata {
+            // clear selection point
+            v.select_point = None;
+
             // reset main mark
             v.mark_index = 0;
             let mut marks = v.moving_marks.borrow_mut();
@@ -2161,13 +2168,57 @@ pub fn button_release(
     }
 }
 
-// TODO:
+// crossterm
 pub fn pointer_motion(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    let v = &mut view.as_ref().borrow_mut();
+    let screen = v.screen.clone();
+    let screen = screen.read().unwrap();
+
+    assert_eq!(v.mark_index, 0);
+    assert_eq!(v.moving_marks.borrow().len(), 1);
+
+    // TODO: match events
+    match &trigger[0] {
+        InputEvent::PointerMotion(PointerEvent { mods, x, y }) => {
+            // TODO: change screen (x,y) to i32 ? and filter in functions ?
+            let x = {
+                if *x < 0 {
+                    0
+                } else {
+                    *x as usize
+                }
+            };
+            let y = {
+                if *y < 0 {
+                    0
+                } else {
+                    *y as usize
+                }
+            };
+
+            if let Some(cpi) = screen.get_used_cpinfo(x, y) {
+                if !cpi.metadata {
+                    // update selection point
+                    v.select_point = Some(Mark { offset: cpi.offset });
+
+                    dbg_println!(
+                        "@{:?} : pointer motion x({}) y({}) | select offset({})",
+                        Instant::now(),
+                        x,
+                        y,
+                        cpi.offset
+                    );
+                }
+            }
+        }
+
+        _ => {}
+    }
 }
 
 pub fn select_next_view(
@@ -2216,6 +2267,7 @@ pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64, is_selected: bo
         offset,
         is_selected,
         codepointinfo::CodepointInfo::default_color(),
+        codepointinfo::CodepointInfo::default_bg_color(),
     ));
     ok
 }

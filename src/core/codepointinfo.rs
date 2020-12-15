@@ -10,12 +10,17 @@ pub struct CodepointInfo {
     pub displayed_cp: char,
     pub offset: u64,
     pub is_selected: bool,
-    pub color: (u8, u8, u8), // (R,G,B)
+    pub color: (u8, u8, u8),    // (R,G,B)
+    pub bg_color: (u8, u8, u8), // (R,G,B)
 }
 
 impl CodepointInfo {
     pub fn default_color() -> (u8, u8, u8) {
         (192, 192, 192)
+    }
+
+    pub fn default_bg_color() -> (u8, u8, u8) {
+        (0, 0, 0)
     }
 
     pub fn new() -> Self {
@@ -26,6 +31,7 @@ impl CodepointInfo {
             offset: 0,
             is_selected: false,
             color: CodepointInfo::default_color(),
+            bg_color: CodepointInfo::default_bg_color(),
         }
     }
 }

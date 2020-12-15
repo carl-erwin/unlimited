@@ -10,8 +10,6 @@ use std::time::Instant;
 
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 extern crate libc;
 
@@ -20,6 +18,9 @@ use self::libc::{c_void, read};
 //
 extern crate termion;
 
+use crate::dbg_println;
+
+
 use self::termion::event::parse_event;
 use self::termion::input::MouseTerminal;
 use self::termion::raw::IntoRawMode;
@@ -27,11 +28,11 @@ use self::termion::screen::{AlternateScreen, ToMainScreen};
 use self::termion::terminal_size;
 
 //
-use crate::core::event::ButtonEvent;
 use crate::core::event::Event;
 use crate::core::event::Event::*;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::event::{ButtonEvent, PointerEvent};
 
 use crate::core::screen::Screen;
 
@@ -75,9 +76,8 @@ pub fn main_loop(
     let mut ui_state = UiState::new();
 
     // ui ctx : TODO move to struct UiCtx
-    let mut last_screen = Arc::new(RwLock::new(Box::new(Screen::new(1, 1)))); // last screen ?
-    let mut _prev_screen_rdr_time = Duration::new(0, 0);
-
+    let mut last_screen = Box::new(Screen::new(1, 1)); // last screen ?
+    let mut last_screen_rdr_time = Instant::now();
     write!(stdout, "{}{}", termion::cursor::Hide, termion::clear::All).unwrap();
 
     let mut request_layout = true;
@@ -117,18 +117,43 @@ pub fn main_loop(
 
                 DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
-                    {
-                        let mut last_screen = last_screen.write().unwrap();
-                        let mut screen = screen.write().unwrap();
+                    let mut draw = false;
 
-                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                    let p_input = crate::core::event::pending_input_event_count();
+                    let p_rdr = crate::core::event::pending_render_event_count();
+
+                    dbg_println!("DRAW: crossterm pre rdr : p_input {}\r", p_input);
+                    dbg_println!("DRAW: crossterm pre rdr : p_rdr {}\r", p_rdr);
+
+                    if p_input < 10 && p_rdr <  10 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW frame ----- \r");
                     }
-                    last_screen = screen;
 
-                    stdout.flush().unwrap();
+                    let diff = (start - last_screen_rdr_time).as_millis();
+                    dbg_println!("DRAW: crossterm diff {} ----- \r", diff);
+                    if diff >= 1000 / 60 {
+                        draw = true;
+                        dbg_println!("DRAW: crossterm DRAW timeout frame ----- \r");
+                    }
+
+                    if draw {
+                        let screen = screen.read().unwrap();
+                        let mut screen = screen.clone();
+                        draw_view(&mut last_screen, &mut screen, &mut stdout);
+                        last_screen = screen;
+                        last_screen_rdr_time = Instant::now();
+                    } else {
+                        dbg_println!("DRAW: crossterm SKIP frame ----- \r");
+                    }
+
                     let end = Instant::now();
-                    _prev_screen_rdr_time = end.duration_since(start);
-                    crate::core::event::pending_render_event_dec(1);
+                    dbg_println!(
+                        "DRAW: crossterm : time to draw view = {}\r",
+                        (end - start).as_millis()
+                    );
+                    let p_rdr = crate::core::event::pending_render_event_dec(1);
+                    dbg_println!("DRAW: crossterm post rdr : p_rdr {}\r", p_rdr);
                 }
 
                 _ => {}
@@ -150,79 +175,31 @@ fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut S
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
-    let mut prev_cpi = CodepointInfo::new();
-
-    let check_hash = last_screen.max_width() == screen.max_width()
-        && last_screen.max_height() == screen.max_height();
-
-    prev_cpi.color.0 = 0;
-    prev_cpi.color.1 = 0;
-    prev_cpi.color.2 = 0;
-
     for l in 0..screen.max_height() {
         let line = screen.get_mut_unclipped_line(l).unwrap();
 
         terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 
-        let mut have_cursor = false;
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
 
             if cpi.is_selected {
-                have_cursor = true;
-                break;
-            }
-        }
-
-        if check_hash {
-            // check previous screen line
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            for c in 0..prev_line.width() {
-                let cpi = prev_line.get_unclipped_cpi(c).unwrap();
-                if cpi.is_selected {
-                    have_cursor = true;
-                    write!(stdout, "{}", termion::style::NoBold).unwrap();
-                    break;
-                }
-            }
-        }
-
-        if check_hash && !have_cursor {
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
-            if prev_line.hash() == line.hash() {
-                // write!(stdout, "SAME ").unwrap();
-                continue;
-            }
-        }
-
-        for c in 0..line.max_width() {
-            let cpi = line.get_unclipped_cpi(c).unwrap();
-
-            if prev_cpi.is_selected != cpi.is_selected {
-                if cpi.is_selected {
-                    write!(stdout, "{}", termion::style::Invert).unwrap();
-                } else {
-                    write!(stdout, "{}", termion::style::NoInvert).unwrap();
-                }
+                write!(stdout, "{}", termion::style::Invert).unwrap();
+            } else {
+                write!(stdout, "{}", termion::style::NoInvert).unwrap();
             }
 
-            // detect change
-            if prev_cpi.color != cpi.color {
-                write!(
-                    stdout,
-                    "{}",
-                    termion::color::Fg(termion::color::Rgb(cpi.color.0, cpi.color.1, cpi.color.2))
-                )
-                .unwrap();
-            }
-
-            write!(stdout, "{}", cpi.displayed_cp).unwrap();
-
-            prev_cpi = *cpi;
+            let bg = cpi.bg_color;
+            write!(
+                stdout,
+                "{}{}{}",
+                termion::color::Fg(termion::color::Rgb(cpi.color.0, cpi.color.1, cpi.color.2)),
+                termion::color::Bg(termion::color::Rgb(bg.0, bg.1, bg.2)),
+                cpi.displayed_cp
+            )
+            .unwrap();
         }
     }
-
-    write!(stdout, "{}", termion::style::Reset).unwrap();
 }
 
 /*
@@ -480,7 +457,17 @@ fn translate_termion_event(evt: self::termion::event::Event) -> InputEvent {
                     });
                 }
 
-                self::termion::event::MouseEvent::Hold(_x, _y) => {}
+                self::termion::event::MouseEvent::Hold(x, y) => {
+                    return InputEvent::PointerMotion(PointerEvent {
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
+                        x: i32::from(x - 1),
+                        y: i32::from(y - 1),
+                    });
+                }
             };
         }
 

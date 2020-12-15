@@ -12,7 +12,10 @@ use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     queue,
     style::Styler,
-    style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
+    style::{
+        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetColors,
+        SetForegroundColor,
+    },
     terminal::{Clear, ClearType},
     Result,
 };
@@ -166,7 +169,7 @@ pub fn main_loop(
                         let screen = screen.read().unwrap();
                         let mut screen = screen.clone();
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
-                        // draw_screen_dumb(&screen, &mut stdout);
+                        //draw_screen_dumb(&screen, &mut stdout);
                         last_screen = screen;
                         last_screen_rdr_time = Instant::now();
                     } else {
@@ -237,17 +240,29 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
                 g: cpi.color.1,
                 b: cpi.color.2,
             };
+            // color
+            let bg_color = Color::Rgb {
+                r: cpi.bg_color.0,
+                g: cpi.bg_color.1,
+                b: cpi.bg_color.2,
+            };
 
             // draw with style
             let s = cpi.displayed_cp.to_string();
             if cpi.is_selected {
                 queue!(
                     stdout,
+                    SetBackgroundColor(bg_color),
                     SetForegroundColor(color),
                     ::crossterm::style::PrintStyledContent(s.reverse())
                 )?;
             } else {
-                queue!(stdout, SetForegroundColor(color), Print(cpi.displayed_cp))?;
+                queue!(
+                    stdout,
+                    SetBackgroundColor(bg_color),
+                    SetForegroundColor(color),
+                    Print(cpi.displayed_cp)
+                )?;
             }
         }
     }
@@ -280,9 +295,11 @@ fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
     let dcp = a.displayed_cp == b.displayed_cp;
     // pub offset: u64,
     let s = a.is_selected == b.is_selected;
+    //
     let c = a.color == b.color;
+    let bc = a.bg_color == b.bg_color;
 
-    dcp && s && c
+    dcp && s && c && bc
 }
 
 fn draw_screen(
@@ -306,10 +323,17 @@ fn draw_screen(
             g: prev_cpi.color.1,
             b: prev_cpi.color.2,
         };
+        let bg_color = Color::Rgb {
+            r: prev_cpi.bg_color.0,
+            g: prev_cpi.bg_color.1,
+            b: prev_cpi.bg_color.2,
+        };
+
         queue!(
             stdout,
             SetAttribute(Attribute::Reset),
-            SetForegroundColor(color)
+            SetForegroundColor(color),
+            SetBackgroundColor(bg_color)
         )?;
     }
 
@@ -357,7 +381,7 @@ fn draw_screen(
             }
 
             // detect color change
-            if prev_cpi.color != cpi.color {
+            if prev_cpi.color != cpi.color || prev_cpi.bg_color != cpi.bg_color {
                 set_color = true;
                 change = true;
             }
@@ -396,7 +420,17 @@ fn draw_screen(
                         g: cpi.color.1,
                         b: cpi.color.2,
                     };
-                    queue!(stdout, SetForegroundColor(color))?;
+
+                    let bg_color = Color::Rgb {
+                        r: cpi.bg_color.0,
+                        g: cpi.bg_color.1,
+                        b: cpi.bg_color.2,
+                    };
+                    queue!(
+                        stdout,
+                        SetForegroundColor(color),
+                        SetBackgroundColor(bg_color)
+                    )?;
                 }
 
                 // draw character

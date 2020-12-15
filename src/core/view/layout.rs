@@ -10,7 +10,7 @@
     output device
     a special way to describe user input event ? :
      button/click
-     keypress/ IoData utf-32/16/8utf8
+     keypress/ IoData utf-32/16/8
                special keys combination
 
     define: simple unit to be used
@@ -162,7 +162,10 @@ pub trait Filter<'a> {
         env: &mut LayoutEnv,
         input: &Vec<FilterIoData>,
         output: &mut Vec<FilterIoData>,
-    ) -> ();
+    ) -> () {
+        // default
+        *output = input.clone();
+    }
 }
 
 // content_type == unicode
@@ -200,6 +203,7 @@ pub struct FilterIoData {
 
     is_selected: bool,
     color: (u8, u8, u8),
+    bg_color: (u8, u8, u8),
 
     offset: u64,
     size: usize,
@@ -217,6 +221,7 @@ impl FilterIoData {
             quit,        // close pipeline
             is_selected,
             color,
+            bg_color,
             offset: from_offset,
             size: cp_size,
             data:
@@ -237,6 +242,7 @@ impl FilterIoData {
                 is_selected,
                 offset: from_offset,
                 color,
+                bg_color,
                 size: cp_size,
                 data: FilterData::Unicode {
                     cp: new_cp as u32,
@@ -266,7 +272,7 @@ pub struct RawDataFilter {
 }
 
 impl RawDataFilter {
-    fn new(env: &LayoutEnv) -> Self {
+    fn new(env: &LayoutEnv, view: &View) -> Self {
         dbg_println!(
             "RawDataFilter w {} h {}",
             env.screen.width(),
@@ -313,6 +319,7 @@ impl Filter<'_> for RawDataFilter {
                     quit: false, // close pipeline
                     is_selected: false,
                     color: CodepointInfo::default_color(),
+                    bg_color: CodepointInfo::default_bg_color(),
                     offset: self.pos,
                     size: 1,
                     data: FilterData::ByteArray { vec: raw_data },
@@ -331,6 +338,7 @@ impl Filter<'_> for RawDataFilter {
                     quit: false, // close pipeline
                     is_selected: true,
                     color: CodepointInfo::default_color(),
+                    bg_color: CodepointInfo::default_bg_color(),
                     offset: self.pos + rd as u64,
                     size: 1,
                     data: FilterData::Byte { val: b' ' },
@@ -366,6 +374,8 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
                 quit: false, // close pipeline
                 is_selected: false,
                 color: CodepointInfo::default_color(),
+                bg_color: CodepointInfo::default_bg_color(),
+
                 offset: ctx.from_offset,
                 size: ctx.cp_size,
                 data: FilterData::Unicode {
@@ -395,6 +405,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
                 quit: false, // close pipeline
                 is_selected: false,
                 color: CodepointInfo::default_color(),
+                bg_color: CodepointInfo::default_bg_color(),
 
                 offset: ctx.from_offset,
                 size: 1,
@@ -424,7 +435,7 @@ pub struct Utf8Filter {
 }
 
 impl Utf8Filter {
-    fn new(_env: &LayoutEnv) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
         Utf8Filter {}
     }
 }
@@ -487,7 +498,7 @@ pub struct TabFilter {
 }
 
 impl TabFilter {
-    fn new(_env: &LayoutEnv) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
         TabFilter {
             prev_cp: ' ',
             column_count: 0,
@@ -542,6 +553,52 @@ impl Filter<'_> for TabFilter {
     }
 }
 
+pub struct HighlightSelectionFilter {
+    sel_start_offset: u64,
+    sel_end_offset: u64,
+}
+
+impl HighlightSelectionFilter {
+    fn new(env: &LayoutEnv, view: &View) -> Self {
+        let marks = view.moving_marks.clone();
+        let marks = marks.borrow(); // TODO: avoid re-borrow()
+        let min = marks[0].offset;
+        let max = view.select_point.as_ref().unwrap().offset;
+        let (min, max) = if min > max { (max, min) } else { (min, max) };
+
+        HighlightSelectionFilter {
+            sel_start_offset: min,
+            sel_end_offset: max,
+        }
+    }
+}
+
+// TODO: monitor env.quit
+// to flush
+impl Filter<'_> for HighlightSelectionFilter {
+    fn name(&self) -> &'static str {
+        &"HighlightSelectionFilter"
+    }
+
+    fn run(
+        &mut self,
+        _view: &View,
+        _env: &mut LayoutEnv,
+        filter_in: &Vec<FilterIoData>,
+        filter_out: &mut Vec<FilterIoData>,
+    ) {
+        for i in filter_in {
+            if i.offset >= self.sel_start_offset && i.offset <= self.sel_end_offset {
+                let mut i = i.clone();
+                i.bg_color = (56, 56, 83);
+                filter_out.push(i);
+            } else {
+                filter_out.push(i.clone());
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Unknown,
@@ -568,7 +625,7 @@ pub struct HighlightFilter {
     utf8_codec: Box<dyn utf8::TextCodec>, // internal token representation is utf8
 }
 impl HighlightFilter {
-    fn new(_env: &LayoutEnv) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
         HighlightFilter {
             token_io: Vec::new(),
             token_type: TokenType::Unknown,
@@ -758,7 +815,7 @@ pub struct ScreenFilter {
 }
 
 impl ScreenFilter {
-    fn new(_env: &LayoutEnv) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
         ScreenFilter { first_offset: None }
     }
 }
@@ -810,11 +867,13 @@ impl Filter<'_> for ScreenFilter {
                 data: FilterData::Unicode { cp, .. },
                 is_selected,
                 color,
+                bg_color,
                 ..
             } = &*io
             {
                 // screen.push_available() + screen.push_count() == screen.push_capacity()
-                let cp = filter_codepoint(u32_to_char(*cp), *offset, *is_selected, *color);
+                let cp =
+                    filter_codepoint(u32_to_char(*cp), *offset, *is_selected, *color, *bg_color);
 
                 cpis_vec.push(cp);
 
@@ -845,6 +904,7 @@ pub fn filter_codepoint(
     offset: u64,
     is_selected: bool,
     color: (u8, u8, u8),
+    bg_color: (u8, u8, u8),
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
 
@@ -866,6 +926,7 @@ pub fn filter_codepoint(
         offset,
         is_selected,
         color,
+        bg_color,
     }
 }
 
@@ -911,17 +972,23 @@ pub fn run_view_layout_filters_direct(
     // move in mode init
     let mut filters: Vec<Box<dyn Filter>> = vec![];
 
-    filters.push(Box::new(RawDataFilter::new(&layout_env)));
-    filters.push(Box::new(Utf8Filter::new(&layout_env)));
+    filters.push(Box::new(RawDataFilter::new(&layout_env, &view)));
+    filters.push(Box::new(Utf8Filter::new(&layout_env, &view)));
 
     if layout_env.screen.is_off_screen == false {
         /* || editor_env.pending_events <= 1 || */
         // TODO: schedule refresh on idle
-        filters.push(Box::new(HighlightFilter::new(&layout_env)));
+
+        // filters.push(Box::new(MarkHighlightFilter::new(&layout_env)));
+        filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
+
+        if view.select_point.is_some() {
+            filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
+        }
     }
 
-    filters.push(Box::new(TabFilter::new(&layout_env)));
-    filters.push(Box::new(ScreenFilter::new(&layout_env)));
+    filters.push(Box::new(TabFilter::new(&layout_env, &view)));
+    filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
 
     // setup
     let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
