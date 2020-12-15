@@ -592,25 +592,25 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 });
             }
 
-            ::crossterm::event::MouseEvent::ScrollUp(col, row, _mods) => {
+            ::crossterm::event::MouseEvent::ScrollUp(col, row, mods) => {
                 return InputEvent::WheelUp {
-                    mods: KeyModifiers::new(),
+                    mods: translate_crossterm_key_modifier(mods),
                     x: i32::from(col),
                     y: i32::from(row),
                 };
             }
 
-            ::crossterm::event::MouseEvent::ScrollDown(col, row, _mods) => {
+            ::crossterm::event::MouseEvent::ScrollDown(col, row, mods) => {
                 return InputEvent::WheelDown {
-                    mods: KeyModifiers::new(),
+                    mods: translate_crossterm_key_modifier(mods),
                     x: i32::from(col),
                     y: i32::from(row),
                 };
             }
 
-            ::crossterm::event::MouseEvent::Drag(_button, col, row, _mods) => {
+            ::crossterm::event::MouseEvent::Drag(_button, col, row, mods) => {
                 return InputEvent::PointerMotion(PointerEvent {
-                    mods: KeyModifiers::new(),
+                    mods: translate_crossterm_key_modifier(mods),
                     x: i32::from(col),
                     y: i32::from(row),
                 });
