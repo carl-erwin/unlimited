@@ -846,14 +846,17 @@ pub fn filter_codepoint(
     is_selected: bool,
     color: (u8, u8, u8),
 ) -> CodepointInfo {
-    let displayed_cp: char = match c {
-        '\r' | '\n' | '\t' => ' ',
+    let (displayed_cp, color) = match c {
 
-        _ if c < ' ' => '�', // TODO: change color/style '�',
+        '\r' | '\n'  => ('\u{2936}', (0,0,0xCE)),
+        
+        '\t' => (' ', color),
 
-        _ if c == 0x7f as char => '�', // TODO: change color/style '�',
+        _ if c < ' ' => ('�', color), // TODO: change color/style '�',
 
-        _ => c,
+        _ if c == '\u{7f}' =>  ('�', color), // TODO: change color/style '�',
+
+        _ => (c, color),
     };
 
     CodepointInfo {
