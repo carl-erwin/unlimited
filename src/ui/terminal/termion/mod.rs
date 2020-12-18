@@ -20,7 +20,6 @@ extern crate termion;
 
 use crate::dbg_println;
 
-
 use self::termion::event::parse_event;
 use self::termion::input::MouseTerminal;
 use self::termion::raw::IntoRawMode;
@@ -115,7 +114,11 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent { screen, time: _ } => {
+                DrawEvent {
+                    screen,
+                    marks,
+                    time: _,
+                } => {
                     let start = Instant::now();
                     let mut draw = false;
 
@@ -125,7 +128,7 @@ pub fn main_loop(
                     dbg_println!("DRAW: crossterm pre rdr : p_input {}\r", p_input);
                     dbg_println!("DRAW: crossterm pre rdr : p_rdr {}\r", p_rdr);
 
-                    if p_input < 10 && p_rdr <  10 {
+                    if p_input < 10 && p_rdr < 10 {
                         draw = true;
                         dbg_println!("DRAW: crossterm DRAW frame ----- \r");
                     }

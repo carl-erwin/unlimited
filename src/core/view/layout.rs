@@ -560,8 +560,7 @@ pub struct HighlightSelectionFilter {
 
 impl HighlightSelectionFilter {
     fn new(env: &LayoutEnv, view: &View) -> Self {
-        let marks = view.moving_marks.clone();
-        let marks = marks.borrow(); // TODO: avoid re-borrow()
+        let marks = view.moving_marks.read().unwrap();
         let min = marks[0].offset;
         let max = view.select_point.as_ref().unwrap().offset;
         let (min, max) = if min > max { (max, min) } else { (min, max) };
@@ -907,14 +906,13 @@ pub fn filter_codepoint(
     bg_color: (u8, u8, u8),
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
+        '\r' | '\n' => ('\u{2936}', (0, 0, 0xCE)),
 
-        '\r' | '\n'  => ('\u{2936}', (0,0,0xCE)),
-        
         '\t' => (' ', color),
 
         _ if c < ' ' => ('�', color), // TODO: change color/style '�',
 
-        _ if c == '\u{7f}' =>  ('�', color), // TODO: change color/style '�',
+        _ if c == '\u{7f}' => ('�', color), // TODO: change color/style '�',
 
         _ => (c, color),
     };

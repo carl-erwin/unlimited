@@ -12,10 +12,13 @@ use std::time::Instant;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::vec::Vec;
 
 use crate::core::screen::Screen;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::core::mark::Mark;
 
 ////////////////
 // TODO: implement functions ti update the counters
@@ -104,6 +107,8 @@ pub enum Event {
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     DrawEvent {
         screen: Arc<RwLock<Box<Screen>>>,
+        marks: Arc<RwLock<Vec<Mark>>>,
+        // TODO: selection
         time: Instant,
     },
 

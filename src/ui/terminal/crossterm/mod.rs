@@ -42,6 +42,7 @@ use crate::core::event::PointerEvent;
 
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 
 //use crate::core::event::InputEvent::*;
@@ -143,7 +144,11 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent { screen, time: _ } => {
+                DrawEvent {
+                    screen,
+                    marks,
+                    time: _,
+                } => {
                     let start = Instant::now();
                     let mut draw = false;
 
@@ -168,6 +173,8 @@ pub fn main_loop(
                     if draw {
                         let screen = screen.read().unwrap();
                         let mut screen = screen.clone();
+                        let marks = marks.read().unwrap();
+                        refresh_screen_marks(&mut screen, &marks);
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
                         //draw_screen_dumb(&screen, &mut stdout);
                         last_screen = screen;
@@ -207,6 +214,37 @@ pub fn main_loop(
     crossterm::terminal::disable_raw_mode()?;
 
     Ok(())
+}
+
+pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>) {
+    for m in marks.iter() {
+        //dbg_println!(" checking m.offset {}", m.offset);
+
+        if m.offset < screen.first_offset {
+            continue;
+        }
+
+        // the marks sorted
+        if m.offset > screen.last_offset {
+            break;
+        }
+
+        for l in 0..screen.height() {
+            let line = screen.get_mut_line(l).unwrap();
+
+            for c in 0..line.nb_cells {
+                let cpi = line.get_mut_cpi(c).unwrap();
+
+                if cpi.offset == m.offset {
+                    cpi.is_selected = !cpi.metadata;
+                }
+
+                if cpi.offset == m.offset {
+                    cpi.is_selected = !cpi.metadata;
+                }
+            }
+        }
+    }
 }
 
 /*

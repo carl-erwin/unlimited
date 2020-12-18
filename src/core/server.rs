@@ -211,10 +211,13 @@ pub fn send_draw_event(
     let view = view.as_ref().borrow();
     let new_screen = Arc::clone(&view.screen);
 
+    let marks = Arc::clone(&view.moving_marks);
+
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
         DrawEvent {
             screen: new_screen,
+            marks,
             time: Instant::now(),
         },
     );

@@ -161,7 +161,7 @@ pub struct View<'a> {
 
     pub screen: Arc<RwLock<Box<Screen>>>,
 
-    pub moving_marks: Rc<RefCell<Vec<Mark>>>,
+    pub moving_marks: Arc<RwLock<Vec<Mark>>>,
     pub mark_index: usize,
 
     pub select_point: Option<Mark>,
@@ -183,7 +183,7 @@ impl<'a> View<'a> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
 
         // TODO: in future version will be stored in buffer meta data
-        let moving_marks = Rc::new(RefCell::new(vec![Mark { offset: 0 }]));
+        let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
 
         View {
             id,
@@ -576,9 +576,9 @@ pub fn run_view_action(
                 let center = {
                     let v = &mut view.as_ref().borrow();
                     let mid = v.mark_index;
-                    let marks = v.moving_marks.clone();
-                    let offset = marks.borrow()[mid].offset;
-                    let screen = &v.screen.read().unwrap();
+                    let marks = v.moving_marks.read().unwrap();
+                    let offset = marks[mid].offset;
+                    let screen = v.screen.read().unwrap();
                     !screen.contains_offset(offset)
                 };
                 if center {
@@ -598,19 +598,20 @@ pub fn run_view_action(
             }
             Action::MoveMarksToPreviousLine => {}
             Action::MoveMarkToNextLine { idx } => {
-                let marks = { view.as_ref().borrow().moving_marks.clone() };
-                let mut marks = marks.borrow_mut();
-                let mut m = &mut marks[*idx];
-                env.cur_mark_index = Some(*idx);
-                move_mark_to_next_line(env, view, &mut m);
+                move_mark_to_next_line(env, view, *idx);
                 env.cur_mark_index = None;
             }
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
 
             Action::CheckMarks => {
                 let v = &mut view.as_ref().borrow_mut();
-                v.moving_marks.borrow_mut().dedup();
-                let nr_marks = v.moving_marks.borrow().len();
+
+                // TODO: function v.update_marks() ->
+                let nr_marks = {
+                    let mut marks = v.moving_marks.write().unwrap();
+                    marks.dedup();
+                    marks.len()
+                };
                 v.mark_index = if nr_marks != 0 { nr_marks - 1 } else { 0 };
             }
         }
@@ -618,16 +619,15 @@ pub fn run_view_action(
 }
 
 pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-
     let v = view.as_ref().borrow_mut();
 
     // TODO: marks_filter
     // set_render_marks
     // brute force for now
 
-    let marks = v.moving_marks.clone(); // do not hold v
+    let marks = v.moving_marks.read().unwrap();
 
-    for m in marks.borrow().iter() {
+    for m in marks.iter() {
         //dbg_println!(" checking m.offset {}", m.offset);
 
         if m.offset < v.start_offset {
@@ -715,7 +715,10 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
         run_view_action(editor, env, view, &actions);
     }
 
-    refresh_view_marks(editor, env, view);
+    // let t0 = Instant::now();
+    // refresh_view_marks(editor, env, view);
+    // let t1 = Instant::now();
+    // dbg_println!("refresh_view_marks : {} ms", (t1 - t0).as_millis());
 
     let _end = Instant::now();
     // env.time_to_build_screen = end.duration_since(start);
@@ -791,10 +794,17 @@ pub fn insert_codepoint_array(
         let mut offset: u64 = 0;
         let mut grow: u64 = 0;
 
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
+
         doc.tag(env.max_offset, marks_offsets);
 
-        for m in v.moving_marks.borrow_mut().iter_mut() {
+        for m in v.moving_marks.write().unwrap().iter_mut() {
             m.offset += grow;
             doc.insert(m.offset, utf8.len(), &utf8);
             m.offset += utf8.len() as u64;
@@ -806,7 +816,13 @@ pub fn insert_codepoint_array(
 
         env.max_offset = doc.size() as u64;
         //
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
         doc.tag(env.max_offset, marks_offsets);
 
         // mark offscreen ?
@@ -832,11 +848,18 @@ pub fn remove_previous_codepoint(
         let mut doc = doc.as_ref().borrow_mut();
         let codec = v.text_codec.as_ref();
 
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
         doc.tag(env.max_offset, marks_offsets);
 
         let mut shrink = 0;
-        for m in v.moving_marks.borrow_mut().iter_mut() {
+        let mut marks = v.moving_marks.write().unwrap();
+        for m in marks.iter_mut() {
             if m.offset == 0 {
                 continue;
             }
@@ -875,7 +898,13 @@ pub fn remove_previous_codepoint(
         env.max_offset = doc.size() as u64;
         env.view_pre_render.push(Action::CheckMarks);
 
-        let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
         doc.tag(env.max_offset, marks_offsets);
     }
 }
@@ -896,7 +925,7 @@ pub fn undo(
         let v = &mut view.as_ref().borrow_mut();
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
-        let mut marks = v.moving_marks.borrow_mut();
+        let mut marks = v.moving_marks.write().unwrap();
 
         doc.undo_until_tag();
         doc.undo_until_tag();
@@ -930,7 +959,7 @@ pub fn redo(
 
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
-    let mut marks = v.moving_marks.borrow_mut();
+    let mut marks = v.moving_marks.write().unwrap();
 
     doc.redo_until_tag();
     doc.redo_until_tag();
@@ -959,11 +988,20 @@ pub fn remove_codepoint(
     let mut doc = doc.as_ref().borrow_mut();
     let codec = v.text_codec.as_ref();
 
-    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    let marks_offsets: Vec<u64> = v
+        .moving_marks
+        .read()
+        .unwrap()
+        .iter()
+        .map(|m| m.offset)
+        .collect();
     doc.tag(env.max_offset, marks_offsets);
 
     let mut shrink = 0;
-    for m in v.moving_marks.borrow_mut().iter_mut() {
+
+    let mut marks = v.moving_marks.write().unwrap();
+
+    for m in marks.iter_mut() {
         if m.offset >= shrink {
             m.offset -= shrink;
         }
@@ -978,7 +1016,13 @@ pub fn remove_codepoint(
 
     env.max_offset = doc.size() as u64;
 
-    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    let marks_offsets: Vec<u64> = v
+        .moving_marks
+        .read()
+        .unwrap()
+        .iter()
+        .map(|m| m.offset)
+        .collect();
     doc.tag(env.max_offset, marks_offsets);
 }
 
@@ -997,11 +1041,20 @@ pub fn remove_until_end_of_word(
     let codec = v.text_codec.as_ref();
 
     let size = doc.size() as u64;
-    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    let marks_offsets: Vec<u64> = v
+        .moving_marks
+        .read()
+        .unwrap()
+        .iter()
+        .map(|m| m.offset)
+        .collect();
     doc.tag(size, marks_offsets);
 
+    let mut marks = v.moving_marks.write().unwrap();
+
     let mut shrink: u64 = 0;
-    for m in v.moving_marks.borrow_mut().iter_mut() {
+
+    for m in marks.iter_mut() {
         if m.offset >= shrink {
             m.offset -= shrink;
         }
@@ -1060,7 +1113,13 @@ pub fn remove_until_end_of_word(
         m.offset = start.offset;
     }
 
-    let marks_offsets: Vec<u64> = v.moving_marks.borrow().iter().map(|m| m.offset).collect();
+    let marks_offsets: Vec<u64> = v
+        .moving_marks
+        .read()
+        .unwrap()
+        .iter()
+        .map(|m| m.offset)
+        .collect();
 
     env.max_offset = doc.size() as u64;
     doc.tag(env.max_offset, marks_offsets);
@@ -1079,7 +1138,9 @@ pub fn move_marks_backward(
     let codec = v.text_codec.as_ref();
     let midx = v.mark_index;
 
-    for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
+    let mut marks = v.moving_marks.write().unwrap();
+
+    for (idx, m) in marks.iter_mut().enumerate() {
         if idx == midx && m.offset <= v.start_offset {
             env.view_pre_render.push(Action::ScrollUp { n: 1 });
         }
@@ -1107,25 +1168,32 @@ pub fn move_marks_forward(
         let codec = v.text_codec.as_ref();
         let midx = v.mark_index;
 
-        for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
-            // TODO: add main mark check
-            if idx == midx && m.offset >= v.end_offset {
-                env.view_pre_render.push(Action::ScrollDown { n: 1 });
+        let nr_marks = {
+            let mut marks = v.moving_marks.write().unwrap();
+
+            for (idx, m) in marks.iter_mut().enumerate() {
+                // TODO: add main mark check
+                if idx == midx && m.offset >= v.end_offset {
+                    env.view_pre_render.push(Action::ScrollDown { n: 1 });
+                }
+
+                m.move_forward(&doc, codec);
             }
 
-            m.move_forward(&doc, codec);
-        }
+            // update main mark index
+            marks.len()
+        };
 
-        //      move this check at post render to reschedule render ?
-        //      if v.center_on_mark_move {
-        //           env.view_pre_render.push(Action::CenterArroundMainMark);
-        //      }
-
-        env.view_pre_render.push(Action::CheckMarks);
-        // update main mark
-        let nr_marks = v.moving_marks.borrow().len();
-        v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 };
+        // TODO:  env.view_pre_render.push(Action::SelectLastMark);
+        v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 }; // TODO: dedup ?
     }
+
+    //      move this check at post render to reschedule render ?
+    //      if v.center_on_mark_move {
+    //           env.view_pre_render.push(Action::CenterArroundMainMark);
+    //      }
+
+    env.view_pre_render.push(Action::CheckMarks);
 }
 
 pub fn move_marks_to_start_of_line(
@@ -1140,8 +1208,9 @@ pub fn move_marks_to_start_of_line(
     let codec = v.text_codec.as_ref();
     let midx = v.mark_index;
     let screen = v.screen.read().unwrap();
+    let mut marks = v.moving_marks.write().unwrap();
 
-    for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
+    for (idx, m) in marks.iter_mut().enumerate() {
         m.move_to_start_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
@@ -1163,8 +1232,9 @@ pub fn move_marks_to_end_of_line(
     let codec = v.text_codec.as_ref();
     let midx = v.mark_index;
     let screen = v.screen.read().unwrap();
+    let mut marks = v.moving_marks.write().unwrap();
 
-    for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
+    for (idx, m) in marks.iter_mut().enumerate() {
         m.move_to_end_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
@@ -1180,15 +1250,17 @@ fn move_mark_to_previous_line(
     env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
-    m: &mut Mark,
+    midx: usize,
 ) {
     let mut mark_moved = false;
 
-    {
+    let m_offset = {
         let v = &mut view.as_ref().borrow_mut();
+        let mut marks = v.moving_marks.write().unwrap();
+        let mut m = &mut marks[midx];
 
         let screen = v.screen.read().unwrap();
-        // TODO: if v.is_mark_on_screen(m) -> (bool, x, y) ?
+        // TODO: if v.is_mark_on_screen(m) -> (bool, x, y) + (prev/new offset)?
         match screen.find_cpi_by_offset(m.offset) {
             // offscreen
             (None, _, _) => {}
@@ -1216,13 +1288,15 @@ fn move_mark_to_previous_line(
             // impossible
             _ => {}
         }
-    }
+
+        m.offset
+    };
 
     // offscreen
     if !mark_moved {
         // mark is offscreen
 
-        let end_offset = m.offset;
+        let end_offset = m_offset;
         let (start_offset, screen_width, screen_height) = {
             let v = &mut view.as_ref().borrow_mut();
 
@@ -1232,7 +1306,7 @@ fn move_mark_to_previous_line(
                 let codec = v.text_codec.as_ref();
 
                 // todo: set marks codecs
-                let mut tmp = m.clone();
+                let mut tmp = Mark { offset: m_offset };
 
                 // goto start of current line (mar is on first line of screen)
                 tmp.move_to_start_of_line(&doc, codec);
@@ -1257,7 +1331,7 @@ fn move_mark_to_previous_line(
             let width = v.screen.read().unwrap().width();
 
             let add_height = if width > 0 {
-                (m.offset - start_offset) as usize / width
+                (m_offset - start_offset) as usize / width
             } else {
                 1
             };
@@ -1269,14 +1343,8 @@ fn move_mark_to_previous_line(
         // TODO: loop until m.offset is on screen
 
         let lines = {
-            let mut view = view.as_ref().borrow_mut();
-            view.get_lines_offsets_direct(
-                env,
-                start_offset,
-                end_offset,
-                screen_width,
-                screen_height,
-            )
+            let v = &mut view.as_ref().borrow_mut();
+            v.get_lines_offsets_direct(env, start_offset, end_offset, screen_width, screen_height)
         };
 
         // find "previous" line index
@@ -1304,7 +1372,7 @@ fn move_mark_to_previous_line(
             let e = Mark::new(lines[index + 1].1);
             let mut count = 0;
             while s.offset != e.offset {
-                if s.offset == m.offset {
+                if s.offset == m_offset {
                     break;
                 }
 
@@ -1315,7 +1383,7 @@ fn move_mark_to_previous_line(
         };
 
         {
-            let v = &view.as_ref().borrow();
+            let v = &mut view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
             let codec = v.text_codec.as_ref();
@@ -1334,7 +1402,10 @@ fn move_mark_to_previous_line(
         // if m.offset > screen.end -> m.offset = screen.line[last_index].start_offset
 
         // resync mark to "new" first line offset
-        if tmp_mark.offset < m.offset {
+        if tmp_mark.offset < m_offset {
+            let v = &mut view.as_ref().borrow_mut();
+            let mut marks = v.moving_marks.write().unwrap();
+            let mut m = &mut marks[midx];
             m.offset = tmp_mark.offset;
         }
     }
@@ -1346,21 +1417,34 @@ pub fn move_marks_to_previous_line(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let (moving_marks, midx) = {
+    // TODO: maintain env.mark_index_max ?
+    let idx_max = {
         let mut v = view.as_ref().borrow_mut();
-        v.mark_index = 0; // set main mark
-        (v.moving_marks.clone(), v.mark_index)
+        let mut marks = v.moving_marks.write().unwrap();
+        marks.len() - 1
     };
 
-    for (idx, m) in moving_marks.borrow_mut().iter_mut().enumerate() {
-        let prev_offset = m.offset;
-        move_mark_to_previous_line(editor, env, trigger, view, m);
+    for idx in 0..=idx_max {
+        let prev_offset = {
+            let mut v = view.as_ref().borrow();
+            let mut marks = v.moving_marks.write().unwrap();
+            marks[idx].offset
+        };
+        move_mark_to_previous_line(editor, env, trigger, view, idx);
 
         // TODO: move this to pre/post render
         if idx == 0 {
-            let new_offset = m.offset;
+            // env.view_pre_render.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
+            let new_offset = {
+                let mut v = view.as_ref().borrow();
+                let mut marks = v.moving_marks.write().unwrap();
+                marks[idx].offset
+            };
+
             if new_offset != prev_offset {
-                let v = view.as_ref().borrow();
+                let mut v = view.as_ref().borrow_mut();
+                v.mark_index = 0; // reset main mark
+
                 let screen = v.screen.read().unwrap();
                 let was_on_screen = screen.contains_offset(prev_offset);
                 let is_on_screen = screen.contains_offset(new_offset);
@@ -1408,18 +1492,22 @@ pub fn move_on_screen_mark_to_next_line(m: &mut Mark, screen: &Screen) -> (bool,
 }
 
 // remove multiple borrows
-pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut m: &mut Mark) {
+pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mark_idx: usize) {
     // TODO: m.on_buffer_end() ?
     let max_offset = env.max_offset;
 
-    if m.offset == max_offset {
-        return;
-    }
-
     // offscreen ?
+    let mut m_offset = 0;
     {
         let v = view.as_ref().borrow_mut();
         let screen = v.screen.read().unwrap();
+
+        let mut marks = v.moving_marks.write().unwrap();
+        let mut m = &mut marks[mark_idx];
+        m_offset = m.offset;
+        if m.offset == max_offset {
+            return;
+        }
 
         let (ok, action) = move_on_screen_mark_to_next_line(&mut m, &screen);
         if let Some(action) = action {
@@ -1451,6 +1539,8 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut
             let doc = doc.as_ref().borrow();
             let codec = v.text_codec.as_ref();
             //
+            let marks = v.moving_marks.read().unwrap();
+            let m = &marks[mark_idx];
             let mut tmp = Mark::new(m.offset);
             tmp.move_to_start_of_line(&doc, codec);
             tmp.offset
@@ -1458,7 +1548,7 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut
 
         // a codepoint can use 4 bytes the virtual end is
         // + 1 full line away
-        let end_offset = ::std::cmp::min(m.offset + (4 * screen_width) as u64, max_offset);
+        let end_offset = ::std::cmp::min(m_offset + (4 * screen_width) as u64, max_offset);
 
         // get lines start, end offset
         // NB: run full layout code for one screen line ( folding etc ... )
@@ -1482,7 +1572,7 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut
         // find the cursor index
         let index = match lines
             .iter()
-            .position(|e| e.0 <= m.offset && m.offset <= e.1)
+            .position(|e| e.0 <= m_offset && m_offset <= e.1)
         {
             None => return,
             Some(i) => {
@@ -1506,7 +1596,7 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut
             let e = Mark::new(lines[index].1);
             let mut count = 0;
             while s.offset < e.offset {
-                if s.offset == m.offset {
+                if s.offset == m_offset {
                     break;
                 }
 
@@ -1536,7 +1626,16 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mut
             tmp_mark.offset = line_end_off;
         }
 
-        m.offset = tmp_mark.offset;
+        m_offset = tmp_mark.offset;
+    }
+
+    {
+        let v = view.as_ref().borrow_mut();
+        let screen = v.screen.read().unwrap();
+
+        let mut marks = v.moving_marks.write().unwrap();
+        let m = &mut marks[mark_idx];
+        m.offset = m_offset;
     }
 }
 
@@ -1550,7 +1649,7 @@ pub fn move_marks_to_next_line(
     let v = view.as_ref().borrow_mut();
 
     let marks = v.moving_marks.clone();
-    let mut marks = marks.borrow_mut();
+    let mut marks = v.moving_marks.write().unwrap();
 
     let idx_max = marks.len();
     assert!(idx_max > 0);
@@ -1645,28 +1744,35 @@ pub fn clone_and_move_mark_to_previous_line(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let (marks, mi) = {
-        let mut v = view.as_ref().borrow_mut();
-        v.mark_index = 0;
-        (v.moving_marks.clone(), 0)
+    let prev_off = {
+        let mut v = view.as_ref().borrow();
+        let mut marks = v.moving_marks.read().unwrap();
+        let m = &marks[0];
+        m.offset
     };
 
-    let mut marks = marks.borrow_mut();
-    let mut m = &mut marks[mi];
-    let prev_off = m.offset;
     dbg_println!(" clone move up: prev_offset {}", prev_off);
 
-    move_mark_to_previous_line(editor, env, trigger, view, &mut m);
+    move_mark_to_previous_line(editor, env, trigger, view, 0); // TODO return (idx, prev_off, new_off)
 
-    let m_offset = m.offset;
+    let m_offset = {
+        let mut v = view.as_ref().borrow();
+        let mut marks = v.moving_marks.read().unwrap();
+        let m = &marks[0];
+        m.offset
+    };
+
     if m_offset != prev_off {
+        let mut v = view.as_ref().borrow_mut();
+        v.mark_index = 0;
+        let mut marks = v.moving_marks.write().unwrap();
+
         // insert mark @ m_offset + pa
         marks.insert(0, Mark { offset: m_offset });
         marks[1].offset = prev_off;
         // env.sort mark sync direction
         // update view.mark_index
 
-        let v = view.as_ref().borrow();
         let screen = v.screen.read().unwrap();
         let was_on_screen = screen.contains_offset(prev_off);
         let is_on_screen = screen.contains_offset(m_offset);
@@ -1685,37 +1791,43 @@ pub fn clone_and_move_mark_to_next_line(
     view: &Rc<RefCell<View>>,
 ) {
     // refresh mark index
-    let (marks, mi, max_offset) = {
-        let mut v = view.as_ref().borrow_mut();
-        let marks = v.moving_marks.clone();
-        {
-            let len = marks.borrow().len();
-            v.mark_index = len - 1;
-        }
+    let mut prev_off = 0;
+    let mut mi = 0;
+
+    {
+        let v = view.as_ref().borrow();
+
+        // marks
+        let marks = v.moving_marks.read().unwrap();
+        mi = marks.len() - 1;
+        env.cur_mark_index = Some(mi);
+        prev_off = marks[mi].offset;
+
+        // doc
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        let max_offset = doc.size() as u64;
-        (marks, v.mark_index, max_offset)
-    };
+        env.max_offset = doc.size() as u64;
+    }
 
-    let mut marks = marks.borrow_mut();
-    let mut m = &mut marks[mi];
-    let prev_off = m.offset;
     dbg_println!(" clone move down: prev_offset {}", prev_off);
 
-    env.cur_mark_index = Some(mi);
-    env.max_offset = max_offset;
-    move_mark_to_next_line(env, view, &mut m);
+    move_mark_to_next_line(env, view, mi);
 
-    let new_offset = m.offset;
+    let mut v = view.as_ref().borrow_mut();
+    let mut marks = v.moving_marks.write().unwrap();
+
+    let new_offset = marks[mi].offset;
+
     if new_offset != prev_off {
         dbg_println!(" clone move down: new_offset {}", new_offset);
 
         // create new mark @ prev_offset
         marks.push(Mark { offset: new_offset });
-        let mut v = view.as_ref().borrow_mut();
-        v.mark_index = marks.len() - 1;
-        marks[v.mark_index - 1].offset = prev_off;
+
+        let new_idx = marks.len() - 1;
+
+        // TODO:        v.mark_index = marks.len() - 1;
+        marks[new_idx - 1].offset = prev_off;
 
         // env.sort mark sync direction
         // update view.mark_index
@@ -1729,7 +1841,6 @@ pub fn clone_and_move_mark_to_next_line(
             env.view_pre_render.push(Action::CenterArroundMainMark);
         }
     } else {
-        let v = view.as_ref().borrow();
         let screen = v.screen.read().unwrap();
         let was_on_screen = screen.contains_offset(prev_off);
         if !was_on_screen {
@@ -1745,8 +1856,9 @@ pub fn move_mark_to_screen_start(
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow();
+    let mut marks = v.moving_marks.write().unwrap();
 
-    for m in v.moving_marks.borrow_mut().iter_mut() {
+    for m in marks.iter_mut() {
         // TODO: add main mark check
         if m.offset < v.start_offset || m.offset > v.end_offset {
             m.offset = v.start_offset;
@@ -1761,7 +1873,9 @@ pub fn move_mark_to_screen_end(
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.as_ref().borrow();
-    for m in v.moving_marks.borrow_mut().iter_mut() {
+    let mut marks = v.moving_marks.write().unwrap();
+
+    for m in marks.iter_mut() {
         // TODO: add main mark check
         if m.offset < v.start_offset || m.offset > v.end_offset {
             m.offset = v.end_offset;
@@ -1795,7 +1909,7 @@ pub fn move_mark_to_start_of_file(
     v.start_offset = 0;
     v.mark_index = 0;
 
-    let mut moving_marks = v.moving_marks.borrow_mut();
+    let mut moving_marks = v.moving_marks.write().unwrap();
     moving_marks.clear();
     moving_marks.push(Mark { offset: 0 });
 }
@@ -1809,11 +1923,13 @@ pub fn center_arround_mark(
 ) {
     let mut v = view.as_ref().borrow_mut();
 
-    let marks = v.moving_marks.clone();
-    let marks = marks.borrow();
-    let mi = v.mark_index;
+    let offset = {
+        let marks = v.moving_marks.read().unwrap();
+        let mi = v.mark_index;
+        marks[mi].offset
+    };
 
-    v.center_arround_offset(env, marks[mi].offset);
+    v.center_arround_offset(env, offset);
 }
 
 pub fn center_arround_offset(
@@ -1851,7 +1967,7 @@ pub fn move_mark_to_end_of_file(
     v.start_offset = offset;
     v.mark_index = 0;
 
-    let mut marks = v.moving_marks.borrow_mut();
+    let mut marks = v.moving_marks.write().unwrap();
     marks.clear();
     marks.push(Mark { offset });
 
@@ -1891,7 +2007,7 @@ pub fn cut_to_end_of_line(
         let mut doc = doc.as_ref().borrow_mut();
         let codec = v.text_codec.as_ref();
 
-        for m in v.moving_marks.borrow().iter() {
+        for m in v.moving_marks.read().unwrap().iter() {
             let mut end = m.clone();
             end.move_to_end_of_line(&doc, codec);
             doc.remove(m.offset, (end.offset - m.offset) as usize, None);
@@ -1920,8 +2036,8 @@ pub fn paste(
         let codec = v.text_codec.as_ref();
 
         let tr = doc.buffer_log.data[idx].clone();
-
-        for m in v.moving_marks.borrow_mut().iter_mut() {
+        let mut marks = v.moving_marks.write().unwrap();
+        for m in marks.iter_mut() {
             let mut end = m.clone();
             end.move_to_end_of_line(&doc, codec);
             if let Some(ref data) = tr.data {
@@ -1953,7 +2069,9 @@ pub fn move_to_token_start(
         let codec = v.text_codec.as_ref();
         let midx = v.mark_index;
 
-        for (idx, m) in v.moving_marks.borrow_mut().iter_mut().enumerate() {
+        let mut marks = v.moving_marks.write().unwrap();
+
+        for (idx, m) in marks.iter_mut().enumerate() {
             m.move_to_token_start(&doc, codec);
 
             // main mark ?
@@ -1983,7 +2101,9 @@ pub fn move_to_token_end(
         let doc = doc.as_ref().borrow();
         let codec = v.text_codec.as_ref();
 
-        for m in v.moving_marks.borrow_mut().iter_mut() {
+        let mut marks = v.moving_marks.write().unwrap();
+
+        for m in marks.iter_mut() {
             m.move_to_token_end(&doc, codec);
 
             // main mark ?
@@ -2123,7 +2243,7 @@ pub fn button_press(
 
             // reset main mark
             v.mark_index = 0;
-            let mut marks = v.moving_marks.borrow_mut();
+            let mut marks = v.moving_marks.write().unwrap();
             marks.clear();
             marks.push(Mark { offset: cpi.offset });
         }
@@ -2180,7 +2300,7 @@ pub fn pointer_motion(
     let screen = screen.read().unwrap();
 
     assert_eq!(v.mark_index, 0);
-    assert_eq!(v.moving_marks.borrow().len(), 1);
+    assert_eq!(v.moving_marks.read().unwrap().len(), 1);
 
     // TODO: match events
     match &trigger[0] {
