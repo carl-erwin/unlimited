@@ -165,7 +165,6 @@ pub struct View<'a> {
 
     pub select_point: Option<Mark>,
 
-    pub fixed_marks: Rc<RefCell<Vec<Mark>>>,
     // use for cut and paste
     pub last_cut_log_index: Option<usize>,
 }
@@ -196,7 +195,6 @@ impl<'a> View<'a> {
             moving_marks,
             mark_index: 0,
             select_point: None,
-            fixed_marks: Rc::new(RefCell::new(Vec::new())),
             last_cut_log_index: None,
         }
     }
@@ -1832,10 +1830,11 @@ pub fn clone_and_move_mark_to_next_line(
 
     dbg_println!(" clone move down: offsets {:?}", offsets);
 
+    let mut v = view.as_ref().borrow_mut();
+
     // no move ?
     if offsets.0 == offsets.1 {
         // destroy duplicated mark
-        let mut v = view.as_ref().borrow_mut();
         v.mark_index = {
             let mut marks = v.moving_marks.write().unwrap();
             marks.pop();
@@ -1850,25 +1849,23 @@ pub fn clone_and_move_mark_to_next_line(
         return;
     }
 
-    {
-        dbg_println!(" clone move down: new_offset {}", offsets.1);
-        // env.sort mark sync direction
-        // update view.mark_index
+    dbg_println!(" clone move down: new_offset {}", offsets.1);
+    // env.sort mark sync direction
+    // update view.mark_index
 
-        let v = view.as_ref().borrow();
-        let screen = v.screen.read().unwrap();
-        let was_on_screen = screen.contains_offset(offsets.0);
-        let is_on_screen = screen.contains_offset(offsets.1);
-        dbg_println!(
-            " was_on_screen {} , is_on_screen  {}",
-            was_on_screen,
-            is_on_screen
-        );
-        if was_on_screen && !is_on_screen {
-            env.view_pre_render.push(Action::ScrollDown { n: 1 });
-        } else if !is_on_screen {
-            env.view_pre_render.push(Action::CenterArroundMainMark);
-        }
+    let screen = v.screen.read().unwrap();
+    let was_on_screen = screen.contains_offset(offsets.0);
+    let is_on_screen = screen.contains_offset(offsets.1);
+    dbg_println!(
+        " was_on_screen {} , is_on_screen  {}",
+        was_on_screen,
+        is_on_screen
+    );
+
+    if was_on_screen && !is_on_screen {
+        env.view_pre_render.push(Action::ScrollDown { n: 1 });
+    } else if !is_on_screen {
+        env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
 
