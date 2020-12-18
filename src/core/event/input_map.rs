@@ -335,7 +335,7 @@ fn parse_event_entry_input_pointer_motion(
     _name: &String,
     value: &serde_json::Value,
 ) {
-    let s = if let Value::String(ref s) = value {
+    let _s = if let Value::String(ref s) = value {
         dbg_println!("value = '{}'", s);
         s
     } else {

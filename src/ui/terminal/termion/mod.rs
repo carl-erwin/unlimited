@@ -38,7 +38,7 @@ use crate::core::screen::Screen;
 use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
 
-use crate::core::codepointinfo::CodepointInfo;
+
 
 //
 use crate::ui::UiState;
@@ -116,7 +116,7 @@ pub fn main_loop(
 
                 DrawEvent {
                     screen,
-                    marks,
+                    marks: _,
                     time: _,
                 } => {
                     let start = Instant::now();
@@ -174,7 +174,7 @@ pub fn main_loop(
     // ----}
 }
 
-fn draw_screen(last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
+fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut Stdout) {
     write!(stdout, "{}", termion::cursor::Goto(1, 1)).unwrap();
     write!(stdout, "{}", termion::style::Reset).unwrap();
 

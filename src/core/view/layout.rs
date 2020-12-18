@@ -158,8 +158,8 @@ pub trait Filter<'a> {
 
     fn run(
         &mut self,
-        view: &View,
-        env: &mut LayoutEnv,
+        _view: &View,
+        _env: &mut LayoutEnv,
         input: &Vec<FilterIoData>,
         output: &mut Vec<FilterIoData>,
     ) -> () {
@@ -272,7 +272,7 @@ pub struct RawDataFilter {
 }
 
 impl RawDataFilter {
-    fn new(env: &LayoutEnv, view: &View) -> Self {
+    fn new(env: &LayoutEnv, _view: &View) -> Self {
         dbg_println!(
             "RawDataFilter w {} h {}",
             env.screen.width(),
@@ -435,7 +435,7 @@ pub struct Utf8Filter {
 }
 
 impl Utf8Filter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
+    fn new(_env: &LayoutEnv, _view: &View) -> Self {
         Utf8Filter {}
     }
 }
@@ -498,7 +498,7 @@ pub struct TabFilter {
 }
 
 impl TabFilter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
+    fn new(_env: &LayoutEnv, _view: &View) -> Self {
         TabFilter {
             prev_cp: ' ',
             column_count: 0,
@@ -559,7 +559,7 @@ pub struct HighlightSelectionFilter {
 }
 
 impl HighlightSelectionFilter {
-    fn new(env: &LayoutEnv, view: &View) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
         let marks = view.moving_marks.read().unwrap();
         let min = marks[0].offset;
         let max = view.select_point.as_ref().unwrap().offset;
@@ -624,7 +624,7 @@ pub struct HighlightFilter {
     utf8_codec: Box<dyn utf8::TextCodec>, // internal token representation is utf8
 }
 impl HighlightFilter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
+    fn new(_env: &LayoutEnv, _view: &View) -> Self {
         HighlightFilter {
             token_io: Vec::new(),
             token_type: TokenType::Unknown,
@@ -814,7 +814,7 @@ pub struct ScreenFilter {
 }
 
 impl ScreenFilter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
+    fn new(_env: &LayoutEnv, _view: &View) -> Self {
         ScreenFilter { first_offset: None }
     }
 }
@@ -883,7 +883,7 @@ impl Filter<'_> for ScreenFilter {
             }
         }
 
-        let (n, _, last_offset) = env.screen.append(&cpis_vec);
+        let (n, _, _last_offset) = env.screen.append(&cpis_vec);
         if n < cpis_vec.len() {
             env.quit = true;
         }
@@ -954,7 +954,7 @@ pub fn run_view_layout_filters(
 /// 1 - utf8 || hexa
 /// 2 - tabulation
 pub fn run_view_layout_filters_direct(
-    editor_env: &EditorEnv,
+    _editor_env: &EditorEnv,
     view: &View,
     base_offset: u64,
     max_offset: u64,

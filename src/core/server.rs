@@ -24,7 +24,7 @@ use crate::core::view::View;
 use crate::core::view;
 use crate::core::view::update_view;
 
-use crate::core::codepointinfo::CodepointInfo;
+
 use crate::core::screen::Screen;
 
 use crate::core::event::InputEventMap;

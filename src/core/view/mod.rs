@@ -27,7 +27,7 @@ use crate::core::server::EditorEnv; // TODO: editor
 
 use crate::dbg_println;
 
-use crate::core::document::BufferOperation;
+
 use crate::core::document::Document;
 
 use crate::core::screen::Screen;
@@ -727,7 +727,7 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
 ///
 use crate::core::event::Key;
 
-use super::document::BufferOperationType;
+
 
 // CEG
 pub fn scroll_up(
@@ -1419,15 +1419,15 @@ pub fn move_marks_to_previous_line(
 ) {
     // TODO: maintain env.mark_index_max ?
     let idx_max = {
-        let mut v = view.as_ref().borrow_mut();
-        let mut marks = v.moving_marks.write().unwrap();
+        let v = view.as_ref().borrow_mut();
+        let marks = v.moving_marks.write().unwrap();
         marks.len() - 1
     };
 
     for idx in 0..=idx_max {
         let prev_offset = {
-            let mut v = view.as_ref().borrow();
-            let mut marks = v.moving_marks.write().unwrap();
+            let v = view.as_ref().borrow();
+            let marks = v.moving_marks.write().unwrap();
             marks[idx].offset
         };
         move_mark_to_previous_line(editor, env, trigger, view, idx);
@@ -1436,8 +1436,8 @@ pub fn move_marks_to_previous_line(
         if idx == 0 {
             // env.view_pre_render.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
             let new_offset = {
-                let mut v = view.as_ref().borrow();
-                let mut marks = v.moving_marks.write().unwrap();
+                let v = view.as_ref().borrow();
+                let marks = v.moving_marks.write().unwrap();
                 marks[idx].offset
             };
 
@@ -1631,7 +1631,7 @@ pub fn move_mark_to_next_line(env: &mut EditorEnv, view: &Rc<RefCell<View>>, mar
 
     {
         let v = view.as_ref().borrow_mut();
-        let screen = v.screen.read().unwrap();
+        let _screen = v.screen.read().unwrap();
 
         let mut marks = v.moving_marks.write().unwrap();
         let m = &mut marks[mark_idx];
@@ -1648,7 +1648,7 @@ pub fn move_marks_to_next_line(
     //
     let v = view.as_ref().borrow_mut();
 
-    let marks = v.moving_marks.clone();
+    let _marks = v.moving_marks.clone();
     let mut marks = v.moving_marks.write().unwrap();
 
     let idx_max = marks.len();
@@ -1745,8 +1745,8 @@ pub fn clone_and_move_mark_to_previous_line(
     view: &Rc<RefCell<View>>,
 ) {
     let prev_off = {
-        let mut v = view.as_ref().borrow();
-        let mut marks = v.moving_marks.read().unwrap();
+        let v = view.as_ref().borrow();
+        let marks = v.moving_marks.read().unwrap();
         let m = &marks[0];
         m.offset
     };
@@ -1756,8 +1756,8 @@ pub fn clone_and_move_mark_to_previous_line(
     move_mark_to_previous_line(editor, env, trigger, view, 0); // TODO return (idx, prev_off, new_off)
 
     let m_offset = {
-        let mut v = view.as_ref().borrow();
-        let mut marks = v.moving_marks.read().unwrap();
+        let v = view.as_ref().borrow();
+        let marks = v.moving_marks.read().unwrap();
         let m = &marks[0];
         m.offset
     };
@@ -1813,7 +1813,7 @@ pub fn clone_and_move_mark_to_next_line(
 
     move_mark_to_next_line(env, view, mi);
 
-    let mut v = view.as_ref().borrow_mut();
+    let v = view.as_ref().borrow_mut();
     let mut marks = v.moving_marks.write().unwrap();
 
     let new_offset = marks[mi].offset;
@@ -2304,7 +2304,7 @@ pub fn pointer_motion(
 
     // TODO: match events
     match &trigger[0] {
-        InputEvent::PointerMotion(PointerEvent { mods, x, y }) => {
+        InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
             // TODO: change screen (x,y) to i32 ? and filter in functions ?
             let x = {
                 if *x < 0 {
