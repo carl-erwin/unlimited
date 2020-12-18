@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 //
 
-
 use crate::core::buffer::Buffer;
 pub use crate::core::buffer::OpenMode;
 

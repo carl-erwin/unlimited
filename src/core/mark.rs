@@ -3,8 +3,6 @@
 //
 use crate::core::document::Document;
 
-
-
 use crate::core::codec::text::utf8::SyncDirection;
 use crate::core::codec::text::utf8::TextCodec;
 

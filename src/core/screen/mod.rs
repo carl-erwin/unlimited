@@ -4,8 +4,6 @@ pub mod line;
 
 use std::time::Duration;
 
-
-
 use self::line::Line;
 use self::line::LineCellIndex;
 use crate::core::codepointinfo::CodepointInfo;

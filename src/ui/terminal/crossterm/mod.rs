@@ -13,8 +13,7 @@ use crossterm::{
     queue,
     style::Styler,
     style::{
-        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor,
-        SetForegroundColor,
+        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
     },
     terminal::{Clear, ClearType},
     Result,
