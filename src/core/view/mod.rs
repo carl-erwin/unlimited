@@ -1473,7 +1473,7 @@ pub fn move_on_screen_mark_to_next_line(
                 m.offset = cpi.offset;
             }
         } else {
-            panic!("");
+            // l.nb_cells == 0, the line is empty do nothing
         }
 
         (true, Some((old_offset, m.offset)), None)
