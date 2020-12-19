@@ -149,18 +149,19 @@ pub struct View<'a> {
 
     // TODO: add struct to map view["mode(n)"] -> mode(n).data
     // reorder fields
-    pub start_offset: u64,
-    pub end_offset: u64,
+    pub start_offset: u64, // where we want to start the rendering
+    pub end_offset: u64,   // where the rendering stopped
+
     pub center_on_mark_move: bool,
     pub scroll_on_mark_move: bool,
 
-    pub document: Option<Rc<RefCell<Document<'a>>>>,
+    pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
 
-    pub text_codec: Box<dyn utf8::TextCodec>,
+    pub text_codec: Box<dyn utf8::TextCodec>, // Option ? move to mode
 
     pub screen: Arc<RwLock<Box<Screen>>>,
 
-    pub moving_marks: Arc<RwLock<Vec<Mark>>>,
+    pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
     pub mark_index: usize,
 
     pub select_point: Option<Mark>,
