@@ -1025,16 +1025,15 @@ pub fn remove_until_end_of_word(
     let codec = v.text_codec.as_ref();
 
     let size = doc.size() as u64;
-    let marks_offsets: Vec<u64> = v
-        .moving_marks
-        .read()
-        .unwrap()
-        .iter()
-        .map(|m| m.offset)
-        .collect();
-    doc.tag(size, marks_offsets);
+
+    if size == 0 {
+        return;
+    }
 
     let mut marks = v.moving_marks.write().unwrap();
+
+    let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+    doc.tag(size, marks_offsets);
 
     let mut shrink: u64 = 0;
 
@@ -1097,13 +1096,7 @@ pub fn remove_until_end_of_word(
         m.offset = start.offset;
     }
 
-    let marks_offsets: Vec<u64> = v
-        .moving_marks
-        .read()
-        .unwrap()
-        .iter()
-        .map(|m| m.offset)
-        .collect();
+    let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
 
     env.max_offset = doc.size() as u64;
     doc.tag(env.max_offset, marks_offsets);
