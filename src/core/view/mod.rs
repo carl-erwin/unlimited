@@ -844,6 +844,10 @@ pub fn remove_previous_codepoint(
         let mut doc = doc.as_ref().borrow_mut();
         let codec = v.text_codec.as_ref();
 
+        if doc.size() == 0 {
+            return;
+        }
+
         let mut marks = v.moving_marks.write().unwrap();
 
         let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
@@ -973,6 +977,10 @@ pub fn remove_codepoint(
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
     let codec = v.text_codec.as_ref();
+
+    if doc.size() == 0 {
+        return;
+    }
 
     let mut marks = v.moving_marks.write().unwrap();
 
