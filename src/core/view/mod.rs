@@ -844,17 +844,13 @@ pub fn remove_previous_codepoint(
         let mut doc = doc.as_ref().borrow_mut();
         let codec = v.text_codec.as_ref();
 
-        let marks_offsets: Vec<u64> = v
-            .moving_marks
-            .read()
-            .unwrap()
-            .iter()
-            .map(|m| m.offset)
-            .collect();
+        let mut marks = v.moving_marks.write().unwrap();
+
+        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+
         doc.tag(env.max_offset, marks_offsets);
 
         let mut shrink = 0;
-        let mut marks = v.moving_marks.write().unwrap();
         for m in marks.iter_mut() {
             if m.offset == 0 {
                 continue;
@@ -894,13 +890,7 @@ pub fn remove_previous_codepoint(
         env.max_offset = doc.size() as u64;
         env.view_pre_render.push(Action::CheckMarks);
 
-        let marks_offsets: Vec<u64> = v
-            .moving_marks
-            .read()
-            .unwrap()
-            .iter()
-            .map(|m| m.offset)
-            .collect();
+        let marks_offsets = marks.iter().map(|m| m.offset).collect();
         doc.tag(env.max_offset, marks_offsets);
     }
 }
