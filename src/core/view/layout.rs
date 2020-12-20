@@ -205,7 +205,7 @@ pub struct FilterIoData {
     color: (u8, u8, u8),
     bg_color: (u8, u8, u8),
 
-    offset: u64,
+    offset: Option<u64>,
     size: usize,
 
     data: FilterData,
@@ -320,7 +320,7 @@ impl Filter<'_> for RawDataFilter {
                     is_selected: false,
                     color: CodepointInfo::default_color(),
                     bg_color: CodepointInfo::default_bg_color(),
-                    offset: self.pos,
+                    offset: Some(self.pos),
                     size: 1,
                     data: FilterData::ByteArray { vec: raw_data },
                 });
@@ -339,7 +339,7 @@ impl Filter<'_> for RawDataFilter {
                     is_selected: true,
                     color: CodepointInfo::default_color(),
                     bg_color: CodepointInfo::default_bg_color(),
-                    offset: self.pos + rd as u64,
+                    offset: Some(self.pos + rd as u64),
                     size: 1,
                     data: FilterData::Byte { val: b' ' },
                 });
@@ -376,7 +376,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
                 color: CodepointInfo::default_color(),
                 bg_color: CodepointInfo::default_bg_color(),
 
-                offset: ctx.from_offset,
+                offset: Some(ctx.from_offset),
                 size: ctx.cp_size,
                 data: FilterData::Unicode {
                     cp: ctx.codep,
@@ -407,7 +407,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
                 color: CodepointInfo::default_color(),
                 bg_color: CodepointInfo::default_bg_color(),
 
-                offset: ctx.from_offset,
+                offset: Some(ctx.from_offset),
                 size: 1,
                 data: FilterData::Unicode {
                     cp: 0xfffd,
@@ -458,7 +458,7 @@ impl Filter<'_> for Utf8Filter {
         }
 
         let mut ctx = Utf8FilterCtx {
-            from_offset: filter_in[0].offset, // start offset
+            from_offset: filter_in[0].offset.unwrap(), // start offset
             state: 0,
             codep: 0,
             cp_size: 0,
@@ -600,7 +600,8 @@ impl Filter<'_> for WordWrapFilter {
                             if self.column_count > 0 {
                                 let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
                                 new_io.metadata = true;
-                                new_io.offset = self.prev_offset;
+                                new_io.color = (0, 255, 0);
+                                new_io.offset = Some(self.prev_offset);
                                 filter_out.push(new_io);
                                 self.column_count = 0;
                             }
@@ -618,11 +619,9 @@ impl Filter<'_> for WordWrapFilter {
                             self.column_count += n;
                         }
 
-                        self.prev_offset = io.offset;
+                        self.prev_offset = io.offset.unwrap();
                         self.prev_cp = codepoint;
-                        let mut new_io = io.clone();
-                        //new_io.color = (0, 255, 0);
-                        //new_io.is_selected = true;
+                        let new_io = io.clone();
                         filter_out.push(new_io);
                         if codepoint == '\n' {
                             self.column_count = 0;
@@ -633,7 +632,7 @@ impl Filter<'_> for WordWrapFilter {
 
                     (_, codepoint) => {
                         self.prev_cp = codepoint;
-                        let mut new_io = io.clone();
+                        let new_io = io.clone();
                         self.accum.push(new_io);
                         self.accum_count += 1;
                     }
@@ -677,12 +676,18 @@ impl Filter<'_> for HighlightSelectionFilter {
         filter_out: &mut Vec<FilterIoData>,
     ) {
         for i in filter_in {
-            if i.offset >= self.sel_start_offset && i.offset <= self.sel_end_offset {
-                let mut i = i.clone();
-                i.bg_color = (56, 56, 83);
-                filter_out.push(i);
-            } else {
-                filter_out.push(i.clone());
+            match i.offset {
+                Some(offset)
+                    if offset >= self.sel_start_offset && offset <= self.sel_end_offset =>
+                {
+                    let mut i = i.clone();
+                    i.bg_color = (56, 56, 83);
+                    filter_out.push(i);
+                }
+
+                _ => {
+                    filter_out.push(i.clone());
+                }
             }
         }
     }
@@ -929,8 +934,8 @@ impl Filter<'_> for ScreenFilter {
         let base_offset = filter_in[0].offset;
 
         if self.first_offset.is_none() {
-            env.screen.first_offset = base_offset;
-            self.first_offset = Some(base_offset);
+            env.screen.first_offset = base_offset.clone();
+            self.first_offset = base_offset.clone();
         }
 
         let mut cpis_vec = Vec::new();
@@ -964,7 +969,7 @@ impl Filter<'_> for ScreenFilter {
                 // screen.push_available() + screen.push_count() == screen.push_capacity()
                 let cp = filter_codepoint(
                     u32_to_char(*cp),
-                    *offset,
+                    offset.clone(),
                     *is_selected,
                     *color,
                     *bg_color,
@@ -997,14 +1002,14 @@ impl Filter<'_> for ScreenFilter {
 // TODO return array of CodePointInfo  0x7f -> <ESC>
 pub fn filter_codepoint(
     c: char,
-    offset: u64,
+    offset: Option<u64>,
     is_selected: bool,
     color: (u8, u8, u8),
     bg_color: (u8, u8, u8),
     metadata: bool,
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
-        '\r' | '\n' => ('\u{2936}', (0, 0, 0xCE)),
+        '\r' | '\n' => ('\u{2936}', color),
 
         '\t' => (' ', color),
 
@@ -1019,7 +1024,7 @@ pub fn filter_codepoint(
         metadata,
         cp: c,
         displayed_cp,
-        offset,
+        offset: offset.clone(),
         is_selected,
         color,
         bg_color,

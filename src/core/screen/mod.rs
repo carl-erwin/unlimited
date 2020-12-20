@@ -39,9 +39,9 @@ pub struct Screen {
     // the maximum number of elements the screen can hold
     pub push_capacity: usize,
     /// placeholder to record the offset of the first pushed CodepointInfo (used by View)
-    pub first_offset: u64,
+    pub first_offset: Option<u64>,
     /// placeholder to record the offset of the last pushed CodepointInfo (used by View)
-    pub last_offset: u64,
+    pub last_offset: Option<u64>,
     /// placeholder to record the maximum offset of the document (eof)
     pub doc_max_offset: u64,
     /// time spent to generate the screen content
@@ -75,8 +75,8 @@ impl Screen {
             max_height: height,
             push_count: 0,
             push_capacity,
-            first_offset: 0,
-            last_offset: 0,
+            first_offset: None,
+            last_offset: None,
             doc_max_offset: 0,
             time_to_build: Duration::new(0, 0),
             input_size: 0,
@@ -151,8 +151,8 @@ impl Screen {
 
         self.current_line_index = 0;
         self.push_count = 0;
-        self.first_offset = 0;
-        self.last_offset = 0;
+        self.first_offset = None;
+        self.last_offset = None;
         self.doc_max_offset = 0;
         self.input_size = 0;
     }
@@ -194,12 +194,20 @@ impl Screen {
         let (ok, _) = line.push(cpi);
 
         if ok {
-            self.last_offset = cpi.offset;
+            self.last_offset = cpi.offset.clone();
+
             self.push_count += 1;
             if cp == '\n' || cp == '\r' {
                 // dbg_println!("detected enf of line = line[{}] available is {}", self.current_line_index, line.available());
                 // dbg_println!("detected enf of line = line[{}] capacity is {}", self.current_line_index, line.capacity());
                 // dbg_println!("detected enf of line = push capacity is {}", self.push_capacity);
+
+                for i in 0..line.available() {
+                    let mut cpi_fill = CodepointInfo::new();
+                    cpi_fill.offset = cpi.offset.clone();
+                    cpi_fill.metadata = true;
+                    line.push(cpi_fill);
+                }
 
                 line.read_only = true;
                 // substract skipped columns
@@ -217,10 +225,14 @@ impl Screen {
         for (idx, cpi) in cpi_vec.iter().enumerate() {
             let ret = self.push(*cpi);
             if ret.0 == false {
-                return (idx, ret.1, self.last_offset);
+                return (idx, ret.1, self.last_offset.unwrap());
             }
         }
-        (cpi_vec.len(), self.current_line_index, self.last_offset)
+        (
+            cpi_vec.len(),
+            self.current_line_index,
+            self.last_offset.unwrap(),
+        )
     }
 
     pub fn clear(&mut self) {
@@ -230,9 +242,9 @@ impl Screen {
         self.current_line_index = 0;
         self.push_count = 0;
         self.push_capacity = self.max_width * self.max_height;
-        self.first_offset = 0;
-        self.last_offset = 0;
-        self.doc_max_offset = 0;
+        self.first_offset = None;
+        self.last_offset = None;
+        self.doc_max_offset = 0; // TODO: Option<u64>
         self.input_size = 0;
         self.set_clipping(0, 0, self.max_width, self.max_height);
     }
@@ -428,7 +440,14 @@ impl Screen {
     }
 
     pub fn find_cpi_by_offset(&self, offset: u64) -> (Option<&CodepointInfo>, usize, usize) {
-        if offset < self.first_offset || offset > self.last_offset {
+        if self.first_offset.is_none() || self.last_offset.is_none() {
+            return (None, 0, 0);
+        }
+
+        let first_offset = self.first_offset.unwrap();
+        let last_offset = self.last_offset.unwrap();
+
+        if offset < first_offset || offset > last_offset {
             return (None, 0, 0);
         }
 
@@ -440,18 +459,28 @@ impl Screen {
             let l = self.get_line(idx).unwrap();
             let f_cpi = l.get_first_cpi().unwrap();
             let l_cpi = l.get_last_cpi().unwrap();
-            if offset >= f_cpi.offset && offset <= l_cpi.offset {
+
+            if f_cpi.offset.is_none() || l_cpi.offset.is_none() {
+                panic!("");
+            }
+
+            let first_offset = f_cpi.offset.unwrap();
+            let last_offset = l_cpi.offset.unwrap();
+
+            if offset >= first_offset && offset <= last_offset {
                 // TODO: handle line.skip / used
                 for x in 0..l.width() {
                     let cpi = l.get_cpi(x).unwrap();
                     if cpi.metadata {
                         // continue;
                     }
-                    if cpi.offset == offset {
-                        return (Some(cpi), x, idx);
+                    if let Some(cpi_offset) = cpi.offset {
+                        if cpi_offset == offset {
+                            return (Some(cpi), x, idx);
+                        }
                     }
                 }
-            } else if offset > l_cpi.offset {
+            } else if offset > last_offset {
                 min = idx + 1;
             } else {
                 max = idx - 1;
@@ -462,7 +491,14 @@ impl Screen {
     }
 
     pub fn contains_offset(&self, offset: u64) -> bool {
-        if offset < self.first_offset || offset > self.last_offset {
+        if self.first_offset.is_none() || self.last_offset.is_none() {
+            return false;
+        }
+
+        let first_offset = self.first_offset.unwrap();
+        let last_offset = self.last_offset.unwrap();
+
+        if offset < first_offset || offset > last_offset {
             return false;
         }
 

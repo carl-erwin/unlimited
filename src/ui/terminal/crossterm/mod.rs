@@ -231,15 +231,26 @@ pub fn main_loop(
 }
 
 pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
+    let first_offset = if let Some(first_offset) = screen.first_offset {
+        first_offset
+    } else {
+        return;
+    };
+    let last_offset = if let Some(last_offset) = screen.last_offset {
+        last_offset
+    } else {
+        return;
+    };
+
     for m in marks.iter() {
         //dbg_println!(" checking m.offset {}", m.offset);
 
-        if m.offset < screen.first_offset {
+        // the marks sorted
+        if m.offset < first_offset {
             continue;
         }
 
-        // the marks sorted
-        if m.offset > screen.last_offset {
+        if m.offset > last_offset {
             break;
         }
 
@@ -250,14 +261,10 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
                 let cpi = line.get_mut_cpi(c).unwrap();
 
                 if set {
-                    if cpi.offset == m.offset {
-                        cpi.is_selected = !cpi.metadata;
-                        cpi.is_selected = true;
-                    }
-
-                    if cpi.offset == m.offset {
-                        cpi.is_selected = !cpi.metadata;
-                        cpi.is_selected = true;
+                    if let Some(cpi_offset) = cpi.offset {
+                        if cpi_offset == m.offset {
+                            cpi.is_selected = !cpi.metadata;
+                        }
                     }
                 } else {
                     cpi.is_selected = false;

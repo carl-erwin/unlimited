@@ -312,7 +312,9 @@ impl<'a> View<'a> {
         if let (Some(l), _) = self.screen.write().unwrap().get_used_line_clipped(nb_lines) {
             if let Some(cpi) = l.get_first_cpi() {
                 // set first offset of screen.line[nb_lines] as next screen start
-                self.start_offset = cpi.offset;
+                if let Some(offset) = cpi.offset {
+                    self.start_offset = offset;
+                }
             }
         } else {
             panic!();
@@ -393,8 +395,8 @@ impl<'a> View<'a> {
                     continue;
                 }
 
-                let s = screen.line[i].get_first_cpi().unwrap().offset;
-                let e = screen.line[i].get_last_cpi().unwrap().offset;
+                let s = screen.line[i].get_first_cpi().unwrap().offset.unwrap();
+                let e = screen.line[i].get_last_cpi().unwrap().offset.unwrap();
 
                 v.push((s, e));
 
@@ -410,12 +412,14 @@ impl<'a> View<'a> {
                 let s = screen.line[screen.current_line_index]
                     .get_first_cpi()
                     .unwrap()
-                    .offset;
+                    .offset
+                    .unwrap();
 
                 let e = screen.line[screen.current_line_index]
                     .get_last_cpi()
                     .unwrap()
-                    .offset;
+                    .offset
+                    .unwrap();
                 v.push((s, e));
                 return v;
             }
@@ -426,7 +430,7 @@ impl<'a> View<'a> {
                     (Some(cpi), x, y) => {
                         assert_eq!(x, 0);
                         assert_eq!(y, 0);
-                        assert_eq!(cpi.offset, m.offset);
+                        assert_eq!(cpi.offset.unwrap(), m.offset);
                     }
                     _ => panic!("implementation error"),
                 }
@@ -434,7 +438,7 @@ impl<'a> View<'a> {
 
             if let Some(l) = screen.get_last_used_line() {
                 if let Some(cpi) = l.get_first_cpi() {
-                    m.offset = cpi.offset; // update next screen start
+                    m.offset = cpi.offset.unwrap(); // update next screen start
                 }
             }
 
@@ -497,8 +501,8 @@ pub fn get_lines_offsets(
                 continue;
             }
 
-            let s = screen.line[i].get_first_cpi().unwrap().offset;
-            let e = screen.line[i].get_last_cpi().unwrap().offset;
+            let s = screen.line[i].get_first_cpi().unwrap().offset.unwrap();
+            let e = screen.line[i].get_last_cpi().unwrap().offset.unwrap();
 
             v.push((s, e));
 
@@ -514,12 +518,14 @@ pub fn get_lines_offsets(
             let s = screen.line[screen.current_line_index]
                 .get_first_cpi()
                 .unwrap()
-                .offset;
+                .offset
+                .unwrap();
 
             let e = screen.line[screen.current_line_index]
                 .get_last_cpi()
                 .unwrap()
-                .offset;
+                .offset
+                .unwrap();
             v.push((s, e));
             return v;
         }
@@ -530,7 +536,7 @@ pub fn get_lines_offsets(
                 (Some(cpi), x, y) => {
                     assert_eq!(x, 0);
                     assert_eq!(y, 0);
-                    assert_eq!(cpi.offset, m.offset);
+                    assert_eq!(cpi.offset.unwrap(), m.offset);
                 }
                 _ => panic!("implementation error"),
             }
@@ -538,7 +544,7 @@ pub fn get_lines_offsets(
 
         if let Some(l) = screen.get_last_used_line() {
             if let Some(cpi) = l.get_first_cpi() {
-                m.offset = cpi.offset; // update next screen start
+                m.offset = cpi.offset.unwrap(); // update next screen start
             }
         }
 
@@ -644,12 +650,10 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
             for c in 0..line.nb_cells {
                 let cpi = line.get_mut_cpi(c).unwrap();
 
-                if cpi.offset == m.offset {
-                    cpi.is_selected = !cpi.metadata;
-                }
-
-                if cpi.offset == m.offset {
-                    cpi.is_selected = !cpi.metadata;
+                if let Some(offset) = cpi.offset {
+                    if offset == m.offset {
+                        cpi.is_selected = !cpi.metadata;
+                    }
                 }
             }
         }
@@ -677,7 +681,7 @@ pub fn compute_view_layout(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
         run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
         // TODO: from env ?
-        v.end_offset = screen.last_offset;
+        v.end_offset = screen.last_offset.unwrap();
         v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
         v.check_invariants();
     }
@@ -1254,7 +1258,7 @@ fn move_mark_to_previous_line(
                     let new_x = ::std::cmp::min(x, l.nb_cells - 1);
                     let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
                     if !cpi.metadata {
-                        m.offset = cpi.offset;
+                        m.offset = cpi.offset.unwrap();
                         mark_moved = true;
                     }
                 } else {
@@ -1460,7 +1464,7 @@ pub fn move_on_screen_mark_to_next_line(
         if l.nb_cells > 0 {
             let new_x = ::std::cmp::min(x, l.nb_cells - 1);
             let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
-            m.offset = cpi.offset;
+            m.offset = cpi.offset.unwrap();
         } else {
             // l.nb_cells == 0, the line is empty do nothing
         }
@@ -1692,7 +1696,7 @@ pub fn move_marks_to_next_line(
             // go to next screen
             // using the firt offset of the last line
             if let Some(cpi) = last_line.get_first_cpi() {
-                m.offset = cpi.offset; // update next screen start offset
+                m.offset = cpi.offset.unwrap(); // update next screen start offset
                 continue;
             }
         }
@@ -1701,7 +1705,7 @@ pub fn move_marks_to_next_line(
         let mut idx_end = idx_start + 1;
         let cpi = last_line.get_first_cpi().unwrap();
         while idx_end < idx_max {
-            if marks[idx_end].offset >= cpi.offset {
+            if marks[idx_end].offset >= cpi.offset.unwrap() {
                 break;
             }
             idx_end += 1;
@@ -1716,7 +1720,7 @@ pub fn move_marks_to_next_line(
 
         idx_start = idx_end; // next mark index
 
-        m.offset = cpi.offset; // update next screen start
+        m.offset = cpi.offset.unwrap(); // update next screen start
     }
 
     // check main mark
@@ -2149,13 +2153,6 @@ pub fn button_press(
         }
     };
 
-    let mut s = String::new();
-
-    s.push_str(&format!(
-        "clip : {:?}",
-        v.screen.read().unwrap().clip_rect()
-    ));
-
     match button {
         0 => {}
         _ => {
@@ -2200,13 +2197,10 @@ pub fn button_press(
     // 0 <= y < screen.height()
     if y < screen.clip_rect().y {
         y = 0;
-        s.push_str(", y case 1");
     } else if y > screen.clip_rect().y + screen.clip_rect().height {
         y = screen.clip_rect().height - 1;
-        s.push_str(", y case 2");
     } else {
         y -= screen.clip_rect().y;
-        s.push_str(", y case 3");
     }
 
     //
@@ -2219,25 +2213,20 @@ pub fn button_press(
         } else {
             y = last_li;
         }
-        s.push_str(", y >= last_li");
     }
 
     if let Some(l) = screen.get_line(y) {
-        s.push_str(&format!(", get line ok , x:{}, nbcells:{}", x, l.nb_cells));
-
         if l.nb_cells > 0 && x > l.nb_cells {
             x = l.nb_cells - 1;
         } else if l.nb_cells == 0 {
             x = 0;
         }
     } else {
-        s.push_str(", get line failed");
     }
 
-    s.push_str(&format!(", new (x:{},y:{})", x, y));
-
-    if let Some(cpi) = screen.get_used_cpinfo(x, y) {
-        if !cpi.metadata {
+    let mut i = x + 1;
+    while i > 0 {
+        if let Some(cpi) = screen.get_used_cpinfo(x, y) {
             // clear selection point
             v.select_point = None;
 
@@ -2245,8 +2234,12 @@ pub fn button_press(
             v.mark_index = 0;
             let mut marks = v.moving_marks.write().unwrap();
             marks.clear();
-            marks.push(Mark { offset: cpi.offset });
+            marks.push(Mark {
+                offset: cpi.offset.unwrap(),
+            });
         }
+
+        i -= 1;
     }
 
     // s // to internal view.as_ref().borrow_mut().state.s
@@ -2324,14 +2317,16 @@ pub fn pointer_motion(
             if let Some(cpi) = screen.get_used_cpinfo(x, y) {
                 if !cpi.metadata {
                     // update selection point
-                    v.select_point = Some(Mark { offset: cpi.offset });
+                    v.select_point = Some(Mark {
+                        offset: cpi.offset.unwrap(),
+                    });
 
                     dbg_println!(
                         "@{:?} : pointer motion x({}) y({}) | select offset({})",
                         Instant::now(),
                         x,
                         y,
-                        cpi.offset
+                        cpi.offset.unwrap()
                     );
                 }
             }
@@ -2384,7 +2379,7 @@ pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
 pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64, is_selected: bool) -> bool {
     let (ok, _) = screen.push(layout::filter_codepoint(
         c,
-        offset,
+        Some(offset),
         is_selected,
         codepointinfo::CodepointInfo::default_color(),
         codepointinfo::CodepointInfo::default_bg_color(),
