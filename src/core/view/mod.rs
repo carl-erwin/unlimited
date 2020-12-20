@@ -2224,6 +2224,7 @@ pub fn button_press(
     } else {
     }
 
+    // check from right to left until some codepoint is found
     let mut i = x + 1;
     while i > 0 {
         if let Some(cpi) = screen.get_used_cpinfo(x, y) {

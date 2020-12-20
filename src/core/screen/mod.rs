@@ -197,12 +197,13 @@ impl Screen {
             self.last_offset = cpi.offset.clone();
 
             self.push_count += 1;
-            if cp == '\n' || cp == '\r' {
-                // dbg_println!("detected enf of line = line[{}] available is {}", self.current_line_index, line.available());
-                // dbg_println!("detected enf of line = line[{}] capacity is {}", self.current_line_index, line.capacity());
-                // dbg_println!("detected enf of line = push capacity is {}", self.push_capacity);
 
-                for i in 0..line.available() {
+            // move this to ScreenFilter ?
+            if cp == '\n' || cp == '\r' {
+                // fill line with same offset as last pushed cpi
+                // will help when handling button press event 
+                // TODO: line.fill(fill_pattern);
+                for _ in 0..line.available() {
                     let mut cpi_fill = CodepointInfo::new();
                     cpi_fill.offset = cpi.offset.clone();
                     cpi_fill.metadata = true;
@@ -217,6 +218,7 @@ impl Screen {
                     self.push_capacity = 0;
                 }
             }
+
         }
         (ok, self.current_line_index)
     }
