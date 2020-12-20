@@ -2390,6 +2390,7 @@ pub fn screen_putchar(screen: &mut Screen, c: char, offset: u64, is_selected: bo
         is_selected,
         codepointinfo::CodepointInfo::default_color(),
         codepointinfo::CodepointInfo::default_bg_color(),
+        true,
     ));
     ok
 }

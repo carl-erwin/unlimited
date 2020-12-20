@@ -451,8 +451,6 @@ impl Screen {
                         return (Some(cpi), x, idx);
                     }
                 }
-
-                panic!(""); // TODO: handle meta data
             } else if offset > l_cpi.offset {
                 min = idx + 1;
             } else {

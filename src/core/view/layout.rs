@@ -197,7 +197,7 @@ pub enum FilterData {
 #[derive(Debug, Clone)]
 pub struct FilterIoData {
     // general info
-    is_valid: bool,
+    metadata: bool,
     end_of_pipe: bool, // skip
     quit: bool,        // close pipeline
 
@@ -216,7 +216,7 @@ impl FilterIoData {
     pub fn replace_codepoint(io: &FilterIoData, new_cp: char) -> FilterIoData {
         if let &FilterIoData {
             // general info
-            is_valid,
+            metadata,
             end_of_pipe, // skip
             quit,        // close pipeline
             is_selected,
@@ -236,7 +236,7 @@ impl FilterIoData {
         {
             return FilterIoData {
                 // general info
-                is_valid,
+                metadata,
                 end_of_pipe, // skip
                 quit,        // close pipeline
                 is_selected,
@@ -314,7 +314,7 @@ impl Filter<'_> for RawDataFilter {
 
             if rd > 0 {
                 (*filter_out).push(FilterIoData {
-                    is_valid: true,
+                    metadata: false,
                     end_of_pipe: false,
                     quit: false, // close pipeline
                     is_selected: false,
@@ -333,7 +333,7 @@ impl Filter<'_> for RawDataFilter {
                 // for now eof handling -> fake ' ' @ end of stream
 
                 (*filter_out).push(FilterIoData {
-                    is_valid: true,
+                    metadata: true,
                     end_of_pipe: true,
                     quit: false, // close pipeline
                     is_selected: true,
@@ -369,7 +369,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
         utf8::UTF8_ACCEPT => {
             let io = FilterIoData {
                 // general info
-                is_valid: true,
+                metadata: false,
                 end_of_pipe: ctx.end_of_pipe,
                 quit: false, // close pipeline
                 is_selected: false,
@@ -400,7 +400,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
             // decode error : invalid sequence
             let io = FilterIoData {
                 // general info
-                is_valid: true,
+                metadata: false,
                 end_of_pipe: ctx.end_of_pipe,
                 quit: false, // close pipeline
                 is_selected: false,
@@ -592,12 +592,12 @@ impl Filter<'_> for WordWrapFilter {
             } = &*io
             {
                 match (self.prev_cp, u32_to_char(*cp)) {
-                    (_, codepoint) if codepoint == '\n' || codepoint == ' ' => {
+                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' => {
                         if self.column_count + self.accum_count >= self.max_column {
                             // push artificial new line and flush: TODO update metadata flags
                             if self.column_count > 0 {
                                 let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
-                                new_io.is_selected = true;
+                                new_io.metadata = true;
                                 filter_out.push(new_io);
                                 self.column_count = 0;
                             }
@@ -617,8 +617,8 @@ impl Filter<'_> for WordWrapFilter {
 
                         self.prev_cp = codepoint;
                         let mut new_io = io.clone();
-                        new_io.color = (0, 255, 0);
-                        new_io.is_selected = true;
+                        //new_io.color = (0, 255, 0);
+                        //new_io.is_selected = true;
                         filter_out.push(new_io);
                         if codepoint == '\n' {
                             self.column_count = 0;
@@ -630,7 +630,7 @@ impl Filter<'_> for WordWrapFilter {
                     (_, codepoint) => {
                         self.prev_cp = codepoint;
                         let mut new_io = io.clone();
-                        new_io.is_selected = true;
+                        //new_io.is_selected = false;
                         self.accum.push(new_io);
                         self.accum_count += 1;
                     }
@@ -949,6 +949,7 @@ impl Filter<'_> for ScreenFilter {
         // env.quit = true;
         for (idx, io) in filter_in.iter().enumerate() {
             if let FilterIoData {
+                metadata,
                 offset,
                 data: FilterData::Unicode { cp, .. },
                 is_selected,
@@ -958,8 +959,14 @@ impl Filter<'_> for ScreenFilter {
             } = &*io
             {
                 // screen.push_available() + screen.push_count() == screen.push_capacity()
-                let cp =
-                    filter_codepoint(u32_to_char(*cp), *offset, *is_selected, *color, *bg_color);
+                let cp = filter_codepoint(
+                    u32_to_char(*cp),
+                    *offset,
+                    *is_selected,
+                    *color,
+                    *bg_color,
+                    *metadata,
+                );
 
                 cpis_vec.push(cp);
 
@@ -991,6 +998,7 @@ pub fn filter_codepoint(
     is_selected: bool,
     color: (u8, u8, u8),
     bg_color: (u8, u8, u8),
+    metadata: bool,
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
         '\r' | '\n' => ('\u{2936}', (0, 0, 0xCE)),
@@ -1005,7 +1013,7 @@ pub fn filter_codepoint(
     };
 
     CodepointInfo {
-        metadata: false,
+        metadata,
         cp: c,
         displayed_cp,
         offset,
