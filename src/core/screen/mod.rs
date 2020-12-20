@@ -445,7 +445,7 @@ impl Screen {
                 for x in 0..l.width() {
                     let cpi = l.get_cpi(x).unwrap();
                     if cpi.metadata {
-                        continue;
+                        // continue;
                     }
                     if cpi.offset == offset {
                         return (Some(cpi), x, idx);

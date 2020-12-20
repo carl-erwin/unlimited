@@ -558,6 +558,7 @@ pub struct WordWrapFilter {
     column_count: u64,
     accum_count: u64,
     prev_cp: char,
+    prev_offset: u64, // Option<u64> ?
     accum: Vec<FilterIoData>,
 }
 
@@ -568,6 +569,7 @@ impl WordWrapFilter {
             column_count: 0,
             accum_count: 0,
             prev_cp: '\0',
+            prev_offset: 0,
             accum: Vec::new(),
         }
     }
@@ -598,6 +600,7 @@ impl Filter<'_> for WordWrapFilter {
                             if self.column_count > 0 {
                                 let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
                                 new_io.metadata = true;
+                                new_io.offset = self.prev_offset;
                                 filter_out.push(new_io);
                                 self.column_count = 0;
                             }
@@ -615,6 +618,7 @@ impl Filter<'_> for WordWrapFilter {
                             self.column_count += n;
                         }
 
+                        self.prev_offset = io.offset;
                         self.prev_cp = codepoint;
                         let mut new_io = io.clone();
                         //new_io.color = (0, 255, 0);
@@ -630,7 +634,6 @@ impl Filter<'_> for WordWrapFilter {
                     (_, codepoint) => {
                         self.prev_cp = codepoint;
                         let mut new_io = io.clone();
-                        //new_io.is_selected = false;
                         self.accum.push(new_io);
                         self.accum_count += 1;
                     }
@@ -1081,7 +1084,9 @@ pub fn run_view_layout_filters_direct(
     }
 
     filters.push(Box::new(TabFilter::new(&layout_env, &view)));
+
     filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
+
     filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
 
     // setup

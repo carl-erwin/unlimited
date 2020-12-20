@@ -1460,9 +1460,7 @@ pub fn move_on_screen_mark_to_next_line(
         if l.nb_cells > 0 {
             let new_x = ::std::cmp::min(x, l.nb_cells - 1);
             let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
-            if !cpi.metadata {
-                m.offset = cpi.offset;
-            }
+            m.offset = cpi.offset;
         } else {
             // l.nb_cells == 0, the line is empty do nothing
         }

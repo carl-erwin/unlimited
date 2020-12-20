@@ -252,10 +252,12 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
                 if set {
                     if cpi.offset == m.offset {
                         cpi.is_selected = !cpi.metadata;
+                        cpi.is_selected = true;
                     }
 
                     if cpi.offset == m.offset {
                         cpi.is_selected = !cpi.metadata;
+                        cpi.is_selected = true;
                     }
                 } else {
                     cpi.is_selected = false;
