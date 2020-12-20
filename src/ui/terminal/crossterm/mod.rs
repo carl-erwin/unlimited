@@ -24,6 +24,10 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::vec::Vec;
+
 use std::thread;
 
 use std::time::Duration;
@@ -93,6 +97,8 @@ pub fn main_loop(
     let mut last_screen = Box::new(Screen::new(1, 1));
     let mut last_screen_rdr_time = Instant::now();
 
+    let mut last_marks: Option<Arc<RwLock<Vec<Mark>>>> = None;
+
     let mut request_layout = true;
 
     let stdout = stdout();
@@ -110,6 +116,7 @@ pub fn main_loop(
 
     crossterm::terminal::enable_raw_mode()?;
 
+    let mut draw_marks = true;
     while !ui_state.quit {
         // check terminal size
         let (width, height) = crossterm::terminal::size().ok().unwrap();
@@ -133,7 +140,7 @@ pub fn main_loop(
             request_layout = false;
         }
 
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(1000)) {
+        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(500)) {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
@@ -172,11 +179,15 @@ pub fn main_loop(
                     if draw {
                         let screen = screen.read().unwrap();
                         let mut screen = screen.clone();
-                        let marks = marks.read().unwrap();
-                        refresh_screen_marks(&mut screen, &marks);
+                        last_marks = Some(Arc::clone(&marks));
+
+                        let marks = last_marks.as_ref().unwrap().read().unwrap();
+                        refresh_screen_marks(&mut screen, &marks, true);
+
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
                         //draw_screen_dumb(&screen, &mut stdout);
                         last_screen = screen;
+
                         last_screen_rdr_time = Instant::now();
                     } else {
                         dbg_println!("DRAW: crossterm SKIP frame ----- \r");
@@ -195,6 +206,10 @@ pub fn main_loop(
             }
         } else {
             // TODO: handle timeout
+            draw_marks = !draw_marks;
+            let marks = last_marks.as_ref().unwrap().read().unwrap();
+            refresh_screen_marks(&mut last_screen, &marks, draw_marks);
+            draw_screen_dumb(&last_screen, &mut stdout);
         }
     }
 
@@ -215,7 +230,7 @@ pub fn main_loop(
     Ok(())
 }
 
-pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>) {
+pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     for m in marks.iter() {
         //dbg_println!(" checking m.offset {}", m.offset);
 
@@ -234,12 +249,16 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>) {
             for c in 0..line.nb_cells {
                 let cpi = line.get_mut_cpi(c).unwrap();
 
-                if cpi.offset == m.offset {
-                    cpi.is_selected = !cpi.metadata;
-                }
+                if set {
+                    if cpi.offset == m.offset {
+                        cpi.is_selected = !cpi.metadata;
+                    }
 
-                if cpi.offset == m.offset {
-                    cpi.is_selected = !cpi.metadata;
+                    if cpi.offset == m.offset {
+                        cpi.is_selected = !cpi.metadata;
+                    }
+                } else {
+                    cpi.is_selected = false;
                 }
             }
         }
