@@ -553,6 +553,93 @@ impl Filter<'_> for TabFilter {
     }
 }
 
+pub struct WordWrapFilter {
+    max_column: u64,
+    column_count: u64,
+    accum_count: u64,
+    prev_cp: char,
+    accum: Vec<FilterIoData>,
+}
+
+impl WordWrapFilter {
+    fn new(env: &LayoutEnv, _view: &View) -> Self {
+        WordWrapFilter {
+            max_column: env.screen.width() as u64,
+            column_count: 0,
+            accum_count: 0,
+            prev_cp: '\0',
+            accum: Vec::new(),
+        }
+    }
+}
+
+impl Filter<'_> for WordWrapFilter {
+    fn name(&self) -> &'static str {
+        &"WordWrapFilter"
+    }
+
+    fn run(
+        &mut self,
+        _view: &View,
+        _env: &mut LayoutEnv,
+        filter_in: &Vec<FilterIoData>,
+        filter_out: &mut Vec<FilterIoData>,
+    ) {
+        for io in filter_in.iter() {
+            if let FilterIoData {
+                data: FilterData::Unicode { cp, .. },
+                ..
+            } = &*io
+            {
+                match (self.prev_cp, u32_to_char(*cp)) {
+                    (_, codepoint) if codepoint == '\n' || codepoint == ' ' => {
+                        if self.column_count + self.accum_count >= self.max_column {
+                            // push artificial new line and flush: TODO update metadata flags
+                            if self.column_count > 0 {
+                                let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
+                                new_io.is_selected = true;
+                                filter_out.push(new_io);
+                                self.column_count = 0;
+                            }
+
+                            // flush accumulated data
+                            let n = self.accum_count;
+                            filter_out.append(&mut self.accum);
+                            self.accum_count = 0;
+                            self.column_count += n;
+                            self.column_count %= self.max_column;
+                        } else {
+                            let n = self.accum_count;
+                            filter_out.append(&mut self.accum);
+                            self.accum_count = 0;
+                            self.column_count += n;
+                        }
+
+                        self.prev_cp = codepoint;
+                        let mut new_io = io.clone();
+                        new_io.color = (0, 255, 0);
+                        new_io.is_selected = true;
+                        filter_out.push(new_io);
+                        if codepoint == '\n' {
+                            self.column_count = 0;
+                        } else {
+                            self.column_count += 1;
+                        }
+                    }
+
+                    (_, codepoint) => {
+                        self.prev_cp = codepoint;
+                        let mut new_io = io.clone();
+                        new_io.is_selected = true;
+                        self.accum.push(new_io);
+                        self.accum_count += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub struct HighlightSelectionFilter {
     sel_start_offset: u64,
     sel_end_offset: u64,
@@ -986,6 +1073,7 @@ pub fn run_view_layout_filters_direct(
     }
 
     filters.push(Box::new(TabFilter::new(&layout_env, &view)));
+    filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
     filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
 
     // setup
