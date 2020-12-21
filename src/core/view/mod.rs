@@ -1643,28 +1643,46 @@ pub fn move_marks_to_next_line(
     //
     let v = view.as_ref().borrow_mut();
 
-    let _marks = v.moving_marks.clone();
     let mut marks = v.moving_marks.write().unwrap();
 
     let idx_max = marks.len();
     assert!(idx_max > 0);
     let mut idx_start = 0;
 
-    // copy original screen
-    let (width, height) = {
+    // allocate temporary screen
+    let (width, height, screen_first_offset) = {
         let screen = v.screen.as_ref().read().unwrap();
+        let screen_first_offset = screen.first_offset.unwrap();
+
         let width = screen.width();
         let height = screen.height() * 100;
 
-        // big virtual screen ?
-        let height = std::cmp::min(height, 100);
-        (width, height)
+        /*
+         *  (max - min) / screen_width   more lines
+         */
+        /*
+        let min_offset = marks[0].offset;
+        let max_offset = marks[idx_max - 1].offset;
+        let add_lines = (max_offset - min_offset) as usize / width;
+        let height = screen.height() + add_lines;
+
+        // TODO: fix this
+        let height = screen.height() + 100;
+        */
+
+        dbg_println!("new virtual screen : {} x {}", width, height);
+
+        (width, height, screen_first_offset)
     };
 
     let mut screen = Screen::new(width, height);
     screen.is_off_screen = true;
 
-    let mut m = marks[idx_start].clone();
+    // use current screen
+    let mut m = Mark::new(screen_first_offset);
+    if m.offset > marks[idx_start].offset {
+        m.offset = marks[idx_start].offset;
+    }
 
     let max_offset = {
         let doc = v.document.clone();
@@ -1676,10 +1694,21 @@ pub fn move_marks_to_next_line(
         doc.size() as u64
     };
 
+    dbg_println!("max_offset {}", max_offset);
+
     while idx_start < idx_max {
+        dbg_println!(" idx_start {} < idx_max {}", idx_start, idx_max);
+
         // update screen with configure filters
         screen.clear();
+
+        dbg_println!("compute layout from offset {}", m.offset);
+
         run_view_layout_filters_direct(env, &v, m.offset, max_offset, &mut screen);
+
+        dbg_println!("screen first offset {:?}", screen.first_offset);
+        dbg_println!("screen first offset {:?}", screen.last_offset);
+
         // TODO: pass doc &doc to avoid double borrow
         // env.doc ?
         // env.view ? to avoid too many args
@@ -1687,18 +1716,23 @@ pub fn move_marks_to_next_line(
         //
         let last_line = screen.get_last_used_line();
         if last_line.is_none() {
+            dbg_println!("no last line");
+            panic!();
             break;
         }
         let last_line = last_line.unwrap();
 
         // idx_start not on screen  ? ...
         if !screen.contains_offset(marks[idx_start].offset) {
+            dbg_println!("offset not found on screen go to next screen");
+
             // go to next screen
             // using the firt offset of the last line
             if let Some(cpi) = last_line.get_first_cpi() {
                 m.offset = cpi.offset.unwrap(); // update next screen start offset
                 continue;
             }
+            panic!();
         }
 
         // idx_start is on screen
