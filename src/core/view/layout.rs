@@ -696,6 +696,7 @@ impl Filter<'_> for HighlightSelectionFilter {
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Unknown,
+    InvalidUnicode,
     Blank, // ' ' | '\n' | '\t' : TODO: sepcific END_OF_LINE ?
     // Num,
     Identifier,   // _a-zA-Z unicode // default ?
@@ -758,6 +759,7 @@ impl Filter<'_> for HighlightFilter {
                     //                    dbg_println!("parsing char : '{}'", c);
 
                     let token_type = match c {
+                        '�' => TokenType::InvalidUnicode,
                         ' ' | '\n' | '\t' => TokenType::Blank,
                         '(' => TokenType::ParenOpen,
                         ')' => TokenType::ParenClose,
@@ -782,7 +784,10 @@ impl Filter<'_> for HighlightFilter {
                         continue;
                     }
 
-                    if !eof && token_type == self.token_type {
+                    if !eof
+                        && token_type == self.token_type
+                        && token_type != TokenType::InvalidUnicode
+                    {
                         self.token_io.push(io.clone());
                         continue;
                     }
