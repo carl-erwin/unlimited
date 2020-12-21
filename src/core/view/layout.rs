@@ -114,6 +114,7 @@ interface:
 
 */
 
+use core::panic;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -310,7 +311,7 @@ impl Filter<'_> for RawDataFilter {
 
             let rd = doc.borrow().read(self.pos, self.read_size, &mut raw_data);
 
-            dbg_println!("READ {} / {} bytes", rd, self.read_size);
+            dbg_println!("READ from {} : {} / {} bytes", self.pos, rd, self.read_size);
 
             if rd > 0 {
                 (*filter_out).push(FilterIoData {
@@ -321,7 +322,7 @@ impl Filter<'_> for RawDataFilter {
                     color: CodepointInfo::default_color(),
                     bg_color: CodepointInfo::default_bg_color(),
                     offset: Some(self.pos),
-                    size: 1,
+                    size: rd,
                     data: FilterData::ByteArray { vec: raw_data },
                 });
             }
@@ -331,6 +332,8 @@ impl Filter<'_> for RawDataFilter {
 
                 // TODO: only text-mode add special tag end-of-stream, add filter-end-of-stream -> ' '
                 // for now eof handling -> fake ' ' @ end of stream
+
+                dbg_println!("EOF");
 
                 (*filter_out).push(FilterIoData {
                     metadata: true,
@@ -453,6 +456,7 @@ impl Filter<'_> for Utf8Filter {
         mut filter_out: &mut Vec<FilterIoData>,
     ) {
         if filter_in.is_empty() {
+            dbg_println!("Utf8Filter : empty input !!!!");
             *filter_out = vec![];
             return;
         }
@@ -548,6 +552,9 @@ impl Filter<'_> for TabFilter {
                         self.column_count += 1;
                     }
                 }
+            } else {
+                // filter_out.push(io.clone());
+                panic!("");
             }
         }
     }
@@ -587,6 +594,8 @@ impl Filter<'_> for WordWrapFilter {
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
+        dbg_println!("filter_in.len() {}", filter_in.len());
+
         for io in filter_in.iter() {
             if let FilterIoData {
                 data: FilterData::Unicode { cp, .. },
@@ -594,8 +603,11 @@ impl Filter<'_> for WordWrapFilter {
             } = &*io
             {
                 match (self.prev_cp, u32_to_char(*cp)) {
-                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' => {
-                        if self.column_count + self.accum_count >= self.max_column {
+                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' || codepoint == '�' =>
+                    {
+                        if codepoint != '�'
+                            && self.column_count + self.accum_count >= self.max_column
+                        {
                             // push artificial new line and flush: TODO update metadata flags
                             if self.column_count > 0 {
                                 let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
@@ -637,8 +649,12 @@ impl Filter<'_> for WordWrapFilter {
                         self.accum_count += 1;
                     }
                 }
+            } else {
+                panic!("unexpected input");
             }
         }
+
+        dbg_println!("self.accum.len() {}", self.accum.len());
     }
 }
 
@@ -755,8 +771,8 @@ impl Filter<'_> for HighlightFilter {
                 } => {
                     let c = u32_to_char(*cp);
 
-                    //                    dbg_println!("-----------");
-                    //                    dbg_println!("parsing char : '{}'", c);
+                    // dbg_println!("-----------");
+                    // dbg_println!("parsing char : '{}'", c);
 
                     let token_type = match c {
                         '�' => TokenType::InvalidUnicode,
@@ -775,7 +791,10 @@ impl Filter<'_> for HighlightFilter {
 
                     // need more or accumulae same class
                     if self.token_io.len() == 0 {
+                        dbg_println!("self.token_io.len() == 0");
+
                         if eof {
+                            dbg_println!("EOF");
                             filter_out.push(io.clone());
                         } else {
                             self.token_io.push(io.clone());
@@ -892,6 +911,7 @@ impl Filter<'_> for HighlightFilter {
 
                     if eof {
                         filter_out.push(io.clone());
+                        assert!(self.token_io.len() == 0);
                     } else {
                         // prepare next token
                         self.token_io.push(io.clone());
@@ -902,7 +922,9 @@ impl Filter<'_> for HighlightFilter {
                     }
                 }
 
-                _ => {}
+                _ => {
+                    panic!("");
+                }
             }
         }
     }
@@ -987,6 +1009,8 @@ impl Filter<'_> for ScreenFilter {
                     dbg_println!("ScreenFilter : screen eof reached !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     break;
                 }
+            } else {
+                panic!("invalid input type");
             }
         }
 
@@ -1014,7 +1038,8 @@ pub fn filter_codepoint(
     metadata: bool,
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
-        '\r' | '\n' => ('\u{2936}', color),
+        //        '\r' | '\n' => ('\u{2936}', color), // TODO: add user configuration for new-line representation
+        '\r' | '\n' => (' ', color),
 
         '\t' => (' ', color),
 
@@ -1036,13 +1061,6 @@ pub fn filter_codepoint(
     }
 }
 
-/// This function can be considered as the core of the editor.<br/>
-/// It will run the configured filters until the screen is filled or eof is reached.<br/>
-/// the screen is clear first
-/// TODO: pass list of filter function to be applied
-/// 0 - allocate context for each configurred plugin
-/// 1 - utf8 || hexa
-/// 2 - tabulation
 pub fn run_view_layout_filters(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
@@ -1054,13 +1072,16 @@ pub fn run_view_layout_filters(
     run_view_layout_filters_direct(env, &view, base_offset, max_offset, screen)
 }
 
-/// This function can be considered as the core of the editor.<br/>
-/// It will run the configured filters until the screen is filled or eof is reached.<br/>
-/// the screen is clear first
-/// TODO: pass list of filter function to be applied
-/// 0 - allocate context for each configurred plugin
-/// 1 - utf8 || hexa
-/// 2 - tabulation
+// This function can be considered as the core of the editor.<br/>
+// It will run the configured filters until the screen is filled or eof is reached.<br/>
+// the screen should be clearerd first
+// TODO: pass list of filter function to be applied
+// 0 - allocate context for each configurred plugin
+// 1 - utf8 || hexa
+// 2 - high light (some) keywords
+// 3 - higlight selection
+//  4 - tabulation
+//  5 - word wrap
 pub fn run_view_layout_filters_direct(
     _editor_env: &EditorEnv,
     view: &View,
@@ -1075,6 +1096,8 @@ pub fn run_view_layout_filters_direct(
         screen,
     };
 
+    assert_eq!(0, layout_env.screen.push_count());
+
     // move in mode init
     let mut filters: Vec<Box<dyn Filter>> = vec![];
 
@@ -1085,7 +1108,6 @@ pub fn run_view_layout_filters_direct(
         /* || editor_env.pending_events <= 1 || */
         // TODO: schedule refresh on idle
 
-        // filters.push(Box::new(MarkHighlightFilter::new(&layout_env)));
         filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
 
         if view.select_point.is_some() {
@@ -1093,8 +1115,10 @@ pub fn run_view_layout_filters_direct(
         }
     }
 
+    // TODO: fix tab expansion whith binary data ;-)
     filters.push(Box::new(TabFilter::new(&layout_env, &view)));
 
+    // TODO: disable word wrapping on non text input
     filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
 
     filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
@@ -1106,14 +1130,18 @@ pub fn run_view_layout_filters_direct(
     // for f in filters { f.setup(); }
 
     while layout_env.quit == false {
+        dbg_println!("-------------------");
         for f in &mut filters {
             filter_out.clear();
-            // dbg_println!("running {} : in({})", f.name(), filter_in.len());
+            dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
-            // dbg_println!("        {} : out({})", f.name(), filter_out.len());
+            dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
+        //break;
     }
+
+    assert_ne!(0, layout_env.screen.push_count());
 
     // for f in filters { f.finish(); }
 }

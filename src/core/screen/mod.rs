@@ -201,7 +201,7 @@ impl Screen {
             // move this to ScreenFilter ?
             if cp == '\n' || cp == '\r' {
                 // fill line with same offset as last pushed cpi
-                // will help when handling button press event 
+                // will help when handling button press event
                 // TODO: line.fill(fill_pattern);
                 for _ in 0..line.available() {
                     let mut cpi_fill = CodepointInfo::new();
@@ -218,7 +218,6 @@ impl Screen {
                     self.push_capacity = 0;
                 }
             }
-
         }
         (ok, self.current_line_index)
     }

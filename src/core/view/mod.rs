@@ -1655,20 +1655,16 @@ pub fn move_marks_to_next_line(
         let screen_first_offset = screen.first_offset.unwrap();
 
         let width = screen.width();
-        let height = screen.height() * 100;
 
         /*
-         *  (max - min) / screen_width   more lines
+         * NB: 1 is for the first lne of the next screen
+         *  1 + (max - min) / screen_width   more lines
          */
-        /*
+
         let min_offset = marks[0].offset;
         let max_offset = marks[idx_max - 1].offset;
         let add_lines = (max_offset - min_offset) as usize / width;
-        let height = screen.height() + add_lines;
-
-        // TODO: fix this
-        let height = screen.height() + 100;
-        */
+        let height = screen.height() + 1 + add_lines;
 
         dbg_println!("new virtual screen : {} x {}", width, height);
 
@@ -1708,6 +1704,8 @@ pub fn move_marks_to_next_line(
 
         dbg_println!("screen first offset {:?}", screen.first_offset);
         dbg_println!("screen first offset {:?}", screen.last_offset);
+
+        assert_ne!(0, screen.push_count());
 
         // TODO: pass doc &doc to avoid double borrow
         // env.doc ?

@@ -46,20 +46,18 @@ ctrl+a, ctrl-v,
     pub fn scroll_down_offscreen(&mut self, max_offset: u64, nb_lines: usize);
     pub fn scroll_down(&mut self, nb_lines: usize);
 
-    // change
+    // buffer change
     pub fn insert_codepoint_array(&mut self, array: &[char]);
     pub fn remove_until_end_of_word(&mut self);
     pub fn remove_previous_codepoint(&mut self);
-
     pub fn cut_to_end_of_line(&mut self) -> bool
     pub fn paste(&mut self);
-
-
     pub fn undo(&mut self);
     pub fn redo(&mut self);
 
     pub fn save_document(&mut self) -> bool;
 
+    // selection
     pub fn button_press(&mut self, button: u32, x: i32, y: i32);
     pub fn button_release(&mut self, button: u32, _x: i32, _y: i32);
 
