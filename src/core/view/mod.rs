@@ -171,6 +171,12 @@ pub struct View<'a> {
 }
 
 impl<'a> View<'a> {
+    pub fn document(&self) -> Option<Rc<RefCell<Document<'a>>>> {
+        let doc = self.document.clone();
+        let doc = doc?;
+        Some(doc)
+    }
+
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
         id: Id,
@@ -665,15 +671,13 @@ pub fn compute_view_layout(
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) -> Option<()> {
-
     let mut v = view.as_ref().borrow_mut();
 
-    let doc = v.document.clone();
-    let doc = doc.as_ref();
-    let doc = doc?;
+    let doc = v.document()?;
 
     let max_offset = { doc.borrow().size() as u64 };
 
+    // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
     run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
