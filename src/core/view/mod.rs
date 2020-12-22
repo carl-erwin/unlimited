@@ -693,15 +693,13 @@ pub fn compute_view_layout(
 // TODO: test-mode
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
-pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)  -> Option<()> {
     let _start = Instant::now();
 
     // refresh some env vars
     {
         let v = &mut view.as_ref().borrow();
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
-        env.max_offset = doc.size() as u64;
+        env.max_offset = v.document()?.borrow().size() as u64;
     }
 
     // pre layout action
@@ -727,6 +725,8 @@ pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<V
 
     let _end = Instant::now();
     // env.time_to_build_screen = end.duration_since(start);
+
+    Some(())
 }
 
 ///
