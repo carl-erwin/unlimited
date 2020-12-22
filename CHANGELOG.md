@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.5]
+
+### Added
+
+- rework internals : keep modes in mind
+- add crossterm frontend
+- add input map configuration (internal json for now)
+- add multi marks, update undo/redo support
+- add basic selection
+- add basic syntax highlighting
+- work wrapping
+
+### Removed
+
+- remove ncurses frontend
+
+
+
 ## [0.0.4] 2018-06-03
 
 ### Added
