@@ -40,7 +40,7 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
 
        { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
-       { "in": [{ "key": "alt+shift+Up" }],                  "action": "text-mode:clone-and-move-mark-to-previous-line" },
+       { "in": [{ "key": "alt+shift+Up" }],                    "action": "text-mode:clone-and-move-mark-to-previous-line" },
 
        { "in": [{ "key": "Down" }],                            "action": "text-mode:move-marks-to-next-line" },
        { "in": [{ "key": "alt+shift+Down" }],                  "action": "text-mode:clone-and-move-mark-to-next-line" },
@@ -91,7 +91,7 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
 
-       { "in": [{ "pointer-motion": "" }],                   "action": "text-mode:pointer-motion" },
+       { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
        { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
@@ -339,7 +339,7 @@ fn process_input_events(
             // NB: resize previous view's screen to lower memory usage
             let view = editor.view_map[vid].1.clone();
             let v = view.as_ref().borrow_mut();
-            v.screen.write().unwrap().resize(1,1);
+            v.screen.write().unwrap().resize(1, 1);
         }
 
         if event_processed {
@@ -421,10 +421,9 @@ fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
 fn build_action_map() -> ActionMap {
     let mut map: ActionMap = HashMap::new(); // text-mode action map
 
+    // core
     register_action(&mut map, "application:quit", application_quit);
-
     register_action(&mut map, "application:quit-abort", application_quit_abort);
-
     register_action(&mut map, "save-document", save_document);
 
     // TODO: text-mode
