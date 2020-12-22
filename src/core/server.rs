@@ -335,6 +335,11 @@ fn process_input_events(
             dbg_println!("view change {} ->  {}", vid, env.view_id);
             check_view_dimension(editor, env);
             event_processed = true;
+
+            // NB: resize previous view's screen to lower memory usage
+            let view = editor.view_map[vid].1.clone();
+            let v = view.as_ref().borrow_mut();
+            v.screen.write().unwrap().resize(1,1);
         }
 
         if event_processed {
