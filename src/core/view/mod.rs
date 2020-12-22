@@ -660,31 +660,30 @@ pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     }
 }
 
-pub fn compute_view_layout(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    // compute layout
+pub fn compute_view_layout(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+) -> Option<()> {
 
     let mut v = view.as_ref().borrow_mut();
 
     let doc = v.document.clone();
     let doc = doc.as_ref();
+    let doc = doc?;
 
-    // TODO: transform read as filter pass
-    if let Some(ref doc) = doc {
-        // 1st pass raw_data_filter
-        let max_offset = { doc.borrow().size() as u64 };
+    let max_offset = { doc.borrow().size() as u64 };
 
-        let mut screen = Box::new(Screen::new(
-            v.screen.read().unwrap().width(),
-            v.screen.read().unwrap().height(),
-        ));
+    let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
-        run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
+    run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
-        // TODO: from env ?
-        v.end_offset = screen.last_offset.unwrap();
-        v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
-        v.check_invariants();
-    }
+    // TODO: from env ?
+    v.end_offset = screen.last_offset.unwrap();
+    v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
+    v.check_invariants();
+
+    Some(())
 }
 
 // TODO: test-mode

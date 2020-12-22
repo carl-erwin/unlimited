@@ -51,6 +51,14 @@ pub struct Screen {
 }
 
 impl Screen {
+    pub fn with_dimension(dim: (usize, usize)) -> Screen {
+        Screen::new(dim.0, dim.1)
+    }
+
+    pub fn dimension(&self) -> (usize, usize) {
+        (self.width(), self.height())
+    }
+
     pub fn new(width: usize, height: usize) -> Screen {
         assert!(width > 0);
         assert!(height > 0);
