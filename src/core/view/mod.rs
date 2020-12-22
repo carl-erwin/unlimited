@@ -693,7 +693,11 @@ pub fn compute_view_layout(
 // TODO: test-mode
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
-pub fn update_view(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)  -> Option<()> {
+pub fn update_view(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+) -> Option<()> {
     let _start = Instant::now();
 
     // refresh some env vars
