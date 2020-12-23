@@ -23,7 +23,9 @@ pub struct CodepointInfo {
 
 impl CodepointInfo {
     pub fn default_color() -> (u8, u8, u8) {
-        (192, 192, 192)
+        // (192, 192, 192) // White
+        // (128, 128, 128)    // Gray
+        (177, 177, 177)
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
