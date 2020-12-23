@@ -2354,8 +2354,8 @@ pub fn pointer_motion(
                 }
             };
 
-            if let Some(cpi) = screen.get_used_cpinfo(x, y) {
-                if !cpi.metadata {
+            if let Some(cpi) = screen.get_cpinfo(x, y) {
+                {
                     // update selection point
                     v.select_point = Some(Mark {
                         offset: cpi.offset.unwrap(),
