@@ -90,6 +90,8 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
        
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
+       { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
+
 
        { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
 
@@ -102,7 +104,7 @@ static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
 
-       { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
+       { "in": [{ "key": "Esc"}, { "key": "Esc"}], "action": "editor:cancel" },
 
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
@@ -375,6 +377,16 @@ fn process_input_events(
     }
 }
 
+pub fn editor_cancel(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = &mut view.as_ref().borrow_mut();
+    v.select_point = None;
+}
+
 pub fn application_quit(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -562,6 +574,14 @@ fn build_action_map() -> ActionMap {
     );
 
     register_action(&mut map, "text-mode:pointer-motion", view::pointer_motion);
+
+    register_action(
+        &mut map,
+        "text-mode:set-select-point-at-mark",
+        view::set_selection_point_at_mark,
+    );
+
+    register_action(&mut map, "editor:cancel", editor_cancel);
 
     map
 }

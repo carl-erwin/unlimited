@@ -2164,6 +2164,32 @@ pub fn move_to_token_end(
     }
 }
 
+pub fn set_selection_point_at_mark(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let mut sync = false;
+
+    {
+        let v = &mut view.as_ref().borrow_mut();
+        let offset = {
+            let mut marks = v.moving_marks.read().unwrap();
+            let m = &marks[v.mark_index];
+            m.offset
+        };
+        // update selection point
+        v.select_point = Some(Mark { offset });
+    }
+
+    if sync
+    /* alwayd center ? */
+    {
+        env.view_pre_render.push(Action::CenterArroundMainMark);
+    }
+}
+
 pub fn button_press(
     _editor: &mut Editor,
     _env: &mut EditorEnv,

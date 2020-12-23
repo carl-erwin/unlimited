@@ -162,6 +162,7 @@ fn parse_event_entry_input_key(ctx: &mut ParseCtx, _name: &String, value: &serde
             "Pause" => key = Key::Pause,
             "ScrollLock" => key = Key::ScrollLock,
             "SysReq" => key = Key::SysReq,
+            "Esc" => key = Key::Escape,
             "Escape" => key = Key::Escape,
             "Delete" => key = Key::Delete,
             "BackSpace" => key = Key::BackSpace,
@@ -192,6 +193,8 @@ fn parse_event_entry_input_key(ctx: &mut ParseCtx, _name: &String, value: &serde
             "KeypadMul" => key = Key::KeypadMul,
             "KeypadDiv" => key = Key::KeypadDiv,
             "KeypadEnter" => key = Key::KeypadEnter,
+            "Space" => key = Key::Unicode(' '),
+            "Tab" => key = Key::Unicode('\t'),
             _ => {
                 if let Some(c) = k.chars().nth(0) {
                     key = Key::Unicode(c);
@@ -481,6 +484,10 @@ pub fn eval_input_event(
                 }
                 None => {}
             }
+        } else {
+            dbg_println!("no children found: reset");
+            *out_node = None;
+            *in_node = None;
         }
     } else {
         match input_map.as_ref().borrow().get(&event_hash) {
