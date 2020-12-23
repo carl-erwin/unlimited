@@ -1769,6 +1769,8 @@ pub fn move_marks_to_next_line(
         if !screen.contains_offset(marks[idx].offset) {
             env.view_pre_render.push(Action::ScrollDown { n: 1 });
         }
+
+        env.view_pre_render.push(Action::CheckMarks);
     }
 }
 
