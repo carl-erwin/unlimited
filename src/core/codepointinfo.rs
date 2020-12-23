@@ -5,11 +5,18 @@
 
 #[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
-    pub metadata: bool, // offset cannot be used
-    pub cp: char,
-    pub displayed_cp: char,
-    pub offset: Option<u64>,
+    pub metadata: bool,      // offset cannot be used
+    pub cp: char,            // the real codepoint
+    pub displayed_cp: char,  // the displayed codepoint
+    pub offset: Option<u64>, //
+    // TODO: add n/m fragments ie tabs ?
+    // TODO: add real_size ? in bytes
+
+    // regroup in DisplayStyle ?
     pub is_selected: bool,
+    // TODO: add underline
+    // TODO: add bold ?
+    // TODO: add italic ?
     pub color: (u8, u8, u8),    // (R,G,B)
     pub bg_color: (u8, u8, u8), // (R,G,B)
 }
@@ -21,6 +28,10 @@ impl CodepointInfo {
 
     pub fn default_bg_color() -> (u8, u8, u8) {
         (0, 0, 0)
+    }
+
+    pub fn default_selected_bg_color() -> (u8, u8, u8) {
+        (56, 56, 83)
     }
 
     pub fn new() -> Self {

@@ -697,7 +697,7 @@ impl Filter<'_> for HighlightSelectionFilter {
                     if offset >= self.sel_start_offset && offset <= self.sel_end_offset =>
                 {
                     let mut i = i.clone();
-                    i.bg_color = (56, 56, 83);
+                    i.bg_color = CodepointInfo::default_selected_bg_color();
                     filter_out.push(i);
                 }
 
