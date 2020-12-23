@@ -844,7 +844,7 @@ impl Filter<'_> for HighlightFilter {
 
                     self.new_color = match token_str.as_ref() {
                         // some Rust keywords
-                        "use" | "crate" => (255, 0, 0),
+                        "use" | "crate" | "pub" => (255, 0, 0),
 
                         // some Rust keywords
                         "let" | "mut" | "fn" | "impl" | "trait" => (0, 128, 128),
