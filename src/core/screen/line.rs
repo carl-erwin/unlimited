@@ -50,7 +50,6 @@ pub struct Line {
     pub start_index: usize,
     width: usize,
     pub read_only: bool,
-    pub metadata: bool,
     hash_cache: u64,
     hash_unclipped_cache: u64,
 }
@@ -71,7 +70,6 @@ impl Line {
             start_index: 0,
             width,
             read_only: false,
-            metadata: false,
             hash_cache: 0,
             hash_unclipped_cache: 0,
         }
@@ -121,7 +119,6 @@ impl Line {
         self.start_index = 0;
         self.width = width;
         self.read_only = false;
-        self.metadata = false;
         self.hash_cache = 0;
     }
 
@@ -186,7 +183,6 @@ impl Line {
         self.hash_cache = 0;
         self.nb_cells = 0;
         self.read_only = false;
-        self.metadata = false;
         self.hash_cache = 0;
     }
 
