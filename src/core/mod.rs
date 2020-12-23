@@ -3,6 +3,7 @@
 //
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::thread;
 
 #[macro_use]
 pub(crate) mod macros;
@@ -31,6 +32,20 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
     let mut editor = Editor::new(config);
     editor.load_files();
+
+    // start indexer thread
+    let indexer_th = {
+        // let ui_tx_clone = ui_tx.clone();
+        Some(thread::spawn(move || {
+            dbg_println!("stating indexer");
+        }))
+    };
+
     // editor.run(&core_rx, &ui_tx) ?
-    server::run(&mut editor, &core_rx, &ui_tx)
+    server::run(&mut editor, &core_rx, &ui_tx);
+
+    // wait for core thread
+    if let Some(th) = indexer_th {
+        th.join().unwrap()
+    }
 }

@@ -753,9 +753,7 @@ impl<'a> MappedFile<'a> {
                 })
             }
 
-            (None, _, _) => {
-                MappedFileIterator::End(Rc::clone(file_))
-            }
+            (None, _, _) => MappedFileIterator::End(Rc::clone(file_)),
         }
     }
 

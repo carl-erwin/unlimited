@@ -2034,7 +2034,7 @@ pub fn scroll_to_next_screen(
     TODO: with multi marks:
       add per mark cut/paste buffer
       and reuse it when pasting
-
+      check behavior when the marks offset cross each other
       the buffer log is not aware of cut/paste/multicursor
 */
 pub fn cut_to_end_of_line(

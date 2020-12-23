@@ -1,5 +1,21 @@
 // Copyright (c) Carl-Erwin Griffith
 
+/*
+TODO: remove  *_used_* apis
+we will fill the entire screen with Option<..> where the data is not available
+screen "reader" should scan the line until goo information is found
+
+screen.get_first_cell_with_offset(Direction::Left|Right, x, y) skip offset = None and got in the specified direction
+screen.get_first_offset(Direction::Left|Right, x, y)
+
+screen.at(x,y)
+screen.at_mut(x,y)
+screen.get(x,y)
+screen.get_mut(x,y)
+
+
+*/
+
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
