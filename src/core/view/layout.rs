@@ -121,6 +121,8 @@ use std::rc::Rc;
 //
 use crate::core::codec::text::u32_to_char;
 use crate::core::codec::text::utf8;
+use crate::core::codec::text::TextCodec;
+
 use crate::dbg_println;
 
 use crate::core::codepointinfo::CodepointInfo;
@@ -358,6 +360,7 @@ impl Filter<'_> for RawDataFilter {
     }
 }
 
+// TODO: pass codec in env
 struct Utf8FilterCtx {
     from_offset: u64,
     state: u32,
@@ -733,7 +736,7 @@ pub struct HighlightFilter {
     token_type: TokenType,
     utf8_token: Vec<u8>,
     new_color: (u8, u8, u8),
-    utf8_codec: Box<dyn utf8::TextCodec>, // internal token representation is utf8
+    utf8_codec: Box<dyn TextCodec>, // internal token representation is utf8
 }
 impl HighlightFilter {
     fn new(_env: &LayoutEnv, _view: &View) -> Self {

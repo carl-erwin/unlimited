@@ -3,8 +3,8 @@
 //
 use crate::core::document::Document;
 
-use crate::core::codec::text::utf8::SyncDirection;
-use crate::core::codec::text::utf8::TextCodec;
+use crate::core::codec::text::SyncDirection;
+use crate::core::codec::text::TextCodec;
 
 //
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]

@@ -34,7 +34,8 @@ use crate::core::screen::Screen;
 use crate::core::mark::Mark;
 
 use crate::core::codec::text::utf8;
-use crate::core::codec::text::utf8::SyncDirection; // TODO: remove
+use crate::core::codec::text::SyncDirection; // TODO: remove
+use crate::core::codec::text::TextCodec;
 
 use crate::core::codepointinfo;
 
@@ -157,7 +158,7 @@ pub struct View<'a> {
 
     pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
 
-    pub text_codec: Box<dyn utf8::TextCodec>, // Option ? move to mode
+    pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
 
     pub screen: Arc<RwLock<Box<Screen>>>,
 

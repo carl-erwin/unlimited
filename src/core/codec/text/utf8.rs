@@ -5,6 +5,10 @@
 //   Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 //   See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
 
+use super::SyncDirection;
+use super::TextCodec;
+
+
 pub const UTF8_ACCEPT: u32 = 0;
 pub const UTF8_REJECT: u32 = 12;
 
@@ -203,27 +207,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub enum SyncDirection {
-    Backward,
-    Forward,
-}
 
-//TODO: move upper to code/text/mods.rs
-//
-pub trait TextCodec {
-    fn encode_max_size(&self) -> usize;
-
-    fn decode(&self, direction: SyncDirection, data: &[u8], data_offset: u64)
-        -> (char, u64, usize);
-
-    fn encode(&self, codepoint: u32, out: &mut [u8]) -> usize;
-
-    fn is_sync(&self, byte: u8) -> bool;
-
-    // TODO: return Result<u64, need more|invalid offset|...>
-    fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64>;
-}
 
 #[derive(Debug)]
 pub struct Utf8Codec {}
