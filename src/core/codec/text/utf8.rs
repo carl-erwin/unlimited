@@ -8,7 +8,6 @@
 use super::SyncDirection;
 use super::TextCodec;
 
-
 pub const UTF8_ACCEPT: u32 = 0;
 pub const UTF8_REJECT: u32 = 12;
 
@@ -206,8 +205,6 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
 #[derive(Debug)]
 pub struct Utf8Codec {}
