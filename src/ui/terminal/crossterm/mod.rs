@@ -6,6 +6,7 @@ use crate::dbg_println;
 
 use std::io::{stdout, Write};
 
+use clap::ErrorKind;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event,
@@ -672,46 +673,57 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
         },
 
-        ::crossterm::event::Event::Mouse(event) => match event {
-            ::crossterm::event::MouseEvent::Down(button, col, row, mods) => {
+        ::crossterm::event::Event::Mouse(event) => match event.kind {
+            ::crossterm::event::MouseEventKind::Down(button) => {
                 return InputEvent::ButtonPress(ButtonEvent {
-                    mods: translate_crossterm_key_modifier(mods),
-                    x: i32::from(col),
-                    y: i32::from(row),
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
                     button: translate_crossterm_mouse_button(button),
                 });
             }
 
-            ::crossterm::event::MouseEvent::Up(button, col, row, mods) => {
+            ::crossterm::event::MouseEventKind::Up(button) => {
                 return InputEvent::ButtonRelease(ButtonEvent {
-                    mods: translate_crossterm_key_modifier(mods),
-                    x: i32::from(col),
-                    y: i32::from(row),
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
                     button: translate_crossterm_mouse_button(button),
                 });
             }
 
-            ::crossterm::event::MouseEvent::ScrollUp(col, row, mods) => {
+            ::crossterm::event::MouseEventKind::ScrollUp => {
                 return InputEvent::WheelUp {
-                    mods: translate_crossterm_key_modifier(mods),
-                    x: i32::from(col),
-                    y: i32::from(row),
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
                 };
             }
 
-            ::crossterm::event::MouseEvent::ScrollDown(col, row, mods) => {
+            ::crossterm::event::MouseEventKind::ScrollDown => {
                 return InputEvent::WheelDown {
-                    mods: translate_crossterm_key_modifier(mods),
-                    x: i32::from(col),
-                    y: i32::from(row),
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
                 };
             }
 
-            ::crossterm::event::MouseEvent::Drag(_button, col, row, mods) => {
+            ::crossterm::event::MouseEventKind::Drag(button) => {
+                // TODO: no Drag event in the editor yet ?
+                // TODO: filter drgged button
+
                 return InputEvent::PointerMotion(PointerEvent {
-                    mods: translate_crossterm_key_modifier(mods),
-                    x: i32::from(col),
-                    y: i32::from(row),
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
+                });
+            }
+
+            ::crossterm::event::MouseEventKind::Moved => {
+                return InputEvent::PointerMotion(PointerEvent {
+                    mods: translate_crossterm_key_modifier(event.modifiers),
+                    x: i32::from(event.column),
+                    y: i32::from(event.row),
                 });
             }
         },

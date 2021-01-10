@@ -20,7 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 termion = "*"
-crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "fix-poll-timeout" }
+crossterm = { git = "https://github.com/crossterm-rs/crossterm" , branch = "0.19" }
 
 
 [profile.release]
