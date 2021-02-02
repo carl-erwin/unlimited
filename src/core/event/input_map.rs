@@ -447,6 +447,9 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
                         parse_event_entry_input_pointer_motion(&mut ctx, k, v);
                     }
 
+                    //                    "button-drag" => {
+                    //                        parse_event_entry_input_button_drag(&mut ctx, k, v);
+                    //                    }
                     _ => {}
                 }
             }
