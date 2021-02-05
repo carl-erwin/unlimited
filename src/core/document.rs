@@ -235,7 +235,7 @@ impl<'a> Document<'a> {
             return None;
         }
 
-        // get inverted operation
+        // apply inverted previous operation
         let op = self.buffer_log.data[pos - 1].invert();
         self.buffer_log.pos -= 1;
         self.apply_log_operation(&op)
@@ -248,7 +248,7 @@ impl<'a> Document<'a> {
             return None;
         }
 
-        // replay previous op
+        // apply next operation
         let op = self.buffer_log.data[pos].clone();
         self.buffer_log.pos += 1;
         self.apply_log_operation(&op)
