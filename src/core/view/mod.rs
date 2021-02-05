@@ -2411,13 +2411,7 @@ pub fn select_next_view(
     _trigger: &Vec<InputEvent>,
     _view: &Rc<RefCell<View>>,
 ) {
-    let max = editor.view_map.len();
-    dbg_println!("view id max {}", max);
-    dbg_println!("env.view_id {}", env.view_id);
-
-    if env.view_id + 1 < max {
-        env.view_id += 1;
-    }
+    env.view_id = std::cmp::min(env.view_id + 1, editor.view_map.len() - 1);
 }
 
 pub fn select_previous_view(
@@ -2426,9 +2420,7 @@ pub fn select_previous_view(
     _trigger: &Vec<InputEvent>,
     _view: &Rc<RefCell<View>>,
 ) {
-    if env.view_id > 0 {
-        env.view_id -= 1;
-    }
+    env.view_id = env.view_id.saturating_sub(1);
 }
 
 //////////////////////////////////
