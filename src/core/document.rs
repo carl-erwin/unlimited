@@ -128,7 +128,7 @@ impl<'a> Document<'a> {
             .add(offset, BufferOperationType::Tag { marks }, None);
     }
 
-    pub fn get_tag_offset(&mut self) -> Option<Vec<u64>> {
+    pub fn get_tag_offsets(&mut self) -> Option<Vec<u64>> {
         let dlen = self.buffer_log.data.len();
         if dlen == 0 {
             return None;

@@ -931,7 +931,7 @@ pub fn undo(
 
         doc.undo_until_tag();
         doc.undo_until_tag();
-        if let Some(marks_offsets) = doc.get_tag_offset() {
+        if let Some(marks_offsets) = doc.get_tag_offsets() {
             //dbg_println!("restore marks {:?}", marks_offsets);
             marks.clear();
             for offset in marks_offsets {
@@ -965,7 +965,7 @@ pub fn redo(
 
     doc.redo_until_tag();
     doc.redo_until_tag();
-    if let Some(marks_offsets) = doc.get_tag_offset() {
+    if let Some(marks_offsets) = doc.get_tag_offsets() {
         //dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
