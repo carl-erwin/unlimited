@@ -232,15 +232,11 @@ pub fn main_loop(
 }
 
 pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
-    let first_offset = if let Some(first_offset) = screen.first_offset {
-        first_offset
-    } else {
-        return;
-    };
-    let last_offset = if let Some(last_offset) = screen.last_offset {
-        last_offset
-    } else {
-        return;
+    let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
+        (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
+        _ => {
+            return;
+        }
     };
 
     for m in marks.iter() {
