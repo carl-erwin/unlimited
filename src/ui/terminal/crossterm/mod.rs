@@ -802,6 +802,27 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
     }
 }
 
+/*
+  NB: There is a subbtle bug in crossterm input handling.
+
+      - When pasting big chunks of text with graphical terminal. The editor seams stucked.
+
+      Crossterm uses edge-triggered polling BUT the input file descriptor is in blocking mode.
+      if the user input it bigger than the available input buffer space.
+
+      - In non-blocking mode it is not possible to use println!() function fammily.
+       println!() must ensure the data is flushed and will panic on EAGAIN error.
+
+
+      - On linux the (defualt) 0 1 2 fd points to the sam pseudo terminal
+      And thus we cannot change the blocking mode if the input fd (0)
+
+
+      One solution is for crossterm to let the user specify
+      the input buffer/size
+
+      In the case of unlimited we could use a 2M input buffer
+*/
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
 
