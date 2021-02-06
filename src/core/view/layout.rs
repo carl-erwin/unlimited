@@ -129,7 +129,7 @@ use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::screen::Screen;
 
-use crate::core::server::EditorEnv;
+use crate::core::editor::EditorEnv;
 use crate::core::view::View;
 
 pub struct FilterContext {}

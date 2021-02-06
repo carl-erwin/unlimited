@@ -13,6 +13,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::core::editor::Editor;
+use crate::core::editor::EditorEnv;
+
 use crate::core::event::Event;
 use crate::core::event::Event::DrawEvent;
 
@@ -32,150 +34,7 @@ use crate::core::event::InputEventRule;
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::eval_input_event;
 
-type ActionMap = HashMap<String, view::ModeFunction>;
-
-static DEFAULT_INPUT_MAP: &str = r#"[{
-    "events": [
-       { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
-       { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
-
-       { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
-       { "in": [{ "key": "alt+shift+Up" }],                    "action": "text-mode:clone-and-move-mark-to-previous-line" },
-
-       { "in": [{ "key": "Down" }],                            "action": "text-mode:move-marks-to-next-line" },
-       { "in": [{ "key": "alt+shift+Down" }],                  "action": "text-mode:clone-and-move-mark-to-next-line" },
-
-       { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
-       { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
-       
-       { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-start-of-line" },
-       { "in": [{ "key": "ctrl+e" }],                          "action": "text-mode:move-marks-to-end-of-line" },
-       { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-start-of-line" },
-       { "in": [{ "key": "End" }],                             "action": "text-mode:move-marks-to-end-of-line" },
-
-
-       { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-start-of-file" },
-       { "in": [{ "key": "alt+>" }],                           "action": "text-mode:move-marks-to-end-of-file" },
-
-       { "in": [{ "key": "ctrl+Home" }],                       "action": "text-mode:move-marks-to-start-of-file" },
-       { "in": [{ "key": "ctrl+End" }],                        "action": "text-mode:move-marks-to-end-of-file" },
-
-
-       { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
-       { "in": [{ "key": "ctrl+r" }],                          "action": "text-mode:redo" },
-       { "in": [{ "key": "ctrl+d" }],                          "action": "text-mode:remove-codepoint" },
-       { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
-       { "in": [{ "key": "BackSpace" }],                       "action": "text-mode:remove-previous-codepoint" },
-
-       { "in": [{ "key": "alt+d" }],                           "action": "text-mode:remove-until-end-of-word" },
-       { "in": [{ "key": "ctrl+Delete" }],                     "action": "text-mode:remove-until-end-of-word" },
-
-       { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
-       { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
-
-       { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-arround-mark" },
-
-       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-token-start" },
-       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-token-end" },
-
-       { "in": [{ "key": "ctrl+Up"    }],                      "action": "text-mode:scroll-up" },
-       { "in": [{ "key": "ctrl+Down"  }],                      "action": "text-mode:scroll-down" },
-
-       { "in": [{ "wheel": "Up"       }],                      "action": "text-mode:scroll-up" },
-       { "in": [{ "wheel": "Down"     }],                      "action": "text-mode:scroll-down" },
-
-
-       { "in": [{ "key": "ctrl+alt+Left"     }],               "action": "text-mode:move-mark-backward-word" },
-       { "in": [{ "key": "ctrl+alt+Right"     }],              "action": "text-mode:move-mark-one-forward" },
-       
-       { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
-       { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
-       { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
-
-
-       { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
-
-       { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
-
-       { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
-       { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
-
-
-       { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
-
-       { "in": [{ "key": "Esc"}, { "key": "Esc"}], "action": "editor:cancel" },
-
-       { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-
-       { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
-
-       { "default": [],                                        "action": "text-mode:self-insert" }
-     ]
-}]"#;
-
-// env.repeat_action_n , api to set repeat
-// ctrl+:  -> minor mode to read repeat count
-// esc -> reset repeat count
-// kbr macro recording
-pub struct EditorEnv {
-    quit: bool,
-    status: String, // TODO: move to test-mode
-
-    action_map: ActionMap,
-
-    input_map: Rc<RefCell<InputEventMap>>,
-
-    current_node: Option<Rc<InputEventRule>>,
-    next_node: Option<Rc<InputEventRule>>,
-
-    pub pending_events: usize,
-
-    //
-    pub width: usize,
-    pub height: usize,
-    pub view_id: usize, // doc id in view
-
-    // ADD view env ? TODO: refresh env after input_proessing
-
-    // move ths to update_action
-    // reset on each event handling
-    pub view_pre_render: Vec<view::Action>,
-    pub view_post_render: Vec<view::Action>,
-    pub center_offset: Option<u64>,
-    pub cur_mark_index: Option<usize>,
-    pub max_offset: u64,
-}
-
-impl EditorEnv {
-    fn new() -> Self {
-        let input_map = if let Ok(map) = build_input_event_map(DEFAULT_INPUT_MAP) {
-            map
-        } else {
-            Rc::new(RefCell::new(HashMap::new()))
-        };
-
-        EditorEnv {
-            quit: false,
-            status: String::new(),
-            action_map: build_action_map(),
-            input_map,
-            current_node: None,
-            next_node: None,
-            pending_events: 0,
-            width: 0,
-            height: 0,
-            view_id: 0,
-            view_pre_render: Vec::new(),
-            view_post_render: Vec::new(),
-            center_offset: None,
-            cur_mark_index: None,
-            max_offset: 0,
-        }
-    }
-}
+pub type ActionMap = HashMap<String, view::ModeFunction>; // move to Mode ?
 
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
     let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
@@ -430,7 +289,8 @@ fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
     map.insert(s.to_string(), func);
 }
 
-fn build_action_map() -> ActionMap {
+// TODO: move thi to mode init
+pub fn build_action_map() -> ActionMap {
     let mut map: ActionMap = HashMap::new(); // text-mode action map
 
     // core

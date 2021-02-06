@@ -23,7 +23,7 @@ use std::time::Instant;
 
 //
 use crate::core::editor::Editor;
-use crate::core::server::EditorEnv; // TODO: editor
+use crate::core::editor::EditorEnv;
 
 use crate::dbg_println;
 

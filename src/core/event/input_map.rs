@@ -8,6 +8,88 @@ use serde_json::Value;
 
 use super::*;
 
+pub static DEFAULT_INPUT_MAP: &str = r#"[{
+    "events": [
+       { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
+       { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
+
+       { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
+       { "in": [{ "key": "alt+shift+Up" }],                    "action": "text-mode:clone-and-move-mark-to-previous-line" },
+
+       { "in": [{ "key": "Down" }],                            "action": "text-mode:move-marks-to-next-line" },
+       { "in": [{ "key": "alt+shift+Down" }],                  "action": "text-mode:clone-and-move-mark-to-next-line" },
+
+       { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
+       { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
+       
+       { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-start-of-line" },
+       { "in": [{ "key": "ctrl+e" }],                          "action": "text-mode:move-marks-to-end-of-line" },
+       { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-start-of-line" },
+       { "in": [{ "key": "End" }],                             "action": "text-mode:move-marks-to-end-of-line" },
+
+
+       { "in": [{ "key": "alt+<" }],                           "action": "text-mode:move-marks-to-start-of-file" },
+       { "in": [{ "key": "alt+>" }],                           "action": "text-mode:move-marks-to-end-of-file" },
+
+       { "in": [{ "key": "ctrl+Home" }],                       "action": "text-mode:move-marks-to-start-of-file" },
+       { "in": [{ "key": "ctrl+End" }],                        "action": "text-mode:move-marks-to-end-of-file" },
+
+
+       { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
+       { "in": [{ "key": "ctrl+r" }],                          "action": "text-mode:redo" },
+       { "in": [{ "key": "ctrl+d" }],                          "action": "text-mode:remove-codepoint" },
+       { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
+       { "in": [{ "key": "BackSpace" }],                       "action": "text-mode:remove-previous-codepoint" },
+
+       { "in": [{ "key": "alt+d" }],                           "action": "text-mode:remove-until-end-of-word" },
+       { "in": [{ "key": "ctrl+Delete" }],                     "action": "text-mode:remove-until-end-of-word" },
+
+       { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
+       { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
+
+       { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-arround-mark" },
+
+       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-token-start" },
+       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-token-end" },
+
+       { "in": [{ "key": "ctrl+Up"    }],                      "action": "text-mode:scroll-up" },
+       { "in": [{ "key": "ctrl+Down"  }],                      "action": "text-mode:scroll-down" },
+
+       { "in": [{ "wheel": "Up"       }],                      "action": "text-mode:scroll-up" },
+       { "in": [{ "wheel": "Down"     }],                      "action": "text-mode:scroll-down" },
+
+
+       { "in": [{ "key": "ctrl+alt+Left"     }],               "action": "text-mode:move-mark-backward-word" },
+       { "in": [{ "key": "ctrl+alt+Right"     }],              "action": "text-mode:move-mark-one-forward" },
+       
+       { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
+       { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
+       { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
+
+
+       { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
+
+       { "in": [{ "key": "ctrl+x" }, { "key": "Left" } ],      "action": "select-previous-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Right" } ],     "action": "select-next-view" },
+
+       { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
+       { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
+
+
+       { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
+
+       { "in": [{ "key": "Esc"}, { "key": "Esc"}], "action": "editor:cancel" },
+
+       { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
+
+       { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
+
+       { "default": [],                                        "action": "text-mode:self-insert" }
+     ]
+}]"#;
+
 // TODO: map error to editor error
 // unlimited::error::SyntaxError(file, line, col);
 pub fn build_input_event_map(

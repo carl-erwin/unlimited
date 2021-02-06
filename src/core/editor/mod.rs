@@ -17,6 +17,10 @@ use crate::core::view;
 use crate::core::view::View;
 
 //
+mod env;
+pub use env::EditorEnv;
+
+//
 pub type Id = u64;
 
 //
