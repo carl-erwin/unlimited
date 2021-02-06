@@ -1852,6 +1852,12 @@ pub fn clone_and_move_mark_to_next_line(
     };
 
     let offsets = move_mark_to_next_line(env, view, mark_len - 1); // TODO return offset (old, new)
+
+    if offsets.is_none() {
+        dbg_println!(" cannot move mark to next line");
+        return;
+    }
+
     let offsets = offsets.unwrap();
 
     dbg_println!(" clone move down: offsets {:?}", offsets);
