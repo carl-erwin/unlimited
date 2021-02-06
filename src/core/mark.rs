@@ -48,7 +48,7 @@ pub fn read_char_backward(
     }
 
     //
-    let rewind_offset = if from_offset > 4 { from_offset - 4 } else { 0 };
+    let rewind_offset = from_offset.saturating_sub(4);
     let rewind_size = from_offset - rewind_offset;
 
     // fill buf
@@ -74,7 +74,7 @@ pub fn read_char(
     }
 
     //
-    let rewind_offset = if from_offset > 4 { from_offset - 4 } else { 0 };
+    let rewind_offset = from_offset.saturating_sub(4);
     let rewind_size = from_offset - rewind_offset;
 
     // fill buf
@@ -150,7 +150,7 @@ impl Mark {
         let mut prev_cp_size = 0 as usize;
 
         loop {
-            let base_offset = if self.offset > 4 { self.offset - 4 } else { 0 };
+            let base_offset = self.offset.saturating_sub(4);
             let relative_offset = self.offset - base_offset;
 
             assert!(self.offset <= doc.size() as u64);

@@ -257,11 +257,8 @@ impl<'a> View<'a> {
         // rewind width*height chars
         let mut m = Mark::new(self.start_offset);
         let diff = (nb_lines * width * 4) as u64; // if ascci only 4 -> 1
-        if m.offset > diff {
-            m.offset -= diff;
-        } else {
-            m.offset = 0;
-        }
+
+        m.offset = m.offset.saturating_sub(diff);
 
         // get start of line
         {
@@ -623,7 +620,7 @@ pub fn run_view_action(
                     marks.dedup();
                     marks.len()
                 };
-                v.mark_index = if nr_marks != 0 { nr_marks - 1 } else { 0 };
+                v.mark_index = nr_marks.saturating_sub(1);
             }
         }
     }
@@ -1174,7 +1171,7 @@ pub fn move_marks_forward(
         };
 
         // TODO:  env.view_pre_render.push(Action::SelectLastMark);
-        v.mark_index = if nr_marks > 0 { nr_marks - 1 } else { 0 }; // TODO: dedup ?
+        v.mark_index = nr_marks.saturating_sub(1); // TODO: dedup ?
     }
 
     //      move this check at post render to reschedule render ?
@@ -1381,9 +1378,7 @@ fn move_mark_to_previous_line(
                 tmp_mark.move_forward(&doc, codec);
             }
 
-            if tmp_mark.offset > line_end_off {
-                tmp_mark.offset = line_end_off;
-            }
+            tmp_mark.offset = std::cmp::min(tmp_mark.offset, line_end_off);
         }
         // TODO: add some post processing after screen moves
         // this will avoid custom code in pageup/down
@@ -1623,9 +1618,7 @@ pub fn move_mark_to_next_line(
             tmp_mark.move_forward(&doc, codec); // TODO: pass n as arg
         }
 
-        if tmp_mark.offset > line_end_off {
-            tmp_mark.offset = line_end_off;
-        }
+        tmp_mark.offset = std::cmp::min(tmp_mark.offset, line_end_off);
 
         m_offset = tmp_mark.offset;
     }
@@ -1665,13 +1658,17 @@ pub fn move_marks_to_next_line(
         let width = screen.width();
 
         /*
-         * NB: 1 is for the first lne of the next screen
+         * NB: 1 is for the first line of the next screen
          *  1 + (max - min) / screen_width   more lines
          */
 
         let min_offset = marks[0].offset;
         let max_offset = marks[idx_max - 1].offset;
+        dbg_println!("max_offset {} - min_offset {}", max_offset, min_offset);
+
+        // TODO: max - min overflow
         let add_lines = (max_offset - min_offset) as usize / width;
+
         let height = screen.height() + 1 + add_lines;
 
         dbg_println!("new virtual screen : {} x {}", width, height);
@@ -1684,9 +1681,8 @@ pub fn move_marks_to_next_line(
 
     // use current screen
     let mut m = Mark::new(screen_first_offset);
-    if m.offset > marks[idx_start].offset {
-        m.offset = marks[idx_start].offset;
-    }
+
+    m.offset = std::cmp::min(m.offset, marks[idx_start].offset);
 
     let max_offset = {
         let doc = v.document.clone();
