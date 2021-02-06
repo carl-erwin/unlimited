@@ -228,7 +228,36 @@ pub fn main_loop(
     Ok(())
 }
 
+// move to screen module , rename walk/map ?
+fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_mut_line(l) {
+            for c in 0..line.nb_cells {
+                if let Some(cpi) = line.get_mut_cpi(c) {
+                    if on_cpi(c, l, cpi) == false {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// SLOW
+// we should iterate over the screen
+// find the first mark
 pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
+    if !set {
+        screen_apply(screen, |_, _, cpi| {
+            cpi.is_selected = false; /* will blink */
+            true
+        });
+        return;
+    }
+
     let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
         (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
         _ => {
@@ -236,32 +265,79 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         }
     };
 
-    for m in marks.iter() {
-        //dbg_println!(" checking m.offset {}", m.offset);
+    if false {
+        // draw marks
+        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF;
+        let mut fetch_mark = true;
+        let mut mark_it = marks.iter();
+        screen_apply(screen, |_, _, cpi| {
+            if let Some(cpi_offset) = cpi.offset {
+                if fetch_mark {
+                    // get 1st  mark >= current cpi_offset
+                    loop {
+                        let m = mark_it.next();
+                        if m.is_none() {
+                            return false;
+                        }
 
-        // the marks are sorted
-        if m.offset < first_offset {
-            continue;
-        }
+                        let m = m.unwrap();
+                        if m.offset < first_offset {
+                            continue;
+                        }
 
-        if m.offset > last_offset {
-            break;
-        }
+                        if m.offset > last_offset {
+                            return false;
+                        }
 
-        for l in 0..screen.height() {
-            let line = screen.get_mut_line(l).unwrap();
-
-            for c in 0..line.nb_cells {
-                let cpi = line.get_mut_cpi(c).unwrap();
-
-                if set {
-                    if let Some(cpi_offset) = cpi.offset {
-                        if cpi_offset == m.offset {
-                            cpi.is_selected = !cpi.metadata;
+                        if m.offset >= cpi_offset {
+                            mark_offset = m.offset;
+                            break;
                         }
                     }
+                    fetch_mark = false;
+                }
+
+                if cpi_offset == mark_offset {
+                    cpi.is_selected = !cpi.metadata;
                 } else {
-                    cpi.is_selected = false;
+                    //
+                    if mark_offset < cpi_offset {
+                        fetch_mark = true;
+                    }
+                }
+            }
+
+            true
+        });
+    } else {
+        //
+        for m in marks.iter() {
+            //dbg_println!(" checking m.offset {}", m.offset);
+
+            // the marks are sorted
+            if m.offset < first_offset {
+                continue;
+            }
+
+            if m.offset > last_offset {
+                break;
+            }
+
+            for l in 0..screen.height() {
+                let line = screen.get_mut_line(l).unwrap();
+
+                for c in 0..line.nb_cells {
+                    let cpi = line.get_mut_cpi(c).unwrap();
+
+                    if set {
+                        if let Some(cpi_offset) = cpi.offset {
+                            if cpi_offset == m.offset {
+                                cpi.is_selected = !cpi.metadata;
+                            }
+                        }
+                    } else {
+                        cpi.is_selected = false;
+                    }
                 }
             }
         }
@@ -723,6 +799,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
         ::crossterm::event::Event::Resize(_width, _height) => {
             // println!("New size {}x{}", width, height)
+            // TODO: not really an input
         }
     }
 
