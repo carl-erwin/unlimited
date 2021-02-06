@@ -827,35 +827,39 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut flush_ms = 16;
 
     loop {
-        if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
-            // nr pending ?
-
-            if let Ok(cross_evt) = ::crossterm::event::read() {
-                // move to send input events ?
-                // dbg_println!("receive crossterm event {:?}\r", cross_evt);
-                let evt = translate_crossterm_event(cross_evt);
-                accum.push(evt);
-
-                if accum.len() > 255 {
-                    flush_ms = ::std::cmp::min(flush_ms + 500, 1000);
-                    wait_ms = flush_ms;
-                } else {
-                    wait_ms = 1;
-                }
-
-                let el = start.elapsed();
-                if el > Duration::from_millis(flush_ms) {
-                    break;
-                }
-            } else {
-                // dbg_println!("read error ?");
-            }
-        } else {
+        if !::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             // timeout
-            if !accum.is_empty() {
+            if accum.is_empty() {
+                // restart accum timer
+                start = Instant::now();
+            }
+            continue;
+        }
+
+        // nr pending ?
+        if let Ok(cross_evt) = ::crossterm::event::read() {
+            // move to send input events ?
+
+            // dbg_println!("receive crossterm event {:?}\r", cross_evt);
+
+            let evt = translate_crossterm_event(cross_evt);
+            accum.push(evt);
+
+            wait_ms = 1;
+
+            // input batch ? wait max 1000ms
+            if accum.len() > 255 {
+                flush_ms = ::std::cmp::min(flush_ms + 500, 1000);
+                wait_ms = flush_ms;
+            }
+
+            let el = start.elapsed();
+            if el > Duration::from_millis(flush_ms) {
+                // flush
                 break;
             }
-            start = Instant::now();
+        } else {
+            // handle read error
         }
     }
 
