@@ -1,12 +1,9 @@
 // Copyright (c) Carl-Erwin Griffith
 
-//
-
 use crate::dbg_println;
 
 use std::io::{stdout, Write};
 
-use clap::ErrorKind;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event,
@@ -242,7 +239,7 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     for m in marks.iter() {
         //dbg_println!(" checking m.offset {}", m.offset);
 
-        // the marks sorted
+        // the marks are sorted
         if m.offset < first_offset {
             continue;
         }
