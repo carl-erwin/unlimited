@@ -203,7 +203,7 @@ pub fn main_loop(
                 _ => {}
             }
         } else {
-            // TODO: handle timeout
+            // on input timeout : blink
             draw_marks = !draw_marks;
             let marks = last_marks.as_ref().unwrap().read().unwrap();
             refresh_screen_marks(&mut last_screen, &marks, draw_marks);
@@ -211,7 +211,6 @@ pub fn main_loop(
         }
     }
 
-    /* Terminate crossterm */
     /* Terminate crossterm */
     execute!(
         stdout,
@@ -253,7 +252,7 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     if !set {
         screen_apply(screen, |_, _, cpi| {
             cpi.is_selected = false; /* will blink */
-            true
+            true // continue
         });
         return;
     }
@@ -267,7 +266,7 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
 
     if false {
         // draw marks
-        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF;
+        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
         let mut fetch_mark = true;
         let mut mark_it = marks.iter();
         screen_apply(screen, |_, _, cpi| {
