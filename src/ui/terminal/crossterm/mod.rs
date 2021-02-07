@@ -860,13 +860,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
     // send
     if !v.is_empty() {
         let ev_count = v.len();
-        let msg = EventMessage::new(
-            0,
-            Event::InputEvent {
-                events: v,
-                raw_data: None,
-            },
-        );
+        let msg = EventMessage::new(0, Event::InputEvents { events: v });
         crate::core::event::pending_input_event_inc(ev_count);
         tx.send(msg).unwrap_or(());
     }

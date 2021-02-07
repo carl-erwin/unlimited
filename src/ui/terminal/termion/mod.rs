@@ -490,11 +490,8 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         let nb_read = unsafe { read(0, buf.as_mut_ptr() as *mut c_void, BUF_SIZE) as usize };
         let mut buf2 = Vec::<Result<u8, Error>>::with_capacity(nb_read);
 
-        let mut raw_data = Vec::<u8>::with_capacity(nb_read);
-
         for b in buf.iter().take(nb_read) {
             buf2.push(Ok(*b));
-            raw_data.push(*b);
         }
 
         let mut raw_evt = Vec::<_>::with_capacity(BUF_SIZE);
@@ -557,13 +554,7 @@ fn get_input_events(tx: &Sender<EventMessage>) {
         }
 
         if !v.is_empty() {
-            let msg = EventMessage::new(
-                0,
-                Event::InputEvent {
-                    events: v,
-                    raw_data: Some(raw_data),
-                },
-            );
+            let msg = EventMessage::new(0, Event::InputEvents { events: v });
             tx.send(msg).unwrap_or(());
         }
     }

@@ -1,6 +1,6 @@
 ## Design
 
-The Design will evolve at will. Suggestions are welcome.
+The Design will evolve at will. Suggestions are welcomed.
 
 - Editor organization
 
@@ -55,7 +55,8 @@ Messages sent between the ui and the core
 - **Codec**<br/>
 The codec is responsible of the Buffer interpretation
 
-    eg: TextCodec emits codepoints
+    eg: TextCodec emits codepoints<br/>
+    It convert from/to bytes/codepoints
 
 - **CodecId**<br/>
 a unique 64 bits integer that represents the codec.

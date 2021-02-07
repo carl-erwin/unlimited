@@ -56,30 +56,6 @@ pub fn pending_render_event_count() -> usize {
     GLOBAL_UI_PENDING_RENDER_EVENT_COUNT.load(Ordering::SeqCst)
 }
 
-/*
-JSON based ?
-{
-// configuration
-
-[
-  {"ambiguous_exec_timeout": 250 },
-  {"events": [ {"keys":   ["ctrl+c"] }, {"keys": ["ctrl+q"] }], "action": "application:quit" },
-  {"events": [ {"keys":   ["ctrl+c"] } ],                       "action": "text-mode:copy" },
-  {"events": [ {"keys":   ["ctrl+x"] } ],                       "action": "text-mode:cut" },
-  {"events": [ {"keys":   ["ctrl+v"] } ],                       "action": "text-mode:paste" },
-  {"events": [ {"system": [ "xxx" ] } ],                        "action": "text-mode:quit" },
-  {"events": [ {"keys": ["a"] } ],                              "action": "text-mode:self-insert" },
-  {"events": [ {"keys": { } ],                  "action": "self-insert" }, // default handler special syntax
-
-  {"events": [ {"button_press": { "button":1} ],                 "action": "self-insert" }, // default handler special syntax
-
-
-
-]
-
-}
-*/
-
 /// Message sent between core and ui threads.
 #[derive(Debug, Clone)]
 pub struct EventMessage {
@@ -113,9 +89,8 @@ pub enum Event {
     },
 
     /// Sent by ui thread. contains user input information.
-    InputEvent {
-        events: Vec<self::InputEvent>,
-        raw_data: Option<Vec<u8>>, /* raw data for debug */
+    InputEvents {
+        events: Vec<InputEvent>,
     },
 
     ApplicationQuitEvent,

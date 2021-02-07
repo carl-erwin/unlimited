@@ -113,9 +113,9 @@ pub fn run(
                     update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
                 }
 
-                Event::InputEvent { events, raw_data } => {
+                Event::InputEvents { events } => {
                     if !editor.view_map.is_empty() {
-                        process_input_events(&mut editor, &mut env, &ui_tx, &events, &raw_data);
+                        process_input_events(&mut editor, &mut env, &ui_tx, &events);
                     }
                 }
 
@@ -182,7 +182,6 @@ fn process_input_events(
     mut env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
     events: &Vec<InputEvent>,
-    _raw_data: &Option<Vec<u8>>, // TODO: remove
 ) {
     env.pending_events = crate::core::event::pending_input_event_count();
 

@@ -236,6 +236,7 @@ fn parse_event_entry_input_key(ctx: &mut ParseCtx, _name: &String, value: &serde
 
     for k in s.split("+") {
         dbg_println!("key = {:?}", k);
+        // match to_lower(k).as_str() ?
         match k {
             "ctrl" => mods.ctrl = true,
             "alt" => mods.alt = true,
@@ -571,6 +572,7 @@ pub fn eval_input_event(
             }
         } else {
             dbg_println!("no children found: reset");
+            // reset
             *out_node = None;
             *in_node = None;
         }
@@ -579,6 +581,7 @@ pub fn eval_input_event(
             Some(event) => {
                 if let Some(action) = &event.as_ref().action {
                     dbg_println!("found action");
+                    // reset
                     *out_node = None;
                     *in_node = None;
 
@@ -594,22 +597,19 @@ pub fn eval_input_event(
                 let ev = InputEvent::FallbackEvent;
                 let event_hash = compute_input_event_hash(&ev);
 
+                *out_node = None;
+                *in_node = None;
+
                 match input_map.as_ref().borrow().get(&event_hash) {
                     Some(event) => {
                         if let Some(action) = &event.as_ref().action {
                             dbg_println!("default found action {}", action);
                             return Some(action.to_string());
                         }
-
-                        *out_node = None;
-                        *in_node = None;
-
                         dbg_println!("cancel sequence");
                     }
                     None => {
                         dbg_println!("no default action defined");
-                        *out_node = None;
-                        *in_node = None;
                     }
                 }
             }
