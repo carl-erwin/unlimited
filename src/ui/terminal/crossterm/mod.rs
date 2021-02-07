@@ -869,23 +869,24 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 /*
   NB: There is a subbtle bug in crossterm input handling.
 
+      - Level-triggered polling was removed from mio (in 0.7.xx version)
+      - On linux the (default) 0 1 2 fd points to the same pseudo terminal
+        And thus we cannot change the blocking mode if the input fd (0)
+
       - When pasting big chunks of text with graphical terminal. The editor seams stucked.
+        because the input file descriptor is in blocking mode.
 
-      Crossterm uses edge-triggered polling BUT the input file descriptor is in blocking mode.
-      if the user input it bigger than the available input buffer space.
+        if the user input it bigger than the available input buffer space. the read syscal blocks.
 
-      - In non-blocking mode it is not possible to use println!() function fammily.
+      - It is not possible to use println!() function fammily in non-blocking mode.
        println!() must ensure the data is flushed and will panic on EAGAIN error.
 
+       *) One solution is for crossterm to let the user specify the input buffer/size
+         In the case of unlimited we could use a 2M input buffer ?
 
-      - On linux the (defualt) 0 1 2 fd points to the sam pseudo terminal
-      And thus we cannot change the blocking mode if the input fd (0)
+       *) An other solution (hack)
+        change input fd from blocking to no-blocking mode, do read loop and restore mode on exit.
 
-
-      One solution is for crossterm to let the user specify
-      the input buffer/size
-
-      In the case of unlimited we could use a 2M input buffer
 */
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
