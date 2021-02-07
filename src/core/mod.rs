@@ -24,6 +24,7 @@ pub mod view;
 
 use crate::core::config::Config;
 use crate::core::editor::Editor;
+use crate::core::editor::EditorEnv;
 use crate::core::event::EventMessage;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -31,7 +32,9 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// This thread is the "❤" of unlimited.
 pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<EventMessage>) {
     let mut editor = Editor::new(config);
-    editor.load_files();
+    let mut env = EditorEnv::new();
+
+    editor.load_files(&mut env);
 
     // start indexer thread
     let indexer_th = {
@@ -42,7 +45,7 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
     };
 
     // editor.run(&core_rx, &ui_tx) ?
-    server::run(&mut editor, &core_rx, &ui_tx);
+    server::run(&mut editor, &mut env, &core_rx, &ui_tx);
 
     // wait for core thread
     if let Some(th) = indexer_th {

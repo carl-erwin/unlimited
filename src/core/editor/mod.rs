@@ -123,7 +123,7 @@ impl<'a> Editor<'a> {
 
     /// TODO: replace this by load/unload doc functions
     /// the ui will open the documents on demand
-    pub fn load_files(&mut self) {
+    pub fn load_files(&mut self, mut env: &mut EditorEnv<'a>) {
         let mut id = self.document_map.len() as u64;
 
         for f in &self.config.files_list {
@@ -161,7 +161,7 @@ impl<'a> Editor<'a> {
             let id = doc_id as u64;
             let doc = self.document_map.get(&id);
             if let Some(doc) = doc {
-                let view = View::new(id as u64, 0 as u64, 1, 1, Some(doc.clone()));
+                let view = View::new(&mut env, id as u64, 0 as u64, 1, 1, Some(doc.clone()));
 
                 dbg_println!("create view id {}", view.id);
 

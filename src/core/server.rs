@@ -28,13 +28,13 @@ use crate::core::view::update_view;
 
 use crate::core::screen::Screen;
 
-use crate::core::event::InputEventMap;
-use crate::core::event::InputEventRule;
-
-use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::eval_input_event;
 
-pub type ActionMap = HashMap<String, view::ModeFunction>; // move to Mode ?
+pub type ActionMap = HashMap<String, view::ModeFunction>; // kept in EditorEnv, transform into STACK of map
+
+pub fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
+    map.insert(s.to_string(), func);
+}
 
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
     let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
@@ -88,11 +88,10 @@ pub fn send_draw_event(
 
 pub fn run(
     mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
     core_rx: &Receiver<EventMessage>,
     ui_tx: &Sender<EventMessage>,
 ) {
-    let mut env = EditorEnv::new();
-
     let mut seq: usize = 0;
 
     fn get_next_seq(seq: &mut usize) -> usize {
@@ -205,6 +204,7 @@ fn process_input_events(
         if event_processed {
             let start = Instant::now();
             let view = editor.view_map[env.view_id].1.clone();
+            // render_view(&mut editor, &mut env, &view);
             update_view(&mut editor, &mut env, &view);
             let end = Instant::now();
             dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
@@ -233,16 +233,6 @@ fn process_input_events(
         send_draw_event(&mut editor, ui_tx, &view);
         editor.last_rdr_event = Instant::now();
     }
-}
-
-pub fn editor_cancel(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    let v = &mut view.as_ref().borrow_mut();
-    v.select_point = None;
 }
 
 pub fn application_quit(
@@ -284,163 +274,13 @@ pub fn save_document(
     let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
 }
 
-fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
-    map.insert(s.to_string(), func);
-}
-
-// TODO: move thi to mode init
 pub fn build_action_map() -> ActionMap {
-    let mut map: ActionMap = HashMap::new(); // text-mode action map
+    let mut map: ActionMap = HashMap::new();
 
     // core
     register_action(&mut map, "application:quit", application_quit);
     register_action(&mut map, "application:quit-abort", application_quit_abort);
     register_action(&mut map, "save-document", save_document);
-
-    // TODO: text-mode
-    register_action(
-        &mut map,
-        "text-mode:self-insert",
-        view::insert_codepoint_array,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-backward",
-        view::move_marks_backward,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-forward",
-        view::move_marks_forward,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-next-line",
-        view::move_marks_to_next_line,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-previous-line",
-        view::move_marks_to_previous_line,
-    );
-
-    register_action(
-        &mut map,
-        "text-mode:move-to-token-start",
-        view::move_to_token_start,
-    );
-
-    register_action(
-        &mut map,
-        "text-mode:move-to-token-end",
-        view::move_to_token_end,
-    );
-
-    register_action(
-        &mut map,
-        "text-mode:page-up",
-        view::scroll_to_previous_screen,
-    );
-    register_action(&mut map, "text-mode:page-down", view::scroll_to_next_screen);
-
-    register_action(&mut map, "text-mode:scroll-up", view::scroll_up);
-    register_action(&mut map, "text-mode:scroll-down", view::scroll_down);
-
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-start-of-line",
-        view::move_marks_to_start_of_line,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-end-of-line",
-        view::move_marks_to_end_of_line,
-    );
-
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-start-of-file",
-        view::move_mark_to_start_of_file,
-    );
-    register_action(
-        &mut map,
-        "text-mode:move-marks-to-end-of-file",
-        view::move_mark_to_end_of_file,
-    );
-
-    register_action(&mut map, "text-mode:undo", view::undo);
-    register_action(&mut map, "text-mode:redo", view::redo);
-    register_action(
-        &mut map,
-        "text-mode:remove-codepoint",
-        view::remove_codepoint,
-    );
-    register_action(
-        &mut map,
-        "text-mode:remove-previous-codepoint",
-        view::remove_previous_codepoint,
-    );
-
-    register_action(&mut map, "text-mode:button-press", view::button_press);
-    register_action(&mut map, "text-mode:button-release", view::button_release);
-    register_action(
-        &mut map,
-        "text-mode:move-mark-to-clicked-area",
-        view::button_press,
-    );
-
-    register_action(
-        &mut map,
-        "text-mode:center-arround-mark",
-        view::center_arround_mark,
-    );
-    register_action(
-        &mut map,
-        "text-mode:cut-to-end-of-line",
-        view::cut_to_end_of_line,
-    );
-
-    register_action(&mut map, "text-mode:paste", view::paste);
-    register_action(
-        &mut map,
-        "text-mode:remove-until-end-of-word",
-        view::remove_until_end_of_word,
-    );
-    register_action(
-        &mut map,
-        "scroll-to-next-screen",
-        view::scroll_to_next_screen,
-    );
-    register_action(
-        &mut map,
-        "scroll-to-previous-screen",
-        view::scroll_to_previous_screen,
-    );
-
-    register_action(&mut map, "select-next-view", view::select_next_view);
-
-    register_action(&mut map, "select-previous-view", view::select_previous_view);
-
-    register_action(
-        &mut map,
-        "text-mode:clone-and-move-mark-to-previous-line",
-        view::clone_and_move_mark_to_previous_line,
-    );
-    register_action(
-        &mut map,
-        "text-mode:clone-and-move-mark-to-next-line",
-        view::clone_and_move_mark_to_next_line,
-    );
-
-    register_action(&mut map, "text-mode:pointer-motion", view::pointer_motion);
-
-    register_action(
-        &mut map,
-        "text-mode:set-select-point-at-mark",
-        view::set_selection_point_at_mark,
-    );
-
-    register_action(&mut map, "editor:cancel", editor_cancel);
 
     map
 }

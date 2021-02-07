@@ -41,10 +41,16 @@ use crate::core::codepointinfo;
 
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
+use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
 use crate::core::event::PointerEvent;
 
-use crate::core::view::layout::{run_view_layout_filters, run_view_layout_filters_direct};
+use crate::core::view::layout::{run_view_render_filters, run_view_render_filters_direct};
+
+use std::collections::HashMap;
+
+use crate::core::server::register_action;
+use crate::core::server::ActionMap;
 
 pub type Id = u64;
 
@@ -56,6 +62,7 @@ pub type ModeFunction = fn(
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
+    //    mode_data: &mut ModeEnv, // see layout filter
 ) -> (); // () for now
 
 // let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
@@ -138,6 +145,188 @@ pub enum Action {
     CheckMarks,
 }
 
+// trait ?
+// collection of functions, at each pass
+// layout
+// see process_input_event and augment the signatrue
+
+// pre()
+// process
+// post()
+
+// TODO: add ?
+//        doc,
+//        view
+
+pub trait Mode {
+    fn name(&self) -> &'static str;
+
+    // new()
+    //  register input_map + self
+}
+
+pub struct TextMode {
+    // reorder fields
+    pub start_offset: u64, // where we want to start the rendering
+    pub end_offset: u64,   // where the rendering stopped
+    pub center_on_mark_move: bool,
+    pub scroll_on_mark_move: bool,
+    pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
+    pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
+    pub mark_index: usize,
+    pub select_point: Option<Mark>,
+    // TODO: use for cut and paste // move to mark
+    pub last_cut_log_index: Option<usize>,
+}
+
+impl TextMode {
+    fn new(mut env: &mut EditorEnv /* parent view id */) -> Self {
+        dbg_println!("TextMode");
+
+        let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
+
+        Self::register_actions(&mut env.action_map);
+
+        TextMode {
+            start_offset: 0,            // restaure mode ?
+            end_offset: 0,              // will be recomputed later
+            center_on_mark_move: false, // add movement enums and pass it to center fn
+            scroll_on_mark_move: true,
+            text_codec: Box::new(utf8::Utf8Codec::new()),
+            moving_marks,
+            mark_index: 0,
+            select_point: None,
+            last_cut_log_index: None,
+        }
+    }
+
+    pub fn register_actions(mut map: &mut ActionMap) {
+        register_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
+        register_action(
+            &mut map,
+            "text-mode:move-marks-backward",
+            move_marks_backward,
+        );
+        register_action(&mut map, "text-mode:move-marks-forward", move_marks_forward);
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-next-line",
+            move_marks_to_next_line,
+        );
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-previous-line",
+            move_marks_to_previous_line,
+        );
+
+        register_action(
+            &mut map,
+            "text-mode:move-to-token-start",
+            move_to_token_start,
+        );
+
+        register_action(&mut map, "text-mode:move-to-token-end", move_to_token_end);
+
+        register_action(&mut map, "text-mode:page-up", scroll_to_previous_screen);
+        register_action(&mut map, "text-mode:page-down", scroll_to_next_screen);
+
+        register_action(&mut map, "text-mode:scroll-up", scroll_up);
+        register_action(&mut map, "text-mode:scroll-down", scroll_down);
+
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-start-of-line",
+            move_marks_to_start_of_line,
+        );
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-end-of-line",
+            move_marks_to_end_of_line,
+        );
+
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-start-of-file",
+            move_mark_to_start_of_file,
+        );
+        register_action(
+            &mut map,
+            "text-mode:move-marks-to-end-of-file",
+            move_mark_to_end_of_file,
+        );
+
+        register_action(&mut map, "text-mode:undo", undo);
+        register_action(&mut map, "text-mode:redo", redo);
+        register_action(&mut map, "text-mode:remove-codepoint", remove_codepoint);
+        register_action(
+            &mut map,
+            "text-mode:remove-previous-codepoint",
+            remove_previous_codepoint,
+        );
+
+        register_action(&mut map, "text-mode:button-press", button_press);
+        register_action(&mut map, "text-mode:button-release", button_release);
+        register_action(
+            &mut map,
+            "text-mode:move-mark-to-clicked-area",
+            button_press,
+        );
+
+        register_action(
+            &mut map,
+            "text-mode:center-arround-mark",
+            center_arround_mark,
+        );
+        register_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
+
+        register_action(&mut map, "text-mode:paste", paste);
+        register_action(
+            &mut map,
+            "text-mode:remove-until-end-of-word",
+            remove_until_end_of_word,
+        );
+        register_action(&mut map, "scroll-to-next-screen", scroll_to_next_screen);
+        register_action(
+            &mut map,
+            "scroll-to-previous-screen",
+            scroll_to_previous_screen,
+        );
+
+        register_action(&mut map, "select-next-view", select_next_view);
+
+        register_action(&mut map, "select-previous-view", select_previous_view);
+
+        register_action(
+            &mut map,
+            "text-mode:clone-and-move-mark-to-previous-line",
+            clone_and_move_mark_to_previous_line,
+        );
+        register_action(
+            &mut map,
+            "text-mode:clone-and-move-mark-to-next-line",
+            clone_and_move_mark_to_next_line,
+        );
+
+        register_action(&mut map, "text-mode:pointer-motion", pointer_motion);
+
+        register_action(
+            &mut map,
+            "text-mode:set-select-point-at-mark",
+            set_selection_point_at_mark,
+        );
+
+        register_action(&mut map, "editor:cancel", editor_cancel);
+
+        // TODO: handle conflicting bindings
+    }
+}
+
+impl Mode for TextMode {
+    fn name(&self) -> &'static str {
+        &"text-mode"
+    }
+}
+
 // TODO:
 // add struct to map view["mode(n)"] -> data
 // add struct to map doc["mode(n)"]  -> data: ex: line index
@@ -148,26 +337,24 @@ pub enum Action {
 pub struct View<'a> {
     pub id: Id,
 
+    pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
+    pub screen: Arc<RwLock<Box<Screen>>>,
+
+    pub main_mode: Box<dyn Mode>, // mandatory
+    pub modes: Vec<Box<dyn Mode>>,
+
+    // TODO: refactor: move to default Mode
     // TODO: add struct to map view["mode(n)"] -> mode(n).data
     // reorder fields
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
-
     pub center_on_mark_move: bool,
     pub scroll_on_mark_move: bool,
-
-    pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
-
     pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
-
-    pub screen: Arc<RwLock<Box<Screen>>>,
-
     pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
     pub mark_index: usize,
-
     pub select_point: Option<Mark>,
-
-    // use for cut and paste
+    // TODO: use for cut and paste // move to mark
     pub last_cut_log_index: Option<usize>,
 }
 
@@ -180,26 +367,34 @@ impl<'a> View<'a> {
 
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
+        mut env: &mut EditorEnv<'a>,
         id: Id,
         start_offset: u64,
         width: usize,
         height: usize,
-        document: Option<Rc<RefCell<Document>>>,
-    ) -> View {
+        document: Option<Rc<RefCell<Document<'a>>>>,
+    ) -> View<'a> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
 
         // TODO: in future version will be stored in buffer meta data
         let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
 
+        // register action
+
         View {
             id,
+            document,
+            screen,
+
+            main_mode: Box::new(TextMode::new(&mut env)),
+            modes: Vec::new(),
+
+            //
             start_offset,
             end_offset: start_offset,   // will be recomputed later
             center_on_mark_move: false, // add movement enums and pass it to center fn
             scroll_on_mark_move: true,
-            document,
             text_codec: Box::new(utf8::Utf8Codec::new()),
-            screen,
             moving_marks,
             mark_index: 0,
             select_point: None,
@@ -359,7 +554,7 @@ impl<'a> View<'a> {
 
     /// This function computes start/end of lines between start_offset end_offset.<br/>
     /// It (will) run the configured filters/plugins.<br/>
-    /// using the run_view_layout_filters function until end_offset is reached.<br/>
+    /// using the run_view_render_filters function until end_offset is reached.<br/>
     pub fn get_lines_offsets_direct(
         &mut self,
         env: &EditorEnv,
@@ -386,7 +581,7 @@ impl<'a> View<'a> {
         let mut screen = Screen::new(screen_width, screen_height);
 
         loop {
-            run_view_layout_filters_direct(env, &self, m.offset, max_offset, &mut screen);
+            run_view_render_filters_direct(env, &self, m.offset, max_offset, &mut screen);
             if screen.push_count == 0 {
                 return v;
             }
@@ -460,7 +655,7 @@ impl<'a> View<'a> {
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>
 /// It (will) run the configured filters/plugins.<br/>
-/// using the run_view_layout_filters function until end_offset is reached.<br/>
+/// using the run_view_render_filters function until end_offset is reached.<br/>
 pub fn get_lines_offsets(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
@@ -492,7 +687,7 @@ pub fn get_lines_offsets(
     let mut screen = Screen::new(screen_width, screen_height);
 
     loop {
-        run_view_layout_filters(env, &view, m.offset, max_offset, &mut screen);
+        run_view_render_filters(env, &view, m.offset, max_offset, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
@@ -678,7 +873,7 @@ pub fn compute_view_layout(
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
-    run_view_layout_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
+    run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
     // TODO: from env ?
     v.end_offset = screen.last_offset.unwrap();
@@ -732,9 +927,18 @@ pub fn update_view(
 }
 
 ///
-use crate::core::event::Key;
 
-// CEG
+// text mode functions
+pub fn editor_cancel(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = &mut view.as_ref().borrow_mut();
+    v.select_point = None;
+}
+
 pub fn scroll_up(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -1704,7 +1908,7 @@ pub fn move_marks_to_next_line(
 
         dbg_println!("compute layout from offset {}", m.offset);
 
-        run_view_layout_filters_direct(env, &v, m.offset, max_offset, &mut screen);
+        run_view_render_filters_direct(env, &v, m.offset, max_offset, &mut screen);
 
         dbg_println!("screen first offset {:?}", screen.first_offset);
         dbg_println!("screen first offset {:?}", screen.last_offset);
@@ -1720,7 +1924,7 @@ pub fn move_marks_to_next_line(
         if last_line.is_none() {
             dbg_println!("no last line");
             panic!();
-            break;
+            //break;
         }
         let last_line = last_line.unwrap();
 

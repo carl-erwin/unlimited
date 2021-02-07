@@ -134,8 +134,6 @@ use crate::core::screen::Screen;
 use crate::core::editor::EditorEnv;
 use crate::core::view::View;
 
-pub struct FilterContext {}
-
 pub struct LayoutEnv<'a> {
     pub quit: bool,
     pub base_offset: u64,
@@ -1066,7 +1064,7 @@ pub fn filter_codepoint(
     }
 }
 
-pub fn run_view_layout_filters(
+pub fn run_view_render_filters(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
     base_offset: u64,
@@ -1074,7 +1072,7 @@ pub fn run_view_layout_filters(
     screen: &mut Screen,
 ) {
     let view = view.as_ref().borrow();
-    run_view_layout_filters_direct(env, &view, base_offset, max_offset, screen)
+    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen)
 }
 
 // This function can be considered as the core of the editor.<br/>
@@ -1087,7 +1085,7 @@ pub fn run_view_layout_filters(
 // 3 - higlight selection
 //  4 - tabulation
 //  5 - word wrap
-pub fn run_view_layout_filters_direct(
+pub fn run_view_render_filters_direct(
     _editor_env: &EditorEnv,
     view: &View,
     base_offset: u64,

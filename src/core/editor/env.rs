@@ -14,18 +14,20 @@ use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
 use crate::core::server::build_action_map;
 
+use std::marker::PhantomData;
+
 // env.repeat_action_n , api to set repeat
 // ctrl+:  -> minor mode to read repeat count
 // esc -> reset repeat count
 // kbr macro recording
-pub struct EditorEnv {
+pub struct EditorEnv<'a> {
+    phantom: PhantomData<&'a u8>,
     pub quit: bool,
     pub status: String, // TODO: move to test-mode
 
-    pub action_map: ActionMap,
+    pub action_map: ActionMap, // ref to current focused widget ?
 
     pub input_map: Rc<RefCell<InputEventMap>>,
-
     pub current_node: Option<Rc<InputEventRule>>,
     pub next_node: Option<Rc<InputEventRule>>,
 
@@ -47,7 +49,7 @@ pub struct EditorEnv {
     pub max_offset: u64,
 }
 
-impl EditorEnv {
+impl<'a> EditorEnv<'a> {
     pub fn new() -> Self {
         let input_map = if let Ok(map) = build_input_event_map(DEFAULT_INPUT_MAP) {
             map
@@ -56,6 +58,7 @@ impl EditorEnv {
         };
 
         EditorEnv {
+            phantom: PhantomData,
             quit: false,
             status: String::new(),
             action_map: build_action_map(),
