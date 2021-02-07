@@ -91,7 +91,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
 }]"#;
 
 // TODO: map error to editor error
-// unlimited::error::SyntaxError(file, line, col);
+// unlimited::error::SyntaxError(file, line, col, str_details);
 pub fn build_input_event_map(
     json: &str,
 ) -> Result<Rc<RefCell<InputEventMap>>, serde_json::error::Error> {
