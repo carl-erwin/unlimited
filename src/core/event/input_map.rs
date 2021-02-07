@@ -713,39 +713,10 @@ mod tests {
         assert_eq!(button_ref_event_hash, button_event_hash);
     }
 
-    static TEST_MAP: &str = r#"[{
-        "events": [
-           { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-mark-backward" },
-           { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-mark-forward" },
-           { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-mark-to-previous-line" },
-           { "in": [{ "key": "Down"     }],                        "action": "text-mode:move-mark-to-next-line" },
-           { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:move-to-previous-screen" },
-           { "in": [{ "key": "PageDown" }],                        "action": "text-mode:move-to-next-screen" },
-    
-           { "in": [{ "key": "ctrl+alt+Left"     }],                "action": "text-mode:move-mark-backward-word" },
-           { "in": [{ "key": "ctrl+alt+Right"     }],                "action": "text-mode:move-mark-one-forward" },
-    
-           { "in": [{ "key": "ctrl+€"      }],                     "action": "" },
-    
-           { "in": [{ "key": "Esc"      }],                        "action": "editor:cancel" },
-           { "in": [{ "key": "ctrl+g"   }],                        "action": "editor:cancel" },
-    
-           { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
-    
-           { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-    
-           { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+b" } ],    "action": "application:quit2" },
-    
-           { "in": [{ "system": "SIGTERM" } ],                      "action": "application:quit" },
-    
-           { "default": [], "action": "text-mode:self-insert" }
-         ]
-    }]"#;
-
     #[test]
 
     fn test_build_input_event_map() -> Result<(), serde_json::error::Error> {
-        let map = build_input_event_map(TEST_MAP)?;
+        let map = build_input_event_map(DEFAULT_INPUT_MAP)?;
 
         dbg_println!("****** print map");
         for (k, v) in map.as_ref().borrow().iter() {
