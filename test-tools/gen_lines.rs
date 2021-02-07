@@ -26,7 +26,7 @@ fn gen_lines(start: u64, stop: u64, linewidth: u64) -> () {
 
     let stdout = io::stdout();
     let mut buff = BufWriter::new(stdout);
-    for x in start..start + stop + 1 {
+    for x in start..start + stop {
         buff.write_fmt(format_args!("{:012} {}", x, string)).unwrap();
     }
 }
