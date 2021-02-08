@@ -71,6 +71,9 @@ pub fn send_draw_event(
     let view = view.as_ref().borrow();
     let new_screen = Arc::clone(&view.screen);
 
+    // TODO: move : marks to mode
+    // remove marks from rendering
+    // ...
     let marks = Arc::clone(&view.moving_marks);
 
     let msg = EventMessage::new(

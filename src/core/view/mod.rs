@@ -14,10 +14,11 @@
 */
 
 //
-use std::cell::RefCell;
+use std::any::Any;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::{cell::RefCell, hash::Hash, ops::Index};
 
 use std::time::Instant;
 
@@ -62,7 +63,6 @@ pub type ModeFunction = fn(
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
-    //    mode_data: &mut ModeEnv, // see layout filter
 ) -> (); // () for now
 
 // let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
@@ -167,14 +167,11 @@ pub trait Mode {
 
 pub struct TextMode {
     // reorder fields
-    pub start_offset: u64, // where we want to start the rendering
-    pub end_offset: u64,   // where the rendering stopped
     pub center_on_mark_move: bool,
     pub scroll_on_mark_move: bool,
     pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
-    pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
-    pub mark_index: usize,
     pub select_point: Option<Mark>,
+
     // TODO: use for cut and paste // move to mark
     pub last_cut_log_index: Option<usize>,
 }
@@ -188,13 +185,9 @@ impl TextMode {
         Self::register_actions(&mut env.action_map);
 
         TextMode {
-            start_offset: 0,            // restaure mode ?
-            end_offset: 0,              // will be recomputed later
             center_on_mark_move: false, // add movement enums and pass it to center fn
             scroll_on_mark_move: true,
             text_codec: Box::new(utf8::Utf8Codec::new()),
-            moving_marks,
-            mark_index: 0,
             select_point: None,
             last_cut_log_index: None,
         }
@@ -339,23 +332,15 @@ pub struct View<'a> {
 
     pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
     pub screen: Arc<RwLock<Box<Screen>>>,
-
-    pub main_mode: Box<dyn Mode>, // mandatory
-    pub modes: Vec<Box<dyn Mode>>,
-
-    // TODO: refactor: move to default Mode
-    // TODO: add struct to map view["mode(n)"] -> mode(n).data
-    // reorder fields
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
-    pub center_on_mark_move: bool,
-    pub scroll_on_mark_move: bool,
-    pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
+
+    // used in rendering
     pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
-    pub mark_index: usize,
-    pub select_point: Option<Mark>,
-    // TODO: use for cut and paste // move to mark
-    pub last_cut_log_index: Option<usize>,
+    pub mark_index: usize,                    // move to text mode
+
+    pub main_mode: &'static str,                    // mandatory by name
+    pub modes: HashMap<&'static str, Box<dyn Any>>, // HUM ......
 }
 
 impl<'a> View<'a> {
@@ -379,26 +364,27 @@ impl<'a> View<'a> {
         // TODO: in future version will be stored in buffer meta data
         let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
 
-        // register action
+        // set default mode(s)
+        let mut modes: HashMap<&str, Box<dyn Any>> = HashMap::new();
+
+        let text_mode = Box::new(TextMode::new(&mut env));
+        let mode_name = text_mode.name();
+
+        modes.insert(mode_name, text_mode);
 
         View {
             id,
             document,
             screen,
 
-            main_mode: Box::new(TextMode::new(&mut env)),
-            modes: Vec::new(),
-
             //
             start_offset,
-            end_offset: start_offset,   // will be recomputed later
-            center_on_mark_move: false, // add movement enums and pass it to center fn
-            scroll_on_mark_move: true,
-            text_codec: Box::new(utf8::Utf8Codec::new()),
+            end_offset: start_offset, // will be recomputed later
             moving_marks,
             mark_index: 0,
-            select_point: None,
-            last_cut_log_index: None,
+
+            main_mode: mode_name,
+            modes,
         }
     }
 
@@ -415,6 +401,11 @@ impl<'a> View<'a> {
             return;
         }
 
+        // TODO: find abetter way to pas mode data arround, macro ?
+        let tm = self.modes.get_mut("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         // TODO: DUMB version
         // NEW: first try to check nb_lines in the same area
         // repeat mark moves
@@ -430,7 +421,7 @@ impl<'a> View<'a> {
                     break;
                 }
                 tmp.offset -= 1;
-                tmp.move_to_start_of_line(&doc, self.text_codec.as_ref());
+                tmp.move_to_start_of_line(&doc, codec);
             }
 
             self.start_offset = tmp.offset;
@@ -458,7 +449,7 @@ impl<'a> View<'a> {
         // get start of line
         {
             let doc = self.document.as_mut().unwrap().borrow_mut();
-            m.move_to_start_of_line(&doc, self.text_codec.as_ref());
+            m.move_to_start_of_line(&doc, codec);
         }
 
         // build tmp screens until first offset of the original screen if found
@@ -566,12 +557,16 @@ impl<'a> View<'a> {
         let mut v = Vec::<(u64, u64)>::new();
         let mut m = Mark::new(start_offset); // TODO: rename into screen_start
 
+        let tm = self.modes.get_mut("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         let max_offset = {
             let doc = self.document.clone();
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().borrow_mut();
             // get start of the line @offset
-            m.move_to_start_of_line(&doc, self.text_codec.as_ref());
+            m.move_to_start_of_line(&doc, codec);
             doc.size() as u64
         };
 
@@ -675,7 +670,10 @@ pub fn get_lines_offsets(
     // get start of the line @offset
     {
         let v = &view.as_ref().borrow();
-        let codec = v.text_codec.as_ref();
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         m.move_to_start_of_line(&doc, codec);
     }
 
@@ -936,7 +934,10 @@ pub fn editor_cancel(
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
-    v.select_point = None;
+
+    let tm = v.modes.get_mut("text-mode").unwrap();
+    let tm = tm.downcast_mut::<TextMode>().unwrap();
+    tm.select_point = None;
 }
 
 pub fn scroll_up(
@@ -989,7 +990,10 @@ pub fn insert_codepoint_array(
         let v = view.as_ref().borrow();
         let mut doc = v.document.as_ref().unwrap().borrow_mut();
 
-        let codec = v.text_codec.as_ref();
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+
+        let codec = tm.text_codec.as_ref();
         let mut utf8 = Vec::with_capacity(array.len());
 
         for codepoint in array {
@@ -1055,7 +1059,11 @@ pub fn remove_previous_codepoint(
         let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+
+        let codec = tm.text_codec.as_ref();
 
         if doc.size() == 0 {
             return;
@@ -1189,7 +1197,10 @@ pub fn remove_codepoint(
 
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
-    let codec = v.text_codec.as_ref();
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+
+    let codec = tm.text_codec.as_ref();
 
     if doc.size() == 0 {
         return;
@@ -1235,7 +1246,10 @@ pub fn remove_until_end_of_word(
 
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
-    let codec = v.text_codec.as_ref();
+
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
 
     let size = doc.size() as u64;
 
@@ -1325,7 +1339,11 @@ pub fn move_marks_backward(
     let v = &mut view.as_ref().borrow_mut();
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap().borrow();
-    let codec = v.text_codec.as_ref();
+
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
+
     let midx = v.mark_index;
 
     let mut marks = v.moving_marks.write().unwrap();
@@ -1340,7 +1358,10 @@ pub fn move_marks_backward(
 
     env.view_pre_render.push(Action::CheckMarks);
 
-    if v.center_on_mark_move {
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+
+    if tm.center_on_mark_move {
         env.view_pre_render.push(Action::CenterArroundMainMark);
     }
 }
@@ -1355,7 +1376,11 @@ pub fn move_marks_forward(
         let v = &mut view.as_ref().borrow_mut();
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap().borrow();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         let midx = v.mark_index;
 
         let nr_marks = {
@@ -1395,7 +1420,10 @@ pub fn move_marks_to_start_of_line(
     let v = &mut view.as_ref().borrow();
 
     let doc = v.document.as_ref().unwrap().borrow();
-    let codec = v.text_codec.as_ref();
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
+
     let midx = v.mark_index;
     let screen = v.screen.read().unwrap();
     let mut marks = v.moving_marks.write().unwrap();
@@ -1419,7 +1447,11 @@ pub fn move_marks_to_end_of_line(
 ) {
     let v = &view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap().borrow();
-    let codec = v.text_codec.as_ref();
+
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
+
     let midx = v.mark_index;
     let screen = v.screen.read().unwrap();
     let mut marks = v.moving_marks.write().unwrap();
@@ -1493,7 +1525,10 @@ fn move_mark_to_previous_line(
             let start_offset = {
                 let doc = v.document.as_ref().unwrap();
                 let doc = doc.as_ref().borrow();
-                let codec = v.text_codec.as_ref();
+
+                let tm = v.modes.get("text-mode").unwrap();
+                let tm = tm.downcast_ref::<TextMode>().unwrap();
+                let codec = tm.text_codec.as_ref();
 
                 // todo: set marks codecs
                 let mut tmp = Mark { offset: m_offset };
@@ -1556,7 +1591,10 @@ fn move_mark_to_previous_line(
             let v = &mut view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
-            let codec = v.text_codec.as_ref();
+
+            let tm = v.modes.get("text-mode").unwrap();
+            let tm = tm.downcast_ref::<TextMode>().unwrap();
+            let codec = tm.text_codec.as_ref();
 
             let mut s = Mark::new(lines[index + 1].0);
             let e = Mark::new(lines[index + 1].1);
@@ -1576,7 +1614,9 @@ fn move_mark_to_previous_line(
             let v = &mut view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
-            let codec = v.text_codec.as_ref();
+            let tm = v.modes.get("text-mode").unwrap();
+            let tm = tm.downcast_ref::<TextMode>().unwrap();
+            let codec = tm.text_codec.as_ref();
 
             for _ in 0..new_x {
                 tmp_mark.move_forward(&doc, codec);
@@ -1737,7 +1777,11 @@ pub fn move_mark_to_next_line(
             let v = &view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
-            let codec = v.text_codec.as_ref();
+
+            let tm = v.modes.get("text-mode").unwrap();
+            let tm = tm.downcast_ref::<TextMode>().unwrap();
+            let codec = tm.text_codec.as_ref();
+
             //
             let marks = v.moving_marks.read().unwrap();
             let m = &marks[mark_idx];
@@ -1789,7 +1833,10 @@ pub fn move_mark_to_next_line(
             let v = &view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
-            let codec = v.text_codec.as_ref();
+
+            let tm = v.modes.get("text-mode").unwrap();
+            let tm = tm.downcast_ref::<TextMode>().unwrap();
+            let codec = tm.text_codec.as_ref();
 
             // TODO: use codec.read(doc, n=width) until e.offset is reached
             let mut s = Mark::new(lines[index].0);
@@ -1816,7 +1863,11 @@ pub fn move_mark_to_next_line(
         let v = &view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         // TODO: codec.skip_n(doc, 0..new_x)
         for _ in 0..new_x {
             tmp_mark.move_forward(&doc, codec); // TODO: pass n as arg
@@ -1893,7 +1944,11 @@ pub fn move_marks_to_next_line(
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().borrow_mut();
 
-        m.move_to_start_of_line(&doc, v.text_codec.as_ref());
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
+        m.move_to_start_of_line(&doc, codec);
 
         doc.size() as u64
     };
@@ -2257,7 +2312,10 @@ pub fn cut_to_end_of_line(
     let pos = {
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
 
         for m in v.moving_marks.read().unwrap().iter() {
             let mut end = m.clone();
@@ -2271,7 +2329,11 @@ pub fn cut_to_end_of_line(
 
     // save buffer log idx
     assert!(pos > 0);
-    v.last_cut_log_index = Some(pos - 1);
+
+    let tm = v.modes.get_mut("text-mode").unwrap();
+    let tm = tm.downcast_mut::<TextMode>().unwrap();
+
+    tm.last_cut_log_index = Some(pos - 1);
 }
 
 pub fn paste(
@@ -2282,10 +2344,13 @@ pub fn paste(
 ) {
     let v = &mut view.as_ref().borrow();
 
-    if let Some(idx) = v.last_cut_log_index {
+    let tm = v.modes.get("text-mode").unwrap();
+    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
+
+    if let Some(idx) = tm.last_cut_log_index {
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
-        let codec = v.text_codec.as_ref();
 
         let tr = doc.buffer_log.data[idx].clone();
         let mut marks = v.moving_marks.write().unwrap();
@@ -2318,7 +2383,11 @@ pub fn move_to_token_start(
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
+
         let midx = v.mark_index;
 
         let mut marks = v.moving_marks.write().unwrap();
@@ -2351,7 +2420,10 @@ pub fn move_to_token_end(
         let v = &mut view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
-        let codec = v.text_codec.as_ref();
+
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+        let codec = tm.text_codec.as_ref();
 
         let mut marks = v.moving_marks.write().unwrap();
 
@@ -2384,16 +2456,18 @@ pub fn set_selection_point_at_mark(
     {
         let v = &mut view.as_ref().borrow_mut();
         let offset = {
-            let mut marks = v.moving_marks.read().unwrap();
+            let marks = v.moving_marks.read().unwrap();
             let m = &marks[v.mark_index];
             m.offset
         };
         // update selection point
-        v.select_point = Some(Mark { offset });
+        let tm = v.modes.get_mut("text-mode").unwrap();
+        let tm = tm.downcast_mut::<TextMode>().unwrap();
+        tm.select_point = Some(Mark { offset });
     }
 
     if sync
-    /* alwayd center ? */
+    /* always center ? */
     {
         env.view_pre_render.push(Action::CenterArroundMainMark);
     }
@@ -2503,7 +2577,10 @@ pub fn button_press(
     while i > 0 {
         if let Some(cpi) = screen.get_used_cpinfo(x, y) {
             // clear selection point
-            v.select_point = None;
+            // WARNING:
+            let tm = v.modes.get_mut("text-mode").unwrap();
+            let tm = tm.downcast_mut::<TextMode>().unwrap();
+            tm.select_point = None;
 
             // reset main mark
             v.mark_index = 0;
@@ -2592,7 +2669,9 @@ pub fn pointer_motion(
             if let Some(cpi) = screen.get_cpinfo(x, y) {
                 {
                     // update selection point
-                    v.select_point = Some(Mark {
+                    let tm = v.modes.get_mut("text-mode").unwrap();
+                    let tm = tm.downcast_mut::<TextMode>().unwrap();
+                    tm.select_point = Some(Mark {
                         offset: cpi.offset.unwrap(),
                     });
 

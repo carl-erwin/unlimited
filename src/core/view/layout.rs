@@ -666,11 +666,25 @@ pub struct HighlightSelectionFilter {
     sel_end_offset: u64,
 }
 
+// TODO: move highlight filter to text mode
+// must share selection point or
+// declare var 'selection-point' : value  -> language level ...
+// enum { type, value }
+// a dynamic variables storage for view
+// view.vars['selection-point'] -> &mut enum { int64, float64, string, Vec<u8> } | "C" api ...
+// view.modes[''] -> std::anny::Any
+//
+use crate::core::view::TextMode;
+
 impl HighlightSelectionFilter {
     fn new(_env: &LayoutEnv, view: &View) -> Self {
         let marks = view.moving_marks.read().unwrap();
+
+        let tm = view.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+
         let min = marks[0].offset;
-        let max = view.select_point.as_ref().unwrap().offset;
+        let max = tm.select_point.as_ref().unwrap().offset;
         let (min, max) = if min > max { (max, min) } else { (min, max) };
 
         HighlightSelectionFilter {
@@ -1113,7 +1127,10 @@ pub fn run_view_render_filters_direct(
 
         filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
 
-        if view.select_point.is_some() {
+        let tm = view.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
+
+        if tm.select_point.is_some() {
             filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
         }
     }
