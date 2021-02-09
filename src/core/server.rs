@@ -277,13 +277,15 @@ pub fn save_document(
     let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
 }
 
-pub fn build_action_map() -> ActionMap {
+// TODO: CoreMode ? quit/force-quit
+pub fn build_core_action_map() -> ActionMap {
     let mut map: ActionMap = HashMap::new();
 
     // core
     register_action(&mut map, "application:quit", application_quit);
     register_action(&mut map, "application:quit-abort", application_quit_abort);
-    register_action(&mut map, "save-document", save_document);
+
+    register_action(&mut map, "save-document", save_document); // core ?
 
     map
 }

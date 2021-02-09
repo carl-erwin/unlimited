@@ -12,7 +12,7 @@ use crate::core::view;
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
-use crate::core::server::build_action_map;
+use crate::core::server::build_core_action_map;
 
 use std::marker::PhantomData;
 
@@ -44,9 +44,10 @@ pub struct EditorEnv<'a> {
     // reset on each event handling
     pub view_pre_render: Vec<view::Action>,
     pub view_post_render: Vec<view::Action>,
+
     pub center_offset: Option<u64>,
     pub cur_mark_index: Option<usize>,
-    pub max_offset: u64,
+    pub max_offset: u64, // remove this, doc property
 }
 
 impl<'a> EditorEnv<'a> {
@@ -61,7 +62,7 @@ impl<'a> EditorEnv<'a> {
             phantom: PhantomData,
             quit: false,
             status: String::new(),
-            action_map: build_action_map(),
+            action_map: build_core_action_map(),
             input_map,
             current_node: None,
             next_node: None,
