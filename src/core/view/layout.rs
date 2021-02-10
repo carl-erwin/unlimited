@@ -169,11 +169,17 @@ pub trait Filter<'a> {
         // default
         *output = input.clone();
     }
+
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+        // default
+    }
 }
 
 // content_type == unicode
 #[derive(Debug, Clone)]
 pub enum FilterData {
+    EndOfStream,
+
     ByteArray {
         vec: Vec<u8>,
     },
@@ -201,8 +207,6 @@ pub enum FilterData {
 pub struct FilterIoData {
     // general info
     metadata: bool,
-    end_of_pipe: bool, // skip
-    quit: bool,        // close pipeline
 
     is_selected: bool,
     color: (u8, u8, u8),
@@ -220,8 +224,6 @@ impl FilterIoData {
         if let &FilterIoData {
             // general info
             metadata,
-            end_of_pipe, // skip
-            quit,        // close pipeline
             is_selected,
             color,
             bg_color,
@@ -240,8 +242,6 @@ impl FilterIoData {
             return FilterIoData {
                 // general info
                 metadata,
-                end_of_pipe, // skip
-                quit,        // close pipeline
                 is_selected,
                 offset: from_offset,
                 color,
@@ -313,13 +313,16 @@ impl Filter<'_> for RawDataFilter {
 
             let rd = doc.borrow().read(self.pos, self.read_size, &mut raw_data);
 
-            dbg_println!("READ from {} : {} / {} bytes", self.pos, rd, self.read_size);
+            dbg_println!(
+                "READ from offset({}) : {} / {} bytes",
+                self.pos,
+                rd,
+                self.read_size
+            );
 
             if rd > 0 {
                 (*filter_out).push(FilterIoData {
                     metadata: false,
-                    end_of_pipe: false,
-                    quit: false, // close pipeline
                     is_selected: false,
                     color: CodepointInfo::default_color(),
                     bg_color: CodepointInfo::default_bg_color(),
@@ -332,27 +335,23 @@ impl Filter<'_> for RawDataFilter {
             if rd < self.read_size {
                 env.quit = true;
 
-                // TODO: only text-mode add special tag end-of-stream, add filter-end-of-stream -> ' '
-                // for now eof handling -> fake ' ' @ end of stream
-
-                dbg_println!("EOF");
-
                 (*filter_out).push(FilterIoData {
-                    metadata: true,
-                    end_of_pipe: true,
-                    quit: false, // close pipeline
-                    is_selected: true,
+                    metadata: false,
+                    is_selected: false,
                     color: CodepointInfo::default_color(),
                     bg_color: CodepointInfo::default_bg_color(),
                     offset: Some(self.pos + rd as u64),
-                    size: 1,
-                    data: FilterData::Byte { val: b' ' },
+                    size: 0,
+                    data: FilterData::EndOfStream,
                 });
+
+                dbg_println!("EOF");
             }
 
             self.pos += rd as u64;
 
             // increase read size at every call
+            // TODO: find better default size
             if self.read_size < 1024 * 1024 {
                 self.read_size += env.screen.width();
             }
@@ -367,7 +366,6 @@ struct Utf8FilterCtx {
     codep: u32,
     cp_size: usize,
     cp_index: u64,
-    end_of_pipe: bool,
 }
 
 fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>) {
@@ -376,8 +374,6 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
             let io = FilterIoData {
                 // general info
                 metadata: false,
-                end_of_pipe: ctx.end_of_pipe,
-                quit: false, // close pipeline
                 is_selected: false,
                 color: CodepointInfo::default_color(),
                 bg_color: CodepointInfo::default_bg_color(),
@@ -407,8 +403,6 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
             let io = FilterIoData {
                 // general info
                 metadata: false,
-                end_of_pipe: ctx.end_of_pipe,
-                quit: false, // close pipeline
                 is_selected: false,
                 color: CodepointInfo::default_color(),
                 bg_color: CodepointInfo::default_bg_color(),
@@ -423,6 +417,7 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
                     fragment_count: 0,
                 },
             };
+
             filter_out.push(io);
 
             // restart @ next byte
@@ -470,7 +465,6 @@ impl Filter<'_> for Utf8Filter {
             codep: 0,
             cp_size: 0,
             cp_index: 0,
-            end_of_pipe: false,
         };
 
         for d in filter_in {
@@ -485,13 +479,24 @@ impl Filter<'_> for Utf8Filter {
 
                 // TODO: add special type for end on stream ?
                 FilterData::Byte { val } => {
-                    ctx.end_of_pipe = d.end_of_pipe;
                     ctx.cp_size += 1;
                     ctx.state = utf8::decode_byte(ctx.state, *val, &mut ctx.codep);
                     filter_utf8_byte(&mut ctx, &mut filter_out);
+                    dbg_println!(
+                        "UTF8 : EOF reached (out:len {}) post last filter_utf8_byte",
+                        filter_out.len()
+                    );
                 }
 
-                _ => { /* unexpected */ }
+                FilterData::EndOfStream => {
+                    filter_out.push(d.clone());
+                }
+
+                _ => {
+                    /* unexpected */
+                    dbg_println!("receive unexpedted io {:?}", d.data);
+                    panic!("");
+                }
             }
         }
 
@@ -667,6 +672,10 @@ impl Filter<'_> for WordWrapFilter {
         }
 
         dbg_println!("self.accum.len() {}", self.accum.len());
+
+        // flush remaining accumulated data
+        filter_out.append(&mut self.accum);
+        self.accum_count = 0;
     }
 }
 
@@ -788,8 +797,6 @@ impl Filter<'_> for HighlightFilter {
         filter_out: &mut Vec<FilterIoData>,
     ) {
         for io in filter_in {
-            let eof = io.end_of_pipe;
-
             match &*io {
                 FilterIoData {
                     data: FilterData::Unicode { cp, .. },
@@ -819,20 +826,13 @@ impl Filter<'_> for HighlightFilter {
                     if self.token_io.len() == 0 {
                         dbg_println!("self.token_io.len() == 0");
 
-                        if eof {
-                            dbg_println!("EOF");
-                            filter_out.push(io.clone());
-                        } else {
-                            self.token_io.push(io.clone());
-                            self.token_type = token_type;
-                        }
+                        self.token_io.push(io.clone());
+                        self.token_type = token_type;
+
                         continue;
                     }
 
-                    if !eof
-                        && token_type == self.token_type
-                        && token_type != TokenType::InvalidUnicode
-                    {
+                    if token_type == self.token_type && token_type != TokenType::InvalidUnicode {
                         self.token_io.push(io.clone());
                         continue;
                     }
@@ -935,20 +935,30 @@ impl Filter<'_> for HighlightFilter {
                     }
                     filter_out.append(&mut self.token_io);
 
-                    if eof {
-                        filter_out.push(io.clone());
-                        assert!(self.token_io.len() == 0);
-                    } else {
-                        // prepare next token
-                        self.token_io.push(io.clone());
+                    // prepare next token
+                    self.token_io.push(io.clone());
 
-                        // reset state
-                        self.utf8_token.clear();
-                        self.new_color = CodepointInfo::default_color();
+                    // reset state
+                    self.utf8_token.clear();
+                    self.new_color = CodepointInfo::default_color();
+                }
+
+                FilterIoData {
+                    data: FilterData::EndOfStream,
+                    ..
+                } => {
+                    // flush pending token: set color
+                    for mut io in self.token_io.iter_mut() {
+                        io.color = self.new_color;
                     }
+                    filter_out.append(&mut self.token_io);
+
+                    // push eof tag
+                    filter_out.push(io.clone());
                 }
 
                 _ => {
+                    dbg_println!("unexpected {:?}", io);
                     panic!("");
                 }
             }
@@ -986,6 +996,7 @@ impl Filter<'_> for ScreenFilter {
         // start offset
         let base_offset = filter_in[0].offset;
 
+        // here ?
         if self.first_offset.is_none() {
             env.screen.first_offset = base_offset.clone();
             self.first_offset = base_offset.clone();
@@ -1002,41 +1013,35 @@ impl Filter<'_> for ScreenFilter {
             env.screen.push_capacity()
         );
 
-        let remain = env.screen.push_available();
         dbg_println!(
             "ScreenFilter :  env.screen.push_available(); {}",
             env.screen.push_available()
         );
         // env.quit = true;
-        for (idx, io) in filter_in.iter().enumerate() {
-            if let FilterIoData {
-                metadata,
-                offset,
-                data: FilterData::Unicode { cp, .. },
-                is_selected,
-                color,
-                bg_color,
-                ..
-            } = &*io
-            {
-                // screen.push_available() + screen.push_count() == screen.push_capacity()
-                let cp = filter_codepoint(
-                    u32_to_char(*cp),
-                    offset.clone(),
-                    *is_selected,
-                    *color,
-                    *bg_color,
-                    *metadata,
-                );
-
-                cpis_vec.push(cp);
-
-                if idx == remain {
-                    dbg_println!("ScreenFilter : screen eof reached !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                    break;
+        for io in filter_in.iter() {
+            match io.data {
+                FilterData::EndOfStream => {
+                    // _filter_out.push(io.clone());
+                    // fak space here ?
                 }
-            } else {
-                panic!("invalid input type");
+
+                FilterData::Unicode { cp, .. } => {
+                    // screen.push_available() + screen.push_count() == screen.push_capacity()
+                    let cp = filter_codepoint(
+                        u32_to_char(cp),
+                        io.offset.clone(),
+                        io.is_selected,
+                        io.color,
+                        io.bg_color,
+                        io.metadata,
+                    );
+
+                    cpis_vec.push(cp);
+                }
+
+                _ => {
+                    panic!("invalid input type");
+                }
             }
         }
 
@@ -1050,6 +1055,28 @@ impl Filter<'_> for ScreenFilter {
         // TODO: add filter.finish(env)
 
         // remove this: add filter.finish() pass
+    }
+
+    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
+        // default
+
+        let offset = if let Some(offset) = env.screen.last_offset {
+            offset + 1
+        } else {
+            0
+        };
+
+        let cpis_vec = vec![filter_codepoint(
+            u32_to_char(' ' as u32),
+            Some(offset),
+            false,
+            CodepointInfo::default_color(),
+            CodepointInfo::default_bg_color(),
+            false,
+        )];
+
+        let (n, _, _last_offset) = env.screen.append(&cpis_vec);
+
         env.screen.doc_max_offset = env.max_offset;
     }
 }
@@ -1145,10 +1172,10 @@ pub fn run_view_render_filters_direct(
     }
 
     // TODO: fix tab expansion whith binary data ;-)
-    filters.push(Box::new(TabFilter::new(&layout_env, &view)));
+    //    filters.push(Box::new(TabFilter::new(&layout_env, &view)));
 
     // TODO: disable word wrapping on non text input
-    filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
+    //    filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
 
     filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
 
@@ -1170,7 +1197,13 @@ pub fn run_view_render_filters_direct(
         //break;
     }
 
-    assert_ne!(0, layout_env.screen.push_count());
+    for f in &mut filters {
+        f.finish(&view, &mut layout_env);
+    }
+
+    // not really, when computing marks
+    // the virtual screen can be empty...
+    // assert_ne!(0, layout_env.screen.push_count());
 
     // for f in filters { f.finish(); }
 }

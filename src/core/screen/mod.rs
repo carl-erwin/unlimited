@@ -202,7 +202,11 @@ impl Screen {
         let (ok, _) = line.push(cpi);
 
         if ok {
+            if self.push_count == 0 {
+                self.first_offset = cpi.offset.clone();
+            }
             self.last_offset = cpi.offset.clone();
+            // remember
 
             self.push_count += 1;
 

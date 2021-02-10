@@ -391,6 +391,15 @@ impl<'a> View<'a> {
 
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
+
+        let max_offset = self.document().as_ref().unwrap().borrow().size();
+
+        let marks = self.moving_marks.read().unwrap();
+        for m in marks.iter() {
+            if m.offset > max_offset as u64 {
+                panic!("");
+            }
+        }
     }
 
     /* TODO: use nb_lines
@@ -1712,6 +1721,7 @@ pub fn move_on_screen_mark_to_next_line(
         if l.nb_cells > 0 {
             let new_x = ::std::cmp::min(x, l.nb_cells - 1);
             let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
+
             m.offset = cpi.offset.unwrap();
         } else {
             // l.nb_cells == 0, the line is empty do nothing
@@ -1892,6 +1902,7 @@ pub fn move_mark_to_next_line(
     Some((old_offset, m_offset))
 }
 
+// CEG: BUG eof offset == doc.size()
 pub fn move_marks_to_next_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -1919,14 +1930,12 @@ pub fn move_marks_to_next_line(
 
         dbg_println!("max_offset {} - min_offset {}", max_offset, min_offset);
 
-        let add_lines = (max_offset - min_offset) as usize / width;
-
         /*
           NB : the virtual screen MUST but big enough to compute the marks on the the last line
-           2 => 1 + 1 (potential line wrapping)
-           add_lines can be 0
         */
-        let height = screen.height() + 2 + add_lines;
+        let height = screen.height() * 2;
+
+        dbg_println!("current screen : {} x {}", screen.width(), screen.height());
 
         dbg_println!("new virtual screen : {} x {}", width, height);
 
@@ -1952,13 +1961,25 @@ pub fn move_marks_to_next_line(
 
         m.move_to_start_of_line(&doc, codec);
 
-        doc.size() as u64
+        let doc_size = doc.size() as u64;
+
+        if doc_size > 0 {
+            assert!(m.offset < doc_size);
+        }
+
+        doc_size
     };
 
-    dbg_println!("max_offset {}", max_offset);
-
+    // TODO: add eof in conditions
+    // find a way to transform while loops into iterator over screens
+    // document_walk ? ...
     while idx_start < idx_max {
         dbg_println!(" idx_start {} < idx_max {}", idx_start, idx_max);
+
+        dbg_println!(
+            "looking for marks[idx_start].offset = {}",
+            marks[idx_start].offset
+        );
 
         // update screen with configure filters
         screen.clear();
@@ -1968,7 +1989,8 @@ pub fn move_marks_to_next_line(
         run_view_render_filters_direct(env, &v, m.offset, max_offset, &mut screen);
 
         dbg_println!("screen first offset {:?}", screen.first_offset);
-        dbg_println!("screen first offset {:?}", screen.last_offset);
+        dbg_println!("screen last offset {:?}", screen.last_offset);
+        dbg_println!("max_offset {}", max_offset);
 
         assert_ne!(0, screen.push_count());
 
@@ -1985,9 +2007,26 @@ pub fn move_marks_to_next_line(
         }
         let last_line = last_line.unwrap();
 
+        // go to next screen
+        // using the firt offset of the last line
+        if let Some(cpi) = last_line.get_first_cpi() {
+            let last_line_first_offset = cpi.offset.unwrap(); // update next screen start offset
+            dbg_println!("last_line_first_offset {}", last_line_first_offset);
+        } else {
+            panic!();
+        }
+
         // idx_start not on screen  ? ...
         if !screen.contains_offset(marks[idx_start].offset) {
-            dbg_println!("offset not found on screen go to next screen");
+            dbg_println!(
+                "offset {} not found on screen go to next screen",
+                marks[idx_start].offset
+            );
+
+            if screen.contains_offset(max_offset) {
+                // EOF reached
+                break;
+            }
 
             // go to next screen
             // using the firt offset of the last line
@@ -2013,6 +2052,9 @@ pub fn move_marks_to_next_line(
         for i in idx_start..idx_end {
             let ret = move_on_screen_mark_to_next_line(&mut marks[i], &screen);
             assert!(ret.0, true);
+            if max_offset > 0 {
+                //                assert!(marks[i].offset < max_offset);
+            }
         }
 
         idx_start = idx_end; // next mark index

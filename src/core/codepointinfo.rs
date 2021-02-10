@@ -8,7 +8,8 @@ pub struct CodepointInfo {
     pub metadata: bool,      // offset cannot be used
     pub cp: char,            // the real codepoint
     pub displayed_cp: char,  // the displayed codepoint
-    pub offset: Option<u64>, //
+    pub offset: Option<u64>, // TODO: Option<(u64, usize)>, back end size (codec)
+
     // TODO: add n/m fragments ie tabs ?
     // TODO: add real_size ? in bytes
 
