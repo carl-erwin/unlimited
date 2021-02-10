@@ -109,7 +109,6 @@ pub fn main_loop(
 
     crossterm::terminal::enable_raw_mode()?;
 
-    let mut draw_marks = true;
     while !ui_state.quit {
         // check terminal size
         let (width, height) = crossterm::terminal::size().ok().unwrap();
@@ -224,7 +223,7 @@ fn draw_view(
     let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
 }
 
-fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
+fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
     queue!(stdout, ResetColor)?;
 
     for li in 0..screen.height() {
@@ -643,7 +642,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 };
             }
 
-            ::crossterm::event::MouseEventKind::Drag(button) => {
+            ::crossterm::event::MouseEventKind::Drag(_button) => {
                 // TODO: no Drag event in the editor yet ?
                 // TODO: filter drgged button
 

@@ -1,7 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
 use std::sync::mpsc::Sender;
-use std::{borrow::Borrow, sync::mpsc::Receiver};
+use std::sync::mpsc::Receiver;
 
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -178,10 +178,10 @@ pub struct TextMode {
 }
 
 impl TextMode {
-    fn new(mut env: &mut EditorEnv /* parent view id */) -> Self {
+    fn new(env: &mut EditorEnv /* parent view id */) -> Self {
         dbg_println!("TextMode");
 
-        let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
+        let _moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
 
         Self::register_actions(&mut env.action_map);
 
@@ -930,7 +930,7 @@ pub fn update_view(
 // text mode functions
 pub fn editor_cancel(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -1735,8 +1735,8 @@ pub fn move_mark_to_next_line(
     let max_offset = env.max_offset;
 
     // offscreen ?
-    let mut m_offset = 0;
-    let mut old_offset = 0;
+    let mut m_offset;
+    let old_offset;
 
     {
         let v = view.as_ref().borrow_mut();
@@ -2453,7 +2453,7 @@ pub fn set_selection_point_at_mark(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let mut sync = false;
+    let sync = false;
 
     {
         let v = &mut view.as_ref().borrow_mut();
