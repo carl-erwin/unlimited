@@ -86,7 +86,8 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         }
     };
 
-    if false {
+    // TEST incremental mark rendering
+    if true {
         // draw marks
         let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
         let mut fetch_mark = true;
