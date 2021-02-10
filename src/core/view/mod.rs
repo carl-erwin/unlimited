@@ -1702,37 +1702,44 @@ pub fn move_on_screen_mark_to_next_line(
     m: &mut Mark,
     screen: &Screen,
 ) -> (bool, Option<(u64, u64)>, Option<Action>) {
+    // TODO: add hints: check in screen range
     if !screen.contains_offset(m.offset) {
         return (false, None, None);
     }
 
-    // yes get coordinates
+    // get offset coordinates
     let (_, x, y) = screen.find_cpi_by_offset(m.offset);
     let screen_height = screen.height();
 
-    //dbg_println!("m.offset screen (X({}), Y({}))", x, y);
-    //dbg_println!("screen_height {}", screen_height);
+    // dbg_println!("m.offset screen (X({}), Y({}))", x, y);
+    // dbg_println!("screen_height {}", screen_height);
 
-    // not last line -> on screen move ?
-    if y < screen_height - 1 {
-        let new_y = y + 1;
-        let l = screen.get_line(new_y).unwrap();
-        let old_offset = m.offset;
-        if l.nb_cells > 0 {
-            let new_x = ::std::cmp::min(x, l.nb_cells - 1);
-            let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
-
-            m.offset = cpi.offset.unwrap();
-        } else {
-            // l.nb_cells == 0, the line is empty do nothing
-        }
-
-        (true, Some((old_offset, m.offset)), None)
-    } else {
+    // mark on last line -> must scroll
+    let new_y = y + 1;
+    if new_y >= screen_height {
         // mark on last screen line cannot be updated
         assert_eq!(y, screen_height - 1);
-        (false, None, Some(Action::ScrollDown { n: 1 }))
+        return (false, None, Some(Action::ScrollDown { n: 1 }));
     }
+
+    // new_y < screen_height
+    let l = screen.get_line(new_y).unwrap();
+    if l.nb_cells == 0 {
+        // line is empty do nothing
+        return (true, Some((m.offset, m.offset)), None);
+    }
+
+    // l.nb_cells > 0
+    let new_x = ::std::cmp::min(x, l.nb_cells - 1);
+    let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
+
+    let old_offset = m.offset;
+    m.offset = cpi.offset.unwrap();
+
+    dbg_println!("update mark : offset => {} -> {}", old_offset, m.offset);
+
+    // ok
+    (true, Some((old_offset, m.offset)), None)
 }
 
 // remove multiple borrows
