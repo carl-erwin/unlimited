@@ -1719,6 +1719,7 @@ pub fn move_on_screen_mark_to_next_line(
 
         (true, Some((old_offset, m.offset)), None)
     } else {
+        // mark on last screen line cannot be updated
         assert_eq!(y, screen_height - 1);
         (false, None, Some(Action::ScrollDown { n: 1 }))
     }
@@ -1913,19 +1914,19 @@ pub fn move_marks_to_next_line(
 
         let width = screen.width();
 
-        /*
-         * NB: 1 is for the first line of the next screen
-         *  1 + (max - min) / screen_width   more lines
-         */
-
         let min_offset = marks[0].offset;
         let max_offset = marks[idx_max - 1].offset;
+
         dbg_println!("max_offset {} - min_offset {}", max_offset, min_offset);
 
-        // TODO: max - min overflow
         let add_lines = (max_offset - min_offset) as usize / width;
 
-        let height = screen.height() + 1 + add_lines;
+        /*
+          NB : the virtual screen MUST but big enough to compute the marks on the the last line
+           2 => 1 + 1 (potential line wrapping)
+           add_lines can be 0
+        */
+        let height = screen.height() + 2 + add_lines;
 
         dbg_println!("new virtual screen : {} x {}", width, height);
 
