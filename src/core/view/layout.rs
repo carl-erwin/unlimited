@@ -606,19 +606,25 @@ impl Filter<'_> for WordWrapFilter {
             } = &*io
             {
                 match (self.prev_cp, u32_to_char(*cp)) {
-                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' || codepoint == '�' =>
+                    // TODO: split case
+                    // blank separator
+                    // new line separator
+                    // should we consider '�' like normal char ?
+                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' /* || codepoint == '�' */ =>
                     {
-                        if codepoint != '�'
+                        // NB: ' ' at end of line acts like '\n'
+                        if codepoint != ' ' /* && codepoint != '�' */
                             && self.column_count + self.accum_count >= self.max_column
                         {
                             // push artificial new line and flush: TODO update metadata flags
                             if self.column_count > 0 {
+                                // insert new line only if previous data was seen
                                 let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
                                 new_io.metadata = true;
                                 new_io.color = (0, 255, 0);
                                 new_io.offset = Some(self.prev_offset);
                                 filter_out.push(new_io);
-                                self.column_count = 0;
+                                self.column_count = 0; // reset column counter
                             }
 
                             // flush accumulated data
@@ -627,13 +633,16 @@ impl Filter<'_> for WordWrapFilter {
                             self.accum_count = 0;
                             self.column_count += n;
                             self.column_count %= self.max_column;
+
                         } else {
+                            // current word fits
                             let n = self.accum_count;
                             filter_out.append(&mut self.accum);
                             self.accum_count = 0;
                             self.column_count += n;
                         }
 
+                        // append current separator
                         self.prev_offset = io.offset.unwrap();
                         self.prev_cp = codepoint;
                         let new_io = io.clone();
