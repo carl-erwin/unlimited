@@ -369,6 +369,8 @@ struct Utf8FilterCtx {
 }
 
 fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>) {
+    ctx.cp_size += 1; // HERE ?
+
     match ctx.state {
         utf8::UTF8_ACCEPT => {
             let io = FilterIoData {
@@ -394,8 +396,10 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
             ctx.cp_index += 1;
             ctx.from_offset += ctx.cp_size as u64;
 
+            // restart
             ctx.codep = 0;
             ctx.cp_size = 0;
+            ctx.state = 0; // TODO: enum
         }
 
         utf8::UTF8_REJECT => {
@@ -424,8 +428,10 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, filter_out: &mut Vec<FilterIoData>)
             ctx.cp_index += 1;
             ctx.from_offset += 1 as u64;
 
+            // restart
             ctx.codep = 0;
             ctx.cp_size = 0;
+            ctx.state = 0; // reset state on error
         }
         _ => { /* need more data */ }
     }
@@ -471,7 +477,6 @@ impl Filter<'_> for Utf8Filter {
             match &d.data {
                 FilterData::ByteArray { vec } => {
                     for val in vec {
-                        ctx.cp_size += 1;
                         ctx.state = utf8::decode_byte(ctx.state, *val, &mut ctx.codep);
                         filter_utf8_byte(&mut ctx, &mut filter_out);
                     }
@@ -479,7 +484,6 @@ impl Filter<'_> for Utf8Filter {
 
                 // TODO: add special type for end on stream ?
                 FilterData::Byte { val } => {
-                    ctx.cp_size += 1;
                     ctx.state = utf8::decode_byte(ctx.state, *val, &mut ctx.codep);
                     filter_utf8_byte(&mut ctx, &mut filter_out);
                     dbg_println!(
