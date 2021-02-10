@@ -16,10 +16,10 @@ use unlimited::core::config::Config;
 use unlimited::core::VERSION;
 use unlimited::ui;
 
-/// program entry point
+/// Program entry point
 /// It parses the command line to build the configuration.
 /// Creates the core thread.
-/// Nb: the ui is kept in the main thread
+/// Nb: the ui created and ran the main thread
 fn main() {
     // parse user command line
     let config = parse_command_line();
@@ -46,6 +46,7 @@ fn main() {
     }
 }
 
+/// Parse command and an return a Config
 fn parse_command_line() -> Config {
     let matches = App::new("unlimited")
         .version(VERSION)
