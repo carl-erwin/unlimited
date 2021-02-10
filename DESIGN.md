@@ -119,5 +119,5 @@ We want the Ui (the view) to pilot the Core (model/controller):<br/>
 - run selected ui main loop (in the main thread)<br/>
 
  **Ui main loop**<br>
- - the ui(s) request the list of opened Documents
- - and from there the ui can request layout for a given Document
+ - the ui(s) received a screen from the core (first command line argument)
+ - and from there the ui can send input event to core

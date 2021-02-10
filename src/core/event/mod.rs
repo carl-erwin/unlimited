@@ -18,9 +18,7 @@ use crate::core::screen::Screen;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::core::mark::Mark;
-
-////////////////
+//
 // TODO: implement functions ti update the counters
 // on send (++) / receive (--)
 // add per Event counters
@@ -83,8 +81,6 @@ pub enum Event {
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     DrawEvent {
         screen: Arc<RwLock<Box<Screen>>>,
-        marks: Arc<RwLock<Vec<Mark>>>,
-        // TODO: selection
         time: Instant,
     },
 

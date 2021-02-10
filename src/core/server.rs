@@ -1,7 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::{borrow::Borrow, sync::mpsc::Receiver};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -27,6 +27,9 @@ use crate::core::view;
 use crate::core::view::update_view;
 
 use crate::core::screen::Screen;
+
+use crate::core::codepointinfo::CodepointInfo;
+use crate::core::mark::Mark;
 
 use crate::core::event::input_map::eval_input_event;
 
@@ -63,24 +66,141 @@ pub fn update_view_and_send_draw_event(
     send_draw_event(&mut editor, ui_tx, &view);
 }
 
+// move to core: and later transform into RenderFilter
+// SLOW
+// we should iterate over the screen
+// find the first mark
+pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
+    if !set {
+        screen_apply(screen, |_, _, cpi| {
+            cpi.is_selected = false; /* will blink */
+            true // continue
+        });
+        return;
+    }
+
+    let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
+        (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
+        _ => {
+            return;
+        }
+    };
+
+    if false {
+        // draw marks
+        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
+        let mut fetch_mark = true;
+        let mut mark_it = marks.iter();
+        screen_apply(screen, |_, _, cpi| {
+            if let Some(cpi_offset) = cpi.offset {
+                if fetch_mark {
+                    // get 1st  mark >= current cpi_offset
+                    loop {
+                        let m = mark_it.next();
+                        if m.is_none() {
+                            return false;
+                        }
+
+                        let m = m.unwrap();
+                        if m.offset < first_offset {
+                            continue;
+                        }
+
+                        if m.offset > last_offset {
+                            return false;
+                        }
+
+                        if m.offset >= cpi_offset {
+                            mark_offset = m.offset;
+                            break;
+                        }
+                    }
+                    fetch_mark = false;
+                }
+
+                if cpi_offset == mark_offset {
+                    cpi.is_selected = !cpi.metadata;
+                } else {
+                    //
+                    if mark_offset < cpi_offset {
+                        fetch_mark = true;
+                    }
+                }
+            }
+
+            true
+        });
+    } else {
+        //
+        for m in marks.iter() {
+            //dbg_println!(" checking m.offset {}", m.offset);
+
+            // the marks are sorted
+            if m.offset < first_offset {
+                continue;
+            }
+
+            if m.offset > last_offset {
+                break;
+            }
+
+            for l in 0..screen.height() {
+                let line = screen.get_mut_line(l).unwrap();
+
+                for c in 0..line.nb_cells {
+                    let cpi = line.get_mut_cpi(c).unwrap();
+
+                    if set {
+                        if let Some(cpi_offset) = cpi.offset {
+                            if cpi_offset == m.offset {
+                                cpi.is_selected = !cpi.metadata;
+                            }
+                        }
+                    } else {
+                        cpi.is_selected = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// move to screen module , rename walk/map ?
+fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_mut_line(l) {
+            for c in 0..line.nb_cells {
+                if let Some(cpi) = line.get_mut_cpi(c) {
+                    if on_cpi(c, l, cpi) == false {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn send_draw_event(
     _editor: &mut Editor,
     ui_tx: &Sender<EventMessage>,
     view: &Rc<RefCell<View>>,
 ) {
     let view = view.as_ref().borrow();
-    let new_screen = Arc::clone(&view.screen);
 
-    // TODO: move : marks to mode
-    // remove marks from rendering
-    // ...
-    let marks = Arc::clone(&view.moving_marks);
+    // render marks here for now
+    let marks = view.moving_marks.read().unwrap();
+
+    refresh_screen_marks(&mut view.screen.write().as_mut().unwrap(), &marks, true);
+
+    let new_screen = Arc::clone(&view.screen);
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
         DrawEvent {
             screen: new_screen,
-            marks,
             time: Instant::now(),
         },
     );
@@ -246,9 +366,11 @@ pub fn application_quit(
 ) {
     env.status = "<quit>".to_string();
 
-    let doc = &view.as_ref().borrow();
-    let doc = doc.document.as_ref().unwrap();
-    if doc.borrow().changed {
+    let v = &view.as_ref().borrow();
+    let doc = v.document.as_ref().unwrap();
+    let doc = doc.as_ref().borrow();
+
+    if doc.changed {
         env.status = "<quit> : modified buffer exits. type F4 to quit without saving".to_string();
     } else {
         env.quit = true;

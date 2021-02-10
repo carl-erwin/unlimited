@@ -112,11 +112,7 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent {
-                    screen,
-                    marks: _,
-                    time: _,
-                } => {
+                DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
                     let mut draw = false;
 

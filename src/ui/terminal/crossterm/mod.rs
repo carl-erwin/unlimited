@@ -22,8 +22,6 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-use std::sync::Arc;
-use std::sync::RwLock;
 use std::vec::Vec;
 
 use std::thread;
@@ -43,7 +41,6 @@ use crate::core::event::PointerEvent;
 
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
-use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 
 //use crate::core::event::InputEvent::*;
@@ -94,8 +91,6 @@ pub fn main_loop(
     // ui ctx : TODO move to struct UiCtx
     let mut last_screen = Box::new(Screen::new(1, 1));
     let mut last_screen_rdr_time = Instant::now();
-
-    let mut last_marks: Option<Arc<RwLock<Vec<Mark>>>> = None;
 
     let mut request_layout = true;
 
@@ -148,11 +143,7 @@ pub fn main_loop(
                     break;
                 }
 
-                DrawEvent {
-                    screen,
-                    marks,
-                    time: _,
-                } => {
+                DrawEvent { screen, time: _ } => {
                     let start = Instant::now();
                     let mut draw = false;
 
@@ -177,10 +168,6 @@ pub fn main_loop(
                     if draw {
                         let screen = screen.read().unwrap();
                         let mut screen = screen.clone();
-                        last_marks = Some(Arc::clone(&marks));
-
-                        let marks = last_marks.as_ref().unwrap().read().unwrap();
-                        refresh_screen_marks(&mut screen, &marks, true);
 
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
                         //draw_screen_dumb(&screen, &mut stdout);
@@ -203,11 +190,7 @@ pub fn main_loop(
                 _ => {}
             }
         } else {
-            // on input timeout : blink
-            draw_marks = !draw_marks;
-            let marks = last_marks.as_ref().unwrap().read().unwrap();
-            refresh_screen_marks(&mut last_screen, &marks, draw_marks);
-            draw_screen_dumb(&last_screen, &mut stdout);
+            // on input timeout
         }
     }
 
@@ -225,122 +208,6 @@ pub fn main_loop(
     crossterm::terminal::disable_raw_mode()?;
 
     Ok(())
-}
-
-// move to screen module , rename walk/map ?
-fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
-    screen: &mut Screen,
-    mut on_cpi: F,
-) {
-    for l in 0..screen.height() {
-        if let Some(line) = screen.get_mut_line(l) {
-            for c in 0..line.nb_cells {
-                if let Some(cpi) = line.get_mut_cpi(c) {
-                    if on_cpi(c, l, cpi) == false {
-                        return;
-                    }
-                }
-            }
-        }
-    }
-}
-
-// SLOW
-// we should iterate over the screen
-// find the first mark
-pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
-    if !set {
-        screen_apply(screen, |_, _, cpi| {
-            cpi.is_selected = false; /* will blink */
-            true // continue
-        });
-        return;
-    }
-
-    let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
-        (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
-        _ => {
-            return;
-        }
-    };
-
-    if false {
-        // draw marks
-        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
-        let mut fetch_mark = true;
-        let mut mark_it = marks.iter();
-        screen_apply(screen, |_, _, cpi| {
-            if let Some(cpi_offset) = cpi.offset {
-                if fetch_mark {
-                    // get 1st  mark >= current cpi_offset
-                    loop {
-                        let m = mark_it.next();
-                        if m.is_none() {
-                            return false;
-                        }
-
-                        let m = m.unwrap();
-                        if m.offset < first_offset {
-                            continue;
-                        }
-
-                        if m.offset > last_offset {
-                            return false;
-                        }
-
-                        if m.offset >= cpi_offset {
-                            mark_offset = m.offset;
-                            break;
-                        }
-                    }
-                    fetch_mark = false;
-                }
-
-                if cpi_offset == mark_offset {
-                    cpi.is_selected = !cpi.metadata;
-                } else {
-                    //
-                    if mark_offset < cpi_offset {
-                        fetch_mark = true;
-                    }
-                }
-            }
-
-            true
-        });
-    } else {
-        //
-        for m in marks.iter() {
-            //dbg_println!(" checking m.offset {}", m.offset);
-
-            // the marks are sorted
-            if m.offset < first_offset {
-                continue;
-            }
-
-            if m.offset > last_offset {
-                break;
-            }
-
-            for l in 0..screen.height() {
-                let line = screen.get_mut_line(l).unwrap();
-
-                for c in 0..line.nb_cells {
-                    let cpi = line.get_mut_cpi(c).unwrap();
-
-                    if set {
-                        if let Some(cpi_offset) = cpi.offset {
-                            if cpi_offset == m.offset {
-                                cpi.is_selected = !cpi.metadata;
-                            }
-                        }
-                    } else {
-                        cpi.is_selected = false;
-                    }
-                }
-            }
-        }
-    }
 }
 
 /*
