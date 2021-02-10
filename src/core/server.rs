@@ -33,7 +33,13 @@ use crate::core::mark::Mark;
 
 use crate::core::event::input_map::eval_input_event;
 
-pub type ActionMap = HashMap<String, view::ModeFunction>; // kept in EditorEnv, transform into STACK of map
+// ActionMap is kept in EditorEnv
+// TODO:
+// Have a map per view
+// and if eval fails, fallback to EditorEnv's
+// It will allow per mode actions instanciate for each view
+// transform into STACK of map ?
+pub type ActionMap = HashMap<String, view::ModeFunction>;
 
 pub fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
     map.insert(s.to_string(), func);
