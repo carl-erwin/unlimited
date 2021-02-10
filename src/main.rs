@@ -1,14 +1,16 @@
 // Copyright (c) Carl-Erwin Griffith
 
-extern crate clap;
-extern crate unlimited;
-
-//
+// std
 use std::sync::mpsc::channel;
 use std::thread;
 
+// ext
+extern crate clap;
+extern crate unlimited;
+
 use clap::{App, Arg};
 
+// crate
 use unlimited::core;
 use unlimited::core::config::Config;
 use unlimited::core::VERSION;

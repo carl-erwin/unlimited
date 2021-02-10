@@ -1,37 +1,34 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::sync::mpsc::Sender;
-use std::sync::mpsc::Receiver;
-
+// std
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::RwLock;
-
 use std::time::Duration;
 use std::time::Instant;
 
+// ext
+
+// crate
+use crate::core::codepointinfo::CodepointInfo;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
-
+use crate::core::event::input_map::eval_input_event;
 use crate::core::event::Event;
 use crate::core::event::Event::DrawEvent;
-
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
-
-use crate::core::view::View;
-
+use crate::core::mark::Mark;
+use crate::core::screen::Screen;
 use crate::core::view;
 use crate::core::view::update_view;
+use crate::core::view::View;
 
-use crate::core::screen::Screen;
-
-use crate::core::codepointinfo::CodepointInfo;
-use crate::core::mark::Mark;
-
-use crate::core::event::input_map::eval_input_event;
+// local
 
 // ActionMap is kept in EditorEnv
 // TODO:
