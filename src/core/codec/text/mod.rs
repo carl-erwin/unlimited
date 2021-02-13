@@ -1,8 +1,15 @@
 // Copyright (c) Carl-Erwin Griffith
 
+// mode declaration
+pub mod utf8;
+
+// std
 use std::char;
 
-pub mod utf8;
+
+// ext
+
+// crate
 
 #[derive(Debug, Clone)]
 pub enum SyncDirection {
