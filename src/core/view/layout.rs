@@ -133,6 +133,7 @@ use crate::core::codepointinfo::CodepointInfo;
 use crate::core::screen::Screen;
 
 use crate::core::editor::EditorEnv;
+use crate::core::mark::Mark;
 use crate::core::view::View;
 
 pub struct LayoutEnv<'a> {
@@ -140,6 +141,7 @@ pub struct LayoutEnv<'a> {
     pub base_offset: u64,
     pub max_offset: u64,
     pub screen: &'a mut Screen,
+    pub main_mark: Mark,
 }
 
 // TODO: add ?
@@ -740,14 +742,12 @@ pub struct HighlightSelectionFilter {
 use crate::core::view::TextMode;
 
 impl HighlightSelectionFilter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
+    fn new(env: &LayoutEnv, view: &View) -> Self {
         // move the marks to mode ?
-        let marks = view.moving_marks.read().unwrap(); // dead lock
-
         let tm = view.modes.get("text-mode").unwrap();
         let tm = tm.downcast_ref::<TextMode>().unwrap();
 
-        let min = marks[0].offset;
+        let min = env.main_mark.offset;
         let max = tm.select_point.as_ref().unwrap().offset;
         let (min, max) = if min > max { (max, min) } else { (min, max) };
 
@@ -1178,9 +1178,10 @@ pub fn run_view_render_filters(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
+    main_mark: Mark,
 ) {
     let view = view.as_ref().borrow();
-    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen)
+    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen, main_mark)
 }
 
 // This function can be considered as the core of the editor.<br/>
@@ -1199,12 +1200,14 @@ pub fn run_view_render_filters_direct(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
+    main_mark: Mark,
 ) {
     let mut layout_env = LayoutEnv {
         quit: false,
         base_offset,
         max_offset,
         screen,
+        main_mark,
     };
 
     assert_eq!(0, layout_env.screen.push_count());
