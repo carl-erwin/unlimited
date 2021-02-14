@@ -65,6 +65,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
        { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
        { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
+
        { "in": [{ "key": "alt+w" } ],                            "action": "text-mode:copy-selection" },
        { "in": [{ "key": "ctrl+w" } ],                       "action": "text-mode:cut-selection" },
 

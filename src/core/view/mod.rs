@@ -177,6 +177,8 @@ pub struct TextMode {
     pub last_cut_log_index: Option<usize>,
 
     pub button_state: [u32; 8],
+
+    pub copy_selection: Vec<u8>,
 }
 
 impl TextMode {
@@ -194,6 +196,7 @@ impl TextMode {
             select_point: None,
             last_cut_log_index: None,
             button_state: [0; 8],
+            copy_selection: Vec::new(),
         }
     }
 
@@ -1746,8 +1749,8 @@ pub fn move_on_screen_mark_to_next_line(
     let (_, x, y) = screen.find_cpi_by_offset(m.offset);
     let screen_height = screen.height();
 
-    // dbg_println!("m.offset screen (X({}), Y({}))", x, y);
-    // dbg_println!("screen_height {}", screen_height);
+    dbg_println!("FOUND m.offset @ (X({}), Y({}))", x, y);
+    dbg_println!("screen_height {}", screen_height);
 
     // mark on last line -> must scroll
     let new_y = y + 1;
@@ -2445,38 +2448,61 @@ pub fn cut_to_end_of_line(
 
 pub fn paste(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow();
 
-    // TODO: check selection
-    {}
-
     let tm = v.modes.get("text-mode").unwrap();
     let tm = tm.downcast_ref::<TextMode>().unwrap();
-    let codec = tm.text_codec.as_ref();
 
-    if let Some(idx) = tm.last_cut_log_index {
-        let doc = v.document.as_ref().unwrap();
-        let mut doc = doc.as_ref().borrow_mut();
+    let doc = v.document.as_ref().unwrap();
+    let mut doc = doc.as_ref().borrow_mut();
 
-        let tr = doc.buffer_log.data[idx].clone();
-        let mut marks = v.moving_marks.write().unwrap();
-        for m in marks.iter_mut() {
-            let mut end = m.clone();
-            end.move_to_end_of_line(&doc, codec);
-            if let Some(ref data) = tr.data {
-                doc.insert(m.offset, data.len(), data.as_slice());
-                m.offset += data.len() as u64;
+    let mut marks = v.moving_marks.write().unwrap();
+
+    {
+        // save marks: TODO helper functions
+        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+    }
+
+    for m in marks.iter_mut() {
+        if tm.copy_selection.len() > 0 {
+            doc.insert(
+                m.offset,
+                tm.copy_selection.len(),
+                tm.copy_selection.as_slice(),
+            );
+            m.offset += tm.copy_selection.len() as u64;
+        } else {
+            // TODO: add perf mark paste buffer
+            if let Some(idx) = tm.last_cut_log_index {
+                let tr = doc.buffer_log.data[idx].clone();
+
+                if let Some(ref data) = tr.data {
+                    doc.insert(m.offset, data.len(), data.as_slice());
+                    m.offset += data.len() as u64;
+                }
             }
         }
-
-    // true
-    } else {
-        // false
     }
+
+    {
+        env.max_offset = doc.size() as u64;
+        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+    }
+
+    // // mark off_screen ?
+    // let screen = v.screen.read().unwrap();
+    // screen.contains_offset(offset) == false || array.len() > screen.width() * screen.height()
+    // };
+    //
+    // if center {
+    // env.view_pre_render.push(Action::CenterArroundMainMark);
+    // };
 }
 
 pub fn move_to_token_start(
@@ -2583,20 +2609,91 @@ pub fn set_selection_point_at_mark(
     }
 }
 
-pub fn copy_selection(
+pub fn copy_maybe_remove_selection(
     _editor: &mut Editor,
     env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
+    remove: bool,
 ) {
+    let v = &mut view.as_ref().clone().borrow_mut();
+
+    let mark_index = v.mark_index;
+
+    let doc = v.document.clone();
+    let doc = doc.as_ref().clone().unwrap();
+    let mut doc = doc.as_ref().borrow_mut();
+
+    // duplicate
+    let mut marks = {
+        let marks = v.moving_marks.read().unwrap();
+        marks.clone()
+    };
+
+    let m = { marks[mark_index].clone() };
+
+    let tm = v.modes.get_mut("text-mode").unwrap();
+    let tm = tm.downcast_mut::<TextMode>().unwrap();
+
+    dbg_println!("COPY SELECTION [{:?} {:?}]", m, tm.select_point);
+
+    if let Some(Mark { offset }) = tm.select_point.clone() {
+        if m.offset == offset {
+            // empty selection
+            return;
+        }
+
+        if remove == true {
+            // FIXME: RESTORE MARKS BEFORE remove
+            // save marks: TODO helper functions
+            let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+            doc.tag(env.max_offset, marks_offsets);
+        }
+
+        let (start, end) = if m.offset > offset {
+            (offset, m.offset)
+        } else {
+            (m.offset, offset)
+        };
+
+        let size = (end - start) as usize;
+        let mut data = Vec::with_capacity(size);
+        doc.read(start, size, &mut data);
+
+        if remove == true {
+            doc.remove(start, size, None);
+            marks[mark_index].offset = start;
+            let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+            env.max_offset = doc.size() as u64;
+            doc.tag(env.max_offset, marks_offsets);
+        }
+
+        tm.copy_selection = data;
+        tm.select_point = None;
+    }
+
+    // save back
+    let mut real_marks = v.moving_marks.write().unwrap();
+    *real_marks = marks;
+}
+
+// TODO: add help, + flag , copy_maybe_remove_selection()
+pub fn copy_selection(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    copy_maybe_remove_selection(editor, env, trigger, view, false);
 }
 
 pub fn cut_selection(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+    trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    copy_maybe_remove_selection(editor, env, trigger, view, true);
 }
 
 pub fn button_press(
