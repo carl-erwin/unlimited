@@ -6,7 +6,6 @@ pub mod utf8;
 // std
 use std::char;
 
-
 // ext
 
 // crate

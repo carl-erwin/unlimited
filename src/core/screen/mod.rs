@@ -22,6 +22,8 @@ pub struct Rect {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Screen {
     pub is_off_screen: bool, // Hints
+    pub has_eof: bool,       // Hints
+
     /// the underlying lines storage
     pub line: Vec<Line>,
     /// the index of the line filled with the push method
@@ -71,6 +73,7 @@ impl Screen {
         let push_capacity = width * height;
         Screen {
             is_off_screen: false,
+            has_eof: false,
             line,
             current_line_index: 0,
             clip: Rect {
@@ -238,6 +241,7 @@ impl Screen {
         for (idx, cpi) in cpi_vec.iter().enumerate() {
             let ret = self.push(*cpi);
             if ret.0 == false {
+                // cannot push screen full
                 return (idx, ret.1, self.last_offset);
             }
         }
@@ -249,6 +253,9 @@ impl Screen {
         for h in 0..self.max_height {
             self.line[h].clear();
         }
+        self.is_off_screen = false;
+        self.has_eof = false;
+
         self.current_line_index = 0;
         self.push_count = 0;
         self.push_capacity = self.max_width * self.max_height;
@@ -257,6 +264,10 @@ impl Screen {
         self.doc_max_offset = 0; // TODO: Option<u64>
         self.input_size = 0;
         self.set_clipping(0, 0, self.max_width, self.max_height);
+    }
+
+    pub fn has_eof(&self) -> bool {
+        self.has_eof
     }
 
     pub fn max_width(&self) -> usize {
@@ -484,12 +495,26 @@ impl Screen {
                     if cpi.metadata {
                         // continue;
                     }
+
                     if let Some(cpi_offset) = cpi.offset {
-                        if cpi_offset == offset {
+
+                        if offset == cpi_offset {
+                            return (Some(cpi), x, idx);
+                        }
+
+                        if cpi_offset < offset && offset < cpi_offset + cpi.size as u64 {
                             return (Some(cpi), x, idx);
                         }
                     }
                 }
+
+                dbg_println!("DUMP wrong line: we are looking for offset {}", offset);
+                for x in 0..l.width() {
+                    let cpi = l.get_cpi(x).unwrap();
+                    dbg_println!("cpi[{}] = {:?}", x, cpi);
+                }
+
+                panic!(""); // line is wrong
             } else if offset > last_offset {
                 min = idx + 1;
             } else {

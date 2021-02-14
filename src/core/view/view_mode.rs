@@ -43,7 +43,7 @@ ctrl+a, ctrl-v,
     pub fn move_mark_to_start_of_file(&mut self);
     pub fn center_arround_mark(&mut self);
     pub fn scroll_to_next_screen(&mut self);
-    pub fn scroll_down_offscreen(&mut self, max_offset: u64, nb_lines: usize);
+    pub fn scroll_down_off_screen(&mut self, max_offset: u64, nb_lines: usize);
     pub fn scroll_down(&mut self, nb_lines: usize);
 
     // buffer change
