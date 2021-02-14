@@ -732,7 +732,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 }
 
 /*
-  NB: There is a subbtle bug in crossterm input handling.
+  NB: There is a subtle bug in crossterm input handling.
 
       - Level-triggered polling was removed from mio (in 0.7.xx version)
       - On linux the (default) 0 1 2 fd points to the same pseudo terminal
@@ -755,50 +755,55 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 */
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
+    let mut wait_ms = 1000;
+    let min_wait_ms = 16;
 
     let mut start = Instant::now();
-    let mut wait_ms = 1000;
-    let mut flush_ms = 16;
+    let mut prev_ev_time = start;
 
+    let mut _2event_diff = 0;
+
+    let mut count = 0;
     loop {
-        if !::crossterm::event::poll(Duration::from_millis(wait_ms))? {
-            // timeout
-            if accum.is_empty() {
-                // restart accum timer
-                start = Instant::now();
+        if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
+            if let Ok(cross_evt) = ::crossterm::event::read() {
+                prev_ev_time = Instant::now();
+                let evt = translate_crossterm_event(cross_evt);
+                accum.push(evt);
             }
+        }
+
+        count += 1;
+
+        wait_ms = min_wait_ms;
+        if count == 1 {
+            // delay flush of 1st input event
+            // real start
+            start = Instant::now();
             continue;
         }
 
-        // nr pending ?
-        if let Ok(cross_evt) = ::crossterm::event::read() {
-            // move to send input events ?
-
-            // dbg_println!("receive crossterm event {:?}\r", cross_evt);
-
-            let evt = translate_crossterm_event(cross_evt);
-            accum.push(evt);
-
-            wait_ms = 1;
-
-            // input batch ? wait max 1000ms
-            if accum.len() > 255 {
-                flush_ms = ::std::cmp::min(flush_ms + 500, 1000);
-                wait_ms = flush_ms;
-            }
-
-            let el = start.elapsed();
-            if el > Duration::from_millis(flush_ms) {
-                // flush
-                break;
-            }
-        } else {
-            // handle read error
+        let d = prev_ev_time.elapsed();
+        //dbg_println!(
+        //    "INPUT: elapsed time between 2 events {:?} accum.len({})",
+        //    d,
+        //    accum.len()
+        //);
+        if d < Duration::from_millis(1) || start.elapsed() < Duration::from_millis(min_wait_ms) {
+            // batch input
+            continue;
         }
+
+        //dbg_println!(
+        //    "INPUT: start.elapsed() > min_wait_ms -> flush accum.len({})",
+        //    accum.len()
+        //);
+        break;
     }
 
     if !accum.is_empty() {
         send_input_events(&accum, tx);
     }
+
     Ok(())
 }
