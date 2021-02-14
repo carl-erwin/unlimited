@@ -497,7 +497,6 @@ impl Screen {
                     }
 
                     if let Some(cpi_offset) = cpi.offset {
-
                         if offset == cpi_offset {
                             return (Some(cpi), x, idx);
                         }

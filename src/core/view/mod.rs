@@ -58,6 +58,14 @@ pub type Id = u64;
 
 pub mod layout;
 
+fn sort_tuple_pair<T: PartialOrd>(t: (T, T)) -> (T, T) {
+    if t.0 > t.1 {
+        (t.1, t.0)
+    } else {
+        t
+    }
+}
+
 // TODO: move to editor
 pub type ModeFunction = fn(
     editor: &mut Editor,
@@ -2650,11 +2658,7 @@ pub fn copy_maybe_remove_selection(
             doc.tag(env.max_offset, marks_offsets);
         }
 
-        let (start, end) = if m.offset > offset {
-            (offset, m.offset)
-        } else {
-            (m.offset, offset)
-        };
+        let (start, end) = sort_tuple_pair((offset, m.offset));
 
         let size = (end - start) as usize;
         let mut data = Vec::with_capacity(size);
