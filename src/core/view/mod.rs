@@ -312,6 +312,10 @@ impl TextMode {
             set_selection_point_at_mark,
         );
 
+        register_action(&mut map, "text-mode:copy-selection", copy_selection);
+
+        register_action(&mut map, "text-mode:cut-selection", cut_selection);
+
         register_action(&mut map, "editor:cancel", editor_cancel);
 
         // TODO: handle conflicting bindings
@@ -2447,6 +2451,9 @@ pub fn paste(
 ) {
     let v = &mut view.as_ref().borrow();
 
+    // TODO: check selection
+    {}
+
     let tm = v.modes.get("text-mode").unwrap();
     let tm = tm.downcast_ref::<TextMode>().unwrap();
     let codec = tm.text_codec.as_ref();
@@ -2574,6 +2581,22 @@ pub fn set_selection_point_at_mark(
     {
         env.view_pre_render.push(Action::CenterArroundMainMark);
     }
+}
+
+pub fn copy_selection(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+}
+
+pub fn cut_selection(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
 }
 
 pub fn button_press(
