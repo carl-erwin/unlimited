@@ -3,3 +3,10 @@ target/
 *.bk
 *~
 perf*
+*.cflags
+*.config
+*.creator
+*.cxxflags
+*.files
+*.includes
+*.creator.user
