@@ -152,6 +152,7 @@ pub enum Action {
     MoveMarkToNextLine { idx: usize },
     MoveMarkToPreviousLine { idx: usize },
     CheckMarks,
+    CancelSelection,
 }
 
 // trait ?
@@ -862,6 +863,14 @@ pub fn run_view_action(
                 };
                 v.mark_index = nr_marks.saturating_sub(1);
             }
+
+            Action::CancelSelection => {
+                let v = &mut view.as_ref().borrow_mut();
+
+                let tm = v.modes.get_mut("text-mode").unwrap();
+                let tm = tm.downcast_mut::<TextMode>().unwrap();
+                tm.select_point = None;
+            }
         }
     }
 }
@@ -1017,11 +1026,14 @@ pub fn scroll_down(
 // TODO: rename into insert_input_event
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    // option ?
+    copy_maybe_remove_selection(editor, env, trigger, view, false, true);
+
     let array = match trigger[0] {
         InputEvent::KeyPress {
             mods:
@@ -1098,6 +1110,8 @@ pub fn insert_codepoint_array(
     if center {
         env.view_pre_render.push(Action::CenterArroundMainMark);
     };
+
+    env.view_pre_render.push(Action::CancelSelection);
 }
 
 pub fn remove_previous_codepoint(
@@ -1208,6 +1222,8 @@ pub fn undo(
 
     env.view_pre_render
         .push(Action::CenterArroundMainMarkIfOffScreen);
+
+    env.view_pre_render.push(Action::CancelSelection);
 }
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
@@ -1236,6 +1252,7 @@ pub fn redo(
 
     env.view_pre_render
         .push(Action::CenterArroundMainMarkIfOffScreen);
+    env.view_pre_render.push(Action::CancelSelection);
 }
 
 /// Remove the current utf8 encoded code point.<br/>
@@ -1284,6 +1301,8 @@ pub fn remove_codepoint(
 
     let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
     doc.tag(env.max_offset, marks_offsets);
+
+    env.view_pre_render.push(Action::CancelSelection);
 }
 
 /// Skip blanks (if any) and remove until end of the word.
@@ -1379,6 +1398,9 @@ pub fn remove_until_end_of_word(
 
     env.max_offset = doc.size() as u64;
     doc.tag(env.max_offset, marks_offsets);
+
+    env.view_pre_render.push(Action::CancelSelection); //TODO register last optype
+                                                       // if doc changes cancel selection ?
 }
 
 // TODO: maintain main mark Option<(x,y)>
@@ -2371,7 +2393,7 @@ pub fn center_arround_offset(
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_arround_offset(env, offset);
+        v.center_arround_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
 }
 
@@ -2421,7 +2443,7 @@ pub fn scroll_to_next_screen(
 */
 pub fn cut_to_end_of_line(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -2435,12 +2457,35 @@ pub fn cut_to_end_of_line(
         let tm = tm.downcast_ref::<TextMode>().unwrap();
         let codec = tm.text_codec.as_ref();
 
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
+
+        doc.tag(env.max_offset, marks_offsets);
+
         for m in v.moving_marks.read().unwrap().iter() {
             let mut end = m.clone();
             end.move_to_end_of_line(&doc, codec);
+            end.move_forward(&doc, codec);
+
             doc.remove(m.offset, (end.offset - m.offset) as usize, None);
             break;
         }
+
+        env.max_offset = doc.size() as u64;
+        //
+        let marks_offsets: Vec<u64> = v
+            .moving_marks
+            .read()
+            .unwrap()
+            .iter()
+            .map(|m| m.offset)
+            .collect();
+        doc.tag(env.max_offset, marks_offsets);
 
         doc.buffer_log.pos
     };
@@ -2452,6 +2497,8 @@ pub fn cut_to_end_of_line(
     let tm = tm.downcast_mut::<TextMode>().unwrap();
 
     tm.last_cut_log_index = Some(pos - 1);
+
+    env.view_pre_render.push(Action::CancelSelection);
 }
 
 pub fn paste(
@@ -2622,6 +2669,7 @@ pub fn copy_maybe_remove_selection(
     env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
+    copy: bool,
     remove: bool,
 ) {
     let v = &mut view.as_ref().clone().borrow_mut();
@@ -2672,7 +2720,10 @@ pub fn copy_maybe_remove_selection(
             doc.tag(env.max_offset, marks_offsets);
         }
 
-        tm.copy_selection = data;
+        if copy {
+            tm.copy_selection = data;
+        }
+
         tm.select_point = None;
     }
 
@@ -2688,7 +2739,7 @@ pub fn copy_selection(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    copy_maybe_remove_selection(editor, env, trigger, view, false);
+    copy_maybe_remove_selection(editor, env, trigger, view, true, false);
 }
 
 pub fn cut_selection(
@@ -2697,7 +2748,7 @@ pub fn cut_selection(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    copy_maybe_remove_selection(editor, env, trigger, view, true);
+    copy_maybe_remove_selection(editor, env, trigger, view, true, true);
 }
 
 pub fn button_press(
