@@ -1,22 +1,20 @@
 // Copyright (c) Carl-Erwin Griffith
 
+// module export
 pub mod input_map;
 
 use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::RwLock;
-
-use std::time::Instant;
-
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::time::Instant;
 use std::vec::Vec;
 
 use crate::core::screen::Screen;
-
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 //
 // TODO: implement functions ti update the counters
@@ -61,6 +59,7 @@ pub struct EventMessage {
     pub seq: usize,
     /// underlying event.
     pub event: Event,
+    // pub reply_to: Sender<EventMessage>, // clone
 }
 
 impl EventMessage {

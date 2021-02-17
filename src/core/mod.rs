@@ -19,7 +19,6 @@ pub mod event;
 pub mod mapped_file;
 pub mod mark;
 pub mod screen;
-pub mod server;
 pub mod view;
 
 use crate::core::config::Config;
@@ -36,6 +35,8 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
 
     editor.load_files(&mut env);
 
+    // TODO: every sent msg must have
+    // reply_to: &Sender<EventMessage>
     // start indexer thread
     let indexer_th = {
         // let ui_tx_clone = ui_tx.clone();
@@ -44,10 +45,9 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
         }))
     };
 
-    // editor.run(&core_rx, &ui_tx) ?
-    server::run(&mut editor, &mut env, &core_rx, &ui_tx);
+    editor::run(&mut editor, &mut env, &core_rx, &ui_tx);
 
-    // wait for core thread
+    // wait for core indexer thread
     if let Some(th) = indexer_th {
         th.join().unwrap()
     }

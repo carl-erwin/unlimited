@@ -6,13 +6,13 @@ use std::rc::Rc;
 
 use crate::core::event::InputEventMap;
 use crate::core::event::InputEventRule;
-use crate::core::server::ActionMap;
+use crate::core::editor::ActionMap;
 use crate::core::view;
 
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
-use crate::core::server::build_core_action_map;
+use crate::core::editor::build_core_action_map;
 
 use std::marker::PhantomData;
 

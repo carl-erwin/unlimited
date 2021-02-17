@@ -25,7 +25,10 @@ use std::time::Instant;
 
 //
 use crate::core::editor::Editor;
+
 use crate::core::editor::EditorEnv;
+
+
 
 use crate::dbg_println;
 
@@ -51,8 +54,8 @@ use crate::core::view::layout::{run_view_render_filters, run_view_render_filters
 
 use std::collections::HashMap;
 
-use crate::core::server::register_action;
-use crate::core::server::ActionMap;
+use crate::core::editor::register_action;
+use crate::core::editor::ActionMap;
 
 pub type Id = u64;
 
