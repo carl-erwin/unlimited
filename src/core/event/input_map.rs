@@ -61,9 +61,15 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "ctrl+alt+Left"     }],               "action": "text-mode:move-mark-backward-word" },
        { "in": [{ "key": "ctrl+alt+Right"     }],              "action": "text-mode:move-mark-one-forward" },
-       
+
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
-       { "in": [{ "button-release": "0"  }],                   "action": "text-mode:ignore" },
+       { "in": [{ "button-release": "0"  }],                   "action": "text-mode:button-release" },
+
+       { "in": [{ "button-press":  "1"  }],                    "action": "text-mode:ignore" },
+       { "in": [{ "button-release": "1"  }],                   "action": "text-mode:ignore" },
+
+
+
        { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
 
        { "in": [{ "key": "alt+w" } ],                            "action": "text-mode:copy-selection" },

@@ -1119,7 +1119,7 @@ pub fn insert_codepoint_array(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    // option ?
+    // delete selection befoire insert
     copy_maybe_remove_selection(editor, env, trigger, view, false, true);
 
     let array = match trigger[0] {
@@ -1203,11 +1203,15 @@ pub fn insert_codepoint_array(
 }
 
 pub fn remove_previous_codepoint(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+    trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) {
+        return;
+    }
+
     let v = &mut view.as_ref().borrow_mut();
     {
         let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
@@ -1345,11 +1349,15 @@ pub fn redo(
 
 /// Remove the current utf8 encoded code point.<br/>
 pub fn remove_codepoint(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+    trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
+    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) {
+        return;
+    }
+
     let v = &mut view.as_ref().borrow_mut();
 
     let doc = v.document.as_ref().unwrap();
@@ -2759,7 +2767,7 @@ pub fn copy_maybe_remove_selection(
     view: &Rc<RefCell<View>>,
     copy: bool,
     remove: bool,
-) {
+) -> bool {
     let v = &mut view.as_ref().clone().borrow_mut();
 
     let mark_index = v.mark_index;
@@ -2784,7 +2792,7 @@ pub fn copy_maybe_remove_selection(
     if let Some(Mark { offset }) = tm.select_point.clone() {
         if m.offset == offset {
             // empty selection
-            return;
+            return false;
         }
 
         if remove == true {
@@ -2799,10 +2807,10 @@ pub fn copy_maybe_remove_selection(
         let size = (end - start) as usize;
 
         // NB: add configuration for max allocation
-        if size > (1024 * 1024 * 1024) {
-            // selection > 1G ?
+        if size == 0 || size > (1024 * 1024 * 1024) {
+            // selection 0 or > 1G ?
             // TODO: notify use tha seleection is too big
-            return;
+            return false;
         }
 
         let mut data = Vec::with_capacity(size);
@@ -2826,6 +2834,7 @@ pub fn copy_maybe_remove_selection(
     // save back
     let mut real_marks = v.moving_marks.write().unwrap();
     *real_marks = marks;
+    true
 }
 
 // TODO: add help, + flag , copy_maybe_remove_selection()
@@ -2986,7 +2995,7 @@ pub fn button_release(
 ) {
     let v = &mut view.as_ref().borrow_mut();
 
-    match trigger[0] {
+    let (button, _x, _y) = match trigger[0] {
         InputEvent::ButtonRelease(ref button_event) => match button_event {
             ButtonEvent {
                 mods:
@@ -2995,31 +3004,22 @@ pub fn button_release(
                         alt: _,
                         shift: _,
                     },
-                x: _,
-                y: _,
+                x,
+                y,
                 button,
-            } => {
-                let button = if *button == 0xff {
-                    // TODO: return last pressed button
-                    0xff
-                } else {
-                    *button
-                };
-
-                let tm = v.modes.get_mut("text-mode").unwrap();
-                let mut tm = tm.downcast_mut::<TextMode>().unwrap();
-
-                if (button as usize) < tm.button_state.len() {
-                    tm.button_state[button as usize] = 1;
-                }
-
-                match button {
-                    _ => {}
-                }
-            }
+            } => (*button, *x, *y),
         },
 
-        _ => {}
+        _ => {
+            return;
+        }
+    };
+
+    let tm = v.modes.get_mut("text-mode").unwrap();
+    let mut tm = tm.downcast_mut::<TextMode>().unwrap();
+
+    if (button as usize) < tm.button_state.len() {
+        tm.button_state[button as usize] = 0;
     }
 }
 
@@ -3041,20 +3041,9 @@ pub fn pointer_motion(
     match &trigger[0] {
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
             // TODO: change screen (x,y) to i32 ? and filter in functions ?
-            let x = {
-                if *x < 0 {
-                    0
-                } else {
-                    *x as usize
-                }
-            };
-            let y = {
-                if *y < 0 {
-                    0
-                } else {
-                    *y as usize
-                }
-            };
+
+            let x = std::cmp::max(0, *x) as usize;
+            let y = std::cmp::max(0, *y) as usize;
 
             if let Some(cpi) = screen.get_cpinfo(x, y) {
                 {
