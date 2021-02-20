@@ -1119,7 +1119,7 @@ pub fn insert_codepoint_array(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    // delete selection befoire insert
+    // delete selection before insert
     copy_maybe_remove_selection(editor, env, trigger, view, false, true);
 
     let array = match trigger[0] {
@@ -1139,56 +1139,67 @@ pub fn insert_codepoint_array(
     };
 
     let center = {
-        let v = view.as_ref().borrow();
-        let mut doc = v.document.as_ref().unwrap().borrow_mut();
-
-        let tm = v.modes.get("text-mode").unwrap();
-        let tm = tm.downcast_ref::<TextMode>().unwrap();
-
-        let codec = tm.text_codec.as_ref();
-        let mut utf8 = Vec::with_capacity(array.len());
-
-        for codepoint in array {
-            let mut data: &mut [u8] = &mut [0, 0, 0, 0];
-            let data_size = codec.encode(*codepoint as u32, &mut data);
-            for d in data.iter().take(data_size) {
-                utf8.push(*d);
-            }
-        }
-
+        let mut v = view.as_ref().borrow_mut();
+        let view_start = v.start_offset;
+        let mut view_growth = 0;
         let mut offset: u64 = 0;
-        let mut grow: u64 = 0;
+        {
+            let mut doc = v.document.as_ref().unwrap().borrow_mut();
 
-        let marks_offsets: Vec<u64> = v
-            .moving_marks
-            .read()
-            .unwrap()
-            .iter()
-            .map(|m| m.offset)
-            .collect();
+            let tm = v.modes.get("text-mode").unwrap();
+            let tm = tm.downcast_ref::<TextMode>().unwrap();
 
-        doc.tag(env.max_offset, marks_offsets);
+            let codec = tm.text_codec.as_ref();
+            let mut utf8 = Vec::with_capacity(array.len());
 
-        for m in v.moving_marks.write().unwrap().iter_mut() {
-            m.offset += grow;
-            doc.insert(m.offset, utf8.len(), &utf8);
-            m.offset += utf8.len() as u64;
+            for codepoint in array {
+                let mut data: &mut [u8] = &mut [0, 0, 0, 0];
+                let data_size = codec.encode(*codepoint as u32, &mut data);
+                for d in data.iter().take(data_size) {
+                    utf8.push(*d);
+                }
+            }
 
-            offset = m.offset; // TODO: remove this merge
+            let mut grow: u64 = 0;
 
-            grow += utf8.len() as u64;
+            let marks_offsets: Vec<u64> = v
+                .moving_marks
+                .read()
+                .unwrap()
+                .iter()
+                .map(|m| m.offset)
+                .collect();
+
+            doc.tag(env.max_offset, marks_offsets);
+
+            for m in v.moving_marks.write().unwrap().iter_mut() {
+                if m.offset < view_start {
+                    view_growth += utf8.len() as u64;
+                }
+
+                m.offset += grow;
+                doc.insert(m.offset, utf8.len(), &utf8);
+                m.offset += utf8.len() as u64;
+
+                offset = m.offset; // TODO: remove this merge
+
+                grow += utf8.len() as u64;
+            }
+
+            env.max_offset = doc.size() as u64;
+            //
+            let marks_offsets: Vec<u64> = v
+                .moving_marks
+                .read()
+                .unwrap()
+                .iter()
+                .map(|m| m.offset)
+                .collect();
+            doc.tag(env.max_offset, marks_offsets);
         }
+        v.start_offset += view_growth;
 
-        env.max_offset = doc.size() as u64;
-        //
-        let marks_offsets: Vec<u64> = v
-            .moving_marks
-            .read()
-            .unwrap()
-            .iter()
-            .map(|m| m.offset)
-            .collect();
-        doc.tag(env.max_offset, marks_offsets);
+        dbg_println!("view_growth = {}", view_growth);
 
         // mark off_screen ?
         let screen = v.screen.read().unwrap();
@@ -1359,44 +1370,53 @@ pub fn remove_codepoint(
     }
 
     let v = &mut view.as_ref().borrow_mut();
+    let view_start = v.start_offset;
+    let mut view_shrink: u64 = 0;
 
-    let doc = v.document.as_ref().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
-    let tm = v.modes.get("text-mode").unwrap();
-    let tm = tm.downcast_ref::<TextMode>().unwrap();
+    {
+        let doc = v.document.as_ref().unwrap();
+        let mut doc = doc.as_ref().borrow_mut();
+        let tm = v.modes.get("text-mode").unwrap();
+        let tm = tm.downcast_ref::<TextMode>().unwrap();
 
-    let codec = tm.text_codec.as_ref();
+        let codec = tm.text_codec.as_ref();
 
-    if doc.size() == 0 {
-        return;
-    }
-
-    let mut marks = v.moving_marks.write().unwrap();
-
-    let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-    doc.tag(env.max_offset, marks_offsets);
-
-    let mut shrink = 0;
-
-    for m in marks.iter_mut() {
-        if m.offset >= shrink {
-            m.offset -= shrink;
+        if doc.size() == 0 {
+            return;
         }
 
-        let mut data = Vec::with_capacity(4);
-        doc.read(m.offset, data.capacity(), &mut data);
-        let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
+        let mut marks = v.moving_marks.write().unwrap();
 
-        let nr_removed = doc.remove(m.offset, size as usize, None);
-        shrink += nr_removed as u64;
+        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
+
+        let mut shrink = 0;
+
+        for m in marks.iter_mut() {
+            if m.offset >= shrink {
+                m.offset -= shrink;
+            }
+
+            let mut data = Vec::with_capacity(4);
+            doc.read(m.offset, data.capacity(), &mut data);
+            let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
+
+            if m.offset < view_start {
+                view_shrink += size as u64;
+            }
+
+            let nr_removed = doc.remove(m.offset, size as usize, None);
+            shrink += nr_removed as u64;
+        }
+
+        env.max_offset = doc.size() as u64;
+
+        marks.dedup(); // here ?
+
+        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+        doc.tag(env.max_offset, marks_offsets);
     }
-
-    env.max_offset = doc.size() as u64;
-
-    marks.dedup(); // here ?
-
-    let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-    doc.tag(env.max_offset, marks_offsets);
+    v.start_offset -= view_shrink;
 
     env.view_pre_render.push(Action::CancelSelection);
 }
