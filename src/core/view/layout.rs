@@ -285,10 +285,13 @@ impl RawDataFilter {
             env.screen.height()
         );
 
+        let screen_max_cp = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
+        let read_size = std::cmp::min(env.max_offset as usize, screen_max_cp);
+
         RawDataFilter {
             pos: env.base_offset,
             //max: env.max_offset,
-            read_size: env.screen.width() * env.screen.height() * 4, // 4 code.size()
+            read_size,
         }
     }
 }
@@ -737,7 +740,7 @@ pub struct HighlightSelectionFilter {
 // enum { type, value }
 // a dynamic variables storage for view
 // view.vars['selection-point'] -> &mut enum { int64, float64, string, Vec<u8> } | "C" api ...
-// view.modes[''] -> std::anny::Any
+// view.modes[''] -> std::any::Any
 //
 use crate::core::view::TextMode;
 
