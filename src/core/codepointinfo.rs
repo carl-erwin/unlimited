@@ -38,7 +38,7 @@ impl CodepointInfo {
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
         let sbg = Self::default_bg_color();
-        let add = 15;
+        let add = 25;
         (sbg.0 + add, sbg.1 + add, sbg.2 + add)
     }
 

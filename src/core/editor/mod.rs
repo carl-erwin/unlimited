@@ -232,7 +232,7 @@ pub fn update_view_and_send_draw_event(
     let view = editor.view_map[env.view_id].1.clone();
 
     update_view(&mut editor, &mut env, &view);
-    send_draw_event(&mut editor, ui_tx, &view);
+    send_draw_event(&mut editor, &mut env, ui_tx, &view);
 }
 
 // move to core: and later transform into RenderFilter
@@ -355,6 +355,7 @@ fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
 
 pub fn send_draw_event(
     _editor: &mut Editor,
+    env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -363,7 +364,11 @@ pub fn send_draw_event(
     // render marks here for now
     let marks = view.moving_marks.read().unwrap();
 
-    refresh_screen_marks(&mut view.screen.write().as_mut().unwrap(), &marks, true);
+    refresh_screen_marks(
+        &mut view.screen.write().as_mut().unwrap(),
+        &marks,
+        env.draw_marks,
+    );
 
     let new_screen = Arc::clone(&view.screen);
 
@@ -416,6 +421,7 @@ pub fn run(
         }
     }
 
+    // send ApplicationQuitEvent to ui thread
     let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
     ui_tx.send(msg).unwrap_or(());
 }
@@ -456,6 +462,8 @@ fn process_input_event(
                 if let Some(action) = env.action_map.get(&action) {
                     let trigger = env.trigger.clone();
                     action(editor, env, &trigger, &mut view);
+                } else {
+                    // clear ?
                 }
                 env.trigger.clear();
             }
@@ -526,7 +534,7 @@ fn process_input_events(
     if (p_input <= 60) || editor.last_rdr_event.elapsed() > Duration::from_millis(1000 / 10) {
         // hit
         let view = &editor.view_map[env.view_id].1.clone();
-        send_draw_event(&mut editor, ui_tx, &view);
+        send_draw_event(&mut editor, &mut env, ui_tx, &view);
         editor.last_rdr_event = Instant::now();
     }
 }

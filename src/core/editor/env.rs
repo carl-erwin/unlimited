@@ -50,6 +50,8 @@ pub struct EditorEnv<'a> {
     pub center_offset: Option<u64>,
     pub cur_mark_index: Option<usize>,
     pub max_offset: u64, // remove this, doc property
+
+    pub draw_marks: bool,
 }
 
 impl<'a> EditorEnv<'a> {
@@ -78,6 +80,7 @@ impl<'a> EditorEnv<'a> {
             center_offset: None,
             cur_mark_index: None,
             max_offset: 0,
+            draw_marks: true,
         }
     }
 }

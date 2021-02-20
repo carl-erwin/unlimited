@@ -119,6 +119,7 @@ use crate::core::document::Document;
 
 use crate::core::screen::Screen;
 
+use crate::core::mark;
 use crate::core::mark::Mark;
 
 use crate::core::codec::text::utf8;
@@ -957,6 +958,7 @@ pub fn run_view_action(
                 let tm = v.modes.get_mut("text-mode").unwrap();
                 let tm = tm.downcast_mut::<TextMode>().unwrap();
                 tm.select_point = None;
+                env.draw_marks = true;
             }
         }
     }
@@ -1077,7 +1079,7 @@ pub fn update_view(
 // text mode functions
 pub fn editor_cancel(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -1086,7 +1088,7 @@ pub fn editor_cancel(
     let tm = v.modes.get_mut("text-mode").unwrap();
     let tm = tm.downcast_mut::<TextMode>().unwrap();
     tm.select_point = None;
-    tm.last_cut_log_index = None;
+    env.draw_marks = true;
 }
 
 pub fn scroll_up(
@@ -1119,9 +1121,6 @@ pub fn insert_codepoint_array(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    // delete selection before insert
-    copy_maybe_remove_selection(editor, env, trigger, view, false, true);
-
     let array = match trigger[0] {
         InputEvent::KeyPress {
             mods:
@@ -1137,6 +1136,9 @@ pub fn insert_codepoint_array(
             return;
         }
     };
+
+    // delete selection before insert
+    copy_maybe_remove_selection(editor, env, trigger, view, false, true);
 
     let center = {
         let mut v = view.as_ref().borrow_mut();
@@ -2592,6 +2594,9 @@ pub fn cut_to_end_of_line(
             break;
         }
 
+        let pos = doc.buffer_log.pos;
+        // TODO: pate_buffer_log_index.push(pos)
+
         env.max_offset = doc.size() as u64;
         //
         let marks_offsets: Vec<u64> = v
@@ -2603,7 +2608,7 @@ pub fn cut_to_end_of_line(
             .collect();
         doc.tag(env.max_offset, marks_offsets);
 
-        doc.buffer_log.pos
+        pos
     };
 
     // save buffer log idx
@@ -2640,22 +2645,29 @@ pub fn paste(
     }
 
     for m in marks.iter_mut() {
+        //
         if tm.copy_selection.len() > 0 {
             doc.insert(
                 m.offset,
                 tm.copy_selection.len(),
                 tm.copy_selection.as_slice(),
             );
+
             m.offset += tm.copy_selection.len() as u64;
         } else {
             // TODO: add perf mark paste buffer
+
             if let Some(idx) = tm.last_cut_log_index {
                 let tr = doc.buffer_log.data[idx].clone();
 
                 if let Some(ref data) = tr.data {
                     doc.insert(m.offset, data.len(), data.as_slice());
                     m.offset += data.len() as u64;
+                } else {
+                    // wrong record index
+                    panic!();
                 }
+            } else {
             }
         }
     }
@@ -2752,6 +2764,21 @@ pub fn move_to_token_end(
     }
 }
 
+fn get_main_mark_offset(view: &View) -> u64 {
+    let mark_index = view.mark_index;
+    let marks = &view.moving_marks.read().unwrap();
+    marks[mark_index].offset
+}
+
+/*
+TODO:
+fn get_mode_mut<...>(view: &mut View<'a>, mode_name: &str) -> Option<&'a mut M> {
+    let modes = &mut view.modes;
+    let tm = modes.get_mut("text-mode").unwrap();
+    tm.downcast_mut::<'a, M>()
+}
+*/
+
 pub fn set_selection_point_at_mark(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -2762,14 +2789,15 @@ pub fn set_selection_point_at_mark(
 
     {
         let v = &mut view.as_ref().borrow_mut();
-        let offset = {
-            let marks = v.moving_marks.read().unwrap();
-            let m = &marks[v.mark_index];
-            m.offset
-        };
-        // update selection point
-        let tm = v.modes.get_mut("text-mode").unwrap();
+
+        let offset = get_main_mark_offset(&v);
+
+        // TODO: let tm = get_mode_mut<TextMode>(v, "text-mode");
+        let modes = &mut v.modes;
+        let tm = modes.get_mut("text-mode").unwrap();
         let tm = tm.downcast_mut::<TextMode>().unwrap();
+
+        // update selection point
         tm.select_point = Some(Mark { offset });
     }
 
@@ -2806,6 +2834,7 @@ pub fn copy_maybe_remove_selection(
 
     let tm = v.modes.get_mut("text-mode").unwrap();
     let tm = tm.downcast_mut::<TextMode>().unwrap();
+    let codec = tm.text_codec.as_ref();
 
     dbg_println!("COPY SELECTION [{:?} {:?}]", m, tm.select_point);
 
@@ -2824,7 +2853,9 @@ pub fn copy_maybe_remove_selection(
 
         let (start, end) = sort_tuple_pair((offset, m.offset));
 
-        let size = (end - start + 1) as usize;
+        let (_, _, _) = mark::read_char_forward(&doc, end, codec);
+
+        let size = (end - start) as usize;
 
         // NB: add configuration for max allocation
         if size == 0 || size > (1024 * 1024 * 1024) {
@@ -2838,10 +2869,7 @@ pub fn copy_maybe_remove_selection(
 
         if remove == true {
             doc.remove(start, size, None);
-
-            if marks[mark_index].offset != start {
-                marks[mark_index].offset = marks[mark_index].offset.saturating_sub(size as u64);
-            }
+            marks[mark_index].offset = start;
             dbg_println!("marks[{}].offset({})", mark_index, marks[mark_index].offset);
 
             let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
@@ -2854,6 +2882,8 @@ pub fn copy_maybe_remove_selection(
         }
 
         tm.select_point = None;
+        env.draw_marks = true;
+
         // save back
         let mut real_marks = v.moving_marks.write().unwrap();
         *real_marks = marks;
@@ -2892,7 +2922,7 @@ pub fn cut_selection(
 
 pub fn button_press(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
@@ -3005,6 +3035,7 @@ pub fn button_press(
             let tm = v.modes.get_mut("text-mode").unwrap();
             let tm = tm.downcast_mut::<TextMode>().unwrap();
             tm.select_point = None;
+            env.draw_marks = true;
 
             // reset main mark
             v.mark_index = 0;
@@ -3057,7 +3088,6 @@ pub fn button_release(
     }
 }
 
-// crossterm
 pub fn pointer_motion(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
