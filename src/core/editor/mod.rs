@@ -1,8 +1,5 @@
 // Copyright (c) Carl-Erwin Griffith
 
-
-
-
 // std
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -16,12 +13,10 @@ use std::time::Instant;
 
 // ext
 
-
 //
 mod env;
 
 pub use env::EditorEnv;
-
 
 // crate
 use crate::core::codepointinfo::CodepointInfo;
@@ -46,8 +41,6 @@ use crate::core::view::View;
 // transform into STACK of map ?
 pub type ActionMap = HashMap<String, view::ModeFunction>;
 
-
-
 // Copyright (c) Carl-Erwin Griffith
 
 //
@@ -57,8 +50,6 @@ use crate::core::config::Config;
 use crate::core::document;
 use crate::core::document::Document;
 use crate::core::document::DocumentBuilder;
-
-
 
 //
 pub type Id = u64;
@@ -212,7 +203,6 @@ impl<'a> Editor<'a> {
 }
 
 //////////////////////////////////////////////
-
 
 pub fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
     map.insert(s.to_string(), func);

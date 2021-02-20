@@ -82,6 +82,8 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
 
        { "in": [{ "key": "Esc"}, { "key": "Esc"}], "action": "editor:cancel" },
+       { "in": [{ "key": "ctrl+g"} ], "action": "editor:cancel" },
+
 
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },

@@ -64,11 +64,7 @@ impl DocumentBuilder {
 
     ///
     pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
-        let buffer = Buffer::new(&self.file_name, self.mode.clone());
-        let buffer = match buffer {
-            Some(bb) => bb,
-            None => return None,
-        };
+        let buffer = Buffer::new(&self.file_name, self.mode.clone())?;
 
         let mut doc = Document {
             id: 0,

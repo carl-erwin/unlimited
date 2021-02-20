@@ -13,7 +13,7 @@ pub struct Mark {
 }
 
 fn is_blank(cp: char) -> bool {
-    // TODO: put defintion of word in array of cahr and use any(is_word_vec)
+    // TODO: put definition of word in array of char and use any(is_word_vec)
     match cp {
         ' ' | '\r' | '\n' | '\t' => true,
         _ => false,
@@ -32,7 +32,7 @@ pub fn read_char_forward(
     }
 
     let mut data = Vec::with_capacity(4);
-    doc.read(from_offset, data.capacity(), &mut data); // TODO: decode upto capacity ?
+    doc.read(from_offset, data.capacity(), &mut data); // TODO: decode up to capacity ?
     codec.decode(SyncDirection::Forward, &data, 0)
 }
 
@@ -57,7 +57,7 @@ pub fn read_char_backward(
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
 
-    /* result aare always relative to from_offset/direction */
+    /* result are always relative to from_offset/direction */
     (ret.0, from_offset - ret.2 as u64, ret.2)
 }
 

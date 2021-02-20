@@ -1210,6 +1210,14 @@ pub fn run_view_render_filters_direct(
         main_mark,
     };
 
+    // NB: we allocate this at every screen rendering
+    // For now it is simple/efficient enough
+    //
+    // TODO: move pipeline construction in Mode initialization
+    // reserve/update io_vec size on screen dimension changes
+    // this will obviously be mor efficient
+
+    // screen must be clear by caller: we don't want
     assert_eq!(0, layout_env.screen.push_count());
 
     // move in mode init
@@ -1218,12 +1226,12 @@ pub fn run_view_render_filters_direct(
     filters.push(Box::new(RawDataFilter::new(&layout_env, &view)));
     filters.push(Box::new(Utf8Filter::new(&layout_env, &view)));
 
-    if layout_env.screen.is_off_screen == false {
-        /* || editor_env.pending_events <= 1 || */
-        // TODO: schedule refresh on idle
-
+    if layout_env.screen.is_off_screen == false
+    /* && editor_env.pending_events <= 1 */
+    {
         filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
 
+        // TODO: find a way to unify filter signature and ActionMap callbacks
         let tm = view.modes.get("text-mode").unwrap();
         let tm = tm.downcast_ref::<TextMode>().unwrap();
 
@@ -1248,6 +1256,7 @@ pub fn run_view_render_filters_direct(
     //    f.setup(&view, &mut layout_env);
     //}
 
+    // is interactive rendering possible ?
     while layout_env.quit == false {
         dbg_println!("-------------------");
         for f in &mut filters {
@@ -1257,16 +1266,9 @@ pub fn run_view_render_filters_direct(
             dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
-        //break;
     }
 
     for f in &mut filters {
         f.finish(&view, &mut layout_env);
     }
-
-    // not really, when computing marks
-    // the virtual screen can be empty...
-    // assert_ne!(0, layout_env.screen.push_count());
-
-    // for f in filters { f.finish(); }
 }

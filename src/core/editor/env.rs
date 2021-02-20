@@ -4,9 +4,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::core::editor::ActionMap;
 use crate::core::event::InputEventMap;
 use crate::core::event::InputEventRule;
-use crate::core::editor::ActionMap;
 use crate::core::view;
 
 use crate::core::event::input_map::build_input_event_map;
