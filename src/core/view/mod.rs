@@ -3068,9 +3068,6 @@ pub fn pointer_motion(
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    assert_eq!(v.mark_index, 0);
-    assert_eq!(v.moving_marks.read().unwrap().len(), 1);
-
     // TODO: match events
     match &trigger[0] {
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
