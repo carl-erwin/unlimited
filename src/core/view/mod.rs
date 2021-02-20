@@ -1208,7 +1208,7 @@ pub fn remove_previous_codepoint(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) {
+    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) > 0 {
         return;
     }
 
@@ -1354,7 +1354,7 @@ pub fn remove_codepoint(
     trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) {
+    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) > 0 {
         return;
     }
 
@@ -2767,7 +2767,7 @@ pub fn copy_maybe_remove_selection(
     view: &Rc<RefCell<View>>,
     copy: bool,
     remove: bool,
-) -> bool {
+) -> usize {
     let v = &mut view.as_ref().clone().borrow_mut();
 
     let mark_index = v.mark_index;
@@ -2789,10 +2789,10 @@ pub fn copy_maybe_remove_selection(
 
     dbg_println!("COPY SELECTION [{:?} {:?}]", m, tm.select_point);
 
-    if let Some(Mark { offset }) = tm.select_point.clone() {
+    let (start, size) = if let Some(Mark { offset }) = tm.select_point.clone() {
         if m.offset == offset {
             // empty selection
-            return false;
+            return 0;
         }
 
         if remove == true {
@@ -2804,13 +2804,13 @@ pub fn copy_maybe_remove_selection(
 
         let (start, end) = sort_tuple_pair((offset, m.offset));
 
-        let size = (end - start) as usize;
+        let size = (end - start + 1) as usize;
 
         // NB: add configuration for max allocation
         if size == 0 || size > (1024 * 1024 * 1024) {
             // selection 0 or > 1G ?
-            // TODO: notify use tha seleection is too big
-            return false;
+            // TODO: notify use tha selection is too big
+            return 0;
         }
 
         let mut data = Vec::with_capacity(size);
@@ -2818,7 +2818,12 @@ pub fn copy_maybe_remove_selection(
 
         if remove == true {
             doc.remove(start, size, None);
-            marks[mark_index].offset = start;
+
+            if marks[mark_index].offset != start {
+                marks[mark_index].offset = marks[mark_index].offset.saturating_sub(size as u64);
+            }
+            dbg_println!("marks[{}].offset({})", mark_index, marks[mark_index].offset);
+
             let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
             env.max_offset = doc.size() as u64;
             doc.tag(env.max_offset, marks_offsets);
@@ -2829,12 +2834,21 @@ pub fn copy_maybe_remove_selection(
         }
 
         tm.select_point = None;
+        // save back
+        let mut real_marks = v.moving_marks.write().unwrap();
+        *real_marks = marks;
+
+        (start, size)
+    } else {
+        (0, 0)
+    };
+
+    /* update view's start offset */
+    if v.start_offset > start {
+        v.start_offset = v.start_offset.saturating_sub(size as u64);
     }
 
-    // save back
-    let mut real_marks = v.moving_marks.write().unwrap();
-    *real_marks = marks;
-    true
+    size
 }
 
 // TODO: add help, + flag , copy_maybe_remove_selection()

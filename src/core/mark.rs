@@ -153,6 +153,7 @@ impl Mark {
             let base_offset = self.offset.saturating_sub(4);
             let relative_offset = self.offset - base_offset;
 
+            //dbg_println!("self.offset({}) doc.size({})", self.offset, doc.size());
             assert!(self.offset <= doc.size() as u64);
             assert!(base_offset <= doc.size() as u64);
 
