@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::core::editor::ActionMap;
+use crate::core::event::InputEvent;
 use crate::core::event::InputEventMap;
 use crate::core::event::InputEventRule;
 use crate::core::view;
@@ -30,6 +31,7 @@ pub struct EditorEnv<'a> {
     pub input_map: Rc<RefCell<InputEventMap>>,
     pub current_node: Option<Rc<InputEventRule>>,
     pub next_node: Option<Rc<InputEventRule>>,
+    pub trigger: Vec<InputEvent>,
 
     pub pending_events: usize,
 
@@ -66,6 +68,7 @@ impl<'a> EditorEnv<'a> {
             input_map,
             current_node: None,
             next_node: None,
+            trigger: vec![],
             pending_events: 0,
             width: 0,
             height: 0,

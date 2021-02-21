@@ -441,7 +441,8 @@ fn process_input_event(
         &mut env.next_node,    // TODO: EvalEnv
     );
 
-    let trigger = vec![(*ev).clone()];
+    // track whole input seq
+    env.trigger.push((*ev).clone());
 
     if let Some(action) = action {
         env.current_node = None;
@@ -453,8 +454,10 @@ fn process_input_event(
         match action.as_str() {
             _ => {
                 if let Some(action) = env.action_map.get(&action) {
+                    let trigger = env.trigger.clone();
                     action(editor, env, &trigger, &mut view);
                 }
+                env.trigger.clear();
             }
         }
 
