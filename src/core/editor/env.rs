@@ -23,6 +23,8 @@ use std::marker::PhantomData;
 // kbr macro recording
 pub struct EditorEnv<'a> {
     phantom: PhantomData<&'a u8>,
+    pub graphic_display: bool,
+
     pub quit: bool,
     pub status: String, // TODO: move to test-mode
 
@@ -64,6 +66,7 @@ impl<'a> EditorEnv<'a> {
 
         EditorEnv {
             phantom: PhantomData,
+            graphic_display: false,
             quit: false,
             status: String::new(),
             action_map: build_core_action_map(),

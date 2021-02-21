@@ -169,7 +169,7 @@ pub fn main_loop(
                         let mut screen = screen.clone();
 
                         draw_view(&mut last_screen, &mut screen, &mut stdout);
-                        //draw_screen_dumb(&screen, &mut stdout);
+
                         last_screen = screen;
 
                         last_screen_rdr_time = Instant::now();
@@ -249,7 +249,7 @@ fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Resul
 
             // draw with style
             let s = cpi.displayed_cp.to_string();
-            if cpi.is_selected {
+            if cpi.is_mark {
                 queue!(
                     stdout,
                     SetBackgroundColor(bg_color),
@@ -294,12 +294,14 @@ fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
     // pub cp: char,
     let dcp = a.displayed_cp == b.displayed_cp;
     // pub offset: u64,
+    let m = a.is_mark == b.is_mark;
+
     let s = a.is_selected == b.is_selected;
     //
     let c = a.color == b.color;
     let bc = a.bg_color == b.bg_color;
 
-    dcp && s && c && bc
+    dcp && m && s && c && bc
 }
 
 fn draw_screen(
@@ -374,7 +376,7 @@ fn draw_screen(
             }
 
             // default style
-            if cpi.is_selected != prev_cpi.is_selected {
+            if cpi.is_mark != prev_cpi.is_mark || cpi.is_selected != prev_cpi.is_selected {
                 set_style = true;
                 set_color = true;
                 change = true;
@@ -406,7 +408,7 @@ fn draw_screen(
             {
                 if set_style {
                     set_style = false;
-                    if cpi.is_selected {
+                    if cpi.is_mark || cpi.is_selected {
                         queue!(stdout, SetAttribute(Attribute::Reverse))?;
                     } else {
                         queue!(stdout, SetAttribute(Attribute::NoReverse))?;
@@ -755,7 +757,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 */
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
-    let mut wait_ms = 1000;
+    let mut wait_ms = 500;
     let min_wait_ms = 4;
 
     let mut start = Instant::now();

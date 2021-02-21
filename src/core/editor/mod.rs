@@ -242,7 +242,7 @@ pub fn update_view_and_send_draw_event(
 pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     if !set {
         screen_apply(screen, |_, _, cpi| {
-            cpi.is_selected = false; /* will blink */
+            cpi.is_mark = false;
             true // continue
         });
         return;
@@ -255,84 +255,50 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         }
     };
 
-    // TEST incremental mark rendering
-    if true {
-        // draw marks
-        let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
-        let mut fetch_mark = true;
-        let mut mark_it = marks.iter();
-        screen_apply(screen, |_, _, cpi| {
-            if let Some(cpi_offset) = cpi.offset {
-                if fetch_mark {
-                    // get 1st  mark >= current cpi_offset
-                    loop {
-                        let m = mark_it.next();
-                        if m.is_none() {
-                            return false;
-                        }
-
-                        let m = m.unwrap();
-                        if m.offset < first_offset {
-                            continue;
-                        }
-
-                        if m.offset > last_offset {
-                            return false;
-                        }
-
-                        if m.offset >= cpi_offset {
-                            mark_offset = m.offset;
-                            break;
-                        }
+    // incremental mark rendering
+    // draw marks
+    let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
+    let mut fetch_mark = true;
+    let mut mark_it = marks.iter();
+    screen_apply(screen, |_, _, cpi| {
+        if let Some(cpi_offset) = cpi.offset {
+            if fetch_mark {
+                // get 1st  mark >= current cpi_offset
+                loop {
+                    let m = mark_it.next();
+                    if m.is_none() {
+                        return false;
                     }
-                    fetch_mark = false;
-                }
 
-                if cpi_offset == mark_offset {
-                    cpi.is_selected = !cpi.metadata;
-                } else {
-                    //
-                    if mark_offset < cpi_offset {
-                        fetch_mark = true;
+                    let m = m.unwrap();
+                    if m.offset < first_offset {
+                        continue;
+                    }
+
+                    if m.offset > last_offset {
+                        return false;
+                    }
+
+                    if m.offset >= cpi_offset {
+                        mark_offset = m.offset;
+                        break;
                     }
                 }
+                fetch_mark = false;
             }
 
-            true
-        });
-    } else {
-        //
-        for m in marks.iter() {
-            //dbg_println!(" checking m.offset {}", m.offset);
-
-            // the marks are sorted
-            if m.offset < first_offset {
-                continue;
-            }
-
-            if m.offset > last_offset {
-                break;
-            }
-
-            for l in 0..screen.height() {
-                let line = screen.get_mut_line(l).unwrap();
-
-                for c in 0..line.nb_cells {
-                    let cpi = line.get_mut_cpi(c).unwrap();
-
-                    if set {
-                        if let Some(cpi_offset) = cpi.offset {
-                            if cpi_offset == m.offset {
-                                cpi.is_selected = !cpi.metadata;
-                            }
-                        }
-                    } else {
-                        cpi.is_selected = false;
-                    }
+            if cpi_offset == mark_offset {
+                cpi.is_mark = !cpi.metadata;
+            } else {
+                //
+                if mark_offset < cpi_offset {
+                    fetch_mark = true;
                 }
             }
         }
-    }
+
+        true
+    });
 }
 
 // move to screen module , rename walk/map ?
@@ -398,7 +364,7 @@ pub fn run(
     }
 
     while !env.quit {
-        if let Ok(evt) = core_rx.recv() {
+        if let Ok(evt) = core_rx.recv_timeout(Duration::from_millis(500)) {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     break;
@@ -412,12 +378,17 @@ pub fn run(
 
                 Event::InputEvents { events } => {
                     if !editor.view_map.is_empty() {
+                        env.draw_marks = true;
                         process_input_events(&mut editor, &mut env, &ui_tx, &events);
                     }
                 }
 
                 _ => {}
             }
+        } else {
+            // input timeout
+            env.draw_marks = !env.draw_marks;
+            update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
         }
     }
 
@@ -447,7 +418,7 @@ fn process_input_event(
         &mut env.next_node,    // TODO: EvalEnv
     );
 
-    // track whole input seq
+    // TODO: track whole input seq // not tested
     env.trigger.push((*ev).clone());
 
     if let Some(action) = action {

@@ -180,7 +180,7 @@ fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut 
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
 
-            if cpi.is_selected {
+            if cpi.is_mark || cpi.is_selected {
                 write!(stdout, "{}", termion::style::Invert).unwrap();
             } else {
                 write!(stdout, "{}", termion::style::NoInvert).unwrap();

@@ -33,6 +33,12 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
     let mut editor = Editor::new(config);
     let mut env = EditorEnv::new();
 
+    // X11 session
+    match std::env::var("DISPLAY") {
+        Ok(_) => env.graphic_display = true,
+        Err(_) => {}
+    };
+
     editor.load_files(&mut env);
 
     // TODO: every sent msg must have

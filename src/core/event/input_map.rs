@@ -21,7 +21,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
        { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
-       
+
        { "in": [{ "key": "ctrl+a" }],                          "action": "text-mode:move-marks-to-start-of-line" },
        { "in": [{ "key": "ctrl+e" }],                          "action": "text-mode:move-marks-to-end-of-line" },
        { "in": [{ "key": "Home" }],                            "action": "text-mode:move-marks-to-start-of-line" },
@@ -94,6 +94,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Esc" } ],    "action": "application:quit-abort" },
 
        { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
 

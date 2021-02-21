@@ -137,6 +137,7 @@ use crate::core::mark::Mark;
 use crate::core::view::View;
 
 pub struct LayoutEnv<'a> {
+    pub graphic_display: bool,
     pub quit: bool,
     pub base_offset: u64,
     pub max_offset: u64,
@@ -771,15 +772,40 @@ impl Filter<'_> for HighlightSelectionFilter {
     fn run(
         &mut self,
         _view: &View,
-        _env: &mut LayoutEnv,
+        env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
+        let _colors = [
+            /* Black	     */ (0, 0, 0),
+            /* Light_red	 */ (255, 0, 0),
+            /* Light_green	 */ (0, 255, 0),
+            /* Yellow	     */ (255, 255, 0),
+            /* Light_blue	 */ (0, 0, 255),
+            /* Light_magenta */ (255, 0, 255),
+            /* Light_cyan	 */ (0, 255, 255),
+            /* High_white	 */ (255, 255, 255),
+            /* Gray	         */ (128, 128, 128),
+            /* Red	         */ (128, 0, 0),
+            /* Green	     */ (0, 128, 0),
+            /* Brown	     */ (128, 128, 0),
+            /* Blue	         */ (0, 0, 128),
+            /* Magenta       */ (128, 0, 128),
+            /* Cyan	         */ (0, 128, 128),
+            /* White	     */ (192, 192, 192),
+        ];
+
         for i in filter_in {
             match i.offset {
                 Some(offset) if offset >= self.sel_start_offset && offset < self.sel_end_offset => {
                     let mut i = i.clone();
-                    i.bg_color = CodepointInfo::default_selected_bg_color();
+                    if env.graphic_display {
+                        i.bg_color = CodepointInfo::default_selected_bg_color();
+                    } else {
+                        //let idx = offset as usize % _colors.len();
+                        i.bg_color = (0, 0, 255);
+                    }
+
                     filter_out.push(i);
                 }
 
@@ -1167,6 +1193,7 @@ pub fn filter_codepoint(
         displayed_cp,
         offset: offset.clone(),
         size,
+        is_mark: false,
         is_selected,
         color,
         bg_color,
@@ -1196,7 +1223,7 @@ pub fn run_view_render_filters(
 //  4 - tabulation
 //  5 - word wrap
 pub fn run_view_render_filters_direct(
-    _editor_env: &EditorEnv,
+    editor_env: &EditorEnv,
     view: &View,
     base_offset: u64,
     max_offset: u64,
@@ -1204,6 +1231,7 @@ pub fn run_view_render_filters_direct(
     main_mark: Mark,
 ) {
     let mut layout_env = LayoutEnv {
+        graphic_display: editor_env.graphic_display,
         quit: false,
         base_offset,
         max_offset,

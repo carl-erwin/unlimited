@@ -964,44 +964,6 @@ pub fn run_view_action(
     }
 }
 
-pub fn refresh_view_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.as_ref().borrow_mut();
-
-    // TODO: marks_filter
-    // set_render_marks
-    // brute force for now
-
-    let marks = v.moving_marks.read().unwrap();
-
-    for m in marks.iter() {
-        //dbg_println!(" checking m.offset {}", m.offset);
-
-        if m.offset < v.start_offset {
-            continue;
-        }
-
-        // the marks sorted
-        if m.offset > v.end_offset {
-            break;
-        }
-
-        let mut screen = v.screen.write().unwrap();
-        for l in 0..screen.height() {
-            let line = screen.get_mut_line(l).unwrap();
-
-            for c in 0..line.nb_cells {
-                let cpi = line.get_mut_cpi(c).unwrap();
-
-                if let Some(offset) = cpi.offset {
-                    if offset == m.offset {
-                        cpi.is_selected = !cpi.metadata;
-                    }
-                }
-            }
-        }
-    }
-}
-
 pub fn compute_view_layout(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -1062,11 +1024,6 @@ pub fn update_view(
         env.view_post_render.clear();
         run_view_action(editor, env, view, &actions);
     }
-
-    // let t0 = Instant::now();
-    // refresh_view_marks(editor, env, view);
-    // let t1 = Instant::now();
-    // dbg_println!("refresh_view_marks : {} ms", (t1 - t0).as_millis());
 
     let _end = Instant::now();
     // env.time_to_build_screen = end.duration_since(start);
@@ -1163,7 +1120,7 @@ pub fn scroll_down(
     env.view_pre_render.push(Action::ScrollDown { n: 3 });
 }
 
-// TODO: rename into insert_input_event
+// TODO: rename into handle_input_events
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(
     editor: &mut Editor,
@@ -1186,6 +1143,8 @@ pub fn insert_codepoint_array(
             return;
         }
     };
+
+    env.draw_marks = true;
 
     // delete selection before insert
     copy_maybe_remove_selection(editor, env, trigger, view, false, true);
@@ -1470,6 +1429,7 @@ pub fn remove_codepoint(
     }
     v.start_offset -= view_shrink;
 
+    env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection);
 }
 
@@ -1567,6 +1527,7 @@ pub fn remove_until_end_of_word(
     env.max_offset = doc.size() as u64;
     doc.tag(env.max_offset, marks_offsets);
 
+    env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection); //TODO register last optype
                                                        // if doc changes cancel selection ?
 }
@@ -2669,6 +2630,7 @@ pub fn cut_to_end_of_line(
 
     tm.last_cut_log_index = Some(pos - 1);
 
+    env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection);
 }
 

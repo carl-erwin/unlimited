@@ -17,6 +17,7 @@ pub struct CodepointInfo {
     // TODO: add real_size ? in bytes
 
     // regroup in DisplayStyle ?
+    pub is_mark: bool,
     pub is_selected: bool,
     // TODO: add underline
     // TODO: add bold ?
@@ -49,6 +50,7 @@ impl CodepointInfo {
             displayed_cp: ' ',
             offset: None,
             size: 0,
+            is_mark: false,
             is_selected: false,
             color: CodepointInfo::default_color(),
             bg_color: CodepointInfo::default_bg_color(),
