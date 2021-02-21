@@ -4,9 +4,23 @@
 
 [user] -> (input event) ->  [view, doc] -> [modes]-> [function](<input_events_trigger>, doc, view) -> layout? -> [user]
 
-type ModeFunction = fn(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>, doc: &mut Doc, view: &mut View) -> | Status ok/err need layout ? |
+type Mode_InputActionFunction:
+= fn(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>, doc: &mut Doc, view: &mut View)-> Status ok/err need layout ?
+{
+    dyn mut mode = view->get_mode_mut("xxxx"); // always mut ?
+    do stuff
+}
 
-let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>, doc: &mut Doc, view: &mut View)
+let ptr : ModeRenderFunction = highlight(editor: &mut Editor (?), env: &mut EditorEnv, FILTER_TRAIT, IN, OUT,
+                                     env: &mut LayoutEnv {
+                                         doc: &Doc,
+                                         view: &View
+                                         screen: &mut Screen, // final output (implicit) ?
+                                      }
+                                    }
+
+let ptr : RenderPipeline: Vec<RenderFunction>
+
 
 will allow keyboard recording/keyboard macros
 fallback if no match ?
@@ -96,6 +110,232 @@ ctrl+a, ctrl-v,
 
   this function will called to refresh the view screen when
   the user modifies the buffer
+*/
+
+/*
+[TODO] - move marks to tm
+[TODO] - transform selection point in vector of marks
+
+[TODO] add last_max_column (update by move-forward , move-backward)
+[TODO] add exchange point and mark only if size ==
+
+
+
+Mark/Point
+{
+    offset: u64,
+    column_index: Option(usize),
+    max_column_index: Option(usize)
+}
+
+array[mark]
+array[point]
+
+Selection
+{
+   start: u64,
+   end:   u64,
+}
+
+Selections : Vec<Selection> // updated from mark/point after all move/change
+
+
+The is only 3 operation  (copy|insert|remove)(marks/points)
+transform this in vec of buffer operations easier to debug ? :
+
+???? record action ??? same format as buffer log ?
+???? allow lazy updates (lazy offscreen ops)
+push(select_first_mark)
+push(select_first_mark)
+push(copy, data, size,   start_offset)
+push(select_next_mark)
+push(update_cur_offset, inc|dec, usize)
+push(insert, data, size, @star_offset relative ...)
+push(remove, data, size, @star_offset relative ...)
+????
+
+multi-mark/selection
+     copy(alt+w)
+     cut(ctrl+w)
+     cut to eol (ctrl+k) merge with cut ?
+     paste (ctrl+y)
+
+Something emerge:
+    there are view.marks : Vec<Mark{offset}>
+    there are tm.points: Vec<Mark{offset}>
+
+    when doing set-points (ctrl+space)
+
+    Each mark is 'cloned' and stored to (points)
+
+ [Mark Moves]:
+  when the marks move, we MUST ensure the relative point is updated
+  if the marks are merged th
+
+  [m0].....[p0]
+                [m1].....[p1]
+
+    0     1     2     3    4     5     6     7     8     9     10            <---- buffer[offsets]
+   [p0)  ....  ....  ....  m0[  ....  ....  ....  ....  ....  ....           <---- selection0  [0..4[
+   ....  ....  ....  ....  [p1  ....  ....  ....  ....   m1[  ....           <---- selection1  [4..9[
+
+   (m0,p1) marked for delete
+
+
+first handle marks/point move: never allow overlapping
+
+when a mark enters the range of the next selection it is destroyed an d the selection range are merged
+
+To the right
+
+    M     S
+0  [9]  [ 0]
+1  [15] [10]
+2  [35] [20]
+
+move right x 2
+    M     S
+0  [11] [ 0]        m[0] > s[O+1] : flagged
+1  [17] [10]
+2  [37] [20]
+
+  m[0]   <--- m[0+1]
+  s[0+1] <--- s[0]
+
+    M     S
+0  [17] [ 0]
+1  [17] [ 0]
+2  [37] [20]
+
+dedup marks/selection
+
+move right
+    M     S
+0  [17] [ 0]
+1  [37] [20]
+
+...
+move right x4
+    M     S
+0  [20] [ 0]
+1  [41] [20]
+
+  m[0]   <--- m[0+1]
+  s[0+1] <--- s[0]
+
+    M     S
+0  [41] [ 0]
+1  [41] [ 0]
+
+dedup marks/selection
+
+    M     S
+0  [41] [ 0]
+
+
+
+
+
+
+The selection should be comment aware alt+shit+right : select comment region
+
+enum TextBufferOperation {
+    SelectFirstMark
+    SelectNextMark
+
+    SelectFirstPoint
+    SelectNextPoint
+
+    ReadSelectionData(sel_size)
+    ReadData(data_size)
+    Copy
+    Cut
+    Remove(rm_data)
+    SaveRemovedData()
+    Insert(insert_ata)
+    Paste
+    OffsetInc() // grow op
+    OffsetDec() // shrink op
+};
+
+if (cut)
+  clear copy_buffers
+
+cut   = copy+remove
+paste = remove+insert
+
+// if nr marks == nr points
+
+
+if nr marks != nr points
+{
+
+}
+
+
+
+
+if read/copy/cut/remove/insert/paste "data" {
+
+  save in buffer log marks(+point ?)
+
+  shrink = 0;
+  grow = 0;
+
+  for each mark/point (mark,point)
+  {
+      mark.offset -= shrink
+      mark.offset += grow
+
+      point.offset -= shrink
+      point.offset += grow
+
+      let (min, max) = sorted([mark..point];
+
+      if (read) {
+         read(min, (max-min)) -> data
+      }
+
+      if (copy) {
+          copy_buffers.push(data)
+      }
+
+      if (remove flag) {
+        remove sorted([mark..point], data) -> nr_removed
+        if (cut) {
+            push(data)
+        }
+        shrink += size(rm_data) // OffsetDec(size(rm_data))
+       }
+
+      if (insert flag) {
+        insert(data)
+        grow += size(insert_data) // OffsetDec(size(add_data))
+      }
+
+      clear(point)
+     }
+}
+
+
+
+
+
+    [TODO] : write expected behavior the marks do not overlap
+             when doing moves they are merge (the selections are merged)
+
+            multi selections
+                    [point].....[mark(0)]   last_copy: Some(log_index) in the mark
+                    [point].....[mark(1)]
+                    [point].....[mark(2)]
+                            ...
+                    [point].....[mark(n)]
+
+    [KO] alt+w
+    [OK] multi-marks : ctrl+k/ctrl-y
+    [KO] multi-marks ctrl+space : broken
+    [KO] alt-w xor ctrl+k
+
 */
 
 //
@@ -269,12 +509,7 @@ pub struct TextMode {
     pub text_codec: Box<dyn TextCodec>, // Option ? move to mode
     pub select_point: Option<Mark>,
 
-    // TODO: use for cut and paste // move to mark
-    pub last_cut_log_index: Option<usize>,
-
     pub button_state: [u32; 8],
-
-    pub copy_selection: Vec<u8>,
 }
 
 impl TextMode {
@@ -290,9 +525,7 @@ impl TextMode {
             scroll_on_mark_move: true,
             text_codec: Box::new(utf8::Utf8Codec::new()),
             select_point: None,
-            last_cut_log_index: None,
             button_state: [0; 8],
-            copy_selection: Vec::new(),
         }
     }
 
@@ -444,7 +677,9 @@ pub struct View<'a> {
 
     // used in rendering
     pub moving_marks: Arc<RwLock<Vec<Mark>>>, // move to mode ?
-    pub mark_index: usize,                    // move to text mode
+    pub copy_buffer: Arc<RwLock<Vec<usize>>>, // move to mode ?
+
+    pub mark_index: usize, // move to text mode
 
     pub main_mode: &'static str,                    // mandatory by name
     pub modes: HashMap<&'static str, Box<dyn Any>>, // HUM ......
@@ -470,6 +705,7 @@ impl<'a> View<'a> {
 
         // TODO: in future version will be stored in buffer meta data
         let moving_marks = Arc::new(RwLock::new(vec![Mark { offset: 0 }]));
+        let copy_buffer = Arc::new(RwLock::new(vec![]));
 
         // set default mode(s)
         let mut modes: HashMap<&str, Box<dyn Any>> = HashMap::new();
@@ -488,6 +724,7 @@ impl<'a> View<'a> {
             start_offset,
             end_offset: start_offset, // will be recomputed later
             moving_marks,
+            copy_buffer,
             mark_index: 0,
 
             main_mode: mode_name,
@@ -529,7 +766,8 @@ impl<'a> View<'a> {
         // if we find '\n' or \r we stop
         // and take the next char offset -> self.start_offset
         if nb_lines == 1 {
-            let doc = self.document.as_mut().unwrap().borrow_mut();
+            let doc = self.document.as_ref().unwrap();
+            let doc = doc.as_ref().borrow();
 
             let mut tmp = Mark::new(self.start_offset);
             for _ in 0..nb_lines {
@@ -564,7 +802,7 @@ impl<'a> View<'a> {
 
         // get start of line
         {
-            let doc = self.document.as_mut().unwrap().borrow_mut();
+            let doc = self.document.as_ref().unwrap().borrow();
             m.move_to_start_of_line(&doc, codec);
         }
 
@@ -599,7 +837,7 @@ impl<'a> View<'a> {
         }
 
         let max_offset = {
-            let doc = self.document.as_mut().unwrap().borrow_mut();
+            let doc = self.document.as_ref().unwrap().borrow();
             doc.size() as u64
         };
 
@@ -1047,7 +1285,9 @@ pub fn save_marks(
 
     // save marks in log ?
     let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-    let mut doc = v.document.as_ref().unwrap().borrow_mut();
+    let doc = v.document.as_ref().unwrap();
+    let mut doc = doc.as_ref().borrow_mut();
+
     doc.tag(env.max_offset, marks_offsets);
 }
 
@@ -1155,7 +1395,8 @@ pub fn insert_codepoint_array(
         let mut view_growth = 0;
         let mut offset: u64 = 0;
         {
-            let mut doc = v.document.as_ref().unwrap().borrow_mut();
+            let doc = v.document.as_ref().unwrap();
+            let mut doc = doc.as_ref().borrow_mut();
 
             let tm = v.modes.get("text-mode").unwrap();
             let tm = tm.downcast_ref::<TextMode>().unwrap();
@@ -2578,13 +2819,20 @@ pub fn cut_to_end_of_line(
 ) {
     let v = &mut view.as_ref().borrow_mut();
 
-    let pos = {
+    {
         let doc = v.document.as_ref().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
 
         let tm = v.modes.get("text-mode").unwrap();
         let tm = tm.downcast_ref::<TextMode>().unwrap();
         let codec = tm.text_codec.as_ref();
+
+        // setup paste log buffer indexes
+        // there will be 1 push per mark
+        let copy_index = v.copy_buffer.as_ref();
+        let mut copy_index = copy_index.write().unwrap();
+
+        copy_index.clear();
 
         let marks_offsets: Vec<u64> = v
             .moving_marks
@@ -2596,7 +2844,10 @@ pub fn cut_to_end_of_line(
 
         doc.tag(env.max_offset, marks_offsets);
 
-        for m in v.moving_marks.read().unwrap().iter() {
+        let mut shrink = 0;
+        for m in v.moving_marks.write().unwrap().iter_mut() {
+            m.offset -= shrink as u64;
+
             let mut end = m.clone();
             let offset0 = m.offset;
             end.move_to_end_of_line(&doc, codec);
@@ -2604,12 +2855,17 @@ pub fn cut_to_end_of_line(
             if offset0 == offset1 {
                 end.move_forward(&doc, codec);
             }
-            doc.remove(m.offset, (end.offset - m.offset) as usize, None);
-            break;
+            let size = (end.offset - m.offset) as usize;
+            doc.remove(m.offset, size, None);
+
+            shrink += size;
+
+            // save transaction's index
+            copy_index.push(doc.buffer_log.pos - 1);
         }
 
-        let pos = doc.buffer_log.pos;
-        // TODO: pate_buffer_log_index.push(pos)
+        let mlen = v.moving_marks.read().unwrap().len();
+        assert!(copy_index.len() == mlen);
 
         env.max_offset = doc.size() as u64;
         //
@@ -2621,17 +2877,7 @@ pub fn cut_to_end_of_line(
             .map(|m| m.offset)
             .collect();
         doc.tag(env.max_offset, marks_offsets);
-
-        pos
     };
-
-    // save buffer log idx
-    assert!(pos > 0);
-
-    let tm = v.modes.get_mut("text-mode").unwrap();
-    let tm = tm.downcast_mut::<TextMode>().unwrap();
-
-    tm.last_cut_log_index = Some(pos - 1);
 
     env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection);
@@ -2652,6 +2898,17 @@ pub fn paste(
     let mut doc = doc.as_ref().borrow_mut();
 
     let mut marks = v.moving_marks.write().unwrap();
+    let marks_len = marks.len();
+
+    let mut copy_index = v.copy_buffer.write().unwrap();
+
+    dbg_println!("mark_len {}", marks_len);
+
+    dbg_println!("copy_index.len() {}", copy_index.len());
+    if copy_index.len() == 0 {
+        panic!("");
+        return;
+    }
 
     {
         // save marks: TODO helper functions
@@ -2659,30 +2916,24 @@ pub fn paste(
         doc.tag(env.max_offset, marks_offsets);
     }
 
-    for m in marks.iter_mut() {
-        //
-        if tm.copy_selection.len() > 0 {
-            doc.insert(
-                m.offset,
-                tm.copy_selection.len(),
-                tm.copy_selection.as_slice(),
-            );
+    let mut grow = 0;
+    for (midx, m) in marks.iter_mut().enumerate() {
+        m.offset += grow;
 
-            m.offset += tm.copy_selection.len() as u64;
+        if copy_index.len() != marks_len {
+            // TODO: insert each copy_index transaction + '\n'
+            // grow += each tr
         } else {
-            // TODO: add perf mark paste buffer
-
-            if let Some(idx) = tm.last_cut_log_index {
-                let tr = doc.buffer_log.data[idx].clone();
-
-                if let Some(ref data) = tr.data {
-                    doc.insert(m.offset, data.len(), data.as_slice());
-                    m.offset += data.len() as u64;
-                } else {
-                    // wrong record index
-                    panic!();
-                }
+            let tridx = copy_index[midx];
+            // function here
+            // apply_log_transaction(tridx) -> size
+            let tr = doc.buffer_log.data[tridx].clone();
+            if let Some(ref data) = tr.data {
+                doc.insert(m.offset, data.len(), data.as_slice());
+                m.offset += data.len() as u64;
+                grow += data.len() as u64;
             } else {
+                // wrong record index
             }
         }
     }
@@ -2835,15 +3086,21 @@ pub fn copy_maybe_remove_selection(
 
     let mark_index = v.mark_index;
 
+    // doc
     let doc = v.document.clone();
     let doc = doc.as_ref().clone().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    // duplicate
-    let mut marks = {
-        let marks = v.moving_marks.read().unwrap();
-        marks.clone()
-    };
+    //  marks
+    let marks = v.moving_marks.clone();
+    let mut marks = marks.write().unwrap();
+
+    // copy buffer
+    let copy_index = v.copy_buffer.clone();
+    let mut copy_index = copy_index.write().unwrap();
+
+    // clear copy buffer
+    copy_index.clear();
 
     let m = { marks[mark_index].clone() };
 
@@ -2884,27 +3141,27 @@ pub fn copy_maybe_remove_selection(
 
         if remove == true {
             doc.remove(start, size, None);
+
+            if copy {
+                copy_index.push(doc.buffer_log.pos);
+            }
+
             marks[mark_index].offset = start;
             dbg_println!("marks[{}].offset({})", mark_index, marks[mark_index].offset);
 
             let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
             env.max_offset = doc.size() as u64;
-            doc.tag(env.max_offset, marks_offsets);
-        }
 
-        if copy {
-            tm.copy_selection = data;
+            doc.tag(env.max_offset, marks_offsets);
         }
 
         tm.select_point = None;
         env.draw_marks = true;
 
-        // save back
-        let mut real_marks = v.moving_marks.write().unwrap();
-        *real_marks = marks;
-
         (start, size)
     } else {
+        // walk through marks
+
         (0, 0)
     };
 
