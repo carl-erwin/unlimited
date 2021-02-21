@@ -1084,11 +1084,21 @@ pub fn editor_cancel(
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
+    let mark_index = v.mark_index;
+    v.mark_index = 0;
 
     let tm = v.modes.get_mut("text-mode").unwrap();
     let tm = tm.downcast_mut::<TextMode>().unwrap();
     tm.select_point = None;
     env.draw_marks = true;
+
+    // save marks in log ?
+
+    let mut marks = v.moving_marks.write().unwrap();
+    let offset = marks[mark_index].offset;
+
+    marks.clear();
+    marks.push(Mark { offset });
 }
 
 pub fn scroll_up(
