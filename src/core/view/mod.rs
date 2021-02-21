@@ -1074,23 +1074,19 @@ pub fn update_view(
     Some(())
 }
 
-///
-
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // text mode functions
-pub fn editor_cancel(
+
+pub fn cancel_marks(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
     let mark_index = v.mark_index;
     v.mark_index = 0;
-
-    let tm = v.modes.get_mut("text-mode").unwrap();
-    let tm = tm.downcast_mut::<TextMode>().unwrap();
-    tm.select_point = None;
-    env.draw_marks = true;
 
     // save marks in log ?
 
@@ -1099,6 +1095,30 @@ pub fn editor_cancel(
 
     marks.clear();
     marks.push(Mark { offset });
+}
+
+// text mode functions
+pub fn cancel_selection(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = &mut view.as_ref().borrow_mut();
+    let tm = v.modes.get_mut("text-mode").unwrap();
+    let tm = tm.downcast_mut::<TextMode>().unwrap();
+    tm.select_point = None;
+}
+
+pub fn editor_cancel(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    cancel_marks(editor, env, trigger, view);
+
+    cancel_selection(editor, env, trigger, view);
 }
 
 pub fn scroll_up(
