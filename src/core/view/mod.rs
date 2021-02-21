@@ -1078,23 +1078,43 @@ pub fn update_view(
 //
 // text mode functions
 
-pub fn cancel_marks(
+pub fn save_marks(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
-    let mark_index = v.mark_index;
-    v.mark_index = 0;
+    let marks = v.moving_marks.clone();
+    let marks = marks.write().unwrap();
 
     // save marks in log ?
+    let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
+    let mut doc = v.document.as_ref().unwrap().borrow_mut();
+    doc.tag(env.max_offset, marks_offsets);
+}
 
-    let mut marks = v.moving_marks.write().unwrap();
+pub fn cancel_marks(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+) {
+    save_marks(editor, env, trigger, view);
+
+    let v = &mut view.as_ref().borrow_mut();
+    let mark_index = v.mark_index;
+
+    let marks = v.moving_marks.clone();
+    let mut marks = marks.write().unwrap();
     let offset = marks[mark_index].offset;
+
+    v.mark_index = 0;
 
     marks.clear();
     marks.push(Mark { offset });
+
+    //    save_marks(editor, env, trigger, view); ?
 }
 
 // text mode functions
