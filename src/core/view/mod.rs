@@ -2598,9 +2598,12 @@ pub fn cut_to_end_of_line(
 
         for m in v.moving_marks.read().unwrap().iter() {
             let mut end = m.clone();
+            let offset0 = m.offset;
             end.move_to_end_of_line(&doc, codec);
-            end.move_forward(&doc, codec);
-
+            let offset1 = end.offset;
+            if offset0 == offset1 {
+                end.move_forward(&doc, codec);
+            }
             doc.remove(m.offset, (end.offset - m.offset) as usize, None);
             break;
         }
