@@ -331,13 +331,14 @@ pub fn send_draw_event(
     view: &Rc<RefCell<View>>,
 ) {
     let view = view.as_ref().borrow();
+    let tm = view.get_mode::<TextMode>("text-mode");
 
+    // TODO: REMOVE THIS:
+    // add mark filter before screen
     // render marks here for now
-    let marks = view.moving_marks.read().unwrap();
-
     refresh_screen_marks(
         &mut view.screen.write().as_mut().unwrap(),
-        &marks,
+        &tm.marks,
         env.draw_marks,
     );
 

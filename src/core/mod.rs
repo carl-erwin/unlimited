@@ -3,7 +3,6 @@
 //
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::thread;
 
 #[macro_use]
 pub(crate) mod macros;
@@ -18,6 +17,7 @@ pub mod editor;
 pub mod event;
 pub mod mapped_file;
 pub mod mark;
+pub mod modes;
 pub mod screen;
 pub mod view;
 

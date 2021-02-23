@@ -44,6 +44,35 @@ pub struct EditorEnv<'a> {
 
     // ADD view env ? TODO: refresh env after input_proessing
 
+    //TODO: define workflow
+    //  pre_input | input | post_input | pre_eval | eval | pos_eval |  pre_render | render | post_render
+    //  each stage MUST have special signature
+    // the modes register themselves at any stage
+    // json ? to define pipeline ?
+    //  mode dependencies ?
+    //  xxx_mode: depends: "name", "name2", ...
+    //  xxx_mode: optional_depends: "name", "name2", ...
+    //
+    // promote  FilterData like enum
+    // promote  pub enum DataType {  FilterData }
+    //
+    // }
+    //
+    // define routes aka pipeline
+    //
+    // stage         pre_processing | processing | post processing
+    //
+    // pre_input    =
+    // input        =
+    // post_input   =
+    // pre_eval     =
+    // eval         =   TextMode::actions::*
+    // pos_eval     =
+    // pre_render   =   setup/reset ? here
+    // render       =   TextMode::filters { raw | utf8 | highlight | tab | word-wrap | selection | marks | screen }
+    // post_render  =   tooltips | syntax error | spellcheck
+    // route
+
     // move ths to update_action
     // reset on each event handling
     pub view_pre_render: Vec<view::Action>,
