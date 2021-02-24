@@ -44,17 +44,17 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
     // TODO: every sent msg must have
     // reply_to: &Sender<EventMessage>
     // start indexer thread
-    let indexer_th = {
-        // let ui_tx_clone = ui_tx.clone();
-        Some(thread::spawn(move || {
-            dbg_println!("stating indexer");
-        }))
-    };
+    //let indexer_th = {
+    //    // let ui_tx_clone = ui_tx.clone();
+    //    Some(thread::spawn(move || {
+    //        dbg_println!("starting indexer");
+    //    }))
+    //};
 
     editor::run(&mut editor, &mut env, &core_rx, &ui_tx);
 
     // wait for core indexer thread
-    if let Some(th) = indexer_th {
-        th.join().unwrap()
-    }
+    //if let Some(th) = indexer_th {
+    //    th.join().unwrap()
+    //}
 }
