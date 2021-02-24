@@ -1511,28 +1511,30 @@ pub fn clone_and_move_mark_to_previous_line(
         move_mark_to_previous_line(editor, env, trigger, &mut v, 0, &mut marks);
     }
 
-    let m_offset = {
-        let v = view.as_ref().borrow();
-        let tm = v.get_mode::<TextMode>("text-mode");
-        tm.marks[0].offset
-    };
+    let mut v = view.as_ref().borrow_mut();
+    let screen = v.screen.clone();
+    let screen = screen.read().unwrap();
 
-    if m_offset != prev_off {
-        let mut v = view.as_ref().borrow_mut();
+    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    tm.marks = marks;
 
+    if tm.marks[0].offset != prev_off {
         let tm = v.get_mode_mut::<TextMode>("text-mode");
         tm.mark_index = 0;
-        let marks = &mut tm.marks;
 
         // insert mark @ m_offset + pa
-        marks.insert(0, Mark { offset: m_offset });
-        marks[1].offset = prev_off;
+        tm.marks.insert(
+            0,
+            Mark {
+                offset: tm.marks[0].offset,
+            },
+        );
+        tm.marks[1].offset = prev_off;
         // env.sort mark sync direction
         // update view.mark_index
 
-        let screen = v.screen.read().unwrap();
         let was_on_screen = screen.contains_offset(prev_off);
-        let is_on_screen = screen.contains_offset(m_offset);
+        let is_on_screen = screen.contains_offset(tm.marks[0].offset);
         if was_on_screen && !is_on_screen {
             env.view_pre_render.push(Action::ScrollUp { n: 1 });
         } else if !is_on_screen {
