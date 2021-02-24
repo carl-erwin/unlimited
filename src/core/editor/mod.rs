@@ -114,7 +114,6 @@ pub struct Editor<'a> {
     pub config: Config,
     pub document_map: HashMap<document::Id, Rc<RefCell<Document<'a>>>>,
     pub view_map: Vec<(view::Id, Rc<RefCell<View<'a>>>)>,
-    pub last_rdr_event: Instant,
 }
 
 impl<'a> Editor<'a> {
@@ -124,7 +123,6 @@ impl<'a> Editor<'a> {
             config,
             document_map: HashMap::new(),
             view_map: Vec::new(),
-            last_rdr_event: Instant::now(),
         }
     }
 
@@ -453,47 +451,16 @@ fn process_input_event(
     true
 }
 
-fn process_input_events(
+fn send_ui_event(
     mut editor: &mut Editor,
     mut env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
-    events: &Vec<InputEvent>,
+    _events: &Vec<InputEvent>,
 ) {
-    env.pending_events = crate::core::event::pending_input_event_count();
-
-    let start = Instant::now();
-    for ev in events {
-        let vid = env.view_id;
-        let mut event_processed = process_input_event(&mut editor, &mut env, vid, ev);
-
-        // to check_focus_change()
-        if vid != env.view_id {
-            dbg_println!("view change {} ->  {}", vid, env.view_id);
-            check_view_dimension(editor, env);
-            event_processed = true;
-
-            // NB: resize previous view's screen to lower memory usage
-            let view = editor.view_map[vid].1.clone();
-            let v = view.as_ref().borrow_mut();
-            v.screen.write().unwrap().resize(1, 1);
-        }
-
-        if event_processed {
-            let start = Instant::now();
-            let view = editor.view_map[env.view_id].1.clone();
-            // render_view(&mut editor, &mut env, &view);
-            update_view(&mut editor, &mut env, &view);
-            let end = Instant::now();
-            dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
-        }
-
-        if env.pending_events > 0 {
-            env.pending_events = crate::core::event::pending_input_event_dec(1);
-        }
-    }
-
-    let end = Instant::now();
-    dbg_println!("EVAL: input process time {}\r", (end - start).as_millis());
+    dbg_println!(
+        "EVAL: input process time {}\r",
+        (env.process_input_end - env.process_input_start).as_millis()
+    );
 
     //
     let p_input = crate::core::event::pending_input_event_count();
@@ -504,12 +471,72 @@ fn process_input_events(
 
     // % last render time
     // TODO: receive FPS form ui in Event ?
-    if (p_input <= 60) || editor.last_rdr_event.elapsed() > Duration::from_millis(1000 / 10) {
+    if (p_input <= 60) || env.last_rdr_event.elapsed() > Duration::from_millis(1000 / 10) {
         // hit
         let view = &editor.view_map[env.view_id].1.clone();
         send_draw_event(&mut editor, &mut env, ui_tx, &view);
-        editor.last_rdr_event = Instant::now();
+        env.last_rdr_event = Instant::now();
     }
+}
+
+/*
+pre_process_input_event(&mut editor, &mut env, &ui_tx, &events);
+input_process(&mut editor, &mut env, &ui_tx, &events);
+pre_input_process(&mut editor, &mut env, &ui_tx, &events);
+process_input_events(&mut editor, &mut env, &ui_tx, &events);
+
+*/
+fn process_input_events(
+    mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
+    ui_tx: &Sender<EventMessage>,
+    events: &Vec<InputEvent>,
+) {
+    env.pending_events = crate::core::event::pending_input_event_count();
+
+    env.process_input_start = Instant::now();
+    for ev in events {
+        let vid = env.view_id;
+
+        // pre_eval_input_stage(&mut editor, &mut env, vid, ev);
+
+        // need_rendering ?
+        env.event_processed = process_input_event(&mut editor, &mut env, vid, ev);
+
+        // post_eval_stage(&mut editor, &mut env, vid, ev);
+        // {
+        // to check_focus_change()
+        if vid != env.view_id {
+            dbg_println!("view change {} ->  {}", vid, env.view_id);
+            check_view_dimension(editor, env);
+            env.event_processed = true;
+
+            // NB: resize previous view's screen to lower memory usage
+            let view = editor.view_map[vid].1.clone();
+            let v = view.as_ref().borrow_mut();
+            v.screen.write().unwrap().resize(1, 1);
+        }
+        // }
+
+        // pre_render_stage(&mut editor, &mut env, vid, ev);
+
+        if env.event_processed {
+            let start = Instant::now();
+            let view = editor.view_map[env.view_id].1.clone();
+            // render_view(&mut editor, &mut env, &view);
+            update_view(&mut editor, &mut env, &view);
+            let end = Instant::now();
+            dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
+        }
+        if env.pending_events > 0 {
+            env.pending_events = crate::core::event::pending_input_event_dec(1);
+        }
+
+        //
+    }
+    env.process_input_end = Instant::now();
+
+    send_ui_event(editor, env, ui_tx, events);
 }
 
 pub fn application_quit(

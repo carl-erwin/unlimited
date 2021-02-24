@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Instant;
 
 use crate::core::editor::ActionMap;
 use crate::core::event::InputEvent;
@@ -27,6 +28,9 @@ pub struct EditorEnv<'a> {
 
     pub quit: bool,
     pub status: String, // TODO: move to test-mode
+    /// This flag is set when an input event as triggered a change
+    /// and the ui must be refresh
+    pub event_processed: bool,
 
     pub action_map: ActionMap, // ref to current focused widget ?
 
@@ -36,14 +40,16 @@ pub struct EditorEnv<'a> {
     pub trigger: Vec<InputEvent>,
 
     pub pending_events: usize,
+    pub last_rdr_event: Instant,
+    pub process_input_start: Instant,
+    pub process_input_end: Instant,
 
     //
     pub width: usize,
     pub height: usize,
     pub view_id: usize, // doc id in view
 
-    // ADD view env ? TODO: refresh env after input_proessing
-
+    // ADD view env ? TODO: refresh env after input_processing
     //TODO: define workflow
     //  pre_input | input | post_input | pre_eval | eval | pos_eval |  pre_render | render | post_render
     //  each stage MUST have special signature
@@ -62,18 +68,42 @@ pub struct EditorEnv<'a> {
     //
     // stage         pre_processing | processing | post processing
     //
+    //
+    // {READ}
     // pre_input    =
     // input        =
     // post_input   =
+    //
+    // {EVAL}
     // pre_eval     =
-    // eval         =   TextMode::actions::*
+    // eval         =   EVAL: TextMode::actions::*
     // pos_eval     =
+    //
+    // {MODEL}
     // pre_render   =   setup/reset ? here
     // render       =   TextMode::filters { raw | utf8 | highlight | tab | word-wrap | selection | marks | screen }
     // post_render  =   tooltips | syntax error | spellcheck
-    // route
+    //
+    // pre_route_to_ui
+    // route_to_ui
+    // post_route_to_ui
+    // {PRINT}
+    //
+    // A mode is a collection functions+state registered
+    // at some stages
+    // Text indexers / Async ?
+    // connect the stage with tokio ?
+    // we have a model
+    //
+    // Processor : {PRE_PROCESS|PROCESS_|POST_PROCESS}
+    // input  core::DataType { core::events, mime_types }
+    // input  core::DataType
+    // each process receive an input with
+    // src/dest
+    // the destination can be diferrent from the input generator
+    // multiplex
 
-    // move ths to update_action
+    // move this to corresponding pre/pos stages
     // reset on each event handling
     pub view_pre_render: Vec<view::Action>,
     pub view_post_render: Vec<view::Action>,
@@ -97,6 +127,7 @@ impl<'a> EditorEnv<'a> {
             phantom: PhantomData,
             graphic_display: false,
             quit: false,
+            event_processed: false,
             status: String::new(),
             action_map: build_core_action_map(),
             input_map,
@@ -104,6 +135,9 @@ impl<'a> EditorEnv<'a> {
             next_node: None,
             trigger: vec![],
             pending_events: 0,
+            last_rdr_event: Instant::now(),
+            process_input_start: Instant::now(),
+            process_input_end: Instant::now(),
             width: 0,
             height: 0,
             view_id: 0,
