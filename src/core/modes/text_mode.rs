@@ -1824,7 +1824,7 @@ pub fn paste(
 
     dbg_println!("copy_buffer.len() {}", tm.copy_buffer.len());
     if tm.copy_buffer.len() == 0 {
-        panic!("");
+        return;
     }
 
     {
@@ -2004,7 +2004,9 @@ pub fn copy_maybe_remove_selection(
     let mark_index = tm.mark_index;
 
     // copy buffer
-    tm.copy_buffer.clear();
+    if copy {
+       tm.copy_buffer.clear();
+    }
 
     let m = { tm.marks[mark_index].clone() };
 
