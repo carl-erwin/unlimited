@@ -26,6 +26,9 @@ use crate::core::event::Event::DrawEvent;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::mark::Mark;
+
+use crate::core::modes::TextMode;
+
 use crate::core::screen::Screen;
 use crate::core::view;
 use crate::core::view::update_view;
@@ -54,7 +57,9 @@ use crate::core::document::DocumentBuilder;
 //
 pub type Id = u64;
 
-//
+/*
+   TODO: add Timers -> Blink
+*/
 /* Hierarchy Reminder
 
     core
@@ -364,7 +369,7 @@ pub fn run(
     }
 
     while !env.quit {
-        if let Ok(evt) = core_rx.recv_timeout(Duration::from_millis(500)) {
+        if let Ok(evt) = core_rx.recv() {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     break;
@@ -385,10 +390,6 @@ pub fn run(
 
                 _ => {}
             }
-        } else {
-            // input timeout
-            env.draw_marks = !env.draw_marks;
-            update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
         }
     }
 
