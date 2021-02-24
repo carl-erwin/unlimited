@@ -757,7 +757,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 */
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
-    let mut wait_ms = 1000;
+    let mut wait_ms = 10000;
     let min_wait_ms = 4;
 
     let mut start = Instant::now();
