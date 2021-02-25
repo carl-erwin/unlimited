@@ -441,8 +441,7 @@ fn process_input_event(
         match action.as_str() {
             _ => {
                 if let Some(action) = env.action_map.get(&action) {
-                    let trigger = env.trigger.clone();
-                    action(editor, env, &trigger, &mut view);
+                    action(editor, env, &mut view);
                 } else {
                     // clear ?
                 }
@@ -549,12 +548,7 @@ fn process_input_events(
     send_ui_event(editor, env, ui_tx, events);
 }
 
-pub fn application_quit(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     env.status = "<quit>".to_string();
 
     let v = &view.as_ref().borrow();
@@ -571,18 +565,13 @@ pub fn application_quit(
 pub fn application_quit_abort(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     _view: &Rc<RefCell<View>>,
 ) {
     env.quit = true;
 }
 
-pub fn save_document(
-    _editor: &mut Editor,
-    _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn save_document(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = view.as_ref().borrow_mut();
     let doc = v.document.as_ref().unwrap();
     let mut doc = doc.as_ref().borrow_mut();

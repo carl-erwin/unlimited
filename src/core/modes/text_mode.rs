@@ -16,7 +16,6 @@ use crate::dbg_println;
 
 use crate::core::screen::Screen;
 
-use crate::core::mark;
 use crate::core::mark::Mark;
 
 use crate::core::codec::text::utf8;
@@ -29,6 +28,7 @@ use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
 use crate::core::event::PointerEvent;
 
+//
 use crate::core::view::layout::run_view_render_filters_direct;
 
 use crate::core::editor::register_action;
@@ -38,6 +38,7 @@ pub type Id = u64;
 
 use crate::core::view::View;
 
+// TODO: move to TextMode post actions
 use crate::core::view::Action;
 
 use super::Mode;
@@ -214,26 +215,124 @@ impl Mode for TextMode {
     }
 }
 
+pub fn run_text_mode_actions(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+    actions: &Vec<Action>,
+) {
+    // we can put borrwow out of loop
+
+    for a in actions.iter() {
+        match a {
+            Action::ScrollUp { n } => {
+                let v = &mut view.as_ref().borrow_mut();
+
+                v.scroll_up(env, *n);
+            }
+            Action::ScrollDown { n } => {
+                let v = &mut view.as_ref().borrow_mut();
+
+                v.scroll_down(env, *n);
+            }
+            Action::CenterArroundMainMark => {
+                center_arround_mark(editor, env, &view);
+            }
+            Action::CenterArroundMainMarkIfOffScreen => {
+                let center = {
+                    let v = &mut view.as_ref().borrow_mut();
+
+                    let tm = v.get_mode::<TextMode>("text-mode");
+                    let mid = tm.mark_index;
+                    let marks = &tm.marks;
+                    let offset = marks[mid].offset;
+                    let screen = v.screen.read().unwrap();
+                    !screen.contains_offset(offset)
+                };
+                if center {
+                    center_arround_mark(editor, env, &view);
+                }
+            }
+            Action::CenterArround { offset } => {
+                env.center_offset = Some(*offset);
+                center_arround_mark(editor, env, &view);
+            }
+            Action::MoveMarksToNextLine => {
+                move_marks_to_next_line(editor, env, &view);
+            }
+            Action::MoveMarksToPreviousLine => {}
+            Action::MoveMarkToNextLine { idx } => {
+                move_mark_to_next_line(env, view, *idx);
+                env.cur_mark_index = None;
+            }
+            Action::MoveMarkToPreviousLine { idx: _usize } => {}
+
+            Action::ResetMarks => {
+                env.view_pre_render.push(Action::ResetMarks);
+
+                let v = &mut view.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let offset = tm.marks[tm.mark_index].offset;
+
+                tm.mark_index = 0;
+                tm.marks.clear();
+                tm.marks.push(Mark { offset });
+            }
+
+            Action::CheckMarks => {
+                let v = &mut view.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                tm.marks.dedup();
+                tm.mark_index = tm.marks.len().saturating_sub(1);
+            }
+
+            Action::SaveCurrentMarks => {
+                let v = &mut view.as_ref().borrow_mut();
+                let doc = v.document.clone();
+                let doc = doc.as_ref().unwrap();
+                let mut doc = doc.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+
+                env.max_offset = doc.size() as u64;
+                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+                doc.tag(env.max_offset, marks_offsets);
+            }
+
+            Action::DedupAndSaveMarks => {
+                let v = &mut view.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+
+                //
+                tm.marks.dedup();
+                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+
+                //
+                let doc = v.document.as_ref().unwrap();
+                let mut doc = doc.as_ref().borrow_mut();
+                doc.tag(env.max_offset, marks_offsets);
+            }
+
+            Action::CancelSelection => {
+                let v = &mut view.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                tm.select_point.clear();
+                env.draw_marks = true;
+            }
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // text mode functions
 
-pub fn save_marks(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn save_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     env.view_pre_render.push(Action::SaveCurrentMarks);
 }
 
-pub fn cancel_marks(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    save_marks(editor, env, trigger, view);
+pub fn cancel_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    env.view_pre_render.push(Action::SaveCurrentMarks);
+    env.view_pre_render.push(Action::ResetMarks);
 
     let v = &mut view.as_ref().borrow_mut();
     let tm = v.get_mode_mut::<TextMode>("text-mode");
@@ -242,51 +341,29 @@ pub fn cancel_marks(
     tm.mark_index = 0;
     tm.marks.clear();
     tm.marks.push(Mark { offset });
-
-    //    save_marks(editor, env, trigger, view); ?
 }
 
 // text mode functions
-pub fn cancel_selection(
-    _editor: &mut Editor,
-    _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn cancel_selection(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
     let tm = v.get_mode_mut::<TextMode>("text-mode");
 
     tm.select_point.clear();
 }
 
-pub fn editor_cancel(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    cancel_marks(editor, env, trigger, view);
+pub fn editor_cancel(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    cancel_marks(editor, env, view);
 
-    cancel_selection(editor, env, trigger, view);
+    cancel_selection(editor, env, view);
 }
 
-pub fn scroll_up(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    _view: &Rc<RefCell<View>>,
-) {
+pub fn scroll_up(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
     env.view_pre_render.push(Action::ScrollUp { n: 3 });
 }
 
-pub fn scroll_down(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    _view: &Rc<RefCell<View>>,
-) {
+pub fn scroll_down(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
     env.view_pre_render.push(Action::ScrollDown { n: 3 });
@@ -294,32 +371,31 @@ pub fn scroll_down(
 
 // TODO: rename into handle_input_events
 /// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
-pub fn insert_codepoint_array(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    let array = match trigger[0] {
-        InputEvent::KeyPress {
-            mods:
-                KeyModifiers {
-                    ctrl: false,
-                    alt: false,
-                    shift: false,
-                },
-            key: Key::UnicodeArray(ref v),
-        } => v,
+pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let array = {
+        assert!(env.trigger.len() > 0);
+        let idx = env.trigger.len() - 1;
+        match &env.trigger[idx] {
+            InputEvent::KeyPress {
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
+                key: Key::UnicodeArray(ref v),
+            } => v.clone(), // should move Rc<> ?
 
-        _ => {
-            return;
+            _ => {
+                return;
+            }
         }
     };
 
     env.draw_marks = true;
 
     // delete selection before insert
-    copy_maybe_remove_selection(editor, env, trigger, view, false, true);
+    copy_maybe_remove_selection(editor, env, view, false, true);
 
     let center = {
         let mut v = view.as_ref().borrow_mut();
@@ -336,7 +412,7 @@ pub fn insert_codepoint_array(
             let codec = tm.text_codec.as_ref();
             let mut utf8 = Vec::with_capacity(array.len());
 
-            for codepoint in array {
+            for codepoint in &array {
                 let mut data: &mut [u8] = &mut [0, 0, 0, 0];
                 let data_size = codec.encode(*codepoint as u32, &mut data);
                 for d in data.iter().take(data_size) {
@@ -388,10 +464,10 @@ pub fn insert_codepoint_array(
 pub fn remove_previous_codepoint(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
-    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) > 0 {
+    if copy_maybe_remove_selection(editor, env, view, false, true) > 0 {
         return;
     }
 
@@ -461,12 +537,7 @@ pub fn remove_previous_codepoint(
 }
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
-pub fn undo(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
     let mut doc = v.document.clone();
@@ -495,12 +566,7 @@ pub fn undo(
 }
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
-pub fn redo(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
     let mut doc = v.document.clone();
@@ -528,13 +594,8 @@ pub fn redo(
 }
 
 /// Remove the current utf8 encoded code point.<br/>
-pub fn remove_codepoint(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    if copy_maybe_remove_selection(editor, env, trigger, view, false, true) > 0 {
+pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    if copy_maybe_remove_selection(editor, env, view, false, true) > 0 {
         return;
     }
 
@@ -591,7 +652,7 @@ pub fn remove_codepoint(
 pub fn remove_until_end_of_word(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
@@ -685,12 +746,7 @@ pub fn remove_until_end_of_word(
 }
 
 // TODO: maintain main mark Option<(x,y)>
-pub fn move_marks_backward(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
     let start_offset = v.start_offset;
@@ -722,12 +778,7 @@ pub fn move_marks_backward(
     }
 }
 
-pub fn move_marks_forward(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     {
         let v = &mut view.as_ref().borrow_mut();
 
@@ -774,7 +825,7 @@ pub fn move_marks_forward(
 pub fn move_marks_to_start_of_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let v = &mut view.as_ref().borrow_mut();
@@ -803,7 +854,7 @@ pub fn move_marks_to_start_of_line(
 pub fn move_marks_to_end_of_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -833,7 +884,7 @@ pub fn move_marks_to_end_of_line(
 fn move_mark_to_previous_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     v: &mut View,
     midx: usize,
     marks: &mut Vec<Mark>,
@@ -997,7 +1048,7 @@ fn move_mark_to_previous_line(
 pub fn move_marks_to_previous_line(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let (mut marks, idx_max) = {
@@ -1018,7 +1069,7 @@ pub fn move_marks_to_previous_line(
 
         for idx in 0..=idx_max {
             let prev_offset = marks[idx].offset;
-            move_mark_to_previous_line(editor, env, trigger, &mut v, idx, &mut marks);
+            move_mark_to_previous_line(editor, env, &mut v, idx, &mut marks);
 
             // TODO: move this to pre/post render
             if idx == 0 {
@@ -1335,7 +1386,7 @@ fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
 pub fn move_marks_to_next_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     // allocate temporary screen
@@ -1492,7 +1543,7 @@ pub fn move_marks_to_next_line(
 pub fn clone_and_move_mark_to_previous_line(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let (mut marks, prev_off) = {
@@ -1505,7 +1556,7 @@ pub fn clone_and_move_mark_to_previous_line(
 
     {
         let mut v = view.as_ref().borrow_mut();
-        move_mark_to_previous_line(editor, env, trigger, &mut v, 0, &mut marks);
+        move_mark_to_previous_line(editor, env, &mut v, 0, &mut marks);
     }
 
     let mut v = view.as_ref().borrow_mut();
@@ -1543,7 +1594,7 @@ pub fn clone_and_move_mark_to_previous_line(
 pub fn clone_and_move_mark_to_next_line(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     // refresh mark index
@@ -1625,7 +1676,7 @@ pub fn clone_and_move_mark_to_next_line(
 pub fn move_mark_to_screen_start(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1645,7 +1696,7 @@ pub fn move_mark_to_screen_start(
 pub fn move_mark_to_screen_end(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1665,7 +1716,7 @@ pub fn move_mark_to_screen_end(
 pub fn scroll_to_previous_screen(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     {
@@ -1675,13 +1726,13 @@ pub fn scroll_to_previous_screen(
     }
 
     // TODO: add hints to trigger mar moves
-    move_mark_to_screen_end(editor, env, trigger, &view);
+    move_mark_to_screen_end(editor, env, &view);
 }
 
 pub fn move_mark_to_start_of_file(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1698,7 +1749,7 @@ pub fn move_mark_to_start_of_file(
 pub fn move_mark_to_end_of_file(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let mut v = view.as_ref().borrow_mut();
@@ -1722,12 +1773,7 @@ pub fn move_mark_to_end_of_file(
     env.view_pre_render.push(Action::ScrollUp { n })
 }
 
-pub fn scroll_to_next_screen(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn scroll_to_next_screen(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = view.as_ref().borrow_mut();
     let n = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
     env.view_pre_render.push(Action::ScrollDown { n });
@@ -1740,12 +1786,7 @@ pub fn scroll_to_next_screen(
       check behavior when the marks offset cross each other
       the buffer log is not aware of cut/paste/multicursor
 */
-pub fn cut_to_end_of_line(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
     let mut doc = v.document.clone();
@@ -1810,12 +1851,7 @@ pub fn cut_to_end_of_line(
     env.view_pre_render.push(Action::CancelSelection);
 }
 
-pub fn paste(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
     let mut doc = v.document.clone();
@@ -1834,7 +1870,10 @@ pub fn paste(
         return;
     }
 
+    // TODO: post_eval stage(editor, env, view, action as member of mode);
+    // view::run_text_mode_actions(_editor, env, view, vec![]);
     {
+        // TODO: run_action(Action::SaveCurrentMarks);
         // save marks: TODO helper functions
         let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
         doc.tag(env.max_offset, marks_offsets);
@@ -1870,12 +1909,7 @@ pub fn paste(
         }
     }
 
-    {
-        env.max_offset = doc.size() as u64;
-        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
-    }
-
+    env.view_pre_render.push(Action::SaveCurrentMarks);
     env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection);
 
@@ -1889,12 +1923,7 @@ pub fn paste(
     // };
 }
 
-pub fn move_to_token_start(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn move_to_token_start(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // TODO: factorize macrk action
     // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
     //
@@ -1932,12 +1961,7 @@ pub fn move_to_token_start(
     }
 }
 
-pub fn move_to_token_end(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut sync = false;
 
     {
@@ -1980,7 +2004,7 @@ fn get_main_mark_offset(view: &View) -> u64 {
 pub fn set_selection_points_at_marks(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
 ) {
     let sync = false;
@@ -2008,7 +2032,7 @@ pub fn set_selection_points_at_marks(
 pub fn copy_maybe_remove_selection_symetric(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
     copy: bool,
     remove: bool,
@@ -2076,7 +2100,7 @@ pub fn copy_maybe_remove_selection_symetric(
 pub fn copy_maybe_remove_selection_non_symetric(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
+
     _view: &Rc<RefCell<View>>,
     _copy: bool,
     _remove: bool,
@@ -2087,7 +2111,7 @@ pub fn copy_maybe_remove_selection_non_symetric(
 pub fn copy_maybe_remove_selection(
     editor: &mut Editor,
     env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
+
     view: &Rc<RefCell<View>>,
     copy: bool,
     remove: bool,
@@ -2102,42 +2126,27 @@ pub fn copy_maybe_remove_selection(
 
     // todo: sync view(new_start, adjust_size)
     let (copied, removed) = if symetric {
-        copy_maybe_remove_selection_symetric(editor, env, trigger, view, copy, remove)
+        copy_maybe_remove_selection_symetric(editor, env, view, copy, remove)
     } else {
-        copy_maybe_remove_selection_non_symetric(editor, env, trigger, view, copy, remove)
+        copy_maybe_remove_selection_non_symetric(editor, env, view, copy, remove)
     };
 
     copied + removed
 }
 
 // TODO: add help, + flag , copy_maybe_remove_selection()
-pub fn copy_selection(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    copy_maybe_remove_selection(editor, env, trigger, view, true, false);
+pub fn copy_selection(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    copy_maybe_remove_selection(editor, env, view, true, false);
 }
 
-pub fn cut_selection(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
-    copy_maybe_remove_selection(editor, env, trigger, view, true, true);
+pub fn cut_selection(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    copy_maybe_remove_selection(editor, env, view, true, true);
 }
 
-pub fn button_press(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
-    let (button, x, y) = match trigger[0] {
+    let (button, x, y) = match env.trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {
             ButtonEvent {
                 mods:
@@ -2260,15 +2269,10 @@ pub fn button_press(
     // s // to internal view.as_ref().borrow_mut().state.s
 }
 
-pub fn button_release(
-    _editor: &mut Editor,
-    _env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
-    let (button, _x, _y) = match trigger[0] {
+    let (button, _x, _y) = match env.trigger[0] {
         InputEvent::ButtonRelease(ref button_event) => match button_event {
             ButtonEvent {
                 mods:
@@ -2294,18 +2298,13 @@ pub fn button_release(
     }
 }
 
-pub fn pointer_motion(
-    _editor: &mut Editor,
-    _env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
     // TODO: match events
-    match &trigger[0] {
+    match &env.trigger[0] {
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
             // TODO: change screen (x,y) to i32 ? and filter in functions ?
 
@@ -2339,43 +2338,23 @@ pub fn pointer_motion(
     }
 }
 
-pub fn select_next_view(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    _view: &Rc<RefCell<View>>,
-) {
+pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
     env.view_id = std::cmp::min(env.view_id + 1, editor.view_map.len() - 1);
 }
 
-pub fn select_previous_view(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    _view: &Rc<RefCell<View>>,
-) {
+pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
     env.view_id = env.view_id.saturating_sub(1);
 }
 
 // TODO: view.center_arrout_offset()
-pub fn center_arround_mark(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn center_arround_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut v = view.as_ref().borrow_mut();
     let tm = v.get_mode::<TextMode>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
     v.center_arround_offset(env, offset);
 }
 
-pub fn center_arround_offset(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-    _trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) {
+pub fn center_arround_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     if let Some(center_offset) = env.center_offset {
         let mut v = view.as_ref().borrow_mut();
         let offset = {

@@ -42,12 +42,8 @@ pub type Id = u64;
 pub mod layout;
 
 // TODO: move to editor
-pub type ModeFunction = fn(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    trigger: &Vec<InputEvent>,
-    view: &Rc<RefCell<View>>,
-) -> (); // () for now
+pub type ModeFunction =
+    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) -> (); // () for now
 
 // let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
 
@@ -126,6 +122,7 @@ pub enum Action {
     MoveMarksToPreviousLine,
     MoveMarkToNextLine { idx: usize },
     MoveMarkToPreviousLine { idx: usize },
+    ResetMarks,
     CheckMarks,
     DedupAndSaveMarks,
     CancelSelection,
@@ -618,107 +615,6 @@ pub fn get_lines_offsets(
     }
 }
 
-// TODO: post_eval stage(editor, env, view, action as member of mode);
-pub fn run_view_action(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
-    view: &Rc<RefCell<View>>,
-    actions: &Vec<Action>,
-) {
-    for a in actions.iter() {
-        match a {
-            Action::ScrollUp { n } => {
-                let v = &mut view.as_ref().borrow_mut();
-                v.scroll_up(env, *n);
-            }
-            Action::ScrollDown { n } => {
-                let v = &mut view.as_ref().borrow_mut();
-                v.scroll_down(env, *n);
-            }
-            Action::CenterArroundMainMark => {
-                let trigger = Vec::new();
-                text_mode::center_arround_mark(editor, env, &trigger, &view);
-            }
-            Action::CenterArroundMainMarkIfOffScreen => {
-                let trigger = Vec::new();
-                // TODO: transform all cb to &trigger -> Option<&trigger>
-                //        put trigger in env ?
-
-                let center = {
-                    let v = &mut view.as_ref().borrow();
-
-                    let tm = v.get_mode::<TextMode>("text-mode");
-                    let mid = tm.mark_index;
-                    let marks = &tm.marks;
-                    let offset = marks[mid].offset;
-                    let screen = v.screen.read().unwrap();
-                    !screen.contains_offset(offset)
-                };
-                if center {
-                    text_mode::center_arround_mark(editor, env, &trigger, &view);
-                }
-            }
-            Action::CenterArround { offset } => {
-                // TODO:
-
-                let trigger = Vec::new();
-                env.center_offset = Some(*offset);
-                text_mode::center_arround_mark(editor, env, &trigger, &view);
-            }
-            Action::MoveMarksToNextLine => {
-                let trigger = Vec::new();
-                text_mode::move_marks_to_next_line(editor, env, &trigger, &view);
-            }
-            Action::MoveMarksToPreviousLine => {}
-            Action::MoveMarkToNextLine { idx } => {
-                move_mark_to_next_line(env, view, *idx);
-                env.cur_mark_index = None;
-            }
-            Action::MoveMarkToPreviousLine { idx: _usize } => {}
-
-            Action::CheckMarks => {
-                let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
-                tm.marks.dedup();
-                tm.mark_index = tm.marks.len().saturating_sub(1);
-            }
-
-            Action::SaveCurrentMarks => {
-                let v = &mut view.as_ref().borrow_mut();
-                let doc = v.document.clone();
-                let doc = doc.as_ref().unwrap();
-                let mut doc = doc.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
-
-                env.max_offset = doc.size() as u64;
-                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-                doc.tag(env.max_offset, marks_offsets);
-            }
-
-            Action::DedupAndSaveMarks => {
-                let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
-
-                //
-                tm.marks.dedup();
-                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-
-                //
-                let doc = v.document.as_ref().unwrap();
-                let mut doc = doc.as_ref().borrow_mut();
-                doc.tag(env.max_offset, marks_offsets);
-            }
-
-            Action::CancelSelection => {
-                let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
-                tm.select_point.clear();
-                env.draw_marks = true;
-            }
-        }
-    }
-}
-
 pub fn compute_view_layout(
     _editor: &mut Editor,
     env: &mut EditorEnv,
@@ -756,17 +652,17 @@ pub fn update_view(
 ) -> Option<()> {
     let _start = Instant::now();
 
-    // refresh some env vars
+    // refresh_env_variables(editor, env, view);
     {
         let v = &mut view.as_ref().borrow();
         env.max_offset = v.document()?.borrow().size() as u64;
     }
 
-    // pre layout action
+    // pre layout action == post input
     {
         let actions = env.view_pre_render.clone();
         env.view_pre_render.clear();
-        run_view_action(editor, env, view, &actions);
+        run_text_mode_actions(editor, env, view, &actions);
     }
 
     compute_view_layout(editor, env, view);
@@ -775,7 +671,7 @@ pub fn update_view(
     if false {
         let actions = env.view_post_render.clone();
         env.view_post_render.clear();
-        run_view_action(editor, env, view, &actions);
+        run_text_mode_actions(editor, env, view, &actions);
     }
 
     let _end = Instant::now();
