@@ -27,7 +27,7 @@ pub struct EditorEnv<'a> {
     pub graphic_display: bool,
 
     pub quit: bool,
-    pub status: String, // TODO: move to test-mode
+
     /// This flag is set when an input event as triggered a change
     /// and the ui must be refresh
     pub event_processed: bool,
@@ -128,7 +128,7 @@ impl<'a> EditorEnv<'a> {
             graphic_display: false,
             quit: false,
             event_processed: false,
-            status: String::new(),
+
             action_map: build_core_action_map(),
             input_map,
             current_node: None,

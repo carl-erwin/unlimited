@@ -417,7 +417,6 @@ fn process_input_event(
 
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
-        env.status = "no input event".to_string();
         return false;
     }
 
@@ -549,15 +548,11 @@ fn process_input_events(
 }
 
 pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    env.status = "<quit>".to_string();
-
     let v = &view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap();
     let doc = doc.as_ref().borrow();
 
-    if doc.changed {
-        env.status = "<quit> : modified buffer exits. type F4 to quit without saving".to_string();
-    } else {
+    if !doc.changed {
         env.quit = true;
     }
 }
