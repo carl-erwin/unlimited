@@ -4,29 +4,19 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::RwLock;
-
 use std::time::Instant;
 
 //
-
-use crate::core::editor::Editor;
-
-use crate::core::editor::EditorEnv;
-
-use crate::core::document::Document;
-
-use crate::core::screen::Screen;
-
-use crate::core::mark::Mark;
-
-// TODO: remove
-
 use crate::core::codepointinfo;
-
+use crate::core::document::Document;
+use crate::core::editor::Editor;
+use crate::core::editor::EditorEnv;
 use crate::core::event::InputEvent;
+use crate::core::mark::Mark;
+use crate::core::screen::Screen;
 
 use crate::core::view::layout::{run_view_render_filters, run_view_render_filters_direct};
 
@@ -37,7 +27,7 @@ use crate::core::modes::text_mode::*;
 use crate::core::modes::Mode;
 use crate::core::modes::TextMode;
 
-pub type Id = u64;
+pub type Id = usize;
 
 pub mod layout;
 
@@ -142,6 +132,8 @@ pub enum Action {
 // add struct to map view["mode(n)"] -> data
 // add struct to map doc["mode(n)"]  -> data: ex: line index
 
+static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
+
 /// The **View** represents a way to represent a given Document.<br/>
 // TODO: find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
@@ -175,7 +167,6 @@ impl<'a> View<'a> {
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
         mut env: &mut EditorEnv<'a>,
-        id: Id, // Should the View generate them ?
         start_offset: u64,
         width: usize,
         height: usize,
@@ -189,6 +180,8 @@ impl<'a> View<'a> {
         let mode_name = text_mode.name();
 
         modes.insert(mode_name, text_mode);
+
+        let id = VIEW_ID.fetch_add(1, Ordering::SeqCst);
 
         View {
             id,

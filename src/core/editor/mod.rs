@@ -199,10 +199,8 @@ impl<'a> Editor<'a> {
             let id = doc_id as u64;
             let doc = self.document_map.get(&id);
             if let Some(doc) = doc {
-                let view = View::new(&mut env, id as u64, 0 as u64, 1, 1, Some(doc.clone()));
-
+                let view = View::new(&mut env, 0 as u64, 1, 1, Some(doc.clone()));
                 dbg_println!("create view id {}", view.id);
-
                 self.view_map.push((view.id, Rc::new(RefCell::new(view))));
             }
         }
