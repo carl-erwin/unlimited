@@ -161,6 +161,8 @@ pub struct View<'a> {
 
     pub main_mode: &'static str,                    // mandatory by name
     pub modes: HashMap<&'static str, Box<dyn Any>>, // HUM ......
+
+    pub children: [Option<Box<View<'a>>>; 2],
 }
 
 impl<'a> View<'a> {
@@ -173,7 +175,7 @@ impl<'a> View<'a> {
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
         mut env: &mut EditorEnv<'a>,
-        id: Id,
+        id: Id, // Should the View generate them ?
         start_offset: u64,
         width: usize,
         height: usize,
@@ -198,6 +200,8 @@ impl<'a> View<'a> {
             end_offset: start_offset, // will be recomputed later
             main_mode: mode_name,
             modes,
+            //
+            children: [None, None],
         }
     }
 
