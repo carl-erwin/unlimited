@@ -41,10 +41,6 @@ pub type Id = u64;
 
 pub mod layout;
 
-// TODO: move to editor
-pub type ModeFunction =
-    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) -> (); // () for now
-
 // let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
 
 // TODO: add modes

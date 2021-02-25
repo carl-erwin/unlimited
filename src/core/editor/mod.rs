@@ -36,13 +36,17 @@ use crate::core::view::View;
 
 // local
 
+// TODO: move to editor
+pub type ModeFunction =
+    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) -> ();
+
 // ActionMap is kept in EditorEnv
 // TODO:
 // Have a map per view
 // and if eval fails, fallback to EditorEnv's
 // It will allow per mode actions instanciate for each view
 // transform into STACK of map ?
-pub type ActionMap = HashMap<String, view::ModeFunction>;
+pub type ActionMap = HashMap<String, ModeFunction>;
 
 // Copyright (c) Carl-Erwin Griffith
 
@@ -207,7 +211,7 @@ impl<'a> Editor<'a> {
 
 //////////////////////////////////////////////
 
-pub fn register_action(map: &mut ActionMap, s: &str, func: view::ModeFunction) {
+pub fn register_action(map: &mut ActionMap, s: &str, func: ModeFunction) {
     map.insert(s.to_string(), func);
 }
 
