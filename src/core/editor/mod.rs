@@ -258,6 +258,16 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         }
     };
 
+    for m in marks.iter() {
+        match screen.find_cpi_by_offset(m.offset) {
+            (Some(&cpi), x, y) => {
+                screen.get_mut_cpinfo(x, y).unwrap().is_mark = true;
+            }
+            _ => {}
+        }
+    }
+    return;
+
     // incremental mark rendering
     // draw marks
     let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
