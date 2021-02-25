@@ -127,8 +127,9 @@ pub enum Action {
     MoveMarkToNextLine { idx: usize },
     MoveMarkToPreviousLine { idx: usize },
     CheckMarks,
-    SaveMarks,
+    DedupAndSaveMarks,
     CancelSelection,
+    SaveCurrentMarks,
 }
 
 // trait ?
@@ -682,7 +683,19 @@ pub fn run_view_action(
                 tm.mark_index = tm.marks.len().saturating_sub(1);
             }
 
-            Action::SaveMarks => {
+            Action::SaveCurrentMarks => {
+                let v = &mut view.as_ref().borrow_mut();
+                let doc = v.document.clone();
+                let doc = doc.as_ref().unwrap();
+                let mut doc = doc.as_ref().borrow_mut();
+                let tm = v.get_mode_mut::<TextMode>("text-mode");
+
+                env.max_offset = doc.size() as u64;
+                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+                doc.tag(env.max_offset, marks_offsets);
+            }
+
+            Action::DedupAndSaveMarks => {
                 let v = &mut view.as_ref().borrow_mut();
                 let tm = v.get_mode_mut::<TextMode>("text-mode");
 
@@ -699,7 +712,7 @@ pub fn run_view_action(
             Action::CancelSelection => {
                 let v = &mut view.as_ref().borrow_mut();
                 let tm = v.get_mode_mut::<TextMode>("text-mode");
-                tm.select_point = None;
+                tm.select_point.clear();
                 env.draw_marks = true;
             }
         }

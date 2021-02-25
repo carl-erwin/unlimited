@@ -636,8 +636,14 @@ impl HighlightSelectionFilter {
     fn new(env: &LayoutEnv, view: &View) -> Self {
         let tm = view.get_mode::<TextMode>("text-mode");
 
-        let min = env.main_mark.offset;
-        let max = tm.select_point.as_ref().unwrap().offset;
+        // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
+        let min = env.main_mark.offset; // << remove this use tm.mark_index
+        let max = if tm.select_point.len() == 1 {
+            tm.select_point[0].offset
+        } else {
+            min
+        };
+
         let (min, max) = sort_tuple_pair((min, max));
         HighlightSelectionFilter {
             sel_start_offset: min,
@@ -1059,9 +1065,8 @@ pub fn filter_codepoint(
     metadata: bool,
 ) -> CodepointInfo {
     let (displayed_cp, color) = match c {
-        //        '\r' | '\n' => ('\u{2936}', color), // TODO: add user configuration for new-line representation
-        '\r' | '\n' => (' ', color),
-
+        '\r' | '\n' => ('\u{2936}', color), // TODO: add user configuration for new-line representation
+        //'\r' | '\n' => (' ', color),
         '\t' => (' ', color),
 
         _ if c < ' ' => ('.', (0, 128, 0)), // TODO: change color/style '�',
@@ -1146,7 +1151,7 @@ pub fn run_view_render_filters_direct(
 
         // TODO: find a way to unify filter signature and ActionMap callbacks
         let tm = view.get_mode::<TextMode>("text-mode");
-        if tm.select_point.is_some() {
+        if tm.select_point.len() > 0 {
             filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
         }
     }

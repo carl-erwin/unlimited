@@ -42,6 +42,12 @@ use crate::core::view::Action;
 
 use super::Mode;
 
+// save transaction's index
+pub enum CopyData {
+    BufferLogIndex(usize),
+    Buffer(Vec<u8>),
+}
+
 pub struct TextMode {
     // reorder fields
     pub center_on_mark_move: bool,
@@ -51,9 +57,8 @@ pub struct TextMode {
     // TODO: in future version will be store marks in mapped_buffer meta data
     pub mark_index: usize, // move to text mode
     pub marks: Vec<Mark>,
-    pub select_point: Option<Mark>,
-    pub copy_buffer: Vec<usize>,
-    //
+    pub select_point: Vec<Mark>,
+    pub copy_buffer: Vec<CopyData>,
     pub button_state: [u32; 8],
 }
 
@@ -73,7 +78,7 @@ impl TextMode {
             marks,
             copy_buffer,
             mark_index: 0,
-            select_point: None,
+            select_point: vec![],
             button_state: [0; 8],
         }
     }
@@ -190,7 +195,7 @@ impl TextMode {
         register_action(
             &mut map,
             "text-mode:set-select-point-at-mark",
-            set_selection_point_at_mark,
+            set_selection_points_at_marks,
         );
 
         register_action(&mut map, "text-mode:copy-selection", copy_selection);
@@ -219,15 +224,7 @@ pub fn save_marks(
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
 ) {
-    let v = &mut view.as_ref().borrow_mut();
-    let tm = v.get_mode::<TextMode>("text-mode");
-
-    // save marks in log ?
-    let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-    let doc = v.document.as_ref().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
-
-    doc.tag(env.max_offset, marks_offsets);
+    env.view_pre_render.push(Action::SaveCurrentMarks);
 }
 
 pub fn cancel_marks(
@@ -259,7 +256,7 @@ pub fn cancel_selection(
     let v = &mut view.as_ref().borrow_mut();
     let tm = v.get_mode_mut::<TextMode>("text-mode");
 
-    tm.select_point = None;
+    tm.select_point.clear();
 }
 
 pub fn editor_cancel(
@@ -585,7 +582,7 @@ pub fn remove_codepoint(
     v.start_offset -= view_shrink;
 
     env.view_pre_render.push(Action::CheckMarks);
-    env.view_pre_render.push(Action::SaveMarks);
+    env.view_pre_render.push(Action::DedupAndSaveMarks);
     env.view_pre_render.push(Action::CancelSelection);
 }
 
@@ -1751,54 +1748,64 @@ pub fn cut_to_end_of_line(
 ) {
     let v = &mut view.as_ref().borrow_mut();
 
-    {
-        let mut doc = v.document.clone();
-        let doc = doc.as_mut().unwrap();
-        let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = v.document.clone();
+    let doc = doc.as_mut().unwrap();
+    let mut doc = doc.as_ref().borrow_mut();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.get_mode_mut::<TextMode>("text-mode");
 
-        let codec = tm.text_codec.as_ref();
+    let codec = tm.text_codec.as_ref();
 
-        // setup paste log buffer indexes
-        // there will be 1 push per mark
+    tm.copy_buffer.clear();
 
-        tm.copy_buffer.clear();
+    let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
 
-        let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+    doc.tag(env.max_offset, marks_offsets);
+    // TODO: doc.tag(env.max_offset, marks_offsets, selections);
 
-        doc.tag(env.max_offset, marks_offsets);
+    let mut remove_size = Vec::with_capacity(tm.marks.len());
+    let single_mark = tm.marks.len() == 1;
 
-        let mut shrink = 0;
-        for m in tm.marks.iter_mut() {
-            m.offset -= shrink as u64;
+    // this will join line whith multi-marks
+    let remove_eol = false && !single_mark; // && join_lines // TODO: use option join-cut-lines
 
-            let mut end = m.clone();
-            let offset0 = m.offset;
-            end.move_to_end_of_line(&doc, codec);
-            let offset1 = end.offset;
-            if offset0 == offset1 {
-                end.move_forward(&doc, codec);
-            }
-            let size = (end.offset - m.offset) as usize;
-            doc.remove(m.offset, size, None);
+    // TODO: compute range, check overlaps
+    // remove marks in other ranges
+    // and cut
+    for m in tm.marks.iter_mut().rev() {
+        let offset0 = m.offset;
 
-            shrink += size;
+        let mut end = m.clone();
+        end.move_to_end_of_line(&doc, codec);
+        let offset1 = end.offset;
 
-            // save transaction's index
-            tm.copy_buffer.push(doc.buffer_log.pos - 1);
+        // remove end-of-line (\n) ?
+        if offset0 == offset1 && single_mark || remove_eol {
+            end.move_forward(&doc, codec);
         }
 
-        let mlen = tm.marks.len();
-        assert!(tm.copy_buffer.len() == mlen);
+        // remove data
+        let size = (end.offset - m.offset) as usize;
+        doc.remove(m.offset, size, None);
+        remove_size.insert(0, size);
 
-        env.max_offset = doc.size() as u64;
-        //
-        let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+        // save transaction's index
+        tm.copy_buffer
+            .insert(0, CopyData::BufferLogIndex(doc.buffer_log.pos - 1));
+    }
 
-        doc.tag(env.max_offset, marks_offsets);
-    };
+    // update marks offsets
+    let mut shrink = 0;
+    for (idx, m) in tm.marks.iter_mut().skip(1).enumerate() {
+        shrink += remove_size[idx] as u64;
+        m.offset -= shrink;
+    }
 
+    // invariants
+    let mlen = tm.marks.len();
+    assert!(tm.copy_buffer.len() == mlen);
+
+    env.view_pre_render.push(Action::SaveCurrentMarks);
     env.view_pre_render.push(Action::CheckMarks);
     env.view_pre_render.push(Action::CancelSelection);
 }
@@ -1841,17 +1848,25 @@ pub fn paste(
             // TODO: insert each tm.copy_buffer transaction + '\n'
             // grow += each tr
         } else {
-            let tridx = tm.copy_buffer[midx];
-            // function here
-            // apply_log_transaction(tridx) -> size
-            let tr = doc.buffer_log.data[tridx].clone();
-            if let Some(ref data) = tr.data {
-                doc.insert(m.offset, data.len(), data.as_slice());
-                m.offset += data.len() as u64;
-                grow += data.len() as u64;
-            } else {
-                // wrong record index
-            }
+            let copy = &tm.copy_buffer[midx];
+            let data = match copy {
+                CopyData::BufferLogIndex(tridx) => {
+                    let tr = doc.buffer_log.data[*tridx].clone();
+                    if let Some(ref data) = tr.data {
+                        data.as_ref().clone()
+                    } else {
+                        panic!("wrong transaction index");
+                    }
+                }
+                CopyData::Buffer(data) => data.clone(),
+            };
+
+            dbg_println!("paste @ offset {} data.len {}", m.offset, data.len());
+
+            let nr_in = doc.insert(m.offset, data.len(), data.as_slice());
+            assert_eq!(nr_in, data.len());
+            grow += nr_in as u64;
+            m.offset += nr_in as u64;
         }
     }
 
@@ -1860,6 +1875,9 @@ pub fn paste(
         let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
         doc.tag(env.max_offset, marks_offsets);
     }
+
+    env.view_pre_render.push(Action::CheckMarks);
+    env.view_pre_render.push(Action::CancelSelection);
 
     // // mark off_screen ?
     // let screen = v.screen.read().unwrap();
@@ -1959,7 +1977,7 @@ fn get_main_mark_offset(view: &View) -> u64 {
     tm.marks[tm.mark_index].offset
 }
 
-pub fn set_selection_point_at_mark(
+pub fn set_selection_points_at_marks(
     _editor: &mut Editor,
     env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
@@ -1969,12 +1987,15 @@ pub fn set_selection_point_at_mark(
 
     {
         let mut v = view.as_ref().borrow_mut();
-        let offset = get_main_mark_offset(&v);
 
         let tm = v.get_mode_mut::<TextMode>("text-mode");
 
         // update selection point
-        tm.select_point = Some(Mark { offset });
+        tm.select_point.clear();
+        for m in tm.marks.iter() {
+            dbg_println!("set point @ offset {}", m.offset);
+            tm.select_point.push(Mark::new(m.offset));
+        }
     }
 
     if sync
@@ -1984,14 +2005,14 @@ pub fn set_selection_point_at_mark(
     }
 }
 
-pub fn copy_maybe_remove_selection(
+pub fn copy_maybe_remove_selection_symetric(
     _editor: &mut Editor,
     env: &mut EditorEnv,
     _trigger: &Vec<InputEvent>,
     view: &Rc<RefCell<View>>,
     copy: bool,
     remove: bool,
-) -> usize {
+) -> (usize, usize) {
     let v = &mut view.as_ref().clone().borrow_mut();
 
     // doc
@@ -1999,86 +2020,94 @@ pub fn copy_maybe_remove_selection(
     let doc = doc.as_ref().clone().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    //
     let tm = v.get_mode_mut::<TextMode>("text-mode");
-    let mark_index = tm.mark_index;
 
-    // copy buffer
+    let mut nr_bytes_copied = 0;
+    let mut nr_bytes_removed = 0;
+
     if copy {
-       tm.copy_buffer.clear();
+        tm.copy_buffer.clear();
     }
 
-    let m = { tm.marks[mark_index].clone() };
+    let mut shrink = 0;
+    for (idx, m) in tm.marks.iter_mut().enumerate() {
+        dbg_println!(
+            " m.offset({}), tm.select_point[{}].offset {}",
+            m.offset,
+            idx,
+            tm.select_point[idx].offset
+        );
 
-    let codec = tm.text_codec.as_ref();
+        m.offset -= shrink;
+        tm.select_point[idx].offset -= shrink;
 
-    dbg_println!("COPY SELECTION [{:?} {:?}]", m, tm.select_point);
-
-    let (start, size) = if let Some(Mark { offset }) = tm.select_point.clone() {
-        if m.offset == offset {
-            // empty selection
-            return 0;
-        }
-
-        if remove == true {
-            // FIXME: RESTORE MARKS BEFORE remove
-            // save marks: TODO helper functions
-            let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-            doc.tag(env.max_offset, marks_offsets);
-        }
-
-        let (start, end) = sort_tuple_pair((offset, m.offset));
-
-        let (_, _, _) = mark::read_char_forward(&doc, end, codec);
-
-        let size = (end - start) as usize;
-
-        // NB: add configuration for max allocation
-        if size == 0 || size > (1024 * 1024 * 1024) {
-            // selection 0 or > 1G ?
-            // TODO: notify use tha selection is too big
-            return 0;
-        }
-
-        let mut data = Vec::with_capacity(size);
-        doc.read(start, size, &mut data);
-
-        if remove == true {
-            doc.remove(start, size, None);
-
-            if copy {
-                tm.copy_buffer.push(doc.buffer_log.pos);
-            }
-
-            tm.marks[mark_index].offset = start;
+        let (min, max) = sort_tuple_pair((m.offset, tm.select_point[idx].offset));
+        let data_size = (max - min) as usize;
+        if copy {
+            let mut data = Vec::with_capacity(data_size);
+            let nr_read = doc.read(min, data_size, &mut data);
             dbg_println!(
-                "marks[{}].offset({})",
-                mark_index,
-                tm.marks[mark_index].offset
+                "nr copied from min({}) -> max({}) = {}",
+                min,
+                max,
+                data_size
             );
 
-            let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-            env.max_offset = doc.size() as u64;
+            assert_eq!(nr_read, data.len());
+            tm.copy_buffer.push(CopyData::Buffer(data));
 
-            doc.tag(env.max_offset, marks_offsets);
+            nr_bytes_copied += nr_read;
         }
-
-        tm.select_point = None;
-        env.draw_marks = true;
-
-        (start, size)
-    } else {
-        // walk through marks
-
-        (0, 0)
-    };
-
-    /* update view's start offset */
-    if v.start_offset > start {
-        v.start_offset = v.start_offset.saturating_sub(size as u64);
+        if remove {
+            let nr_removed = doc.remove(min, data_size, None);
+            assert_eq!(nr_removed, data_size);
+            shrink += data_size as u64;
+            nr_bytes_removed += data_size;
+        }
     }
 
-    size
+    if nr_bytes_copied + nr_bytes_removed > 0 {
+        tm.select_point.clear();
+    }
+
+    (nr_bytes_copied, nr_bytes_removed)
+}
+
+pub fn copy_maybe_remove_selection_non_symetric(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    _trigger: &Vec<InputEvent>,
+    _view: &Rc<RefCell<View>>,
+    _copy: bool,
+    _remove: bool,
+) -> (usize, usize) {
+    (0, 0)
+}
+
+pub fn copy_maybe_remove_selection(
+    editor: &mut Editor,
+    env: &mut EditorEnv,
+    trigger: &Vec<InputEvent>,
+    view: &Rc<RefCell<View>>,
+    copy: bool,
+    remove: bool,
+) -> usize {
+    let symetric = {
+        let v = &mut view.as_ref().clone().borrow_mut();
+        let start_offset = v.start_offset;
+        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let symetric = tm.marks.len() == tm.select_point.len();
+        symetric
+    };
+
+    // todo: sync view(new_start, adjust_size)
+    let (copied, removed) = if symetric {
+        copy_maybe_remove_selection_symetric(editor, env, trigger, view, copy, remove)
+    } else {
+        copy_maybe_remove_selection_non_symetric(editor, env, trigger, view, copy, remove)
+    };
+
+    copied + removed
 }
 
 // TODO: add help, + flag , copy_maybe_remove_selection()
@@ -2214,7 +2243,7 @@ pub fn button_press(
             // clear selection point
             // WARNING:
 
-            tm.select_point = None;
+            tm.select_point.clear();
             env.draw_marks = true;
 
             // reset main mark
@@ -2286,11 +2315,12 @@ pub fn pointer_motion(
             if let Some(cpi) = screen.get_cpinfo(x, y) {
                 {
                     // update selection point
-                    let tm = v.get_mode_mut::<TextMode>("text-mode");
+                    let mut tm = v.get_mode_mut::<TextMode>("text-mode");
 
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
-                            tm.select_point = Some(Mark { offset });
+                            tm.select_point.clear();
+                            tm.select_point.push(Mark { offset });
                         }
                     }
 
