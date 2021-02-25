@@ -51,7 +51,7 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
     //    }))
     //};
 
-    editor::run(&mut editor, &mut env, &core_rx, &ui_tx);
+    editor::main_loop(&mut editor, &mut env, &core_rx, &ui_tx);
 
     // wait for core indexer thread
     //if let Some(th) = indexer_th {

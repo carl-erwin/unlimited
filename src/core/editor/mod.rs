@@ -364,7 +364,7 @@ pub fn send_draw_event(
     ui_tx.send(msg).unwrap_or(());
 }
 
-pub fn run(
+pub fn main_loop(
     mut editor: &mut Editor,
     mut env: &mut EditorEnv,
     core_rx: &Receiver<EventMessage>,
