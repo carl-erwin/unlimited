@@ -73,9 +73,8 @@ impl DocumentBuilder {
             buffer_log: BufferLog::new(),
             changed: false,
         };
-        // TODO: move to view
-        // first tag at @
-        doc.tag(0, vec![0]);
+
+        doc.tag(0, vec![0]); // TODO: move to TextMode
 
         Some(Rc::new(RefCell::new(doc)))
     }

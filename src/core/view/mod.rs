@@ -101,9 +101,9 @@ pub mod layout;
 pub enum Action {
     ScrollUp { n: usize },
     ScrollDown { n: usize },
-    CenterArroundMainMark,
-    CenterArroundMainMarkIfOffScreen,
-    CenterArround { offset: u64 },
+    CenterAroundMainMark,
+    CenterAroundMainMarkIfOffScreen,
+    CenterAround { offset: u64 },
     MoveMarksToNextLine,
     MoveMarksToPreviousLine,
     MoveMarkToNextLine { idx: usize },
@@ -137,6 +137,8 @@ static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 /// The **View** represents a way to represent a given Document.<br/>
 // TODO: find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
+// TODO editor.env.current.view_id = view.id
+// can zoom ?
 pub struct View<'a> {
     pub id: Id,
 
@@ -151,10 +153,10 @@ pub struct View<'a> {
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
 
-    pub main_mode: &'static str,                    // mandatory by name
-    pub modes: HashMap<&'static str, Box<dyn Any>>, // HUM ......
+    pub main_mode: String,                    // mandatory by name
+    pub modes: HashMap<String, Box<dyn Any>>, // HUM ......
 
-    pub children: [Option<Box<View<'a>>>; 2],
+    pub children: [Option<Rc<RefCell<View<'a>>>>; 2],
 }
 
 impl<'a> View<'a> {
@@ -175,11 +177,11 @@ impl<'a> View<'a> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
 
         // set default mode(s)
-        let mut modes: HashMap<&str, Box<dyn Any>> = HashMap::new();
+        let mut modes: HashMap<String, Box<dyn Any>> = HashMap::new();
         let text_mode = Box::new(TextMode::new(&mut env));
-        let mode_name = text_mode.name();
+        let mode_name = text_mode.name().to_owned();
 
-        modes.insert(mode_name, text_mode);
+        modes.insert(mode_name.clone(), text_mode);
 
         let id = VIEW_ID.fetch_add(1, Ordering::SeqCst);
 
@@ -198,14 +200,60 @@ impl<'a> View<'a> {
         }
     }
 
+    pub fn get_view_at_mouse_position(&mut self, x: i32, y: i32) -> Option<&'a View<'a>> {
+        None
+    }
+
+    pub fn split_vertically(&mut self, mut env: &mut EditorEnv<'a>, left: usize, right: usize) {
+        // check if already split
+        if self.children[0].is_some() || self.children[1].is_some() {
+            return;
+        }
+
+        // compute left and right size as current View / 2
+        // get screen
+        let screen = self.screen.read().unwrap();
+
+        let (W, H) = (screen.width(), screen.height());
+        if W == 0 || H == 0 {
+            return;
+        }
+        let (left_w, right_w) = if W / 2 + W / 2 < W {
+            (W / 2 + 1, W / 2)
+        } else {
+            (W / 2, W / 2)
+        };
+
+        // allocate 2 Views
+        let left_view = View::new(
+            &mut env,
+            self.start_offset,
+            left_w,
+            H,
+            self.document.clone(),
+        );
+
+        let right_view = View::new(
+            &mut env,
+            self.start_offset,
+            right_w,
+            H,
+            self.document.clone(),
+        );
+        self.children[0] = Some(Rc::new(RefCell::new(left_view)));
+        self.children[1] = Some(Rc::new(RefCell::new(right_view)));
+    }
+
+    pub fn split_horizontally(&mut self, top: usize, bottom: usize) {}
+
     pub fn get_mode<'v, M: 'static>(&'v self, name: &str) -> &'v M {
-        let m = self.modes.get(name).unwrap();
+        let m = self.modes.get(&name.to_owned()).unwrap();
         let m = m.downcast_ref::<M>().unwrap(); // will panic
         m
     }
 
     pub fn get_mode_mut<'v, M: 'static>(&'v mut self, name: &str) -> &'v mut M {
-        let m = self.modes.get_mut(name).unwrap();
+        let m = self.modes.get_mut(&name.to_owned()).unwrap();
         let m = m.downcast_mut::<M>().unwrap(); // will panic
         m
     }
@@ -234,7 +282,7 @@ impl<'a> View<'a> {
             return;
         }
 
-        // TODO: find abetter way to pas mode data arround, macro ?
+        // TODO: find abetter way to pas mode data Around, macro ?
 
         // TODO: DUMB version
         // NEW: first try to check nb_lines in the same area
@@ -490,7 +538,7 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn center_arround_offset(&mut self, env: &EditorEnv, offset: u64) {
+    pub fn center_Around_offset(&mut self, env: &EditorEnv, offset: u64) {
         // TODO use env.center_offset
         self.start_offset = offset;
         let h = self.screen.read().unwrap().height() / 2;

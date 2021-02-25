@@ -59,7 +59,7 @@ unlimited [FILE1] .. [FILEn]
   * **Goto start of file**: ctrl+<
   * **Goto end of file**: ctrl+>
   * **Mouse left button**: move cursor to clicked area
-  * **Center arround mark/cursor**: ctrl+l
+  * **Center Around mark/cursor**: ctrl+l
 
 ---
 

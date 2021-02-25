@@ -156,11 +156,7 @@ impl TextMode {
             button_press,
         );
 
-        register_action(
-            &mut map,
-            "text-mode:center-arround-mark",
-            center_arround_mark,
-        );
+        register_action(&mut map, "text-mode:center-Around-mark", center_Around_mark);
         register_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
 
         register_action(&mut map, "text-mode:paste", paste);
@@ -235,10 +231,10 @@ pub fn run_text_mode_actions(
 
                 v.scroll_down(env, *n);
             }
-            Action::CenterArroundMainMark => {
-                center_arround_mark(editor, env, &view);
+            Action::CenterAroundMainMark => {
+                center_Around_mark(editor, env, &view);
             }
-            Action::CenterArroundMainMarkIfOffScreen => {
+            Action::CenterAroundMainMarkIfOffScreen => {
                 let center = {
                     let v = &mut view.as_ref().borrow_mut();
 
@@ -250,12 +246,12 @@ pub fn run_text_mode_actions(
                     !screen.contains_offset(offset)
                 };
                 if center {
-                    center_arround_mark(editor, env, &view);
+                    center_Around_mark(editor, env, &view);
                 }
             }
-            Action::CenterArround { offset } => {
+            Action::CenterAround { offset } => {
                 env.center_offset = Some(*offset);
-                center_arround_mark(editor, env, &view);
+                center_Around_mark(editor, env, &view);
             }
             Action::MoveMarksToNextLine => {
                 move_marks_to_next_line(editor, env, &view);
@@ -455,7 +451,7 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
     };
 
     if center {
-        env.view_pre_render.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterAroundMainMark);
     };
 
     env.view_pre_render.push(Action::CancelSelection);
@@ -560,7 +556,7 @@ pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
     tm.mark_index = 0;
 
     env.view_pre_render
-        .push(Action::CenterArroundMainMarkIfOffScreen);
+        .push(Action::CenterAroundMainMarkIfOffScreen);
 
     env.view_pre_render.push(Action::CancelSelection);
 }
@@ -589,7 +585,7 @@ pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
     }
 
     env.view_pre_render
-        .push(Action::CenterArroundMainMarkIfOffScreen);
+        .push(Action::CenterAroundMainMarkIfOffScreen);
     env.view_pre_render.push(Action::CancelSelection);
 }
 
@@ -774,7 +770,7 @@ pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
     let tm = v.get_mode::<TextMode>("text-mode");
 
     if tm.center_on_mark_move {
-        env.view_pre_render.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -816,7 +812,7 @@ pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 
     //      move this check at post render to reschedule render ?
     //      if v.center_on_mark_move {
-    //           env.view_pre_render.push(Action::CenterArroundMainMark);
+    //           env.view_pre_render.push(Action::CenterAroundMainMark);
     //      }
 
     env.view_pre_render.push(Action::CheckMarks);
@@ -844,7 +840,7 @@ pub fn move_marks_to_start_of_line(
         m.move_to_start_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
-            env.view_pre_render.push(Action::CenterArroundMainMark);
+            env.view_pre_render.push(Action::CenterAroundMainMark);
         }
     }
 
@@ -874,7 +870,7 @@ pub fn move_marks_to_end_of_line(
         m.move_to_end_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
-            env.view_pre_render.push(Action::CenterArroundMainMark);
+            env.view_pre_render.push(Action::CenterAroundMainMark);
         }
     }
 
@@ -1084,7 +1080,7 @@ pub fn move_marks_to_previous_line(
                     if was_on_screen && !is_on_screen {
                         env.view_pre_render.push(Action::ScrollUp { n: 1 });
                     } else if !is_on_screen {
-                        env.view_pre_render.push(Action::CenterArroundMainMark);
+                        env.view_pre_render.push(Action::CenterAroundMainMark);
                     }
                 }
             }
@@ -1586,7 +1582,7 @@ pub fn clone_and_move_mark_to_previous_line(
         if was_on_screen && !is_on_screen {
             env.view_pre_render.push(Action::ScrollUp { n: 1 });
         } else if !is_on_screen {
-            env.view_pre_render.push(Action::CenterArroundMainMark);
+            env.view_pre_render.push(Action::CenterAroundMainMark);
         }
     }
 }
@@ -1648,7 +1644,7 @@ pub fn clone_and_move_mark_to_next_line(
         let screen = v.screen.read().unwrap();
         let was_on_screen = screen.contains_offset(offsets.0);
         if !was_on_screen {
-            env.view_pre_render.push(Action::CenterArroundMainMark);
+            env.view_pre_render.push(Action::CenterAroundMainMark);
         }
         return;
     }
@@ -1669,7 +1665,7 @@ pub fn clone_and_move_mark_to_next_line(
     if was_on_screen && !is_on_screen {
         env.view_pre_render.push(Action::ScrollDown { n: 1 });
     } else if !is_on_screen {
-        env.view_pre_render.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -1919,7 +1915,7 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
     // };
     //
     // if center {
-    // env.view_pre_render.push(Action::CenterArroundMainMark);
+    // env.view_pre_render.push(Action::CenterAroundMainMark);
     // };
 }
 
@@ -1954,7 +1950,7 @@ pub fn move_to_token_start(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
                     // TODO: push to post action queue
                     // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                     //
-                    env.view_pre_render.push(Action::CenterArroundMainMark);
+                    env.view_pre_render.push(Action::CenterAroundMainMark);
                 }
             }
         }
@@ -1992,7 +1988,7 @@ pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
     }
 
     if sync {
-        env.view_pre_render.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2025,7 +2021,7 @@ pub fn set_selection_points_at_marks(
     if sync
     /* always center ? */
     {
-        env.view_pre_render.push(Action::CenterArroundMainMark);
+        env.view_pre_render.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2347,14 +2343,14 @@ pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &R
 }
 
 // TODO: view.center_arrout_offset()
-pub fn center_arround_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_Around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut v = view.as_ref().borrow_mut();
     let tm = v.get_mode::<TextMode>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
-    v.center_arround_offset(env, offset);
+    v.center_Around_offset(env, offset);
 }
 
-pub fn center_arround_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_Around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     if let Some(center_offset) = env.center_offset {
         let mut v = view.as_ref().borrow_mut();
         let offset = {
@@ -2363,6 +2359,6 @@ pub fn center_arround_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &R
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_arround_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
+        v.center_Around_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
 }

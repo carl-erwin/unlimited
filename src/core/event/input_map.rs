@@ -47,7 +47,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
        { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
 
-       { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-arround-mark" },
+       { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-Around-mark" },
 
        { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-token-start" },
        { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-token-end" },
