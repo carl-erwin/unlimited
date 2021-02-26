@@ -22,6 +22,9 @@ use crate::core::editor::EditorEnv;
 use crate::core::mark::Mark;
 use crate::core::view::View;
 
+use crate::core::modes::text_mode::TextModeData; // TODO remove this impl details
+
+//
 pub struct LayoutEnv<'a> {
     pub graphic_display: bool,
     pub quit: bool,
@@ -634,7 +637,7 @@ use crate::sort_tuple_pair;
 
 impl HighlightSelectionFilter {
     fn new(env: &LayoutEnv, view: &View) -> Self {
-        let tm = view.get_mode::<TextMode>("text-mode");
+        let tm = view.mode_ctx::<TextModeData>("text-mode");
 
         // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
         let min = env.main_mark.offset; // << remove this use tm.mark_index
@@ -1150,7 +1153,7 @@ pub fn run_view_render_filters_direct(
         filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
 
         // TODO: find a way to unify filter signature and ActionMap callbacks
-        let tm = view.get_mode::<TextMode>("text-mode");
+        let tm = view.mode_ctx::<TextModeData>("text-mode");
         if tm.select_point.len() > 0 {
             filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
         }
@@ -1169,7 +1172,7 @@ pub fn run_view_render_filters_direct(
 
     // TODO:
     //for f in &mut filters {
-    //    f.setup(&view, &mut layout_env);
+    //    f.setup(&view, &mut layout_env add offscreen flag);
     //}
 
     // is interactive rendering possible ?

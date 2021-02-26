@@ -33,28 +33,7 @@ pub fn run(config: Config, core_rx: &Receiver<EventMessage>, ui_tx: &Sender<Even
     let mut editor = Editor::new(config);
     let mut env = EditorEnv::new();
 
-    // X11 session
-    match std::env::var("DISPLAY") {
-        Ok(_) => env.graphic_display = true,
-        Err(_) => {}
-    };
-
     editor.load_files(&mut env);
-
-    // TODO: every sent msg must have
-    // reply_to: &Sender<EventMessage>
-    // start indexer thread
-    //let indexer_th = {
-    //    // let ui_tx_clone = ui_tx.clone();
-    //    Some(thread::spawn(move || {
-    //        dbg_println!("starting indexer");
-    //    }))
-    //};
-
-    editor::main_loop(&mut editor, &mut env, &core_rx, &ui_tx);
-
-    // wait for core indexer thread
-    //if let Some(th) = indexer_th {
-    //    th.join().unwrap()
-    //}
+    editor.load_modes(&mut env);
+    editor.main_loop(&mut env, &core_rx, &ui_tx);
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::{any::Any, cell::RefCell};
 
 use std::time::Instant;
 
@@ -49,6 +49,49 @@ pub enum CopyData {
     Buffer(Vec<u8>),
 }
 
+pub struct TextModeData {
+    pub center_on_mark_move: bool,
+    pub scroll_on_mark_move: bool,
+    pub text_codec: Box<dyn TextCodec>,
+    pub mark_index: usize, // move to text mode
+    pub marks: Vec<Mark>,
+    pub select_point: Vec<Mark>,
+    pub copy_buffer: Vec<CopyData>,
+    pub button_state: [u32; 8],
+}
+
+impl Mode for TextMode {
+    fn name(&self) -> &'static str {
+        &"text-mode"
+    }
+
+    fn build_action_map(&self) -> ActionMap {
+        let mut map = ActionMap::new();
+        Self::register_actions(&mut map);
+        map
+    }
+
+    fn alloc_ctx(&self) -> Box<dyn Any> {
+        dbg_println!("allocate text-mode ctx");
+
+        let marks = vec![Mark { offset: 0 }];
+        let copy_buffer = vec![];
+
+        let ctx = TextModeData {
+            center_on_mark_move: false, // add movement enums and pass it to center fn
+            scroll_on_mark_move: true,
+            text_codec: Box::new(utf8::Utf8Codec::new()),
+            marks,
+            copy_buffer,
+            mark_index: 0,
+            select_point: vec![],
+            button_state: [0; 8],
+        };
+
+        Box::new(ctx)
+    }
+}
+
 pub struct TextMode {
     // reorder fields
     pub center_on_mark_move: bool,
@@ -64,13 +107,11 @@ pub struct TextMode {
 }
 
 impl TextMode {
-    pub fn new(env: &mut EditorEnv /* parent view id */) -> Self {
+    pub fn new() -> Self {
         dbg_println!("TextMode");
 
         let marks = vec![Mark { offset: 0 }];
         let copy_buffer = vec![];
-
-        Self::register_actions(&mut env.action_map);
 
         TextMode {
             center_on_mark_move: false, // add movement enums and pass it to center fn
@@ -156,7 +197,7 @@ impl TextMode {
             button_press,
         );
 
-        register_action(&mut map, "text-mode:center-Around-mark", center_Around_mark);
+        register_action(&mut map, "text-mode:center-around-mark", center_around_mark);
         register_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
 
         register_action(&mut map, "text-mode:paste", paste);
@@ -205,12 +246,6 @@ impl TextMode {
     }
 }
 
-impl Mode for TextMode {
-    fn name(&self) -> &'static str {
-        &"text-mode"
-    }
-}
-
 pub fn run_text_mode_actions(
     editor: &mut Editor,
     env: &mut EditorEnv,
@@ -232,13 +267,13 @@ pub fn run_text_mode_actions(
                 v.scroll_down(env, *n);
             }
             Action::CenterAroundMainMark => {
-                center_Around_mark(editor, env, &view);
+                center_around_mark(editor, env, &view);
             }
             Action::CenterAroundMainMarkIfOffScreen => {
                 let center = {
                     let v = &mut view.as_ref().borrow_mut();
 
-                    let tm = v.get_mode::<TextMode>("text-mode");
+                    let tm = v.mode_ctx::<TextModeData>("text-mode");
                     let mid = tm.mark_index;
                     let marks = &tm.marks;
                     let offset = marks[mid].offset;
@@ -246,12 +281,12 @@ pub fn run_text_mode_actions(
                     !screen.contains_offset(offset)
                 };
                 if center {
-                    center_Around_mark(editor, env, &view);
+                    center_around_mark(editor, env, &view);
                 }
             }
             Action::CenterAround { offset } => {
                 env.center_offset = Some(*offset);
-                center_Around_mark(editor, env, &view);
+                center_around_mark(editor, env, &view);
             }
             Action::MoveMarksToNextLine => {
                 move_marks_to_next_line(editor, env, &view);
@@ -267,7 +302,7 @@ pub fn run_text_mode_actions(
                 env.view_pre_render.push(Action::ResetMarks);
 
                 let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
                 let offset = tm.marks[tm.mark_index].offset;
 
                 tm.mark_index = 0;
@@ -277,7 +312,7 @@ pub fn run_text_mode_actions(
 
             Action::CheckMarks => {
                 let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
                 tm.marks.dedup();
                 tm.mark_index = tm.marks.len().saturating_sub(1);
             }
@@ -287,7 +322,7 @@ pub fn run_text_mode_actions(
                 let doc = v.document.clone();
                 let doc = doc.as_ref().unwrap();
                 let mut doc = doc.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
                 env.max_offset = doc.size() as u64;
                 let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
@@ -296,7 +331,7 @@ pub fn run_text_mode_actions(
 
             Action::DedupAndSaveMarks => {
                 let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
                 //
                 tm.marks.dedup();
@@ -310,7 +345,7 @@ pub fn run_text_mode_actions(
 
             Action::CancelSelection => {
                 let v = &mut view.as_ref().borrow_mut();
-                let tm = v.get_mode_mut::<TextMode>("text-mode");
+                let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
                 tm.select_point.clear();
                 env.draw_marks = true;
             }
@@ -322,16 +357,16 @@ pub fn run_text_mode_actions(
 //
 // text mode functions
 
-pub fn save_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn save_marks(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
     env.view_pre_render.push(Action::SaveCurrentMarks);
 }
 
-pub fn cancel_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn cancel_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     env.view_pre_render.push(Action::SaveCurrentMarks);
     env.view_pre_render.push(Action::ResetMarks);
 
     let v = &mut view.as_ref().borrow_mut();
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
 
     tm.mark_index = 0;
@@ -342,7 +377,7 @@ pub fn cancel_marks(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<
 // text mode functions
 pub fn cancel_selection(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     tm.select_point.clear();
 }
@@ -403,7 +438,7 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
             let doc = doc.as_mut().unwrap();
             let mut doc = doc.as_ref().borrow_mut();
 
-            let tm = v.get_mode_mut::<TextMode>("text-mode");
+            let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
             let codec = tm.text_codec.as_ref();
             let mut utf8 = Vec::with_capacity(array.len());
@@ -475,7 +510,7 @@ pub fn remove_previous_codepoint(
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -540,7 +575,7 @@ pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
 
     doc.undo_until_tag();
@@ -569,7 +604,7 @@ pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
 
     tm.mark_index = 0;
@@ -604,7 +639,7 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
         let doc = doc.as_mut().unwrap();
         let mut doc = doc.as_ref().borrow_mut();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -657,7 +692,7 @@ pub fn remove_until_end_of_word(
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
@@ -751,7 +786,7 @@ pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
     let doc = doc.as_ref().unwrap();
     let doc = doc.as_ref().borrow();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
@@ -767,7 +802,7 @@ pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
 
     env.view_pre_render.push(Action::CheckMarks);
 
-    let tm = v.get_mode::<TextMode>("text-mode");
+    let tm = v.mode_ctx::<TextModeData>("text-mode");
 
     if tm.center_on_mark_move {
         env.view_pre_render.push(Action::CenterAroundMainMark);
@@ -786,7 +821,7 @@ pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -831,7 +866,7 @@ pub fn move_marks_to_start_of_line(
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap().borrow();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let codec = tm.text_codec.as_ref();
     //
     let midx = tm.mark_index;
@@ -860,7 +895,7 @@ pub fn move_marks_to_end_of_line(
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap().borrow();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
@@ -934,7 +969,7 @@ fn move_mark_to_previous_line(
                 let doc = v.document.as_ref().unwrap();
                 let doc = doc.as_ref().borrow();
 
-                let tm = v.get_mode::<TextMode>("text-mode");
+                let tm = v.mode_ctx::<TextModeData>("text-mode");
 
                 let codec = tm.text_codec.as_ref();
 
@@ -998,7 +1033,7 @@ fn move_mark_to_previous_line(
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
 
-            let tm = v.get_mode::<TextMode>("text-mode");
+            let tm = v.mode_ctx::<TextModeData>("text-mode");
 
             let codec = tm.text_codec.as_ref();
 
@@ -1019,7 +1054,7 @@ fn move_mark_to_previous_line(
         {
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
-            let tm = v.get_mode::<TextMode>("text-mode");
+            let tm = v.mode_ctx::<TextModeData>("text-mode");
 
             let codec = tm.text_codec.as_ref();
 
@@ -1049,7 +1084,7 @@ pub fn move_marks_to_previous_line(
 ) {
     let (mut marks, idx_max) = {
         let mut v = view.as_ref().borrow_mut();
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         // TODO: maintain env.mark_index_max ?
         let idx_max = tm.marks.len() - 1;
@@ -1091,7 +1126,7 @@ pub fn move_marks_to_previous_line(
         // copy back
         let mut v = view.as_ref().borrow_mut();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         tm.marks = marks;
         if let Some(idx) = mark_index {
             tm.mark_index = idx;
@@ -1169,7 +1204,7 @@ pub fn move_mark_to_next_line(
         let mut v = view.as_ref().borrow_mut();
         let screen = v.screen.clone();
         let screen = screen.read().unwrap();
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         let marks = &mut tm.marks;
         let mut m = &mut marks[mark_idx];
         m_offset = m.offset;
@@ -1208,7 +1243,7 @@ pub fn move_mark_to_next_line(
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
 
-            let tm = v.get_mode::<TextMode>("text-mode");
+            let tm = v.mode_ctx::<TextModeData>("text-mode");
             let codec = tm.text_codec.as_ref();
 
             let m = &tm.marks[mark_idx];
@@ -1261,7 +1296,7 @@ pub fn move_mark_to_next_line(
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().borrow();
 
-            let tm = v.get_mode::<TextMode>("text-mode");
+            let tm = v.mode_ctx::<TextModeData>("text-mode");
 
             let codec = tm.text_codec.as_ref();
 
@@ -1291,7 +1326,7 @@ pub fn move_mark_to_next_line(
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
-        let tm = v.get_mode::<TextMode>("text-mode");
+        let tm = v.mode_ctx::<TextModeData>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -1307,7 +1342,7 @@ pub fn move_mark_to_next_line(
 
     {
         let mut v = view.as_ref().borrow_mut();
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         tm.marks[mark_idx].offset = m_offset;
     }
 
@@ -1341,7 +1376,7 @@ fn allocate_temporary_screen_and_start_offset(view: &Rc<RefCell<View>>) -> (Scre
 fn get_marks_min_offset_and_max_idx(view: &Rc<RefCell<View>>) -> (u64, usize) {
     let mut v = view.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let idx_max = tm.marks.len();
     assert!(idx_max > 0);
 
@@ -1361,7 +1396,7 @@ fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
     let doc = doc.as_ref().borrow_mut();
 
     // ctx
-    let tm = v.get_mode::<TextMode>("text-mode");
+    let tm = v.mode_ctx::<TextModeData>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
@@ -1401,7 +1436,7 @@ pub fn move_marks_to_next_line(
     // copy all marks
     let mut marks = {
         let mut v = view.as_ref().borrow_mut();
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         tm.marks.clone()
     };
 
@@ -1520,7 +1555,7 @@ pub fn move_marks_to_next_line(
         let screen = v.screen.clone();
         let screen = screen.as_ref().read().unwrap();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         // set back
         tm.marks = marks;
@@ -1544,7 +1579,7 @@ pub fn clone_and_move_mark_to_previous_line(
 ) {
     let (mut marks, prev_off) = {
         let v = view.as_ref().borrow();
-        let tm = v.get_mode::<TextMode>("text-mode");
+        let tm = v.mode_ctx::<TextModeData>("text-mode");
         (tm.marks.clone(), tm.marks[0].offset)
     };
 
@@ -1559,11 +1594,11 @@ pub fn clone_and_move_mark_to_previous_line(
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     tm.marks = marks;
 
     if tm.marks[0].offset != prev_off {
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         tm.mark_index = 0;
 
         // insert mark @ m_offset + pa
@@ -1596,7 +1631,7 @@ pub fn clone_and_move_mark_to_next_line(
     // refresh mark index
     let mark_len = {
         let mut v = view.as_ref().borrow_mut();
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         let mark_len = {
             let marks = &mut tm.marks;
@@ -1630,7 +1665,7 @@ pub fn clone_and_move_mark_to_next_line(
     dbg_println!(" clone move down: offsets {:?}", offsets);
 
     let mut v = view.as_ref().borrow_mut();
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     // no move ?
     if offsets.0 == offsets.1 {
@@ -1678,7 +1713,7 @@ pub fn move_mark_to_screen_start(
     let mut v = view.as_ref().borrow_mut();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
 
     for m in marks.iter_mut() {
@@ -1698,7 +1733,7 @@ pub fn move_mark_to_screen_end(
     let mut v = view.as_ref().borrow_mut();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
 
     for m in marks.iter_mut() {
@@ -1734,7 +1769,7 @@ pub fn move_mark_to_start_of_file(
     let mut v = view.as_ref().borrow_mut();
     v.start_offset = 0;
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     tm.mark_index = 0;
 
@@ -1757,7 +1792,7 @@ pub fn move_mark_to_end_of_file(
     };
     v.start_offset = offset;
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     tm.mark_index = 0;
 
     let marks = &mut tm.marks;
@@ -1789,7 +1824,7 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
@@ -1854,7 +1889,7 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let marks = &mut tm.marks;
     let marks_len = marks.len();
@@ -1933,7 +1968,7 @@ pub fn move_to_token_start(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -1969,7 +2004,7 @@ pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().borrow();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         let codec = tm.text_codec.as_ref();
 
         let marks = &mut tm.marks;
@@ -1993,7 +2028,7 @@ pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
 }
 
 fn get_main_mark_offset(view: &View) -> u64 {
-    let tm = view.get_mode::<TextMode>("text-mode");
+    let tm = view.mode_ctx::<TextModeData>("text-mode");
     tm.marks[tm.mark_index].offset
 }
 
@@ -2008,7 +2043,7 @@ pub fn set_selection_points_at_marks(
     {
         let mut v = view.as_ref().borrow_mut();
 
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
         // update selection point
         tm.select_point.clear();
@@ -2027,7 +2062,7 @@ pub fn set_selection_points_at_marks(
 
 pub fn copy_maybe_remove_selection_symetric(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
     copy: bool,
@@ -2040,7 +2075,7 @@ pub fn copy_maybe_remove_selection_symetric(
     let doc = doc.as_ref().clone().unwrap();
     let mut doc = doc.as_ref().borrow_mut();
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let mut nr_bytes_copied = 0;
     let mut nr_bytes_removed = 0;
@@ -2114,8 +2149,8 @@ pub fn copy_maybe_remove_selection(
 ) -> usize {
     let symetric = {
         let v = &mut view.as_ref().clone().borrow_mut();
-        let start_offset = v.start_offset;
-        let tm = v.get_mode_mut::<TextMode>("text-mode");
+        let _start_offset = v.start_offset;
+        let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         let symetric = tm.marks.len() == tm.select_point.len();
         symetric
     };
@@ -2162,7 +2197,7 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
         }
     };
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     if (button as usize) < tm.button_state.len() {
         tm.button_state[button as usize] = 1;
@@ -2240,7 +2275,7 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     }
 
     // check from right to left until some codepoint is found
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
     let mut i = x + 1;
     while i > 0 {
@@ -2288,7 +2323,7 @@ pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
         }
     };
 
-    let tm = v.get_mode_mut::<TextMode>("text-mode");
+    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     if (button as usize) < tm.button_state.len() {
         tm.button_state[button as usize] = 0;
     }
@@ -2310,7 +2345,7 @@ pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
             if let Some(cpi) = screen.get_cpinfo(x, y) {
                 {
                     // update selection point
-                    let mut tm = v.get_mode_mut::<TextMode>("text-mode");
+                    let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
@@ -2343,14 +2378,14 @@ pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &R
 }
 
 // TODO: view.center_arrout_offset()
-pub fn center_Around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut v = view.as_ref().borrow_mut();
-    let tm = v.get_mode::<TextMode>("text-mode");
+    let tm = v.mode_ctx::<TextModeData>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
-    v.center_Around_offset(env, offset);
+    v.center_around_offset(env, offset);
 }
 
-pub fn center_Around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     if let Some(center_offset) = env.center_offset {
         let mut v = view.as_ref().borrow_mut();
         let offset = {
@@ -2359,6 +2394,6 @@ pub fn center_Around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_Around_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
+        v.center_around_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
 }
