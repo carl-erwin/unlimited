@@ -377,7 +377,7 @@ pub fn scroll_down(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell
 }
 
 // TODO: rename into handle_input_events
-/// Insert an array of unicode code points using hardcoded utf8 codec.<br/>
+/// Insert an single element/array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let array = {
         assert!(env.trigger.len() > 0);
@@ -392,6 +392,18 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
                     },
                 key: Key::UnicodeArray(ref v),
             } => v.clone(), // should move Rc<> ?
+
+            InputEvent::KeyPress {
+                key: Key::Unicode(c),
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
+            } => {
+                vec![*c]
+            }
 
             _ => {
                 return;

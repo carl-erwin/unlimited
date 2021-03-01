@@ -678,6 +678,7 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 
     // merge consecutive characters as "array" of chars
     let mut codepoints = Vec::<char>::new();
+
     for evt in accum {
         match evt {
             InputEvent::KeyPress {

@@ -23,6 +23,9 @@ use crate::core::event::Event;
 use crate::core::event::Event::DrawEvent;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::event::Key;
+use crate::core::event::KeyModifiers;
+
 use crate::core::mark::Mark;
 
 use crate::core::modes::text_mode::TextModeData; // TODO remove this impl details
@@ -364,15 +367,19 @@ fn process_input_event<'a>(
         return false;
     }
 
+    dbg_println!("prev (accum) events = {:?}", env.trigger);
+
+    dbg_println!("eval input event input ev = {:?}", ev);
+
+    // TODO: track whole input seq // not tested
+    env.trigger.push((*ev).clone());
+
     let action = eval_input_event(
         &ev,
         &env.input_map,
         &mut env.current_node, // TODO: EvalEnv
         &mut env.next_node,    // TODO: EvalEnv
     );
-
-    // TODO: track whole input seq // not tested
-    env.trigger.push((*ev).clone());
 
     if let Some(action) = action {
         env.current_node = None;
@@ -446,8 +453,39 @@ fn process_input_events(
 ) {
     env.pending_events = crate::core::event::pending_input_event_count();
 
-    env.process_input_start = Instant::now();
+    let mut flat_events = vec![];
+    // transform UnicodeArray of 1 element to single element
     for ev in events {
+        match ev {
+            InputEvent::KeyPress {
+                key: Key::UnicodeArray(ref codepoints),
+                mods:
+                    KeyModifiers {
+                        ctrl: false,
+                        alt: false,
+                        shift: false,
+                    },
+            } => {
+                for c in codepoints {
+                    flat_events.push(InputEvent::KeyPress {
+                        key: Key::Unicode(*c),
+                        mods: KeyModifiers {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                        },
+                    });
+                }
+            }
+
+            _ => {
+                flat_events.push(ev.clone());
+            }
+        }
+    }
+
+    env.process_input_start = Instant::now();
+    for ev in &flat_events {
         let vid = env.view_id;
 
         // pre_eval_input_stage(&mut editor, &mut env, vid, ev);

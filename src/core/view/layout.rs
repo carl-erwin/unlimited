@@ -212,12 +212,13 @@ impl Filter<'_> for RawDataFilter {
                 .unwrap()
                 .read(self.pos, self.read_size, &mut raw_data);
 
-            dbg_println!(
-                "READ from offset({}) : {} / {} bytes",
-                self.pos,
-                rd,
-                self.read_size
-            );
+            /*            dbg_println!(
+                            "READ from offset({}) : {} / {} bytes",
+                            self.pos,
+                            rd,
+                            self.read_size
+                        );
+            */
 
             dbg_println!("BUFFER SIZE {}", doc.as_ref().read().unwrap().size());
             dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
@@ -1179,12 +1180,12 @@ pub fn run_view_render_filters_direct(
 
     // is interactive rendering possible ?
     while layout_env.quit == false {
-        dbg_println!("-------------------");
+        //        dbg_println!("-------------------");
         for f in &mut filters {
             filter_out.clear();
-            dbg_println!("running {} : in({})", f.name(), filter_in.len());
+            //            dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
-            dbg_println!("        {} : out({})", f.name(), filter_out.len());
+            //            dbg_println!("        {} : out({})", f.name(), filter_out.len());
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }

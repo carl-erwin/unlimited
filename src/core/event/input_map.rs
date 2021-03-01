@@ -95,13 +95,14 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
        { "in": [{ "key": "F6" } ],                             "action": "split-horizontally" },
 
+       { "in": [{ "key": "ctrl+x" }, { "key": "3" } ],         "action": "split-vertically" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "2" } ],         "action": "split-horizontally" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "v" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "h" } ],         "action": "split-horizontally" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "Esc" } ],    "action": "application:quit-abort" },
 
        { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
 
@@ -744,35 +745,35 @@ mod tests {
 
         let mut iev = Vec::new();
 
-        iev.push(InputEvent::KeyPress {
-            key: Key::Unicode('€'),
-            mods: KeyModifiers {
-                ctrl: false,
-                alt: false,
-                shift: false,
-            },
-        });
+        /*
+            iev.push(InputEvent::KeyPress {
+              key: Key::Unicode('€'),
+              mods: KeyModifiers {
+                  ctrl: false,
+                  alt: false,
+                  shift: false,
+              },
+           });
+        */
 
         // test eval
         {
-            /*
-                    iev.push(InputEvent::KeyPress {
-                        key: Key::Unicode('x'),
-                        mods: KeyModifiers {
-                            ctrl: true,
-                            alt: false,
-                            shift: false,
-                        },
-                    });
-                    iev.push(InputEvent::KeyPress {
-                        key: Key::Unicode('c'),
-                        mods: KeyModifiers {
-                            ctrl: true,
-                            alt: false,
-                            shift: false,
-                        },
-                    });
-            */
+            iev.push(InputEvent::KeyPress {
+                key: Key::Unicode('x'),
+                mods: KeyModifiers {
+                    ctrl: true,
+                    alt: false,
+                    shift: false,
+                },
+            });
+            iev.push(InputEvent::KeyPress {
+                key: Key::Unicode('3'),
+                mods: KeyModifiers {
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                },
+            });
 
             let rc_map = Rc::new(map);
 
