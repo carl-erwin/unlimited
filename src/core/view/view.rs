@@ -141,7 +141,7 @@ pub struct View<'v, 'a> {
 
     // TODO: Option<Arc<RwLock<Document<'a>>>> : shared access with indexer
     pub document: Option<Arc<RwLock<Document<'a>>>>, // if none and no children ... panic ?
-    pub mode_ctx: HashMap<String, Box<dyn Any>>,     // TODO: rename -> mode_ctx
+    pub mode_ctx: HashMap<String, Box<dyn Any>>,
     //
     pub screen: Arc<RwLock<Box<Screen>>>,
 
@@ -149,7 +149,7 @@ pub struct View<'v, 'a> {
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
     //
-    pub children: [Option<Rc<RefCell<View<'v, 'a>>>>; 2],
+    pub children: Vec<Rc<RefCell<View<'v, 'a>>>>,
 }
 
 impl<'v, 'a> View<'v, 'a> {
@@ -181,7 +181,7 @@ impl<'v, 'a> View<'v, 'a> {
             end_offset: start_offset, // will be recomputed later
             mode_ctx,
             //
-            children: [None, None],
+            children: vec![],
         }
     }
 

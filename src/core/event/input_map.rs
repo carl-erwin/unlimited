@@ -91,7 +91,14 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+g"} ], "action": "editor:cancel" },
 
 
-       { "in": [{ "key": "ctrl+q"   }],                        "action": "application:quit" },
+
+       { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
+       { "in": [{ "key": "F6" } ],                             "action": "split-horizontally" },
+
+
+       { "in": [{ "key": "ctrl+x" }, { "key": "v" } ],         "action": "split-vertically" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "h" } ],         "action": "split-horizontally" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
        { "in": [{ "key": "ctrl+x" }, { "key": "Esc" } ],    "action": "application:quit-abort" },

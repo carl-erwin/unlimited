@@ -493,7 +493,7 @@ pub fn remove_previous_codepoint(
     let start_offset = v.start_offset;
 
     {
-        let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
+        let doc = v.document.clone();
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().write().unwrap();
 

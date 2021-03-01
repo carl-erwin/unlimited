@@ -37,8 +37,11 @@ use crate::core::view::View;
 
 // local
 
-pub type ModeFunction =
-    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View<'_, '_>>>) -> ();
+pub type ModeFunction = fn(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'_, 'static>>>,
+) -> ();
 
 // ActionMap is kept in EditorEnv
 // TODO:
@@ -554,14 +557,92 @@ pub fn build_core_action_map<'a>() -> ActionMap<'a> {
 
     register_action(&mut map, "save-document", save_document); // core ?
 
+    register_action(&mut map, "split-vertically", split_vertically);
+    register_action(&mut map, "split-horizontally", split_horizontally);
+
     map
 }
 
-pub fn split_vertically(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.as_ref().borrow_mut();
+// store this in parent and reuse in resize
+pub enum LayoutOperation {
+    // We want a fixed size of sz cells vertically/horizontally in the parent
+    // used = size
+    // remain = remain - sz
+    Fixed { size: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (parent.sz/100) * sz
+    // remain = parent.sz - used
+    Percent { p: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (remain/100 * sz)
+    // (remain <- remain - (remain/100 * sz))
+    RemainPercent { p: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (remain - minus)
+    // remain = remain - used
+    RemainMinus { minus: usize },
+}
+
+fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usize> {
+    let mut sizes = vec![];
+
+    dbg_println!("start = {}", start);
+
+    if start == 0 {
+        return sizes;
+    }
+
+    let mut remain = start;
+
+    for op in ops {
+        if remain == 0 {
+            break;
+        }
+
+        match op {
+            LayoutOperation::Fixed { size } => {
+                remain = remain.saturating_sub(*size);
+                sizes.push(*size);
+            }
+
+            LayoutOperation::Percent { p } => {
+                let used = (*p * start) / 100;
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+
+            LayoutOperation::RemainPercent { p } => {
+                let used = (*p * remain) / 100;
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+
+            // We want a fixed percentage of sz cells vertically/horizontally
+            // used = minus
+            // (remain <- remain - minus))
+            LayoutOperation::RemainMinus { minus } => {
+                let used = remain.saturating_sub(*minus);
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+        }
+    }
+
+    sizes
+}
+
+pub fn split_vertically(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'_, 'static>>>,
+) {
+    let mut v = view.as_ref().borrow_mut();
 
     // check if already split
-    if v.children[0].is_some() || v.children[1].is_some() {
+    if v.children.len() != 0 {
         return;
     }
 
@@ -579,32 +660,58 @@ pub fn split_vertically(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<Re
     // compute_split(size, first_half, first_second);
     let (_left_w, _right_w) = View::compute_split(width);
 
-    // allocate 2 Views
-    /*
-    // left
-    let doc = v.document.as_ref();
-    let doc = Rc::clone(doc.unwrap());
-    // set default mode(s)
-    let mut modes: HashMap<String, Box<dyn Any>> = HashMap::new();
-    let text_mode = TextMode::new();
-    let text_mode = Box::new(text_mode);
-    let mode_name = "text-mode".to_owned();
-    modes.insert(mode_name.clone(), text_mode);
+    let ops = vec![
+        LayoutOperation::Percent { p: 50 },
+        LayoutOperation::Percent { p: 50 },
+    ];
 
-    let id = 0;
+    let sizes = compute_layout_sizes(width, &ops);
 
-    let left_screen = Arc::new(RwLock::new(Box::new(Screen::new(left_w, height))));
-    let left_view = view::View {
-        id,
-        document: Some(doc),
-        screen: left_screen,
-        start_offset: v.start_offset,
-        end_offset: v.start_offset, // will be recomputed later
-        modes: vec![],
-        children: [None, None],
+    dbg_println!("splitV = SIZE {:?}", sizes);
+
+    for size in sizes {
+        let doc_id = v.document.as_ref().unwrap().read().unwrap().id;
+
+        if let Some(doc) = editor.document_map.get(&doc_id) {
+            let doc = editor.document_map.get(&doc_id).unwrap().clone();
+            let screen = Arc::new(RwLock::new(Box::new(Screen::new(size, height))));
+            let view = view::View::new(v.start_offset, size, height, Some(Arc::clone(&doc)));
+            v.children.push(Rc::new(RefCell::new(view)));
+        }
+    }
+}
+
+pub fn split_horizontally(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = view.as_ref().borrow_mut();
+
+    // check if already split
+    if v.children.len() != 0 {
+        return;
+    }
+
+    // compute left and right size as current View / 2
+    // get screen
+
+    let (width, height) = {
+        let screen = v.screen.read().unwrap();
+        (screen.width(), screen.height())
     };
-    v.children[0] = Some(Rc::new(RefCell::new(left_view)));
-    */
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    // compute_split(size, first_half, first_second);
+    let (_left_w, _right_w) = View::compute_split(width);
+
+    let ops = vec![
+        LayoutOperation::Fixed { size: 1 },        // TITLE
+        LayoutOperation::RemainMinus { minus: 3 }, // BODY
+        LayoutOperation::Fixed { size: 3 },        // STATUS/CMD
+    ];
+
+    let sizes = compute_layout_sizes(height, &ops);
+
+    dbg_println!("splitV = SIZE {:?}", sizes);
 }
 
 // TODO: put in main_loop.rs
