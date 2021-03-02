@@ -676,8 +676,11 @@ pub fn update_view(
 
     // refresh_env_variables(editor, env, view);
     {
-        let v = &mut view.as_ref().borrow();
+        let mut v = view.as_ref().borrow_mut();
         env.max_offset = v.document()?.read().unwrap().size() as u64;
+        if v.start_offset > env.max_offset {
+            v.start_offset = env.max_offset;
+        }
     }
 
     // pre layout action == post input
