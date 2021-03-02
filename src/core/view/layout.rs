@@ -509,8 +509,7 @@ impl Filter<'_> for TabFilter {
                     }
                 }
             } else {
-                // unexpected
-                panic!();
+                // not unicode
                 filter_out.push(io.clone());
             }
         }

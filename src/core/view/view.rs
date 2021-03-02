@@ -249,7 +249,7 @@ impl<'v, 'a> View<'v, 'a> {
         let marks = &tm.marks;
         for m in marks.iter() {
             if m.offset > max_offset as u64 {
-                panic!("");
+                panic!("m.offset {} > max_offset {}", m.offset, max_offset);
             }
         }
     }
