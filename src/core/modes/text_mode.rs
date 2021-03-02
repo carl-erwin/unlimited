@@ -1819,6 +1819,16 @@ pub fn scroll_to_next_screen(_editor: &mut Editor, env: &mut EditorEnv, view: &R
 pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.as_ref().borrow_mut();
 
+    // doc read only ?
+    {
+        let doc = v.document.clone();
+        let doc = doc.as_ref().unwrap();
+        let doc = doc.as_ref().read().unwrap();
+        if doc.is_syncing {
+            return;
+        }
+    }
+
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
     let mut doc = doc.as_ref().write().unwrap();
