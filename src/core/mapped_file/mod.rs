@@ -251,7 +251,7 @@ impl Node {
         // 2 - map the page // will invalidate iterators base pointer
         // TODO: check
         let page = self.map().unwrap();
-        let slice = page.as_ref().borrow().as_slice().unwrap();
+        let slice = page.borrow().as_slice().unwrap();
 
         // 3 - allocate a vector big enough to hold page data
         let mut v = Vec::with_capacity(self.size as usize);
@@ -723,7 +723,7 @@ impl<'a> MappedFile<'a> {
         let file = file_.write().unwrap();
 
         let page = file.pool[node_idx as usize].page.upgrade().unwrap();
-        let slice = page.as_ref().borrow_mut().as_slice().unwrap();
+        let slice = page.borrow_mut().as_slice().unwrap();
 
         MappedFileIterator::Real(IteratorInstance {
             file: Arc::clone(file_),
@@ -748,7 +748,7 @@ impl<'a> MappedFile<'a> {
         match pair {
             (Some(node_idx), node_size, local_offset) => {
                 let page = file.pool[node_idx as usize].map().unwrap();
-                let slice = page.as_ref().borrow_mut().as_slice().unwrap();
+                let slice = page.borrow_mut().as_slice().unwrap();
 
                 MappedFileIterator::Real(IteratorInstance {
                     file: Arc::clone(file_),
@@ -872,7 +872,7 @@ impl<'a> MappedFile<'a> {
         match &*it_ {
             MappedFileIterator::End(..) => 0,
             MappedFileIterator::Real(ref it) => match &it.page {
-                ref rc => match *rc.as_ref().borrow_mut() {
+                ref rc => match *rc.borrow_mut() {
                     Page::OnStorage { .. } => 0,
 
                     Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
@@ -885,7 +885,7 @@ impl<'a> MappedFile<'a> {
         match &*it_ {
             MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
             MappedFileIterator::Real(ref it) => match &it.page {
-                ref rc => match *rc.as_ref().borrow_mut() {
+                ref rc => match *rc.borrow_mut() {
                     Page::OnStorage { .. } => {
                         panic!("trying to write on read only memory");
                     }
@@ -1086,7 +1086,7 @@ impl<'a> MappedFile<'a> {
         // before it
         if let Some(ref page) = &it_page {
             if local_offset > 0 {
-                let slc = page.as_ref().borrow().as_slice().unwrap();
+                let slc = page.borrow().as_slice().unwrap();
                 input_slc.push(&slc[0..local_offset as usize]);
             }
         }
@@ -1097,7 +1097,7 @@ impl<'a> MappedFile<'a> {
         // after it
         if let Some(ref page) = &it_page {
             if node_size > 0 {
-                let slc = page.as_ref().borrow().as_slice().unwrap();
+                let slc = page.borrow().as_slice().unwrap();
                 input_slc.push(&slc[local_offset as usize..node_size as usize]);
             }
         }
@@ -1290,7 +1290,7 @@ impl<'a> MappedFile<'a> {
                 eprintln!("local_offset {}", local_offset);
             }
 
-            match *file.pool[idx].cow.as_ref().unwrap().as_ref().borrow_mut() {
+            match *file.pool[idx].cow.as_ref().unwrap().borrow_mut() {
                 Page::OnStorage { .. } => {
                     panic!("trying to write on read only memory");
                 }
@@ -1800,7 +1800,7 @@ impl<'a> MappedFile<'a> {
             let node_size = file.pool[idx].size;
             // map
             let page = file.pool[idx].map().unwrap();
-            let slice = page.as_ref().borrow().as_slice().unwrap();
+            let slice = page.borrow().as_slice().unwrap();
 
             // copy
             let nw = unsafe { write(fd, slice.as_ptr() as *mut c_void, slice.len()) };
@@ -1926,7 +1926,7 @@ impl<'a> Iterator for MappedFileIterator<'a> {
                     let next_node = &mut file.pool[next_node_idx as usize];
 
                     let page = next_node.map().unwrap();
-                    let slice = page.as_ref().borrow_mut().as_slice().unwrap();
+                    let slice = page.borrow_mut().as_slice().unwrap();
 
                     it.node_idx = next_node_idx;
                     it.page_size = next_node.size;

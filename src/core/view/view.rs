@@ -94,7 +94,88 @@ pub type Id = usize;
 // | +--------------+                                                                      |  |
 // +------------------------------------------------------------------------------------------+
 
+// MOVE TO Layout code
+// store this in parent and reuse in resize
+#[derive(Debug, PartialEq, Clone)]
+pub enum LayoutDirection {
+    NotSet,
+    Vertical,
+    Horizontal,
+}
+// store this in parent and reuse in resize
 #[derive(Debug, Clone)]
+pub enum LayoutOperation {
+    // We want a fixed size of sz cells vertically/horizontally in the parent
+    // used = size
+    // remain = remain - sz
+    Fixed { size: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (parent.sz/100) * sz
+    // remain = parent.sz - used
+    Percent { p: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (remain/100 * sz)
+    // (remain <- remain - (remain/100 * sz))
+    RemainPercent { p: usize },
+
+    // We want a fixed percentage of sz cells vertically/horizontally
+    // used = (remain - minus)
+    // remain = remain - used
+    RemainMinus { minus: usize },
+}
+
+// MOVE TO Layout code
+pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usize> {
+    let mut sizes = vec![];
+
+    dbg_println!("start = {}", start);
+
+    if start == 0 {
+        return sizes;
+    }
+
+    let mut remain = start;
+
+    for op in ops {
+        if remain == 0 {
+            break;
+        }
+
+        match op {
+            LayoutOperation::Fixed { size } => {
+                remain = remain.saturating_sub(*size);
+                sizes.push(*size);
+            }
+
+            LayoutOperation::Percent { p } => {
+                let used = (*p * start) / 100;
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+
+            LayoutOperation::RemainPercent { p } => {
+                let used = (*p * remain) / 100;
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+
+            // We want a fixed percentage of sz cells vertically/horizontally
+            // used = minus
+            // (remain <- remain - minus))
+            LayoutOperation::RemainMinus { minus } => {
+                let used = remain.saturating_sub(*minus);
+                remain = remain.saturating_sub(used);
+                sizes.push(used);
+            }
+        }
+    }
+
+    sizes
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Action {
     ScrollUp { n: usize },
     ScrollDown { n: usize },
@@ -138,8 +219,9 @@ static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 // can zoom ?
 pub struct View<'v, 'a> {
     pub id: Id,
+    pub parent_id: Option<Id>,
+    pub focus_to: Option<Id>, // child id
 
-    // TODO: Option<Arc<RwLock<Document<'a>>>> : shared access with indexer
     pub document: Option<Arc<RwLock<Document<'a>>>>, // if none and no children ... panic ?
     pub mode_ctx: HashMap<String, Box<dyn Any>>,
     //
@@ -148,8 +230,21 @@ pub struct View<'v, 'a> {
     //
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
+
+    // layout
     //
+    pub x: usize,
+    pub y: usize,
+
+    pub layout_direction: LayoutDirection,
+    pub layout_ops: Vec<LayoutOperation>,
+    // TODO: keep them here or use view.id -> editor.view(view.id)
     pub children: Vec<Rc<RefCell<View<'v, 'a>>>>,
+
+    // move this to corresponding pre/pos stages
+    // reset on each event handling
+    pub pre_render_action: Vec<Action>,
+    pub post_render_action: Vec<Action>,
 }
 
 impl<'v, 'a> View<'v, 'a> {
@@ -161,6 +256,7 @@ impl<'v, 'a> View<'v, 'a> {
 
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
+        parent_id: Option<Id>,
         start_offset: u64,
         width: usize,
         height: usize,
@@ -173,6 +269,8 @@ impl<'v, 'a> View<'v, 'a> {
         let mode_ctx = HashMap::new();
 
         View {
+            parent_id,
+            focus_to: None,
             id,
             document,
             screen,
@@ -181,7 +279,13 @@ impl<'v, 'a> View<'v, 'a> {
             end_offset: start_offset, // will be recomputed later
             mode_ctx,
             //
+            x: 0,
+            y: 0,
+            layout_direction: LayoutDirection::NotSet,
+            layout_ops: vec![],
             children: vec![],
+            pre_render_action: vec![],
+            post_render_action: vec![],
         }
     }
 
@@ -345,6 +449,8 @@ impl<'v, 'a> View<'v, 'a> {
     }
 
     pub fn scroll_down(&mut self, env: &EditorEnv, nb_lines: usize) {
+        dbg_println!("SCROLL DOWN VID = {}", self.id);
+
         // nothing to do :-( ?
         if nb_lines == 0 {
             return;
@@ -538,7 +644,7 @@ pub fn get_lines_offsets(
     screen_width: usize,
     screen_height: usize,
 ) -> Vec<(u64, u64)> {
-    let doc = &view.as_ref().borrow();
+    let doc = &view.borrow();
     let doc = doc.document.as_ref().unwrap();
     let doc = doc.as_ref().write().unwrap();
 
@@ -548,7 +654,7 @@ pub fn get_lines_offsets(
 
     // get start of the line @offset
     {
-        let v = &view.as_ref().borrow();
+        let v = &view.borrow();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         let codec = tm.text_codec.as_ref();
@@ -642,7 +748,7 @@ pub fn compute_view_layout(
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) -> Option<()> {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
 
     let doc = v.document()?;
 
@@ -657,7 +763,9 @@ pub fn compute_view_layout(
     run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen, main_mark);
 
     // TODO: from env ?
-    v.end_offset = screen.last_offset.unwrap();
+    if let Some(last_offset) = screen.last_offset {
+        v.end_offset = last_offset;
+    }
     v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
     v.check_invariants();
 
@@ -668,15 +776,31 @@ pub fn compute_view_layout(
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
 pub fn update_view(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
+    mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) -> Option<()> {
     let _start = Instant::now();
 
+    let nb_child = {
+        let v = view.borrow_mut();
+        if v.children.len() > 0 {
+            for child in v.children.iter() {
+                dbg_println!(" REC call to : update view depth {}", v.children.len());
+                update_view(&mut editor, &mut env, &child);
+            }
+        }
+        v.children.len()
+    };
+
+    {
+        let v = view.borrow_mut();
+        dbg_println!("update view {} nb_child {}", v.id, nb_child);
+    }
+
     // refresh_env_variables(editor, env, view);
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         env.max_offset = v.document()?.read().unwrap().size() as u64;
         if v.start_offset > env.max_offset {
             v.start_offset = env.max_offset;
@@ -685,18 +809,16 @@ pub fn update_view(
 
     // pre layout action == post input
     {
-        let actions = env.view_pre_render.clone();
-        env.view_pre_render.clear();
-        run_text_mode_actions(editor, env, view, &actions);
+        run_text_mode_actions(editor, env, view, Stage::PreRender);
     }
+
+    // already recursive
 
     compute_view_layout(editor, env, view);
 
     // post layout action
     if false {
-        let actions = env.view_post_render.clone();
-        env.view_post_render.clear();
-        run_text_mode_actions(editor, env, view, &actions);
+        run_text_mode_actions(editor, env, view, Stage::PostRender);
     }
 
     let _end = Instant::now();

@@ -218,7 +218,7 @@ impl ParseCtx {
             if let Some(ref mut map) = rule.children.as_ref() {
                 read_sequence(
                     is_default,
-                    &mut map.as_ref().borrow_mut(),
+                    &mut map.borrow_mut(),
                     sequence,
                     pos + 1,
                     &action,
@@ -226,7 +226,7 @@ impl ParseCtx {
             }
         }
 
-        let map = &mut self.map.as_ref().borrow_mut();
+        let map = &mut self.map.borrow_mut();
         read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
 
         //
@@ -579,7 +579,7 @@ pub fn eval_input_event(
     // not first level ?
     if let Some(node) = in_node.as_ref() {
         if let Some(map) = &node.as_ref().children {
-            let map = map.as_ref().borrow();
+            let map = map.borrow();
             match map.get(&event_hash) {
                 Some(event) => {
                     if let Some(action) = &event.as_ref().action {
@@ -600,7 +600,7 @@ pub fn eval_input_event(
             *in_node = None;
         }
     } else {
-        match input_map.as_ref().borrow().get(&event_hash) {
+        match input_map.borrow().get(&event_hash) {
             Some(event) => {
                 if let Some(action) = &event.as_ref().action {
                     dbg_println!("found action");
@@ -623,7 +623,7 @@ pub fn eval_input_event(
                 *out_node = None;
                 *in_node = None;
 
-                match input_map.as_ref().borrow().get(&event_hash) {
+                match input_map.borrow().get(&event_hash) {
                     Some(event) => {
                         if let Some(action) = &event.as_ref().action {
                             dbg_println!("default found action {}", action);
@@ -742,7 +742,7 @@ mod tests {
         let map = build_input_event_map(DEFAULT_INPUT_MAP)?;
 
         dbg_println!("****** print map");
-        for (k, v) in map.as_ref().borrow().iter() {
+        for (k, v) in map.borrow().iter() {
             dbg_println!("{:?} -> {:?}", k, v);
         }
 

@@ -355,7 +355,10 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     const UNLIMITED_SYNC_BLOCK_SIZE: usize = 4096 * 256;
 
     let block_size = match std::env::var("UNLIMITED_SYNC_BLOCK_SIZE") {
-        Ok(val) => val.trim_end().parse::<usize>().unwrap_or(UNLIMITED_SYNC_BLOCK_SIZE),
+        Ok(val) => val
+            .trim_end()
+            .parse::<usize>()
+            .unwrap_or(UNLIMITED_SYNC_BLOCK_SIZE),
         Err(_) => UNLIMITED_SYNC_BLOCK_SIZE,
     };
 

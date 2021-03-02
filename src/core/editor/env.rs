@@ -9,7 +9,6 @@ use crate::core::editor::ActionMap;
 use crate::core::event::InputEvent;
 use crate::core::event::InputEventMap;
 use crate::core::event::InputEventRule;
-use crate::core::view;
 
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
@@ -104,11 +103,6 @@ pub struct EditorEnv<'a> {
     pub height: usize,
     pub view_id: usize, // doc id in view
 
-    // move this to corresponding pre/pos stages
-    // reset on each event handling
-    pub view_pre_render: Vec<view::Action>,
-    pub view_post_render: Vec<view::Action>,
-
     pub center_offset: Option<u64>,
     pub cur_mark_index: Option<usize>,
     pub max_offset: u64, // remove this, doc property
@@ -147,9 +141,7 @@ impl<'a> EditorEnv<'a> {
             process_input_end: Instant::now(),
             width: 0,
             height: 0,
-            view_id: 0,
-            view_pre_render: Vec::new(),
-            view_post_render: Vec::new(),
+            view_id: 1, // NB
             center_offset: None,
             cur_mark_index: None,
             max_offset: 0,

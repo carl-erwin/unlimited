@@ -7,6 +7,8 @@ use std::cell::RefCell;
 use std::char;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 //
 use crate::core::codec::text::u32_to_char;
@@ -21,6 +23,7 @@ use crate::core::screen::Screen;
 
 use crate::core::editor::EditorEnv;
 use crate::core::mark::Mark;
+use crate::core::view;
 use crate::core::view::View;
 
 use crate::core::modes::text_mode::TextModeContext; // TODO remove this impl details
@@ -974,7 +977,7 @@ impl Filter<'_> for ScreenFilter {
 
     fn run(
         &mut self,
-        view: &View,
+        _view: &View,
         env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         _filter_out: &mut Vec<FilterIoData>,
@@ -1124,7 +1127,7 @@ pub fn filter_codepoint(
 
     let (filtered_cp, filtered_color) = match (new_displayed_cp, new_color) {
         (Some(cp), Some(cl)) => (cp, cl),
-        (None, Some(cl)) => fallback(c, color),
+        (None, Some(_cl)) => fallback(c, color),
         (Some(cp), None) => (cp, color),
         _ => fallback(c, color),
     };
@@ -1150,7 +1153,7 @@ pub fn run_view_render_filters(
     screen: &mut Screen,
     main_mark: Mark,
 ) {
-    let view = view.as_ref().borrow();
+    let view = view.borrow();
     run_view_render_filters_direct(env, &view, base_offset, max_offset, screen, main_mark)
 }
 
@@ -1172,6 +1175,90 @@ pub fn run_view_render_filters_direct(
     screen: &mut Screen,
     main_mark: Mark,
 ) {
+    dbg_println!(
+        "RENDER VID {} nb children = {}",
+        view.id,
+        view.children.len()
+    );
+
+    // check screen size
+    if screen.width() == 0 || screen.height() == 0 {
+        return;
+    }
+
+    // (recursive) children rendering
+    if view.children.len() > 0 {
+        // vertically
+        let split_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
+
+        let (width, height) = (screen.width(), screen.height());
+        if width <= 1 || height <= 1 {
+            return;
+        }
+
+        let sizes = if split_is_vertical {
+            view::compute_layout_sizes(width, &view.layout_ops)
+        } else {
+            view::compute_layout_sizes(height, &view.layout_ops)
+        };
+
+        let mut x = 0;
+        let mut y = 0;
+
+        for (idx, v) in view.children.iter().enumerate() {
+            if idx > sizes.len() {
+                panic!();
+                break;
+            }
+
+            let mut child_v = v.borrow_mut();
+            {
+                child_v.x = x;
+                child_v.y = y;
+                let (w, h) = if split_is_vertical {
+                    (sizes[idx], height)
+                } else {
+                    (width, sizes[idx])
+                };
+
+                assert!(w > 0);
+                assert!(h > 0);
+
+                let mut child_screen = Screen::new(w, h);
+                run_view_render_filters_direct(
+                    editor_env,
+                    &child_v,
+                    child_v.start_offset,
+                    max_offset, // TODO take child doc size
+                    &mut child_screen,
+                    main_mark.clone(),
+                );
+                // TODO: take from child_v main mode
+
+                //
+                child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
+            }
+
+
+            let child_screen = child_v.screen.as_ref().read().unwrap();
+
+            if idx == 0 {
+                screen.first_offset = child_screen.first_offset.clone();
+            }
+
+            // composition copy child to output screen
+            screen.copy_to(x, y, &child_screen);
+            if split_is_vertical {
+                x += child_screen.width();
+            } else {
+                y += child_screen.height();
+            }
+        }
+
+        return;
+    }
+
+    // leaf view
     let mut layout_env = LayoutEnv {
         graphic_display: editor_env.graphic_display,
         quit: false,
@@ -1240,4 +1327,6 @@ pub fn run_view_render_filters_direct(
     for f in &mut filters {
         f.finish(&view, &mut layout_env);
     }
+
+    // update/return screen start offset
 }

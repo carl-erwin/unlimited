@@ -134,9 +134,9 @@ pub fn load_files(editor: &mut Editor) {
         let id = doc_id as u64;
         let doc = editor.document_map.get(&id);
         if let Some(doc) = doc {
-            let view = View::new(0 as u64, 1, 1, Some(doc.clone()));
+            let view = View::new(None, 0 as u64, 1, 1, Some(doc.clone()));
             dbg_println!("create view id {}", view.id);
-            editor.view_map.push((view.id, Rc::new(RefCell::new(view))));
+            editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
         }
     }
 }

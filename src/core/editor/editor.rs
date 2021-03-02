@@ -18,6 +18,7 @@ pub use super::*;
 
 // crate
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::event;
 use crate::core::event::input_map::eval_input_event;
 use crate::core::event::Event;
 use crate::core::event::Event::DrawEvent;
@@ -25,7 +26,6 @@ use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
-
 use crate::core::mark::Mark;
 
 use crate::core::modes::text_mode::TextModeContext; // TODO remove this impl details
@@ -36,14 +36,15 @@ use crate::core::view;
 use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::update_view;
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutOperation;
 use crate::core::view::View;
-
 // local
 
 pub type ModeFunction = fn(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'_, 'static>>>,
+    view: &Rc<RefCell<View<'static, 'static>>>,
 ) -> ();
 
 // ActionMap is kept in EditorEnv
@@ -131,7 +132,7 @@ pub type Id = u64;
 pub struct Editor<'a> {
     pub config: Config,
     pub document_map: HashMap<document::Id, Arc<RwLock<Document<'a>>>>,
-    pub view_map: Vec<(view::Id, Rc<RefCell<View<'a, 'a>>>)>,
+    pub view_map: HashMap<view::Id, Rc<RefCell<View<'a, 'a>>>>,
     pub modes: HashMap<String, Box<dyn Mode>>,
     pub core_tx: Sender<EventMessage<'a>>,
     pub ui_tx: Sender<EventMessage<'a>>,
@@ -149,7 +150,7 @@ impl<'a> Editor<'a> {
         Editor {
             config,
             document_map: HashMap::new(),
-            view_map: Vec::new(),
+            view_map: HashMap::new(),
             modes: HashMap::new(),
             ui_tx,
             core_tx,
@@ -199,7 +200,14 @@ pub fn register_action(map: &mut ActionMap, s: &str, func: ModeFunction) {
 }
 
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
-    let mut view = editor.view_map[env.view_id].1.as_ref().borrow_mut();
+    dbg_println!("checking view dimension {}", env.view_id);
+
+    let mut view = editor
+        .view_map
+        .get(&env.view_id)
+        .as_ref()
+        .unwrap()
+        .borrow_mut();
     // resize ?
     {
         let screen = view.screen.read().unwrap();
@@ -219,7 +227,7 @@ pub fn update_view_and_send_draw_event(
     // check size
     check_view_dimension(editor, env);
 
-    let view = editor.view_map[env.view_id].1.clone();
+    let view = editor.view_map.get(&env.view_id).unwrap().clone();
 
     update_view(editor, &mut env, &view);
     send_draw_event(editor, &mut env, ui_tx, &view);
@@ -328,7 +336,7 @@ pub fn send_draw_event(
     ui_tx: &Sender<EventMessage>,
     view: &Rc<RefCell<View>>,
 ) {
-    let view = view.as_ref().borrow();
+    let view = view.borrow();
     let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
     // TODO: REMOVE THIS:
@@ -357,11 +365,23 @@ pub fn send_draw_event(
 fn process_input_event<'a>(
     editor: &'a mut Editor<'static>,
     mut env: &'a mut EditorEnv<'static>,
-    view_id: usize,
+    view_id: view::Id,
     ev: &InputEvent,
 ) -> bool {
-    let mut view = &editor.view_map[view_id].1.clone();
+    let mut view = &editor.view_map.get(&view_id).unwrap().clone();
 
+    {
+        let v = view.borrow_mut();
+
+        dbg_println!("DISPATCH EVENT TO VID {}", view_id);
+        assert_eq!(v.id, view_id);
+
+        if v.children.len() > 0 {
+            // check focus: must add view(x.y)
+        }
+    }
+
+    //
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
         return false;
@@ -432,10 +452,159 @@ fn send_ui_event(
     // TODO: receive FPS form ui in Event ?
     if (p_input <= 60) || env.last_rdr_event.elapsed() > Duration::from_millis(1000 / 10) {
         // hit
-        let view = &editor.view_map[env.view_id].1.clone();
+        let view = editor.view_map.get(&env.view_id).unwrap().clone();
         send_draw_event(&mut editor, &mut env, ui_tx, &view);
         env.last_rdr_event = Instant::now();
     }
+}
+
+fn get_focused_vid(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    vid: view::Id,
+) -> view::Id {
+    let vid = vid;
+    let view = &editor.view_map.get(&vid).unwrap().clone();
+    let v = view.borrow();
+    if v.children.len() == 0 {
+        return vid;
+    }
+
+    if let Some(focused_vid) = v.focus_to {
+        return get_focused_vid(&mut editor, &mut env, focused_vid);
+    }
+
+    vid
+}
+
+pub fn set_focus_on_vid(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>, vid: view::Id) {
+    let view = &editor.view_map.get(&env.view_id).unwrap().clone();
+    let mut v = view.borrow_mut();
+    v.focus_to = Some(vid);
+}
+
+// clips (x,y) to local view @ (x,y)
+// returns the view's id at
+fn clip_coordinates_xy(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    root_vid: view::Id,
+    _vid: view::Id,
+    x: &mut i32,
+    y: &mut i32,
+) -> view::Id {
+    let mut id = root_vid;
+
+    // check layout type
+    dbg_println!("CLIPPING -----------------------------------BEGIN");
+    dbg_println!("CLIPPING clipping orig coords ({},{})", *x, *y);
+    dbg_println!("CLIPPING         select vid {}", id);
+
+    loop {
+        'inner: loop {
+            if let Some(v) = editor.view_map.get(&id) {
+                let v = v.borrow();
+
+                if v.children.len() == 0 {
+                    dbg_println!("CLIPPING        no more children");
+                    dbg_println!("CLIPPING ----------------------------------- END");
+                    return id;
+                }
+
+                for child in v.children.iter() {
+                    let child_v = child.borrow();
+                    let screen = child_v.screen.read().unwrap();
+
+                    dbg_println!(
+                    "CLIPPING dump child vid {} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                    child_v.id,
+                    child_v.x,
+                    child_v.y,
+                    screen.width(),
+                    screen.height(),
+                    child_v.x + screen.width(),
+                    child_v.y + screen.height()
+                );
+                }
+
+                dbg_println!("CLIPPING");
+
+                let is_layout_vertical = v.layout_direction == LayoutDirection::Vertical;
+
+                let mut last_id = 0;
+                for (idx, child) in v.children.iter().enumerate() {
+                    let child_v = child.borrow();
+                    let screen = child_v.screen.read().unwrap();
+
+                    last_id = child_v.id;
+
+                    dbg_println!(
+                    "CLIPPING checking child vid {} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                    child_v.id,
+                    child_v.x,
+                    child_v.y,
+                    screen.width(),
+                    screen.height(),
+                    child_v.x+screen.width(),
+                    child_v.y+screen.height());
+
+                    if *x >= child_v.x as i32
+                        && *x < (child_v.x + screen.width()) as i32
+                        && *y >= child_v.y as i32
+                        && *y < (child_v.y + screen.height()) as i32
+                    {
+                        if is_layout_vertical {
+                            *x -= child_v.x as i32;
+                        } else {
+                            *y -= child_v.y as i32;
+                        }
+
+                        // found
+                        dbg_println!("CLIPPING         updated clipping coords ({},{})", *x, *y);
+                        dbg_println!("CLIPPING         select vid {}", child_v.id);
+
+                        id = child_v.id;
+                        break 'inner;
+                    } else {
+                        dbg_println!("CLIPPING        not found @ idx {}", idx);
+                    }
+                }
+
+                // take last id if not found
+                id = last_id;
+            }
+        } // 'inner
+    } // 'outer
+}
+
+fn clip_coordinates_and_get_vid(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    ev: &InputEvent,
+    root_vid: view::Id,
+    vid: view::Id,
+) -> (view::Id, InputEvent) {
+    let mut ev = ev.clone();
+    let vid = match &mut ev {
+        InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
+            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+        }
+        InputEvent::ButtonRelease(event::ButtonEvent { x, y, .. }) => {
+            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+        }
+        InputEvent::PointerMotion(event::PointerEvent { x, y, .. }) => {
+            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+        }
+        InputEvent::WheelUp { x, y, .. } => {
+            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+        }
+        InputEvent::WheelDown { x, y, .. } => {
+            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+        }
+        _ => vid,
+    };
+
+    (vid, ev)
 }
 
 /*
@@ -486,24 +655,35 @@ fn process_input_events(
 
     env.process_input_start = Instant::now();
     for ev in &flat_events {
-        let vid = env.view_id;
-
         // pre_eval_input_stage(&mut editor, &mut env, vid, ev);
 
+        // select root
+        let root_vid = env.view_id;
+
+        // get child focus
+        let vid = get_focused_vid(&mut editor, &mut env, root_vid);
+        dbg_println!("FOCUS on vid {}", vid);
+
+        // clip event coordinates
+        let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
+
+        // TODO: if button press only: env.focus_on = Option<vid> ?
+        set_focus_on_vid(&mut editor, &mut env, vid);
+
         // need_rendering ?
-        env.event_processed = process_input_event(&mut editor, &mut env, vid, ev);
+        env.event_processed = process_input_event(&mut editor, &mut env, vid, &ev);
 
         // post_eval_stage(&mut editor, &mut env, vid, ev);
         // {
         // to check_focus_change()
-        if vid != env.view_id {
-            dbg_println!("view change {} ->  {}", vid, env.view_id);
+        if root_vid != env.view_id {
+            dbg_println!("view change {} ->  {}", root_vid, env.view_id);
             check_view_dimension(editor, env);
             env.event_processed = true;
 
             // NB: resize previous view's screen to lower memory usage
-            let view = editor.view_map[vid].1.clone();
-            let v = view.as_ref().borrow_mut();
+            let view = editor.view_map.get(&root_vid).unwrap().clone();
+            let v = view.borrow_mut();
             v.screen.write().unwrap().resize(1, 1);
         }
         // }
@@ -512,12 +692,13 @@ fn process_input_events(
 
         if env.event_processed {
             let start = Instant::now();
-            let view = editor.view_map[env.view_id].1.clone();
+            let view = editor.view_map.get(&env.view_id).unwrap().clone();
             // render_view(&mut editor, &mut env, &view);
             update_view(&mut editor, &mut env, &view);
             let end = Instant::now();
             dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
         }
+
         if env.pending_events > 0 {
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
@@ -530,7 +711,7 @@ fn process_input_events(
 }
 
 pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &view.as_ref().borrow();
+    let v = &view.borrow();
     let doc = v.document.as_ref().unwrap();
     let doc = doc.as_ref().read().unwrap();
 
@@ -549,7 +730,7 @@ pub fn application_quit_abort(
 }
 
 pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.as_ref().borrow_mut();
+    let v = view.borrow_mut();
 
     let doc_id = {
         let doc = v.document.as_ref().unwrap();
@@ -601,83 +782,118 @@ pub fn build_core_action_map<'a>() -> ActionMap<'a> {
     map
 }
 
-// store this in parent and reuse in resize
-pub enum LayoutOperation {
-    // We want a fixed size of sz cells vertically/horizontally in the parent
-    // used = size
-    // remain = remain - sz
-    Fixed { size: usize },
+pub fn split_with_direction(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv,
+    v: &'static mut View,
+    width: usize,
+    height: usize,
+    dir: view::LayoutDirection,
+    doc: Option<Arc<RwLock<Document>>>,
+) {
+    let sizes = if dir == LayoutDirection::Vertical {
+        view::compute_layout_sizes(width, &v.layout_ops) // options ? for ret size == 0
+    } else {
+        view::compute_layout_sizes(height, &v.layout_ops) // options ? for ret size == 0
+    };
 
-    // We want a fixed percentage of sz cells vertically/horizontally
-    // used = (parent.sz/100) * sz
-    // remain = parent.sz - used
-    Percent { p: usize },
-
-    // We want a fixed percentage of sz cells vertically/horizontally
-    // used = (remain/100 * sz)
-    // (remain <- remain - (remain/100 * sz))
-    RemainPercent { p: usize },
-
-    // We want a fixed percentage of sz cells vertically/horizontally
-    // used = (remain - minus)
-    // remain = remain - used
-    RemainMinus { minus: usize },
-}
-
-fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usize> {
-    let mut sizes = vec![];
-
-    dbg_println!("start = {}", start);
-
-    if start == 0 {
-        return sizes;
-    }
-
-    let mut remain = start;
-
-    for op in ops {
-        if remain == 0 {
-            break;
-        }
-
-        match op {
-            LayoutOperation::Fixed { size } => {
-                remain = remain.saturating_sub(*size);
-                sizes.push(*size);
-            }
-
-            LayoutOperation::Percent { p } => {
-                let used = (*p * start) / 100;
-                remain = remain.saturating_sub(used);
-                sizes.push(used);
-            }
-
-            LayoutOperation::RemainPercent { p } => {
-                let used = (*p * remain) / 100;
-                remain = remain.saturating_sub(used);
-                sizes.push(used);
-            }
-
-            // We want a fixed percentage of sz cells vertically/horizontally
-            // used = minus
-            // (remain <- remain - minus))
-            LayoutOperation::RemainMinus { minus } => {
-                let used = remain.saturating_sub(*minus);
-                remain = remain.saturating_sub(used);
-                sizes.push(used);
-            }
+    dbg_println!("split {:?} = SIZE {:?}", dir, sizes);
+    for s in &sizes {
+        if *s == 0 {
+            return;
         }
     }
 
-    sizes
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let mut x = v.x;
+    let mut y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        // vertically
+        let mut view = match dir {
+            LayoutDirection::Vertical => {
+                view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone())
+            }
+            LayoutDirection::Horizontal => {
+                view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone())
+            }
+
+            _ => {
+                return;
+            }
+        };
+
+        // horizontally
+        // create child modes
+        view.x = x;
+        view.y = y;
+
+        for m in v.mode_ctx.iter() {
+            let name = m.0;
+            let mode = editor.modes.get(name.as_str()).unwrap();
+            let ctx = mode.alloc_ctx();
+            dbg_println!("view.id = {}", view.id);
+            view.set_mode_ctx(mode.name(), ctx);
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        let mut view = match dir {
+            LayoutDirection::Vertical => {
+                x += *size;
+            }
+            LayoutDirection::Horizontal => {
+                y += *size;
+            }
+            _ => {
+                return;
+            }
+        };
+    }
 }
 
 pub fn split_vertically(
     editor: &mut Editor<'static>,
     _env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'_, 'static>>>,
+    view: &Rc<RefCell<View<'static, 'static>>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
 
     // check if already split
     if v.children.len() != 0 {
@@ -691,36 +907,96 @@ pub fn split_vertically(
         let screen = v.screen.read().unwrap();
         (screen.width(), screen.height())
     };
-    if width == 0 || height == 0 {
+    //
+    if width <= 4 {
         return;
     }
 
     // compute_split(size, first_half, first_second);
     let (_left_w, _right_w) = View::compute_split(width);
 
-    let ops = vec![
+    // TODO: store
+    v.layout_direction = LayoutDirection::Vertical;
+    v.layout_ops = vec![
         LayoutOperation::Percent { p: 50 },
         LayoutOperation::Percent { p: 50 },
     ];
 
-    let sizes = compute_layout_sizes(width, &ops);
+    let sizes = view::compute_layout_sizes(width, &v.layout_ops); // options ? for ret size == 0
 
     dbg_println!("splitV = SIZE {:?}", sizes);
-
-    for size in sizes {
-        let doc_id = v.document.as_ref().unwrap().read().unwrap().id;
-
-        if let Some(doc) = editor.document_map.get(&doc_id) {
-            let doc = editor.document_map.get(&doc_id).unwrap().clone();
-            let screen = Arc::new(RwLock::new(Box::new(Screen::new(size, height))));
-            let view = view::View::new(v.start_offset, size, height, Some(Arc::clone(&doc)));
-            v.children.push(Rc::new(RefCell::new(view)));
+    for s in &sizes {
+        if *s == 0 {
+            return;
         }
+    }
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let mut x = v.x;
+    let y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        let mut view = view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone());
+        // create child modes
+        view.x = x;
+        view.y = y;
+
+        for m in v.mode_ctx.iter() {
+            let name = m.0;
+            let mode = editor.modes.get(name.as_str()).unwrap();
+            let ctx = mode.alloc_ctx();
+            dbg_println!("view.id = {}", view.id);
+            view.set_mode_ctx(mode.name(), ctx);
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        x += *size;
     }
 }
 
-pub fn split_horizontally(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.as_ref().borrow_mut();
+pub fn split_horizontally(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'static, 'static>>>,
+) {
+    let mut v = view.borrow_mut();
 
     // check if already split
     if v.children.len() != 0 {
@@ -734,22 +1010,88 @@ pub fn split_horizontally(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
         let screen = v.screen.read().unwrap();
         (screen.width(), screen.height())
     };
-    if width == 0 || height == 0 {
+
+    if height <= 4 {
         return;
     }
 
     // compute_split(size, first_half, first_second);
-    let (_left_w, _right_w) = View::compute_split(width);
+    let (_top_h, _bottom_h) = View::compute_split(height);
 
-    let ops = vec![
-        LayoutOperation::Fixed { size: 1 },        // TITLE
-        LayoutOperation::RemainMinus { minus: 3 }, // BODY
-        LayoutOperation::Fixed { size: 3 },        // STATUS/CMD
+    // TODO: store
+    v.layout_direction = LayoutDirection::Horizontal;
+    v.layout_ops = vec![
+        LayoutOperation::Percent { p: 50 },
+        LayoutOperation::Percent { p: 50 },
     ];
 
-    let sizes = compute_layout_sizes(height, &ops);
+    let sizes = view::compute_layout_sizes(height, &v.layout_ops);
 
-    dbg_println!("splitV = SIZE {:?}", sizes);
+    dbg_println!("splitH = SIZE {:?}", sizes);
+    for s in &sizes {
+        if *s == 0 {
+            return;
+        }
+    }
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let x = v.x;
+    let mut y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        let mut view = view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone());
+        // create child modes
+        view.x = x;
+        view.y = y;
+
+        for m in v.mode_ctx.iter() {
+            let name = m.0;
+            let mode = editor.modes.get(name.as_str()).unwrap();
+            let ctx = mode.alloc_ctx();
+            dbg_println!("view.id = {}", view.id);
+            view.set_mode_ctx(mode.name(), ctx);
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        y += *size;
+    }
 }
 
 // TODO: put in main_loop.rs

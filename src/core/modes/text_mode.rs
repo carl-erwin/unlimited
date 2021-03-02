@@ -83,7 +83,7 @@ impl<'a> Mode for TextMode {
 
         let mut char_map = HashMap::new();
 
-        for c in '\0'..' ' {
+        for _c in '\0'..' ' {
             // char_map.insert(c, '.');
         }
 
@@ -251,23 +251,36 @@ impl TextMode {
     }
 }
 
+#[derive(PartialEq)]
+pub enum Stage {
+    PreRender,
+    PostRender,
+}
+
 pub fn run_text_mode_actions(
     editor: &mut Editor,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
-    actions: &Vec<Action>,
+    stage: Stage,
 ) {
-    // we can put borrwow out of loop
+    let actions: Vec<Action> = {
+        let v = &mut view.borrow_mut();
+        if stage == Stage::PreRender {
+            v.pre_render_action.drain(..).collect()
+        } else {
+            v.post_render_action.drain(..).collect()
+        }
+    };
 
     for a in actions.iter() {
         match a {
             Action::ScrollUp { n } => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
 
                 v.scroll_up(env, *n);
             }
             Action::ScrollDown { n } => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
 
                 v.scroll_down(env, *n);
             }
@@ -276,7 +289,7 @@ pub fn run_text_mode_actions(
             }
             Action::CenterAroundMainMarkIfOffScreen => {
                 let center = {
-                    let v = &mut view.as_ref().borrow_mut();
+                    let v = &mut view.borrow_mut();
 
                     let tm = v.mode_ctx::<TextModeContext>("text-mode");
                     let mid = tm.mark_index;
@@ -304,9 +317,7 @@ pub fn run_text_mode_actions(
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
 
             Action::ResetMarks => {
-                env.view_pre_render.push(Action::ResetMarks);
-
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 let offset = tm.marks[tm.mark_index].offset;
 
@@ -316,14 +327,14 @@ pub fn run_text_mode_actions(
             }
 
             Action::CheckMarks => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.marks.dedup();
                 tm.mark_index = tm.marks.len().saturating_sub(1);
             }
 
             Action::SaveCurrentMarks => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
                 let doc = v.document.clone();
                 let doc = doc.as_ref().unwrap();
                 let mut doc = doc.as_ref().write().unwrap();
@@ -335,7 +346,7 @@ pub fn run_text_mode_actions(
             }
 
             Action::DedupAndSaveMarks => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 //
@@ -349,7 +360,7 @@ pub fn run_text_mode_actions(
             }
 
             Action::CancelSelection => {
-                let v = &mut view.as_ref().borrow_mut();
+                let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.select_point.clear();
                 env.draw_marks = true;
@@ -362,14 +373,16 @@ pub fn run_text_mode_actions(
 //
 // text mode functions
 
-pub fn save_marks(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
-    env.view_pre_render.push(Action::SaveCurrentMarks);
+pub fn save_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &mut view.borrow_mut();
+    v.pre_render_action.push(Action::SaveCurrentMarks);
 }
 
-pub fn cancel_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    env.view_pre_render.push(Action::ResetMarks);
+pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &mut view.borrow_mut();
 
-    let v = &mut view.as_ref().borrow_mut();
+    v.pre_render_action.push(Action::ResetMarks);
+
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
 
@@ -380,7 +393,7 @@ pub fn cancel_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
 
 // text mode functions
 pub fn cancel_selection(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     tm.select_point.clear();
@@ -392,16 +405,18 @@ pub fn editor_cancel(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     cancel_selection(editor, env, view);
 }
 
-pub fn scroll_up(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
+pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    env.view_pre_render.push(Action::ScrollUp { n: 3 });
+    let v = &mut view.borrow_mut();
+    v.pre_render_action.push(Action::ScrollUp { n: 3 });
 }
 
-pub fn scroll_down(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
+pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    env.view_pre_render.push(Action::ScrollDown { n: 3 });
+    let v = &mut view.borrow_mut();
+    v.pre_render_action.push(Action::ScrollDown { n: 3 });
 }
 
 // TODO: rename into handle_input_events
@@ -441,7 +456,7 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
 
     // doc read only ?
     {
-        let v = view.as_ref().borrow();
+        let v = view.borrow();
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
@@ -456,7 +471,7 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
     copy_maybe_remove_selection(editor, env, view, false, true);
 
     let center = {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let view_start = v.start_offset;
         let mut view_growth = 0;
         let mut offset: u64 = 0;
@@ -512,11 +527,14 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
         screen.contains_offset(offset) == false || array.len() > screen.width() * screen.height()
     };
 
-    if center {
-        env.view_pre_render.push(Action::CenterAroundMainMark);
-    };
+    {
+        let mut v = view.borrow_mut();
+        if center {
+            v.pre_render_action.push(Action::CenterAroundMainMark);
+        };
 
-    env.view_pre_render.push(Action::CancelSelection);
+        v.pre_render_action.push(Action::CancelSelection);
+    }
 }
 
 pub fn remove_previous_codepoint(
@@ -529,7 +547,8 @@ pub fn remove_previous_codepoint(
         return;
     }
 
-    let v = &mut view.as_ref().borrow_mut();
+    let scroll_down = 0;
+    let v = &mut view.borrow_mut();
     let start_offset = v.start_offset;
 
     {
@@ -549,6 +568,7 @@ pub fn remove_previous_codepoint(
 
         doc.tag(env.max_offset, marks_offsets);
 
+        let mut scroll_down = 0;
         let mut shrink = 0;
         for m in tm.marks.iter_mut() {
             if m.offset == 0 {
@@ -582,21 +602,28 @@ pub fn remove_previous_codepoint(
             shrink += nr_removed as u64;
 
             if m.offset < start_offset {
-                env.view_pre_render.push(Action::ScrollUp { n: 1 });
+                scroll_down = 1;
             }
         }
 
         env.max_offset = doc.size() as u64;
-        env.view_pre_render.push(Action::CheckMarks);
 
         let marks_offsets = tm.marks.iter().map(|m| m.offset).collect();
         doc.tag(env.max_offset, marks_offsets);
     }
+
+    // schedule render actions
+    {
+        if scroll_down > 0 {
+            v.pre_render_action.push(Action::ScrollUp { n: 1 });
+        }
+        v.pre_render_action.push(Action::CheckMarks);
+    }
 }
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
-pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+pub fn undo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &mut view.borrow_mut();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
@@ -617,15 +644,15 @@ pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
 
     tm.mark_index = 0;
 
-    env.view_pre_render
+    v.pre_render_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
 
-    env.view_pre_render.push(Action::CancelSelection);
+    v.pre_render_action.push(Action::CancelSelection);
 }
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
-pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &mut view.borrow_mut();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
@@ -646,9 +673,9 @@ pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
         }
     }
 
-    env.view_pre_render
+    v.pre_render_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
-    env.view_pre_render.push(Action::CancelSelection);
+    v.pre_render_action.push(Action::CancelSelection);
 }
 
 /// Remove the current utf8 encoded code point.<br/>
@@ -657,7 +684,7 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
         return;
     }
 
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
     let view_start = v.start_offset;
     let mut view_shrink: u64 = 0;
 
@@ -700,9 +727,9 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
     }
     v.start_offset -= view_shrink;
 
-    env.view_pre_render.push(Action::CheckMarks);
-    env.view_pre_render.push(Action::DedupAndSaveMarks);
-    env.view_pre_render.push(Action::CancelSelection);
+    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_render_action.push(Action::DedupAndSaveMarks);
+    v.pre_render_action.push(Action::CancelSelection);
 }
 
 /// Skip blanks (if any) and remove until end of the word.
@@ -713,7 +740,7 @@ pub fn remove_until_end_of_word(
 
     view: &Rc<RefCell<View>>,
 ) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
@@ -798,14 +825,14 @@ pub fn remove_until_end_of_word(
     env.max_offset = doc.size() as u64;
     doc.tag(env.max_offset, marks_offsets);
 
-    env.view_pre_render.push(Action::CheckMarks);
-    env.view_pre_render.push(Action::CancelSelection); //TODO register last optype
+    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_render_action.push(Action::CancelSelection); //TODO register last optype
                                                        // if doc changes cancel selection ?
 }
 
 // TODO: maintain main mark Option<(x,y)>
-pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &mut view.borrow_mut();
 
     let start_offset = v.start_offset;
 
@@ -819,26 +846,33 @@ pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
 
     let midx = tm.mark_index;
 
+    let mut scroll_down = 0;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
         if idx == midx && m.offset <= start_offset {
-            env.view_pre_render.push(Action::ScrollUp { n: 1 });
+            scroll_down = 1;
         }
 
         m.move_backward(&doc, codec);
     }
 
-    env.view_pre_render.push(Action::CheckMarks);
+    if scroll_down > 0 {
+        v.pre_render_action.push(Action::ScrollUp { n: 1 });
+    }
+
+    v.pre_render_action.push(Action::CheckMarks);
 
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
     if tm.center_on_mark_move {
-        env.view_pre_render.push(Action::CenterAroundMainMark);
+        v.pre_render_action.push(Action::CenterAroundMainMark);
     }
 }
 
-pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut scroll_down = 0;
+
     {
-        let v = &mut view.as_ref().borrow_mut();
+        let v = &mut view.borrow_mut();
 
         let screen_has_eof = v.screen.read().unwrap().has_eof();
         let end_offset = v.end_offset;
@@ -860,7 +894,7 @@ pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
                 m.move_forward(&doc, codec);
 
                 if idx == midx && m.offset >= end_offset && !screen_has_eof {
-                    env.view_pre_render.push(Action::ScrollDown { n: 1 });
+                    scroll_down = 1;
                 }
             }
 
@@ -868,25 +902,33 @@ pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
             tm.marks.len()
         };
 
-        // TODO:  env.view_pre_render.push(Action::SelectLastMark);
+        // TODO:  v.pre_render_action.push(Action::SelectLastMark);
         tm.mark_index = nr_marks.saturating_sub(1); // TODO: dedup ?
     }
 
     //      move this check at post render to reschedule render ?
     //      if v.center_on_mark_move {
-    //           env.view_pre_render.push(Action::CenterAroundMainMark);
+    //           v.pre_render_action.push(Action::CenterAroundMainMark);
     //      }
+    {
+        let v = &mut view.borrow_mut();
 
-    env.view_pre_render.push(Action::CheckMarks);
+        if scroll_down > 0 {
+            v.pre_render_action
+                .push(Action::ScrollDown { n: scroll_down });
+        }
+
+        v.pre_render_action.push(Action::CheckMarks);
+    }
 }
 
 pub fn move_marks_to_start_of_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
 ) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
@@ -898,24 +940,28 @@ pub fn move_marks_to_start_of_line(
     //
     let midx = tm.mark_index;
 
+    let mut center = false;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
         m.move_to_start_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
-            env.view_pre_render.push(Action::CenterAroundMainMark);
+            center = true;
         }
     }
 
-    env.view_pre_render.push(Action::CheckMarks);
+    if center {
+        v.pre_render_action.push(Action::CenterAroundMainMark);
+    }
+    v.pre_render_action.push(Action::CheckMarks);
 }
 
 pub fn move_marks_to_end_of_line(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
@@ -928,15 +974,20 @@ pub fn move_marks_to_end_of_line(
 
     let midx = tm.mark_index;
 
+    let mut center = false;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
         m.move_to_end_of_line(&doc, codec);
 
         if idx == midx && screen.contains_offset(m.offset) == false {
-            env.view_pre_render.push(Action::CenterAroundMainMark);
+            center = true;
         }
     }
 
-    env.view_pre_render.push(Action::CheckMarks);
+    if center {
+        v.pre_render_action.push(Action::CenterAroundMainMark);
+    }
+
+    v.pre_render_action.push(Action::CheckMarks);
 }
 
 fn move_mark_to_previous_line(
@@ -1110,7 +1161,7 @@ pub fn move_marks_to_previous_line(
     view: &Rc<RefCell<View>>,
 ) {
     let (mut marks, idx_max) = {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         // TODO: maintain env.mark_index_max ?
@@ -1121,7 +1172,7 @@ pub fn move_marks_to_previous_line(
     let mut mark_index = None;
 
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let screen = v.screen.clone();
         let screen = screen.read().unwrap();
 
@@ -1131,7 +1182,7 @@ pub fn move_marks_to_previous_line(
 
             // TODO: move this to pre/post render
             if idx == 0 {
-                // env.view_pre_render.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
+                // v.pre_render_action.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
                 let new_offset = marks[idx].offset;
 
                 if new_offset != prev_offset {
@@ -1140,9 +1191,9 @@ pub fn move_marks_to_previous_line(
                     let was_on_screen = screen.contains_offset(prev_offset);
                     let is_on_screen = screen.contains_offset(new_offset);
                     if was_on_screen && !is_on_screen {
-                        env.view_pre_render.push(Action::ScrollUp { n: 1 });
+                        v.pre_render_action.push(Action::ScrollUp { n: 1 });
                     } else if !is_on_screen {
-                        env.view_pre_render.push(Action::CenterAroundMainMark);
+                        v.pre_render_action.push(Action::CenterAroundMainMark);
                     }
                 }
             }
@@ -1151,16 +1202,17 @@ pub fn move_marks_to_previous_line(
 
     {
         // copy back
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks = marks;
         if let Some(idx) = mark_index {
             tm.mark_index = idx;
         }
-    }
 
-    env.view_pre_render.push(Action::CheckMarks);
+        // schedule actions
+        v.pre_render_action.push(Action::CheckMarks);
+    }
 }
 
 pub fn move_on_screen_mark_to_next_line(
@@ -1228,7 +1280,7 @@ pub fn move_mark_to_next_line(
     let old_offset;
 
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let screen = v.screen.clone();
         let screen = screen.read().unwrap();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1248,7 +1300,7 @@ pub fn move_mark_to_next_line(
             // ADD screen cache ?
             // screen[first mark -> last mark ] ? Ram usage ?
             // updated on resize -> slow
-            env.view_pre_render.push(action);
+            v.pre_render_action.push(action);
         }
 
         if ok == true {
@@ -1259,14 +1311,14 @@ pub fn move_mark_to_next_line(
     if true {
         // mark is off_screen
         let (screen_width, screen_height) = {
-            let view = view.as_ref().borrow_mut();
+            let view = view.borrow_mut();
             let screen = view.screen.read().unwrap();
             (screen.width(), screen.height())
         };
 
         // get start_of_line(m.offset) -> u64
         let start_offset = {
-            let v = &view.as_ref().borrow();
+            let v = &view.borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().read().unwrap();
 
@@ -1290,7 +1342,7 @@ pub fn move_mark_to_next_line(
         // TODO: add perf view screen cache ? sorted by screens.start_offset
         // with same width/heigh as v.screen
         let lines = {
-            let mut view = view.as_ref().borrow_mut();
+            let mut view = view.borrow_mut();
             view.get_lines_offsets_direct(
                 env,
                 start_offset,
@@ -1319,7 +1371,7 @@ pub fn move_mark_to_next_line(
 
         // compute column
         let new_x = {
-            let v = &view.as_ref().borrow();
+            let v = &view.borrow();
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().read().unwrap();
 
@@ -1349,7 +1401,7 @@ pub fn move_mark_to_next_line(
 
         let mut tmp_mark = Mark::new(line_start_off);
 
-        let v = &view.as_ref().borrow();
+        let v = &view.borrow();
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
 
@@ -1368,7 +1420,7 @@ pub fn move_mark_to_next_line(
     }
 
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks[mark_idx].offset = m_offset;
     }
@@ -1381,7 +1433,7 @@ pub fn move_mark_to_next_line(
 // allocate and sets screen.first_offset
 fn allocate_temporary_screen_and_start_offset(view: &Rc<RefCell<View>>) -> (Screen, u64) {
     let (width, height, first_offset) = {
-        let v = view.as_ref().borrow();
+        let v = view.borrow();
         let screen = v.screen.clone();
         let screen = screen.read().unwrap();
         let first_offset = screen.first_offset.unwrap();
@@ -1401,7 +1453,7 @@ fn allocate_temporary_screen_and_start_offset(view: &Rc<RefCell<View>>) -> (Scre
 
 // min offset, max index
 fn get_marks_min_offset_and_max_idx(view: &Rc<RefCell<View>>) -> (u64, usize) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let idx_max = tm.marks.len();
@@ -1417,7 +1469,7 @@ fn get_marks_min_offset_and_max_idx(view: &Rc<RefCell<View>>) -> (u64, usize) {
 }
 
 fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
-    let v = view.as_ref().borrow();
+    let v = view.borrow();
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap();
     let doc = doc.as_ref().read().unwrap();
@@ -1462,7 +1514,7 @@ pub fn move_marks_to_next_line(
 
     // copy all marks
     let mut marks = {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks.clone()
     };
@@ -1474,7 +1526,7 @@ pub fn move_marks_to_next_line(
 
     // update all marks
     {
-        let v = view.as_ref().borrow();
+        let v = view.borrow();
         let mut idx_start = 0;
         while idx_start < idx_max {
             dbg_println!(" idx_start {} < idx_max {}", idx_start, idx_max);
@@ -1578,7 +1630,7 @@ pub fn move_marks_to_next_line(
 
     // check main mark
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let screen = v.screen.clone();
         let screen = screen.as_ref().read().unwrap();
 
@@ -1589,12 +1641,12 @@ pub fn move_marks_to_next_line(
         let idx = tm.mark_index;
 
         if !screen.contains_offset(tm.marks[idx].offset) {
-            env.view_pre_render.push(Action::ScrollDown { n: 1 });
-            // TODO ?  env.view_pre_render.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
-            // TODO ?  env.view_pre_render.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
+            v.pre_render_action.push(Action::ScrollDown { n: 1 });
+            // TODO ?  v.pre_render_action.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
+            // TODO ?  v.pre_render_action.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
         }
 
-        env.view_pre_render.push(Action::CheckMarks);
+        v.pre_render_action.push(Action::CheckMarks);
     }
 }
 
@@ -1605,7 +1657,7 @@ pub fn clone_and_move_mark_to_previous_line(
     view: &Rc<RefCell<View>>,
 ) {
     let (mut marks, prev_off) = {
-        let v = view.as_ref().borrow();
+        let v = view.borrow();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         (tm.marks.clone(), tm.marks[0].offset)
     };
@@ -1613,11 +1665,11 @@ pub fn clone_and_move_mark_to_previous_line(
     dbg_println!(" clone move up: prev_offset {}", prev_off);
 
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         move_mark_to_previous_line(editor, env, &mut v, 0, &mut marks);
     }
 
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
@@ -1642,9 +1694,9 @@ pub fn clone_and_move_mark_to_previous_line(
         let was_on_screen = screen.contains_offset(prev_off);
         let is_on_screen = screen.contains_offset(tm.marks[0].offset);
         if was_on_screen && !is_on_screen {
-            env.view_pre_render.push(Action::ScrollUp { n: 1 });
+            v.pre_render_action.push(Action::ScrollUp { n: 1 });
         } else if !is_on_screen {
-            env.view_pre_render.push(Action::CenterAroundMainMark);
+            v.pre_render_action.push(Action::CenterAroundMainMark);
         }
     }
 }
@@ -1657,7 +1709,7 @@ pub fn clone_and_move_mark_to_next_line(
 ) {
     // refresh mark index
     let mark_len = {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         let mark_len = {
@@ -1691,7 +1743,7 @@ pub fn clone_and_move_mark_to_next_line(
 
     dbg_println!(" clone move down: offsets {:?}", offsets);
 
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     // no move ?
@@ -1703,10 +1755,13 @@ pub fn clone_and_move_mark_to_next_line(
             marks.len() - 1
         };
 
-        let screen = v.screen.read().unwrap();
-        let was_on_screen = screen.contains_offset(offsets.0);
+        let was_on_screen = {
+            let screen = v.screen.read().unwrap();
+            screen.contains_offset(offsets.0)
+        };
+
         if !was_on_screen {
-            env.view_pre_render.push(Action::CenterAroundMainMark);
+            v.pre_render_action.push(Action::CenterAroundMainMark);
         }
         return;
     }
@@ -1715,19 +1770,23 @@ pub fn clone_and_move_mark_to_next_line(
     // env.sort mark sync direction
     // update view.mark_index
 
-    let screen = v.screen.read().unwrap();
-    let was_on_screen = screen.contains_offset(offsets.0);
-    let is_on_screen = screen.contains_offset(offsets.1);
-    dbg_println!(
-        " was_on_screen {} , is_on_screen  {}",
-        was_on_screen,
-        is_on_screen
-    );
+    let (was_on_screen, is_on_screen) = {
+        let screen = v.screen.read().unwrap();
+        let was_on_screen = screen.contains_offset(offsets.0);
+        let is_on_screen = screen.contains_offset(offsets.1);
+        dbg_println!(
+            " was_on_screen {} , is_on_screen  {}",
+            was_on_screen,
+            is_on_screen
+        );
+
+        (was_on_screen, is_on_screen)
+    };
 
     if was_on_screen && !is_on_screen {
-        env.view_pre_render.push(Action::ScrollDown { n: 1 });
+        v.pre_render_action.push(Action::ScrollDown { n: 1 });
     } else if !is_on_screen {
-        env.view_pre_render.push(Action::CenterAroundMainMark);
+        v.pre_render_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -1737,7 +1796,7 @@ pub fn move_mark_to_screen_start(
 
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1757,7 +1816,7 @@ pub fn move_mark_to_screen_end(
 
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1778,7 +1837,7 @@ pub fn scroll_to_previous_screen(
     view: &Rc<RefCell<View>>,
 ) {
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let nb = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
         v.scroll_up(env, nb);
     }
@@ -1793,7 +1852,7 @@ pub fn move_mark_to_start_of_file(
 
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     v.start_offset = 0;
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1806,11 +1865,11 @@ pub fn move_mark_to_start_of_file(
 
 pub fn move_mark_to_end_of_file(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
 ) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
 
     let offset = {
         let doc = v.document.as_ref().unwrap();
@@ -1828,13 +1887,13 @@ pub fn move_mark_to_end_of_file(
 
     //
     let n = v.screen.read().unwrap().height() / 2;
-    env.view_pre_render.push(Action::ScrollUp { n })
+    v.pre_render_action.push(Action::ScrollUp { n })
 }
 
-pub fn scroll_to_next_screen(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.as_ref().borrow_mut();
+pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut v = view.borrow_mut();
     let n = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
-    env.view_pre_render.push(Action::ScrollDown { n });
+    v.pre_render_action.push(Action::ScrollDown { n });
 }
 
 /*
@@ -1845,7 +1904,7 @@ pub fn scroll_to_next_screen(_editor: &mut Editor, env: &mut EditorEnv, view: &R
       the buffer log is not aware of cut/paste/multicursor
 */
 pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
 
     // doc read only ?
     {
@@ -1914,13 +1973,13 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
     let mlen = tm.marks.len();
     assert!(tm.copy_buffer.len() == mlen);
 
-    env.view_pre_render.push(Action::SaveCurrentMarks);
-    env.view_pre_render.push(Action::CheckMarks);
-    env.view_pre_render.push(Action::CancelSelection);
+    v.pre_render_action.push(Action::SaveCurrentMarks);
+    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_render_action.push(Action::CancelSelection);
 }
 
 pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
 
     // doc read only ?
     {
@@ -1987,9 +2046,9 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
         }
     }
 
-    env.view_pre_render.push(Action::SaveCurrentMarks);
-    env.view_pre_render.push(Action::CheckMarks);
-    env.view_pre_render.push(Action::CancelSelection);
+    v.pre_render_action.push(Action::SaveCurrentMarks);
+    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_render_action.push(Action::CancelSelection);
 
     // // mark off_screen ?
     // let screen = v.screen.read().unwrap();
@@ -1997,80 +2056,82 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
     // };
     //
     // if center {
-    // env.view_pre_render.push(Action::CenterAroundMainMark);
+    // v.pre_render_action.push(Action::CenterAroundMainMark);
     // };
 }
 
-pub fn move_to_token_start(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // TODO: factorize macrk action
     // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
     //
 
-    {
-        let v = &mut view.as_ref().borrow_mut();
-        let screen = v.screen.clone();
-        let screen = screen.read().unwrap();
+    let mut center = false;
 
-        let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+    let v = &mut view.borrow_mut();
+    let screen = v.screen.clone();
+    let screen = screen.read().unwrap();
 
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+    let doc = v.document.clone();
+    let doc = doc.as_ref().unwrap();
+    let doc = doc.as_ref().read().unwrap();
 
-        let codec = tm.text_codec.as_ref();
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-        let midx = tm.mark_index;
+    let codec = tm.text_codec.as_ref();
 
-        let marks = &mut tm.marks;
+    let midx = tm.mark_index;
 
-        for (idx, m) in marks.iter_mut().enumerate() {
-            m.move_to_token_start(&doc, codec);
+    let marks = &mut tm.marks;
 
-            // main mark ?
-            if idx == midx {
-                if !screen.contains_offset(m.offset) {
-                    // TODO: push to post action queue
-                    // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
-                    //
-                    env.view_pre_render.push(Action::CenterAroundMainMark);
-                }
-            }
-        }
-    }
-}
+    for (idx, m) in marks.iter_mut().enumerate() {
+        m.move_to_token_start(&doc, codec);
 
-pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let mut sync = false;
-
-    {
-        let mut v = view.as_ref().borrow_mut();
-        let screen = v.screen.clone();
-        let screen = screen.read().unwrap();
-
-        let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
-
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        let codec = tm.text_codec.as_ref();
-
-        let marks = &mut tm.marks;
-
-        for m in marks.iter_mut() {
-            m.move_to_token_end(&doc, codec);
-
-            // main mark ?
+        // main mark ?
+        if idx == midx {
             if !screen.contains_offset(m.offset) {
                 // TODO: push to post action queue
                 // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                 //
-                sync = true;
+                center = true;
             }
         }
     }
 
+    if center {
+        v.pre_render_action.push(Action::CenterAroundMainMark);
+    }
+}
+
+pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut sync = false;
+
+    let mut v = view.borrow_mut();
+    let screen = v.screen.clone();
+    let screen = screen.read().unwrap();
+
+    let doc = v.document.clone();
+    let doc = doc.as_ref().unwrap();
+    let doc = doc.as_ref().read().unwrap();
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+    let codec = tm.text_codec.as_ref();
+
+    let marks = &mut tm.marks;
+
+    for m in marks.iter_mut() {
+        m.move_to_token_end(&doc, codec);
+
+        // main mark ?
+        if !screen.contains_offset(m.offset) {
+            // TODO: push to post action queue
+            // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+            //
+            sync = true;
+        }
+    }
+
     if sync {
-        env.view_pre_render.push(Action::CenterAroundMainMark);
+        v.pre_render_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2081,14 +2142,14 @@ fn _get_main_mark_offset(view: &View) -> u64 {
 
 pub fn set_selection_points_at_marks(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
 ) {
     let sync = false;
 
     {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2103,7 +2164,8 @@ pub fn set_selection_points_at_marks(
     if sync
     /* always center ? */
     {
-        env.view_pre_render.push(Action::CenterAroundMainMark);
+        let mut v = view.borrow_mut();
+        v.pre_render_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2226,7 +2288,7 @@ pub fn cut_selection(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
 }
 
 pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
 
     let (button, x, y) = match env.trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {
@@ -2348,11 +2410,11 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
         i -= 1;
     }
 
-    // s // to internal view.as_ref().borrow_mut().state.s
+    // s // to internal view.borrow_mut().state.s
 }
 
 pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
 
     let (button, _x, _y) = match env.trigger[0] {
         InputEvent::ButtonRelease(ref button_event) => match button_event {
@@ -2381,7 +2443,7 @@ pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
 }
 
 pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.as_ref().borrow_mut();
+    let v = &mut view.borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
@@ -2425,12 +2487,12 @@ pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<Ref
 }
 
 pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
-    env.view_id = env.view_id.saturating_sub(1);
+    env.view_id = std::cmp::max(env.view_id - 1, 1);
 }
 
 // TODO: view.center_arrout_offset()
 pub fn center_around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let mut v = view.as_ref().borrow_mut();
+    let mut v = view.borrow_mut();
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
     v.center_around_offset(env, offset);
@@ -2438,7 +2500,7 @@ pub fn center_around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 
 pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     if let Some(center_offset) = env.center_offset {
-        let mut v = view.as_ref().borrow_mut();
+        let mut v = view.borrow_mut();
         let offset = {
             let doc = v.document.as_ref().unwrap();
             let doc = doc.as_ref().read().unwrap();
@@ -2449,8 +2511,8 @@ pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc
     }
 }
 
-pub fn display_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let mut v = view.as_ref().borrow_mut();
+pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut v = view.borrow_mut();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     let c = if let Some(c) = tm.char_map.as_mut().unwrap().get(&'\n') {
