@@ -5,6 +5,7 @@
 use core::panic;
 use std::cell::RefCell;
 use std::char;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 //
@@ -509,6 +510,7 @@ impl Filter<'_> for TabFilter {
                 }
             } else {
                 // unexpected
+                panic!();
                 filter_out.push(io.clone());
             }
         }
@@ -946,14 +948,22 @@ pub struct ScreenFilter {
     first_offset: Option<u64>,
     last_pushed_offset: Option<u64>,
     screen_is_full: bool,
+    char_map: Option<HashMap<char, char>>,
+    color_map: Option<HashMap<char, (u8, u8, u8)>>,
 }
 
 impl ScreenFilter {
-    fn new(_env: &LayoutEnv, _view: &View) -> Self {
+    fn new(_env: &LayoutEnv, view: &View) -> Self {
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        let char_map = tm.char_map.clone();
+        let color_map = tm.color_map.clone();
+
         ScreenFilter {
             first_offset: None,
             last_pushed_offset: None,
             screen_is_full: false,
+            char_map,
+            color_map,
         }
     }
 }
@@ -965,7 +975,7 @@ impl Filter<'_> for ScreenFilter {
 
     fn run(
         &mut self,
-        _view: &View,
+        view: &View,
         env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         _filter_out: &mut Vec<FilterIoData>,
@@ -1009,6 +1019,8 @@ impl Filter<'_> for ScreenFilter {
                 FilterData::Unicode { cp, .. } => {
                     // screen.push_available() + screen.push_count() == screen.push_capacity()
                     let cp = filter_codepoint(
+                        self.char_map.as_ref(),
+                        self.color_map.as_ref(),
                         u32_to_char(cp),
                         io.offset.clone(),
                         io.size,
@@ -1044,6 +1056,8 @@ impl Filter<'_> for ScreenFilter {
 
         // EOF
         let eof_cpi = filter_codepoint(
+            None,
+            None,
             u32_to_char(' ' as u32),
             Some(env.max_offset),
             0,
@@ -1068,6 +1082,8 @@ impl Filter<'_> for ScreenFilter {
 
 // TODO return array of CodePointInfo  0x7f -> <ESC>
 pub fn filter_codepoint(
+    char_map: Option<&HashMap<char, char>>,
+    color_map: Option<&HashMap<char, (u8, u8, u8)>>,
     c: char,
     offset: Option<u64>,
     size: usize,
@@ -1076,27 +1092,53 @@ pub fn filter_codepoint(
     bg_color: (u8, u8, u8),
     metadata: bool,
 ) -> CodepointInfo {
-    let (displayed_cp, color) = match c {
-        '\r' | '\n' => ('\u{2936}', color), // TODO: add user configuration for new-line representation
-        //'\r' | '\n' => (' ', color),
-        '\t' => (' ', color),
+    let new_color = if let Some(color_map) = color_map {
+        if let Some(new_color) = color_map.get(&c) {
+            Some(new_color.clone())
+        } else {
+            Some(color)
+        }
+    } else {
+        Some(color)
+    };
 
-        _ if c < ' ' => ('.', (0, 128, 0)), // TODO: change color/style '�',
+    let new_displayed_cp = if let Some(char_map) = char_map {
+        if let Some(disp) = char_map.get(&c) {
+            Some(*disp)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
-        _ if c == '\u{7f}' => ('�', color), // TODO: change color/style '�',
+    let fallback = |c: char, color: (u8, u8, u8)| -> (char, (u8, u8, u8)) {
+        match c {
+            '\r' | '\n' => ('\u{2936}', color), // TODO: add user configuration for new-line representation
+            //'\r' | '\n' => (' ', color),
+            '\t' => (' ', color),
+            _ if c < ' ' => ('.', (0, 128, 0)), // TODO: change color/style '�',
+            _ if c == '\u{7f}' => ('�', color), // TODO: change color/style '�',
+            _ => (c, color),
+        }
+    };
 
-        _ => (c, color),
+    let (filtered_cp, filtered_color) = match (new_displayed_cp, new_color) {
+        (Some(cp), Some(cl)) => (cp, cl),
+        (None, Some(cl)) => fallback(c, color),
+        (Some(cp), None) => (cp, color),
+        _ => fallback(c, color),
     };
 
     CodepointInfo {
         metadata,
         cp: c,
-        displayed_cp,
+        displayed_cp: filtered_cp,
         offset: offset.clone(),
         size,
         is_mark: false,
         is_selected,
-        color,
+        color: filtered_color,
         bg_color,
     }
 }

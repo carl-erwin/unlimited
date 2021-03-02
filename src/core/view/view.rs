@@ -713,6 +713,8 @@ pub fn screen_putchar(
     is_selected: bool,
 ) -> bool {
     let (ok, _) = screen.push(layout::filter_codepoint(
+        None,
+        None,
         c,
         Some(offset),
         size,

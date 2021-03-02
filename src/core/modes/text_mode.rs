@@ -3,6 +3,7 @@
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
 
+use std::collections::HashMap;
 use std::time::Instant;
 
 //
@@ -58,6 +59,9 @@ pub struct TextModeContext {
     pub select_point: Vec<Mark>,
     pub copy_buffer: Vec<CopyData>,
     pub button_state: [u32; 8],
+
+    pub char_map: Option<HashMap<char, char>>,
+    pub color_map: Option<HashMap<char, (u8, u8, u8)>>,
 }
 
 impl<'a> Mode for TextMode {
@@ -77,6 +81,22 @@ impl<'a> Mode for TextMode {
         let marks = vec![Mark { offset: 0 }];
         let copy_buffer = vec![];
 
+        let mut char_map = HashMap::new();
+
+        for c in '\0'..' ' {
+            // char_map.insert(c, '.');
+        }
+
+        //
+        char_map.insert('\u{7f}', '�');
+
+        char_map.insert('\r', ' ');
+        char_map.insert('\r', '\u{2190}');
+
+        char_map.insert('\n', ' ');
+
+        char_map.insert('\t', ' ');
+
         let ctx = TextModeContext {
             center_on_mark_move: false, // add movement enums and pass it to center fn
             scroll_on_mark_move: true,
@@ -86,6 +106,8 @@ impl<'a> Mode for TextMode {
             mark_index: 0,
             select_point: vec![],
             button_state: [0; 8],
+            char_map: Some(char_map),
+            color_map: None,
         };
 
         Box::new(ctx)
@@ -103,6 +125,12 @@ impl TextMode {
     }
 
     pub fn register_actions<'a>(mut map: &'a mut ActionMap<'a>) {
+        register_action(
+            &mut map,
+            "text-mode:display-end-of-line",
+            display_end_of_line,
+        );
+
         register_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
 
         register_action(
@@ -2419,4 +2447,23 @@ pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc
 
         v.center_around_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
+}
+
+pub fn display_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut v = view.as_ref().borrow_mut();
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    let c = if let Some(c) = tm.char_map.as_mut().unwrap().get(&'\n') {
+        if *c == ' ' {
+            '\u{2936}'
+        } else {
+            ' '
+        }
+    } else {
+        ' '
+    };
+
+    dbg_println!("\\n -> {}", c);
+
+    tm.char_map.as_mut().unwrap().insert('\n', c);
 }
