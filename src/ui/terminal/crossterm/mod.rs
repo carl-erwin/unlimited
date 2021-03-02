@@ -220,7 +220,11 @@ fn draw_view(
     mut screen: &mut Screen,
     mut stdout: &mut std::io::StdoutLock,
 ) {
-    let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
+    if false {
+        let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
+    } else {
+        let _ = _draw_screen_dumb(&screen, &mut stdout);
+    }
 }
 
 fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
