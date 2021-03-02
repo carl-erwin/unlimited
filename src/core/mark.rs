@@ -365,7 +365,7 @@ fn test_marks() {
             .finalize()
             .unwrap();
 
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
 
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, 6, &data);
@@ -400,7 +400,7 @@ fn test_marks() {
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -426,7 +426,7 @@ fn test_marks() {
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
 
@@ -453,7 +453,7 @@ fn test_marks() {
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
         let data = vec![0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -479,7 +479,7 @@ fn test_marks() {
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
         let data = vec![0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -505,7 +505,7 @@ fn test_marks() {
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.as_ref().borrow_mut();
+        let mut bb = doc.as_ref().write().unwrap();
         let data = vec![0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];

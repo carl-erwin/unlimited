@@ -57,7 +57,7 @@ impl<'a> Buffer<'a> {
             }
         };
 
-        let size = file.as_ref().borrow().size() as usize;
+        let size = file.as_ref().read().unwrap().size() as usize;
 
         // println!("'{}' opened size '{}'", file_name, size);
 
@@ -171,7 +171,7 @@ impl<'a> Buffer<'a> {
         let perms = metadata.permissions();
 
         let res = MappedFile::sync_to_disk(
-            &mut self.data.as_ref().borrow_mut(),
+            &mut self.data.as_ref().write().unwrap(),
             &tmp_file_name,
             &self.file_name,
         );

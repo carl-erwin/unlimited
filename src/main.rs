@@ -2,6 +2,9 @@
 
 // std
 use std::sync::mpsc::channel;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+
 use std::thread;
 
 // ext
@@ -16,6 +19,8 @@ use unlimited::core::config::Config;
 use unlimited::core::VERSION;
 use unlimited::ui;
 
+use unlimited::core::event::EventMessage;
+
 /// Program entry point
 /// It parses the command line to build the configuration.
 /// Creates the core thread.
@@ -25,25 +30,34 @@ fn main() {
     let config = parse_command_line();
 
     // build core/ui communication channels
-    let (ui_tx, ui_rx) = channel();
-    let (cr_tx, cr_rx) = channel();
     let ui_name = config.ui_frontend.clone();
-
+    let (ui_tx, ui_rx) = channel();
+    let (core_tx, core_rx) = channel();
     // create core thread
-    let core_th = {
-        let ui_tx_clone = ui_tx.clone();
-        Some(thread::spawn(move || {
-            core::run(config, &cr_rx, &ui_tx_clone)
-        }))
-    };
+
+    let core_th = start_core_thread(config, core_tx.clone(), core_rx, ui_tx.clone());
 
     // run the ui loop in the main thread
-    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx, &cr_tx);
+    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx, &core_tx);
 
     // wait for core thread
     if let Some(core_handle) = core_th {
         core_handle.join().unwrap()
     }
+}
+
+fn start_core_thread(
+    config: Config,
+    core_tx: Sender<EventMessage<'static>>,
+    core_rx: Receiver<EventMessage<'static>>,
+    ui_tx: Sender<EventMessage<'static>>,
+) -> Option<thread::JoinHandle<()>> {
+    let _tx_ = ui_tx.clone();
+    let core_tx = core_tx.clone();
+
+    Some(thread::spawn(move || {
+        core::run(config, &core_rx, &core_tx, &ui_tx)
+    }))
 }
 
 /// Parse command and an return a Config

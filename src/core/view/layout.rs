@@ -207,7 +207,10 @@ impl Filter<'_> for RawDataFilter {
             // 1st pass raw_data_filter
             let mut raw_data = vec![];
 
-            let rd = doc.borrow().read(self.pos, self.read_size, &mut raw_data);
+            let rd = doc
+                .read()
+                .unwrap()
+                .read(self.pos, self.read_size, &mut raw_data);
 
             dbg_println!(
                 "READ from offset({}) : {} / {} bytes",
@@ -216,7 +219,7 @@ impl Filter<'_> for RawDataFilter {
                 self.read_size
             );
 
-            dbg_println!("BUFFER SIZE {}", doc.borrow().size());
+            dbg_println!("BUFFER SIZE {}", doc.as_ref().read().unwrap().size());
             dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
 
             if rd > 0 {
@@ -632,7 +635,6 @@ pub struct HighlightSelectionFilter {
 // view.vars['selection-point'] -> &mut enum { int64, float64, string, Vec<u8> } | "C" api ...
 // view.modes[''] -> std::any::Any
 //
-use crate::core::modes::TextMode;
 use crate::sort_tuple_pair;
 
 impl HighlightSelectionFilter {

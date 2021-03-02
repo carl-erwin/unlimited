@@ -47,10 +47,10 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
     }
 }
 
-pub fn main_loop(
-    ui_rx: &Receiver<EventMessage>,
-    _ui_tx: &Sender<EventMessage>,
-    core_tx: &Sender<EventMessage>,
+pub fn main_loop<'a>(
+    ui_rx: &Receiver<EventMessage<'static>>,
+    _ui_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) {
     let mut seq: usize = 0;
 

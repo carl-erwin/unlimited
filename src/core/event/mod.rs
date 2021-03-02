@@ -14,6 +14,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 use std::vec::Vec;
 
+use crate::core::document::Document;
 use crate::core::screen::Screen;
 
 //
@@ -54,23 +55,23 @@ pub fn pending_render_event_count() -> usize {
 
 /// Message sent between core and ui threads.
 #[derive(Debug, Clone)]
-pub struct EventMessage {
+pub struct EventMessage<'a> {
     /// sequence number. should be reused in corresponding answer.
     pub seq: usize,
     /// underlying event.
-    pub event: Event,
+    pub event: Event<'a>,
     // pub reply_to: Sender<EventMessage>, // clone
 }
 
-impl EventMessage {
-    pub fn new(seq: usize, event: Event) -> Self {
+impl<'a> EventMessage<'a> {
+    pub fn new(seq: usize, event: Event<'a>) -> Self {
         EventMessage { seq, event }
     }
 }
 
 /// Events sent between core and ui threads via EventMesssage encapsulation.
 #[derive(Debug, Clone)]
-pub enum Event {
+pub enum Event<'a> {
     /// Sent by ui thread. Request the rendering of a given view.
     UpdateViewEvent {
         width: usize,  // used to detect change
@@ -86,6 +87,13 @@ pub enum Event {
     /// Sent by ui thread. contains user input information.
     InputEvents {
         events: Vec<InputEvent>,
+    },
+
+    /// Sent core -> worker thread.
+    /// Saving the document's data is done in parallel in a thread.
+    /// The use can still browse the document.
+    SyncTask {
+        doc: Arc<RwLock<Document<'a>>>,
     },
 
     ApplicationQuitEvent,

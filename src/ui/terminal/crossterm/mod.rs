@@ -68,9 +68,9 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
 // }
 
 pub fn main_loop(
-    ui_rx: &Receiver<EventMessage>,
-    _ui_tx: &Sender<EventMessage>,
-    core_tx: &Sender<EventMessage>,
+    ui_rx: &Receiver<EventMessage<'static>>,
+    _ui_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) -> Result<()> {
     let mut seq: usize = 0;
 
@@ -762,8 +762,6 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
 
     let mut start = Instant::now();
     let mut prev_ev_time = start;
-
-    let mut _2event_diff = 0;
 
     let mut count = 0;
     loop {

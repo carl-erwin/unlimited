@@ -60,12 +60,12 @@ pub struct TextModeData {
     pub button_state: [u32; 8],
 }
 
-impl Mode for TextMode {
+impl<'a> Mode for TextMode {
     fn name(&self) -> &'static str {
         &"text-mode"
     }
 
-    fn build_action_map(&self) -> ActionMap {
+    fn build_action_map(&self) -> ActionMap<'static> {
         let mut map = ActionMap::new();
         Self::register_actions(&mut map);
         map
@@ -93,45 +93,24 @@ impl Mode for TextMode {
 }
 
 pub struct TextMode {
-    // reorder fields
-    pub center_on_mark_move: bool,
-    pub scroll_on_mark_move: bool,
-    pub text_codec: Box<dyn TextCodec>,
-
-    // TODO: in future version will be store marks in mapped_buffer meta data
-    pub mark_index: usize, // move to text mode
-    pub marks: Vec<Mark>,
-    pub select_point: Vec<Mark>,
-    pub copy_buffer: Vec<CopyData>,
-    pub button_state: [u32; 8],
+    // add common filed
 }
 
 impl TextMode {
     pub fn new() -> Self {
         dbg_println!("TextMode");
-
-        let marks = vec![Mark { offset: 0 }];
-        let copy_buffer = vec![];
-
-        TextMode {
-            center_on_mark_move: false, // add movement enums and pass it to center fn
-            scroll_on_mark_move: true,
-            text_codec: Box::new(utf8::Utf8Codec::new()),
-            marks,
-            copy_buffer,
-            mark_index: 0,
-            select_point: vec![],
-            button_state: [0; 8],
-        }
+        TextMode {}
     }
 
-    pub fn register_actions(mut map: &mut ActionMap) {
+    pub fn register_actions<'a>(mut map: &'a mut ActionMap<'a>) {
         register_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
+
         register_action(
             &mut map,
             "text-mode:move-marks-backward",
             move_marks_backward,
         );
+
         register_action(&mut map, "text-mode:move-marks-forward", move_marks_forward);
         register_action(
             &mut map,
@@ -241,8 +220,6 @@ impl TextMode {
         register_action(&mut map, "text-mode:cut-selection", cut_selection);
 
         register_action(&mut map, "editor:cancel", editor_cancel);
-
-        // TODO: handle conflicting bindings
     }
 }
 
@@ -321,7 +298,7 @@ pub fn run_text_mode_actions(
                 let v = &mut view.as_ref().borrow_mut();
                 let doc = v.document.clone();
                 let doc = doc.as_ref().unwrap();
-                let mut doc = doc.as_ref().borrow_mut();
+                let mut doc = doc.as_ref().write().unwrap();
                 let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
                 env.max_offset = doc.size() as u64;
@@ -339,7 +316,7 @@ pub fn run_text_mode_actions(
 
                 //
                 let doc = v.document.as_ref().unwrap();
-                let mut doc = doc.as_ref().borrow_mut();
+                let mut doc = doc.as_ref().write().unwrap();
                 doc.tag(env.max_offset, marks_offsets);
             }
 
@@ -362,7 +339,6 @@ pub fn save_marks(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<
 }
 
 pub fn cancel_marks(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    env.view_pre_render.push(Action::SaveCurrentMarks);
     env.view_pre_render.push(Action::ResetMarks);
 
     let v = &mut view.as_ref().borrow_mut();
@@ -423,6 +399,17 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
         }
     };
 
+    // doc read only ?
+    {
+        let v = view.as_ref().borrow();
+        let doc = v.document.clone();
+        let doc = doc.as_ref().unwrap();
+        let doc = doc.as_ref().read().unwrap();
+        if doc.is_syncing {
+            return;
+        }
+    }
+
     env.draw_marks = true;
 
     // delete selection before insert
@@ -436,7 +423,7 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
         {
             let mut doc = v.document.clone();
             let doc = doc.as_mut().unwrap();
-            let mut doc = doc.as_ref().borrow_mut();
+            let mut doc = doc.as_ref().write().unwrap();
 
             let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -508,7 +495,7 @@ pub fn remove_previous_codepoint(
     {
         let doc = v.document.clone(); // TODO: use Option<clone> to release imut boorow of v
         let doc = doc.as_ref().clone().unwrap();
-        let mut doc = doc.as_ref().borrow_mut();
+        let mut doc = doc.as_ref().write().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -573,7 +560,7 @@ pub fn undo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
@@ -602,7 +589,7 @@ pub fn redo(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>)
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let marks = &mut tm.marks;
@@ -637,7 +624,7 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
     {
         let mut doc = v.document.clone();
         let doc = doc.as_mut().unwrap();
-        let mut doc = doc.as_ref().borrow_mut();
+        let mut doc = doc.as_ref().write().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -690,7 +677,7 @@ pub fn remove_until_end_of_word(
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -784,7 +771,7 @@ pub fn move_marks_backward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
 
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().borrow();
+    let doc = doc.as_ref().read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -819,7 +806,7 @@ pub fn move_marks_forward(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
         //
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -864,7 +851,7 @@ pub fn move_marks_to_start_of_line(
     let screen = screen.read().unwrap();
 
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap().borrow();
+    let doc = doc.as_ref().unwrap().read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -893,7 +880,7 @@ pub fn move_marks_to_end_of_line(
     let screen = screen.read().unwrap();
 
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap().borrow();
+    let doc = doc.as_ref().unwrap().read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -967,7 +954,7 @@ fn move_mark_to_previous_line(
         let (start_offset, screen_width, screen_height) = {
             let start_offset = {
                 let doc = v.document.as_ref().unwrap();
-                let doc = doc.as_ref().borrow();
+                let doc = doc.as_ref().read().unwrap();
 
                 let tm = v.mode_ctx::<TextModeData>("text-mode");
 
@@ -1031,7 +1018,7 @@ fn move_mark_to_previous_line(
         // compute column
         let new_x = {
             let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
 
             let tm = v.mode_ctx::<TextModeData>("text-mode");
 
@@ -1053,7 +1040,7 @@ fn move_mark_to_previous_line(
 
         {
             let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
             let tm = v.mode_ctx::<TextModeData>("text-mode");
 
             let codec = tm.text_codec.as_ref();
@@ -1241,7 +1228,7 @@ pub fn move_mark_to_next_line(
         let start_offset = {
             let v = &view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
 
             let tm = v.mode_ctx::<TextModeData>("text-mode");
             let codec = tm.text_codec.as_ref();
@@ -1294,7 +1281,7 @@ pub fn move_mark_to_next_line(
         let new_x = {
             let v = &view.as_ref().borrow();
             let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
 
             let tm = v.mode_ctx::<TextModeData>("text-mode");
 
@@ -1324,7 +1311,7 @@ pub fn move_mark_to_next_line(
 
         let v = &view.as_ref().borrow();
         let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
 
         let tm = v.mode_ctx::<TextModeData>("text-mode");
 
@@ -1393,7 +1380,7 @@ fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
     let v = view.as_ref().borrow();
     let doc = v.document.clone();
     let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().borrow_mut();
+    let doc = doc.as_ref().read().unwrap();
 
     // ctx
     let tm = v.mode_ctx::<TextModeData>("text-mode");
@@ -1647,7 +1634,7 @@ pub fn clone_and_move_mark_to_next_line(
 
         // doc
         let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
         env.max_offset = doc.size() as u64;
 
         mark_len
@@ -1787,7 +1774,7 @@ pub fn move_mark_to_end_of_file(
 
     let offset = {
         let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
         doc.size() as u64
     };
     v.start_offset = offset;
@@ -1822,7 +1809,7 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -1887,7 +1874,7 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -1966,7 +1953,7 @@ pub fn move_to_token_start(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
 
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -2002,7 +1989,7 @@ pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
 
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().borrow();
+        let doc = doc.as_ref().read().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
         let codec = tm.text_codec.as_ref();
@@ -2027,7 +2014,7 @@ pub fn move_to_token_end(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
     }
 }
 
-fn get_main_mark_offset(view: &View) -> u64 {
+fn _get_main_mark_offset(view: &View) -> u64 {
     let tm = view.mode_ctx::<TextModeData>("text-mode");
     tm.marks[tm.mark_index].offset
 }
@@ -2073,7 +2060,7 @@ pub fn copy_maybe_remove_selection_symetric(
     // doc
     let doc = v.document.clone();
     let doc = doc.as_ref().clone().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
+    let mut doc = doc.as_ref().write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeData>("text-mode");
 
@@ -2390,7 +2377,7 @@ pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc
         let mut v = view.as_ref().borrow_mut();
         let offset = {
             let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 

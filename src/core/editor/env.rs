@@ -78,6 +78,7 @@ use std::marker::PhantomData;
 // kbr macro recording
 pub struct EditorEnv<'a> {
     phantom: PhantomData<&'a u8>,
+
     pub graphic_display: bool,
 
     pub quit: bool,
@@ -86,7 +87,7 @@ pub struct EditorEnv<'a> {
     /// and the ui must be refresh
     pub event_processed: bool,
 
-    pub action_map: ActionMap, // ref to current focused widget ?
+    pub action_map: ActionMap<'static>, // ref to current focused widget ?
 
     pub input_map: Rc<RefCell<InputEventMap>>,
     pub current_node: Option<Rc<InputEventRule>>,

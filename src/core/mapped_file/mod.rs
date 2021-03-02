@@ -22,6 +22,8 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::slice;
 
+use std::sync::{Arc, RwLock};
+
 const DEBUG: bool = false;
 
 use self::libc::{
@@ -111,7 +113,7 @@ type NodeIndex = usize;
 type NodeSize = u64;
 type NodeLocalOffset = u64;
 
-pub type FileHandle<'a> = Rc<RefCell<MappedFile<'a>>>;
+pub type FileHandle<'a> = Arc<RwLock<MappedFile<'a>>>;
 pub type FileIterator<'a> = MappedFileIterator<'a>;
 
 #[derive(Debug, Clone, Default)]
@@ -120,7 +122,7 @@ struct Node {
     used: bool,
     to_delete: bool,
 
-    fd: c_int,
+    fd: c_int, // TODO: Windows handle / cfg
 
     // idx: NodeIndex, // for DEBUG
     parent: Option<NodeIndex>,
@@ -383,7 +385,7 @@ impl<'a> MappedFile<'a> {
         };
 
         if file_size == 0 {
-            return Some(Rc::new(RefCell::new(file)));
+            return Some(Arc::new(RwLock::new(file)));
         }
 
         let root_node = Node {
@@ -439,7 +441,7 @@ impl<'a> MappedFile<'a> {
 
         MappedFile::check_tree(&mut HashSet::new(), file.root_index, &file.pool);
 
-        Some(Rc::new(RefCell::new(file)))
+        Some(Arc::new(RwLock::new(file)))
     }
 
     pub fn size(&self) -> u64 {
@@ -448,6 +450,12 @@ impl<'a> MappedFile<'a> {
         } else {
             0
         }
+    }
+
+    pub fn swap_fd(&mut self, fd: i32) {
+        let old_fd = self.fd;
+        unsafe { close(old_fd) };
+        self.fd = fd;
     }
 
     fn link_prev_next_nodes(
@@ -712,13 +720,13 @@ impl<'a> MappedFile<'a> {
     // creates an iterator over an arbitrary node index
     // always start @ local_offset 0
     pub fn iter_from_node_index(file_: &FileHandle<'a>, node_idx: NodeIndex) -> FileIterator<'a> {
-        let file = file_.borrow_mut();
+        let file = file_.write().unwrap();
 
         let page = file.pool[node_idx as usize].page.upgrade().unwrap();
         let slice = page.as_ref().borrow_mut().as_slice().unwrap();
 
         MappedFileIterator::Real(IteratorInstance {
-            file: Rc::clone(file_),
+            file: Arc::clone(file_),
             file_size: file.size(),
             local_offset: 0,
             page_size: file.pool[node_idx as usize].size,
@@ -729,7 +737,7 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn iter_from(file_: &FileHandle<'a>, offset: u64) -> FileIterator<'a> {
-        let mut file = file_.borrow_mut();
+        let mut file = file_.write().unwrap();
 
         let pair = if file.size() == 0 {
             (None, 0, 0)
@@ -743,7 +751,7 @@ impl<'a> MappedFile<'a> {
                 let slice = page.as_ref().borrow_mut().as_slice().unwrap();
 
                 MappedFileIterator::Real(IteratorInstance {
-                    file: Rc::clone(file_),
+                    file: Arc::clone(file_),
                     file_size: file.size(),
                     local_offset,
                     page_size: node_size,
@@ -753,7 +761,7 @@ impl<'a> MappedFile<'a> {
                 })
             }
 
-            (None, _, _) => MappedFileIterator::End(Rc::clone(file_)),
+            (None, _, _) => MappedFileIterator::End(Arc::clone(file_)),
         }
     }
 
@@ -916,7 +924,7 @@ impl<'a> MappedFile<'a> {
         // check iterator type
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
             MappedFileIterator::End(ref rcfile) => {
-                let mut file = rcfile.as_ref().borrow_mut();
+                let mut file = rcfile.as_ref().write().unwrap();
 
                 MappedFile::print_all_used_nodes(&file, "BEFORE INSERT - @ eof");
 
@@ -940,7 +948,7 @@ impl<'a> MappedFile<'a> {
 
         if DEBUG {
             let rcfile = it_.get_file();
-            let file = rcfile.as_ref().borrow_mut();
+            let file = rcfile.as_ref().write().unwrap();
 
             MappedFile::print_all_used_nodes(&file, "BEFORE INSERT");
         }
@@ -966,7 +974,7 @@ impl<'a> MappedFile<'a> {
 
             // update parents
             let rcfile = it_.get_file();
-            let mut file = rcfile.as_ref().borrow_mut();
+            let mut file = rcfile.as_ref().write().unwrap();
             MappedFile::update_hierarchy(
                 &mut file.pool,
                 node_to_split,
@@ -988,7 +996,7 @@ impl<'a> MappedFile<'a> {
         }
 
         let rcfile = it_.get_file();
-        let mut file = rcfile.as_ref().borrow_mut();
+        let mut file = rcfile.as_ref().write().unwrap();
 
         let base_offset = match node_to_split {
             Some(idx) => file.pool[idx as usize].storage_offset.unwrap_or(0),
@@ -1235,9 +1243,11 @@ impl<'a> MappedFile<'a> {
         let (mut file, start_idx, mut local_offset) = match &mut *it_ {
             MappedFileIterator::End(..) => return 0,
 
-            MappedFileIterator::Real(ref it) => {
-                (it.file.as_ref().borrow_mut(), it.node_idx, it.local_offset)
-            }
+            MappedFileIterator::Real(ref it) => (
+                it.file.as_ref().write().unwrap(),
+                it.node_idx,
+                it.local_offset,
+            ),
         };
 
         MappedFile::print_all_used_nodes(&file, "remove : BEFORE deletion");
@@ -1841,9 +1851,7 @@ impl<'a> MappedFile<'a> {
 
         fs::rename(&tmp_file_name, &rename_file_name)?;
 
-        let old_fd = file.fd;
-        unsafe { close(old_fd) };
-        file.fd = fd;
+        file.swap_fd(fd);
 
         Ok(())
     }
@@ -1866,8 +1874,8 @@ impl<'a> MappedFileIterator<'a> {
 
     fn get_file(&mut self) -> FileHandle<'a> {
         match *self {
-            MappedFileIterator::End(ref file) => Rc::clone(file),
-            MappedFileIterator::Real(ref it) => Rc::clone(&it.file),
+            MappedFileIterator::End(ref file) => Arc::clone(file),
+            MappedFileIterator::Real(ref it) => Arc::clone(&it.file),
         }
     }
 }
@@ -1902,7 +1910,7 @@ impl<'a> Iterator for MappedFileIterator<'a> {
 
             MappedFileIterator::Real(ref mut it) => {
                 if it.local_offset == it.page_size {
-                    let mut file = it.file.borrow_mut();
+                    let mut file = it.file.write().unwrap();
 
                     let next_node_idx = {
                         let node = &mut file.pool[it.node_idx as usize];
@@ -1930,7 +1938,7 @@ impl<'a> Iterator for MappedFileIterator<'a> {
                 it.local_offset += 1;
 
                 Some(MappedFileIterator::Real(IteratorInstance {
-                    file: Rc::clone(&it.file),
+                    file: Arc::clone(&it.file),
                     file_size: it.file_size,
                     node_idx: it.node_idx,
                     local_offset: it.local_offset - 1,
@@ -2075,7 +2083,7 @@ mod tests {
         let mut it = MappedFile::iter_from(&file, offset);
         MappedFile::remove(&mut it, nr_remove);
 
-        eprintln!("-- file.size() {}", file.as_ref().borrow().size());
+        eprintln!("-- file.size() {}", file.as_ref().read().unwrap().size());
         let _ = fs::remove_file("/tmp/playground_remove_test");
     }
 
@@ -2097,8 +2105,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().borrow_mut().sub_page_size = 1024 * 128;
-        file.as_ref().borrow_mut().sub_page_reserve = 1024 * 4;
+        file.as_ref().write().unwrap().sub_page_size = 1024 * 128;
+        file.as_ref().write().unwrap().sub_page_reserve = 1024 * 4;
 
         for i in 0..1_000_000 {
             {
@@ -2108,7 +2116,7 @@ mod tests {
             }
         }
 
-        eprintln!("-- file.size() {}", file.as_ref().borrow().size());
+        eprintln!("-- file.size() {}", file.as_ref().read().unwrap().size());
         let _ = fs::remove_file("/tmp/playground_insert_test");
     }
 
@@ -2152,8 +2160,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().borrow_mut().sub_page_size = 4096;
-        file.as_ref().borrow_mut().sub_page_reserve = 10;
+        file.as_ref().write().unwrap().sub_page_size = 4096;
+        file.as_ref().write().unwrap().sub_page_reserve = 10;
 
         for i in 0..5 {
             eprintln!("-- insert loop {}", i);
@@ -2168,13 +2176,13 @@ mod tests {
         }
 
         MappedFile::sync_to_disk(
-            &mut file.as_ref().borrow_mut(),
+            &mut file.as_ref().write().unwrap(),
             &"/tmp/mapped_file.sync_test",
             &"/tmp/mapped_file.sync_test.result",
         )
         .unwrap();
 
-        eprintln!("-- file.size() {}", file.as_ref().borrow().size());
+        eprintln!("-- file.size() {}", file.as_ref().read().unwrap().size());
 
         let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
         let _ = fs::remove_file("/tmp/playground_insert_test");

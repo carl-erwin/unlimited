@@ -1,6 +1,6 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::rc::Rc;
+use std::sync::Arc;
 use std::vec::Vec;
 
 /// The **BufferLog** holds all modifications applied to a given buffer
@@ -13,7 +13,7 @@ pub struct BufferLog {
 #[derive(Debug, Clone)]
 pub struct BufferOperation {
     pub op_type: BufferOperationType,
-    pub data: Option<Rc<Vec<u8>>>,
+    pub data: Option<Arc<Vec<u8>>>,
     pub offset: u64,
 }
 
@@ -33,7 +33,7 @@ impl BufferLog {
         &mut self,
         offset: u64,
         op_type: BufferOperationType,
-        data: Option<Rc<Vec<u8>>>,
+        data: Option<Arc<Vec<u8>>>,
     ) -> usize {
         let op = BufferOperation {
             op_type,
@@ -83,7 +83,7 @@ impl BufferOperation {
 
         BufferOperation {
             op_type,
-            data: self.data.clone(), // TODO: user Rc<> to share the data, depending on the data.size()
+            data: self.data.clone(), // TODO: user Arc<> to share the data, depending on the data.size()
             offset: self.offset,
         }
     }

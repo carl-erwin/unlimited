@@ -9,9 +9,9 @@ use crate::core::event::EventMessage;
 
 pub fn main_loop(
     ui_name: &str,
-    ui_rx: &Receiver<EventMessage>,
-    ui_tx: &Sender<EventMessage>,
-    core_tx: &Sender<EventMessage>,
+    ui_rx: &Receiver<EventMessage<'static>>,
+    ui_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) {
     // TODO: switch ui here
     match ui_name {

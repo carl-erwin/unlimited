@@ -24,8 +24,6 @@ use std::collections::HashMap;
 
 use crate::core::modes::text_mode::*;
 
-use crate::core::modes::TextMode;
-
 use super::layout;
 
 pub type Id = usize;
@@ -138,11 +136,11 @@ static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 // in future version marks will be stored in buffer meta data.<br/>
 // TODO editor.env.current.view_id = view.id
 // can zoom ?
-pub struct View<'a> {
+pub struct View<'v, 'a> {
     pub id: Id,
 
     // TODO: Option<Arc<RwLock<Document<'a>>>> : shared access with indexer
-    pub document: Option<Rc<RefCell<Document<'a>>>>, // if none and no children ... panic ?
+    pub document: Option<Arc<RwLock<Document<'a>>>>, // if none and no children ... panic ?
     pub mode_ctx: HashMap<String, Box<dyn Any>>,     // TODO: rename -> mode_ctx
     //
     pub screen: Arc<RwLock<Box<Screen>>>,
@@ -151,11 +149,11 @@ pub struct View<'a> {
     pub start_offset: u64, // where we want to start the rendering
     pub end_offset: u64,   // where the rendering stopped
     //
-    pub children: [Option<Rc<RefCell<View<'a>>>>; 2],
+    pub children: [Option<Rc<RefCell<View<'v, 'a>>>>; 2],
 }
 
-impl<'a> View<'a> {
-    pub fn document(&self) -> Option<Rc<RefCell<Document<'a>>>> {
+impl<'v, 'a> View<'v, 'a> {
+    pub fn document(&self) -> Option<Arc<RwLock<Document<'a>>>> {
         let doc = self.document.clone();
         let doc = doc?;
         Some(doc)
@@ -166,8 +164,8 @@ impl<'a> View<'a> {
         start_offset: u64,
         width: usize,
         height: usize,
-        document: Option<Rc<RefCell<Document<'a>>>>,
-    ) -> View<'a> {
+        document: Option<Arc<RwLock<Document<'a>>>>,
+    ) -> View<'v, 'a> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
 
         let id = VIEW_ID.fetch_add(1, Ordering::SeqCst);
@@ -187,7 +185,7 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn set_mode_ctx<'v>(&'v mut self, name: &str, ctx: Box<dyn Any>) -> bool {
+    pub fn set_mode_ctx(&mut self, name: &str, ctx: Box<dyn Any>) -> bool {
         let res = self.mode_ctx.insert(name.to_owned(), ctx);
         assert!(res.is_none());
         true
@@ -225,7 +223,7 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn get_view_at_mouse_position(&mut self, _x: i32, _y: i32) -> Option<&'a View<'a>> {
+    pub fn get_view_at_mouse_position(&mut self, _x: i32, _y: i32) -> Option<&'a View<'a, 'a>> {
         None
     }
 
@@ -244,7 +242,7 @@ impl<'a> View<'a> {
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
 
-        let max_offset = self.document().as_ref().unwrap().borrow().size();
+        let max_offset = self.document().as_ref().unwrap().read().unwrap().size();
 
         let tm = self.mode_ctx::<TextModeData>("text-mode");
 
@@ -277,7 +275,7 @@ impl<'a> View<'a> {
             let start_offset = self.start_offset;
             let doc = self.document.clone();
             let doc = doc.as_ref().unwrap();
-            let doc = doc.as_ref().borrow();
+            let doc = doc.as_ref().read().unwrap();
 
             let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
             let codec = tm.text_codec.as_ref();
@@ -316,7 +314,7 @@ impl<'a> View<'a> {
         // get start of line
         {
             let doc = self.document.clone();
-            let doc = doc.as_ref().unwrap().borrow();
+            let doc = doc.as_ref().unwrap().read().unwrap();
             let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
             let codec = tm.text_codec.as_ref();
             m.move_to_start_of_line(&doc, codec);
@@ -353,7 +351,7 @@ impl<'a> View<'a> {
         }
 
         let max_offset = {
-            let doc = self.document.as_ref().unwrap().borrow();
+            let doc = self.document.as_ref().unwrap().read().unwrap();
             doc.size() as u64
         };
 
@@ -431,7 +429,7 @@ impl<'a> View<'a> {
         let max_offset = {
             let doc = self.document.clone();
             let doc = doc.as_ref().unwrap();
-            let doc = doc.as_ref().borrow_mut();
+            let doc = doc.as_ref().read().unwrap();
 
             let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
             let codec = tm.text_codec.as_ref();
@@ -542,7 +540,7 @@ pub fn get_lines_offsets(
 ) -> Vec<(u64, u64)> {
     let doc = &view.as_ref().borrow();
     let doc = doc.document.as_ref().unwrap();
-    let doc = doc.as_ref().borrow_mut();
+    let doc = doc.as_ref().write().unwrap();
 
     let mut v = Vec::<(u64, u64)>::new();
 
@@ -648,7 +646,7 @@ pub fn compute_view_layout(
 
     let doc = v.document()?;
 
-    let max_offset = { doc.borrow().size() as u64 };
+    let max_offset = { doc.as_ref().read().unwrap().size() as u64 };
 
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
@@ -679,7 +677,7 @@ pub fn update_view(
     // refresh_env_variables(editor, env, view);
     {
         let v = &mut view.as_ref().borrow();
-        env.max_offset = v.document()?.borrow().size() as u64;
+        env.max_offset = v.document()?.read().unwrap().size() as u64;
     }
 
     // pre layout action == post input

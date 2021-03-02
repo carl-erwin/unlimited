@@ -27,7 +27,6 @@ use crate::core::mark::Mark;
 
 use crate::core::modes::text_mode::TextModeData; // TODO remove this impl details
 use crate::core::modes::Mode;
-use crate::core::modes::TextMode;
 
 use crate::core::screen::Screen;
 use crate::core::view;
@@ -39,7 +38,7 @@ use crate::core::view::View;
 // local
 
 pub type ModeFunction =
-    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) -> ();
+    fn(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View<'_, '_>>>) -> ();
 
 // ActionMap is kept in EditorEnv
 // TODO:
@@ -47,7 +46,7 @@ pub type ModeFunction =
 // and if eval fails, fallback to EditorEnv's
 // It will allow per mode actions instanciate for each view
 // transform into STACK of map ?
-pub type ActionMap = HashMap<String, ModeFunction>;
+pub type ActionMap<'a> = HashMap<String, ModeFunction>;
 
 //
 pub type RenderFunction = fn(
@@ -125,19 +124,30 @@ pub type Id = u64;
 */
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: HashMap<document::Id, Rc<RefCell<Document<'a>>>>,
-    pub view_map: Vec<(view::Id, Rc<RefCell<View<'a>>>)>,
+    pub document_map: HashMap<document::Id, Arc<RwLock<Document<'a>>>>,
+    pub view_map: Vec<(view::Id, Rc<RefCell<View<'a, 'a>>>)>,
     pub modes: HashMap<String, Box<dyn Mode>>,
+    pub core_tx: Sender<EventMessage<'a>>,
+    pub ui_tx: Sender<EventMessage<'a>>,
+    pub worker_tx: Sender<EventMessage<'a>>,
 }
 
 impl<'a> Editor<'a> {
     ///
-    pub fn new(config: Config) -> Editor<'a> {
+    pub fn new(
+        config: Config,
+        core_tx: Sender<EventMessage<'a>>,
+        ui_tx: Sender<EventMessage<'a>>,
+        worker_tx: Sender<EventMessage<'a>>,
+    ) -> Editor<'a> {
         Editor {
             config,
             document_map: HashMap::new(),
             view_map: Vec::new(),
             modes: HashMap::new(),
+            ui_tx,
+            core_tx,
+            worker_tx,
         }
     }
 
@@ -169,136 +179,15 @@ impl<'a> Editor<'a> {
             self.document_map.insert(id, b);
         }
     }
-
-    /// TODO: replace this by load/unload doc functions
-    /// the ui will open the documents on demand
-    pub fn load_files<'e>(&mut self, _env: &mut EditorEnv<'e>) {
-        let mut id = self.document_map.len() as u64;
-
-        for f in &self.config.files_list {
-            let b = DocumentBuilder::new()
-                .document_name(f)
-                .file_name(f)
-                .internal(false)
-                .finalize();
-
-            if let Some(b) = b {
-                self.document_map.insert(id, b);
-                id += 1;
-            }
-        }
-
-        // default buffer ?
-        if self.document_map.is_empty() {
-            // edit.get_untitled_count() -> 1
-
-            let b = DocumentBuilder::new()
-                .document_name("untitled-1")
-                .file_name("/dev/null")
-                .internal(false)
-                .finalize();
-            if let Some(b) = b {
-                self.document_map.insert(id, b);
-                id += 1;
-            }
-        }
-
-        dbg_println!("id {}", id);
-
-        // create default views
-        for doc_id in 0..self.document_map.len() {
-            let id = doc_id as u64;
-            let doc = self.document_map.get(&id);
-            if let Some(doc) = doc {
-                let view = View::new(0 as u64, 1, 1, Some(doc.clone()));
-                dbg_println!("create view id {}", view.id);
-                self.view_map.push((view.id, Rc::new(RefCell::new(view))));
-            }
-        }
-    }
-
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
         let name = mode.name();
         self.modes.insert(name.to_owned(), mode);
-    }
-
-    pub fn load_modes<'e>(&mut self, env: &mut EditorEnv<'e>) {
-        // set default mode(s)
-        self.register_mode(Box::new(TextMode::new()));
-
-        for (_name, mode) in self.modes.iter() {
-            // TOOD: pre/post input stage
-            // register_mode_input_stage(mode);
-            let action_map = mode.build_action_map();
-            for (k, v) in action_map {
-                env.action_map.insert(k.clone(), v.clone());
-            }
-
-            // TODO: pre/post "render" stage
-            // register render "stage" function
-            // let action_map = mode.build_render_stage_map();
-            // for (k, v) in action_map {
-            //     env.render_stage_map.insert(k.clone(), v.clone());
-            // }
-
-            // create view's mode context
-            // allocate per view ModeCtx shared between the stages
-            for (k, v) in self.view_map.iter() {
-                let mut v = v.borrow_mut();
-                let ctx = mode.alloc_ctx();
-                dbg_println!("v.id = {}", v.id);
-                v.set_mode_ctx(mode.name(), ctx);
-            }
-        }
-    }
-
-    // TODO: put in main_loop.rs
-    pub fn main_loop<'e>(
-        &mut self,
-        mut env: &mut EditorEnv<'e>,
-        core_rx: &Receiver<EventMessage>,
-        ui_tx: &Sender<EventMessage>,
-    ) {
-        let mut seq: usize = 0;
-
-        fn get_next_seq(seq: &mut usize) -> usize {
-            *seq += 1;
-            *seq
-        }
-
-        while !env.quit {
-            if let Ok(evt) = core_rx.recv() {
-                match evt.event {
-                    Event::ApplicationQuitEvent => {
-                        break;
-                    }
-
-                    Event::UpdateViewEvent { width, height } => {
-                        env.width = width;
-                        env.height = height;
-                        update_view_and_send_draw_event(self, &mut env, ui_tx);
-                    }
-
-                    Event::InputEvents { events } => {
-                        if !self.view_map.is_empty() {
-                            env.draw_marks = true;
-                            process_input_events(self, &mut env, &ui_tx, &events);
-                        }
-                    }
-
-                    _ => {}
-                }
-            }
-        }
-
-        // send ApplicationQuitEvent to ui thread
-        let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
-        ui_tx.send(msg).unwrap_or(());
     }
 }
 
 //////////////////////////////////////////////
 
+// TODO: handle conflicting bindings
 pub fn register_action(map: &mut ActionMap, s: &str, func: ModeFunction) {
     map.insert(s.to_string(), func);
 }
@@ -459,9 +348,9 @@ pub fn send_draw_event(
     ui_tx.send(msg).unwrap_or(());
 }
 
-fn process_input_event(
-    editor: &mut Editor,
-    mut env: &mut EditorEnv,
+fn process_input_event<'a>(
+    editor: &'a mut Editor<'static>,
+    mut env: &'a mut EditorEnv<'static>,
     view_id: usize,
     ev: &InputEvent,
 ) -> bool {
@@ -547,8 +436,8 @@ process_input_events(&mut editor, &mut env, &ui_tx, &events);
 
 */
 fn process_input_events(
-    mut editor: &mut Editor,
-    mut env: &mut EditorEnv,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
     ui_tx: &Sender<EventMessage>,
     events: &Vec<InputEvent>,
 ) {
@@ -602,7 +491,7 @@ fn process_input_events(
 pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &view.as_ref().borrow();
     let doc = v.document.as_ref().unwrap();
-    let doc = doc.as_ref().borrow();
+    let doc = doc.as_ref().read().unwrap();
 
     if !doc.changed {
         env.quit = true;
@@ -618,16 +507,45 @@ pub fn application_quit_abort(
     env.quit = true;
 }
 
-pub fn save_document(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = view.as_ref().borrow_mut();
-    let doc = v.document.as_ref().unwrap();
-    let mut doc = doc.as_ref().borrow_mut();
 
-    let _ = doc.sync_to_disk().is_ok(); // ->  operation ok
+    let doc_id = {
+        let doc = v.document.as_ref().unwrap();
+        {
+            let doc = doc.as_ref().read().unwrap();
+            if doc.is_syncing {
+                // sync is pending
+                // TODO: lock all doc....write()
+                return;
+            }
+        }
+
+        {
+            let mut doc = doc.as_ref().write().unwrap();
+            let doc_id = doc.id;
+            doc.is_syncing = true;
+            doc_id
+        }
+    };
+
+    // NB: We must take the doc clone from Editor not View
+    // because of lifetime(editor) > lifetime(view)
+    // and view.doc is a clone from editor.document_map,
+    // or else error  "data from `view` flows into `editor`"
+    if let Some(doc) = editor.document_map.get(&doc_id) {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::SyncTask {
+                doc: Arc::clone(doc),
+            },
+        };
+        editor.worker_tx.send(msg).unwrap_or(());
+    }
 }
 
 // TODO: CoreMode ? quit/force-quit
-pub fn build_core_action_map() -> ActionMap {
+pub fn build_core_action_map<'a>() -> ActionMap<'a> {
     let mut map: ActionMap = HashMap::new();
 
     // core
@@ -638,8 +556,6 @@ pub fn build_core_action_map() -> ActionMap {
 
     map
 }
-
-use std::any::Any;
 
 pub fn split_vertically(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = view.as_ref().borrow_mut();
@@ -689,4 +605,48 @@ pub fn split_vertically(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<Re
     };
     v.children[0] = Some(Rc::new(RefCell::new(left_view)));
     */
+}
+
+// TODO: put in main_loop.rs
+pub fn main_loop(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    core_rx: &Receiver<EventMessage<'static>>,
+    ui_tx: &Sender<EventMessage<'static>>,
+) {
+    let mut seq: usize = 0;
+
+    fn get_next_seq(seq: &mut usize) -> usize {
+        *seq += 1;
+        *seq
+    }
+
+    while !env.quit {
+        if let Ok(evt) = core_rx.recv() {
+            match evt.event {
+                Event::UpdateViewEvent { width, height } => {
+                    env.width = width;
+                    env.height = height;
+                    update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
+                }
+
+                Event::InputEvents { events } => {
+                    if !editor.view_map.is_empty() {
+                        env.draw_marks = true;
+                        process_input_events(&mut editor, &mut env, &ui_tx, &events);
+                    }
+                }
+
+                _ => {}
+            }
+        }
+    }
+
+    // send ApplicationQuitEvent to worker thread
+    let msg = EventMessage::new(0, Event::ApplicationQuitEvent);
+    editor.worker_tx.send(msg).unwrap_or(());
+
+    // send ApplicationQuitEvent to ui thread
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+    ui_tx.send(msg).unwrap_or(());
 }

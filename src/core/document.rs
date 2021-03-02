@@ -1,8 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
-//
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 //
 
@@ -63,7 +62,7 @@ impl DocumentBuilder {
     }
 
     ///
-    pub fn finalize<'a>(&self) -> Option<Rc<RefCell<Document<'a>>>> {
+    pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'a>>>> {
         let buffer = Buffer::new(&self.file_name, self.mode.clone())?;
 
         let mut doc = Document {
@@ -72,11 +71,12 @@ impl DocumentBuilder {
             buffer,
             buffer_log: BufferLog::new(),
             changed: false,
+            is_syncing: false,
         };
 
         doc.tag(0, vec![0]); // TODO: move to TextMode
 
-        Some(Rc::new(RefCell::new(doc)))
+        Some(Arc::new(RwLock::new(doc)))
     }
 }
 
@@ -87,16 +87,31 @@ pub struct Document<'a> {
     buffer: Buffer<'a>,
     pub buffer_log: BufferLog,
     pub changed: bool,
+    pub is_syncing: bool,
 }
 
+// NB: doc MUST be wrapped in Arc<RwLock<XXX>>
+unsafe impl<'a> Send for Document<'a> {}
+unsafe impl<'a> Sync for Document<'a> {}
+
 impl<'a> Document<'a> {
+    // TODO: remove this ?
     pub fn sync_to_disk(&mut self) -> ::std::io::Result<()> {
         let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
+        self.is_syncing = true;
         self.buffer.sync_to_disk(&tmp_file_name).unwrap();
         self.changed = false;
-
+        self.is_syncing = false;
         Ok(())
+    }
+
+    pub fn file_name(&self) -> String {
+        self.buffer.file_name.clone()
+    }
+
+    pub fn swap_buffer_fd(&mut self, fd: i32) {
+        self.buffer.data.as_ref().write().unwrap().swap_fd(fd);
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
@@ -139,7 +154,7 @@ impl<'a> Document<'a> {
         let op = &self.buffer_log.data[pos];
         match op.op_type {
             BufferOperationType::Tag { ref marks } => {
-                Some(marks.clone()) // TODO: Rc<Vec<u64>>
+                Some(marks.clone()) // TODO: Arc<Vec<u64>>
             }
             _ => None,
         }
@@ -152,8 +167,11 @@ impl<'a> Document<'a> {
         let mut ins_data = Vec::with_capacity(nr_bytes);
         ins_data.extend(&data[..nr_bytes]);
 
-        self.buffer_log
-            .add(offset, BufferOperationType::Insert, Some(Rc::new(ins_data)));
+        self.buffer_log.add(
+            offset,
+            BufferOperationType::Insert,
+            Some(Arc::new(ins_data)),
+        );
 
         let sz = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
         if sz > 0 {
@@ -180,7 +198,7 @@ impl<'a> Document<'a> {
         }
 
         self.buffer_log
-            .add(offset, BufferOperationType::Remove, Some(Rc::new(rm_data)));
+            .add(offset, BufferOperationType::Remove, Some(Arc::new(rm_data)));
         if nr_bytes_removed > 0 {
             self.changed = true;
         }
@@ -325,6 +343,89 @@ impl<'a> Document<'a> {
     }
 }
 
+// helper
+
+use std::ffi::CString;
+
+extern crate libc;
+use self::libc::{c_void, close, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR, S_IWUSR};
+
+// TODO:
+pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
+    const UNLIMITED_SYNC_BLOCK_SIZE: usize = 4096 * 256;
+
+    let block_size = match std::env::var("UNLIMITED_SYNC_BLOCK_SIZE") {
+        Ok(val) => val.trim_end().parse::<usize>().unwrap_or(UNLIMITED_SYNC_BLOCK_SIZE),
+        Err(_) => UNLIMITED_SYNC_BLOCK_SIZE,
+    };
+
+    // read/copy
+    let fd = {
+        let doc = doc.as_ref().read().unwrap();
+
+        let tmp_file_ext = "bak"; // TODO: move to global config
+        let tmp_file_name = format!("{}.{}", doc.file_name(), tmp_file_ext);
+
+        let path = CString::new(tmp_file_name).unwrap();
+        unsafe { unlink(path.as_ptr()) };
+        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
+        if fd < 0 {
+            // LOG CANNOT SAVE XXX
+            dbg_println!("cannot save {}", doc.file_name());
+            return;
+        }
+
+        //
+        let size = doc.size();
+        let mut pos = 0;
+        let mut data = Vec::with_capacity(block_size);
+        while pos < size {
+            data.clear();
+            let _rd = doc.read(pos as u64, data.capacity(), &mut data);
+            let nw = unsafe { write(fd, data.as_ptr() as *mut c_void, data.len()) };
+            if nw < 0 {
+                // LOG CANNOT SAVE XXX
+                dbg_println!("cannot save {}", doc.file_name());
+                return;
+            }
+            pos += nw as usize;
+        }
+
+        fd
+    };
+
+    // update
+    {
+        let mut doc = doc.as_ref().write().unwrap();
+
+        let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
+        let perms = metadata.permissions();
+
+        let tmp_file_ext = "bak"; // TODO: move to global config
+        let tmp_file_name = format!("{}.{}", doc.file_name(), tmp_file_ext);
+
+        let _ = ::std::fs::rename(&tmp_file_name, &doc.file_name());
+
+        // FIXME: fd swapping will not work.
+        // we must check all leaves
+        // refresh every page offset/size
+        // unmap/remap pages with correct alignment
+        // redo all indexing ...
+        // doc.swap_buffer_fd(fd);
+        // We still reference the old fs blocks instance ...
+        unsafe {
+            close(fd);
+        }
+
+        // TODO: check result, handle io results properly
+        // set buffer status to : permission denied etc
+        let _ = ::std::fs::set_permissions(&doc.file_name(), perms);
+
+        doc.changed = false;
+        doc.is_syncing = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -335,13 +436,13 @@ mod tests {
 
     #[test]
     fn undo_redo() {
-        let mut doc = DocumentBuilder::new()
+        let doc = DocumentBuilder::new()
             .document_name("untitled-1")
             .file_name("/dev/null")
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_mut().unwrap().borrow_mut();
+        let mut doc = doc.as_ref().unwrap().write().unwrap();
 
         const STR_LEN: usize = 1000;
 
@@ -396,13 +497,13 @@ mod tests {
 
     #[test]
     fn doc_random_size_inserts() {
-        let mut doc = DocumentBuilder::new()
+        let doc = DocumentBuilder::new()
             .document_name("untitled-1")
             .file_name("/dev/null")
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_mut().unwrap().borrow_mut();
+        let mut doc = doc.as_ref().unwrap().write().unwrap();
 
         const NB_STR: usize = 10000;
 

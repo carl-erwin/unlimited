@@ -1,6 +1,7 @@
 Cargo.lock
 target/
 *.bk
+*.bak
 *~
 perf*
 *.cflags
