@@ -2137,6 +2137,10 @@ pub fn copy_maybe_remove_selection_symetric(
             assert_eq!(nr_removed, data_size);
             shrink += data_size as u64;
             nr_bytes_removed += data_size;
+
+            if m.offset > tm.select_point[idx].offset {
+                m.offset = m.offset.saturating_sub(nr_bytes_removed as u64);
+            }
         }
     }
 
