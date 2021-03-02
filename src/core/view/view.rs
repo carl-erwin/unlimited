@@ -244,7 +244,7 @@ impl<'v, 'a> View<'v, 'a> {
 
         let max_offset = self.document().as_ref().unwrap().read().unwrap().size();
 
-        let tm = self.mode_ctx::<TextModeData>("text-mode");
+        let tm = self.mode_ctx::<TextModeContext>("text-mode");
 
         let marks = &tm.marks;
         for m in marks.iter() {
@@ -277,7 +277,7 @@ impl<'v, 'a> View<'v, 'a> {
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().read().unwrap();
 
-            let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
+            let tm = self.mode_ctx_mut::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
 
             let mut tmp = Mark::new(start_offset);
@@ -315,7 +315,7 @@ impl<'v, 'a> View<'v, 'a> {
         {
             let doc = self.document.clone();
             let doc = doc.as_ref().unwrap().read().unwrap();
-            let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
+            let tm = self.mode_ctx_mut::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
             m.move_to_start_of_line(&doc, codec);
         }
@@ -431,7 +431,7 @@ impl<'v, 'a> View<'v, 'a> {
             let doc = doc.as_ref().unwrap();
             let doc = doc.as_ref().read().unwrap();
 
-            let tm = self.mode_ctx_mut::<TextModeData>("text-mode");
+            let tm = self.mode_ctx_mut::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
 
             // get start of the line @offset
@@ -549,7 +549,7 @@ pub fn get_lines_offsets(
     // get start of the line @offset
     {
         let v = &view.as_ref().borrow();
-        let tm = v.mode_ctx::<TextModeData>("text-mode");
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
@@ -651,7 +651,7 @@ pub fn compute_view_layout(
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
-    let tm = v.mode_ctx::<TextModeData>("text-mode");
+    let tm = v.mode_ctx::<TextModeContext>("text-mode");
     let main_mark = tm.marks[tm.mark_index].clone();
 
     run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen, main_mark);

@@ -28,7 +28,7 @@ use crate::core::event::KeyModifiers;
 
 use crate::core::mark::Mark;
 
-use crate::core::modes::text_mode::TextModeData; // TODO remove this impl details
+use crate::core::modes::text_mode::TextModeContext; // TODO remove this impl details
 use crate::core::modes::Mode;
 
 use crate::core::screen::Screen;
@@ -329,7 +329,7 @@ pub fn send_draw_event(
     view: &Rc<RefCell<View>>,
 ) {
     let view = view.as_ref().borrow();
-    let tm = view.mode_ctx::<TextModeData>("text-mode");
+    let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
     // TODO: REMOVE THIS:
     // add mark filter before screen

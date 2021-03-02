@@ -22,7 +22,7 @@ use crate::core::editor::EditorEnv;
 use crate::core::mark::Mark;
 use crate::core::view::View;
 
-use crate::core::modes::text_mode::TextModeData; // TODO remove this impl details
+use crate::core::modes::text_mode::TextModeContext; // TODO remove this impl details
 
 //
 pub struct LayoutEnv<'a> {
@@ -640,7 +640,7 @@ use crate::sort_tuple_pair;
 
 impl HighlightSelectionFilter {
     fn new(env: &LayoutEnv, view: &View) -> Self {
-        let tm = view.mode_ctx::<TextModeData>("text-mode");
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
         // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
         let min = env.main_mark.offset; // << remove this use tm.mark_index
@@ -1156,7 +1156,7 @@ pub fn run_view_render_filters_direct(
         filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
 
         // TODO: find a way to unify filter signature and ActionMap callbacks
-        let tm = view.mode_ctx::<TextModeData>("text-mode");
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
         if tm.select_point.len() > 0 {
             filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
         }
