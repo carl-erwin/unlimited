@@ -467,7 +467,7 @@ impl Filter<'_> for TabFilter {
     fn run(
         &mut self,
         _view: &View,
-        _env: &mut LayoutEnv,
+        env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
@@ -489,7 +489,13 @@ impl Filter<'_> for TabFilter {
                         let padding = tab_size - (self.column_count % tab_size);
 
                         for _ in 0..padding {
-                            let new_io = FilterIoData::replace_codepoint(io, ' ');
+                            let mut new_io = FilterIoData::replace_codepoint(io, ' ');
+                            if env.graphic_display {
+                                new_io.color = (242, 71, 132); // purple-like
+                            } else {
+                                new_io.color = (128, 0, 128); // magenta
+                            }
+
                             filter_out.push(new_io);
                             self.column_count += 1;
                         }
