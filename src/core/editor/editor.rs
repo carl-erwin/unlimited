@@ -339,15 +339,6 @@ pub fn send_draw_event(
     let view = view.borrow();
     let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
-    // TODO: REMOVE THIS:
-    // add mark filter before screen
-    // render marks here for now
-    refresh_screen_marks(
-        &mut view.screen.write().as_mut().unwrap(),
-        &tm.marks,
-        env.draw_marks,
-    );
-
     let new_screen = Arc::clone(&view.screen);
 
     let msg = EventMessage::new(

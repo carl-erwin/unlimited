@@ -21,7 +21,9 @@ use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::screen::Screen;
 
+use crate::core::editor;
 use crate::core::editor::EditorEnv;
+
 use crate::core::mark::Mark;
 use crate::core::view;
 use crate::core::view::View;
@@ -1239,7 +1241,6 @@ pub fn run_view_render_filters_direct(
                 child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
             }
 
-
             let child_screen = child_v.screen.as_ref().read().unwrap();
 
             if idx == 0 {
@@ -1326,6 +1327,12 @@ pub fn run_view_render_filters_direct(
 
     for f in &mut filters {
         f.finish(&view, &mut layout_env);
+    }
+
+    {
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        let marks = &tm.marks;
+        editor::refresh_screen_marks(&mut layout_env.screen, marks, true);
     }
 
     // update/return screen start offset
