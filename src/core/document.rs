@@ -1,9 +1,10 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::sync::Arc;
 use std::sync::RwLock;
+use std::{borrow::BorrowMut, sync::Arc};
 
 //
+use crate::core::editor::user_is_active;
 
 use crate::core::buffer::Buffer;
 pub use crate::core::buffer::OpenMode;
@@ -96,11 +97,11 @@ unsafe impl<'a> Sync for Document<'a> {}
 
 impl<'a> Document<'a> {
     // TODO: remove this ?
-    pub fn sync_to_disk(&mut self) -> ::std::io::Result<()> {
-        let tmp_file_ext = "unlimited.bk"; // TODO: move to global config
+    pub fn sync_to_storage(&mut self) -> ::std::io::Result<()> {
+        let tmp_file_ext = "update"; // TODO: move to global config
         let tmp_file_name = format!("{}.{}", self.buffer.file_name, tmp_file_ext);
         self.is_syncing = true;
-        self.buffer.sync_to_disk(&tmp_file_name).unwrap();
+        self.buffer.sync_to_storage(&tmp_file_name).unwrap();
         self.changed = false;
         self.is_syncing = false;
         Ok(())
@@ -108,10 +109,6 @@ impl<'a> Document<'a> {
 
     pub fn file_name(&self) -> String {
         self.buffer.file_name.clone()
-    }
-
-    pub fn swap_buffer_fd(&mut self, fd: i32) {
-        self.buffer.data.as_ref().write().unwrap().swap_fd(fd);
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
@@ -363,39 +360,68 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     };
 
     // read/copy
-    let fd = {
-        let doc = doc.as_ref().read().unwrap();
-
-        let tmp_file_ext = "bak"; // TODO: move to global config
-        let tmp_file_name = format!("{}.{}", doc.file_name(), tmp_file_ext);
+    let mut fd = -1;
+    {
+        let doc = doc.read().unwrap();
+        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move to global config
 
         let path = CString::new(tmp_file_name).unwrap();
         unsafe { unlink(path.as_ptr()) };
-        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
+        fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
         if fd < 0 {
             // LOG CANNOT SAVE XXX
             dbg_println!("cannot save {}", doc.file_name());
             return;
         }
+    }
 
-        //
-        let size = doc.size();
-        let mut pos = 0;
-        let mut data = Vec::with_capacity(block_size);
-        while pos < size {
-            data.clear();
-            let _rd = doc.read(pos as u64, data.capacity(), &mut data);
-            let nw = unsafe { write(fd, data.as_ptr() as *mut c_void, data.len()) };
-            if nw < 0 {
-                // LOG CANNOT SAVE XXX
-                dbg_println!("cannot save {}", doc.file_name());
+    let mut idx = None;
+    {
+        let doc = doc.read().unwrap();
+        idx = {
+            let file = doc.buffer.data.read().unwrap();
+            let (node_index, _, _) = file.find_node_by_offset(0);
+            if node_index.is_none() {
                 return;
+            };
+            node_index
+        };
+    }
+
+    while idx != None {
+        // do not hold the doc.lock more
+        {
+            let doc = doc.read().unwrap();
+            let file = doc.buffer.data.read().unwrap();
+            let node = &file.pool[idx.unwrap()];
+
+            let mut data = Vec::with_capacity(node.size as usize);
+            unsafe {
+                data.set_len(data.capacity());
+            };
+
+            if let Some(n) = node.do_direct_copy(&mut data) {
+                let nw = unsafe { write(fd, data.as_ptr() as *mut c_void, n) };
+                if nw < 0 {
+                    dbg_println!("cannot save {}", doc.file_name());
+                    panic!("");
+                    // return false;
+                }
+                // dbg_println!("sync doc('{}') node {}", doc.file_name(), idx.unwrap());
+            } else {
+                panic!("direct copy failed");
             }
-            pos += nw as usize;
+
+            idx = node.next;
         }
 
-        fd
-    };
+        // NB: experimental throttling based on use input freq/rendering
+        // TODO <-- user configuration
+        if user_is_active() == true {
+            let wait = std::time::Duration::from_millis(16);
+            std::thread::sleep(wait);
+        }
+    }
 
     // update
     {
@@ -404,21 +430,24 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
         let perms = metadata.permissions();
 
-        let tmp_file_ext = "bak"; // TODO: move to global config
-        let tmp_file_name = format!("{}.{}", doc.file_name(), tmp_file_ext);
+        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move '.update' to global config
+
+        {
+            // TODO: large file warning in save ? disable backup ?
+            let _tmp_backup_name = format!("{}{}", doc.file_name(), "~");
+            // TODO: move '~' to global config
+            // let _ = ::std::fs::rename(&doc.file_name(), &tmp_backup_name);
+        }
 
         let _ = ::std::fs::rename(&tmp_file_name, &doc.file_name());
 
-        // FIXME: fd swapping will not work.
-        // we must check all leaves
-        // refresh every page offset/size
-        // unmap/remap pages with correct alignment
-        // redo all indexing ...
-        // doc.swap_buffer_fd(fd);
-        // We still reference the old fs blocks instance ...
-        unsafe {
-            close(fd);
-        }
+        // TODO: handle skip with ReadOnly
+        let mapped_file = doc.buffer.data.clone();
+        let mut mapped_file = mapped_file.write().unwrap();
+        crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
+            &mut mapped_file,
+            fd,
+        );
 
         // TODO: check result, handle io results properly
         // set buffer status to : permission denied etc

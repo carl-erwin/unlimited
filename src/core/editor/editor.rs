@@ -726,14 +726,19 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
     let doc_id = {
         let doc = v.document.as_ref().unwrap();
         {
+            // - needed ? already syncing ? -
             let doc = doc.as_ref().read().unwrap();
-            if doc.is_syncing {
-                // sync is pending
-                // TODO: lock all doc....write()
+            if !doc.changed || doc.is_syncing {
+                // TODO: ensure all over places are checking this flag, all doc....write()
+                // better, some permissions mechanism ?
+                // doc.access_permissions = r-
+                // doc.access_permissions = -w
+                // doc.access_permissions = rw
                 return;
             }
         }
 
+        // - set sync flag -
         {
             let mut doc = doc.as_ref().write().unwrap();
             let doc_id = doc.id;
@@ -742,10 +747,13 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
         }
     };
 
+    // - send sync job to worker -
+    //
     // NB: We must take the doc clone from Editor not View
     // because of lifetime(editor) > lifetime(view)
     // and view.doc is a clone from editor.document_map,
-    // or else error  "data from `view` flows into `editor`"
+    // doing this let us avoid the use manual lifetime annotations ('static)
+    // and errors like "data from `view` flows into `editor`"
     if let Some(doc) = editor.document_map.get(&doc_id) {
         let msg = EventMessage {
             seq: 0,

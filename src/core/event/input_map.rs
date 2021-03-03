@@ -11,7 +11,7 @@ use super::*;
 pub static DEFAULT_INPUT_MAP: &str = r#"[{
     "events": [
 
-       { "in": [{ "key": "F9"     }],                        "action": "text-mode:display-end-of-line" },
+       { "in": [{ "key": "F9"     }],                          "action": "text-mode:display-end-of-line" },
 
        { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
@@ -72,11 +72,10 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "button-release": "1"  }],                   "action": "text-mode:ignore" },
 
 
+       { "in": [{ "key": "ctrl+Space" } ],                     "action": "text-mode:set-select-point-at-mark" },
 
-       { "in": [{ "key": "ctrl+Space" } ],                       "action": "text-mode:set-select-point-at-mark" },
-
-       { "in": [{ "key": "alt+w" } ],                            "action": "text-mode:copy-selection" },
-       { "in": [{ "key": "ctrl+w" } ],                       "action": "text-mode:cut-selection" },
+       { "in": [{ "key": "alt+w" } ],                          "action": "text-mode:copy-selection" },
+       { "in": [{ "key": "ctrl+w" } ],                         "action": "text-mode:cut-selection" },
 
 
        { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
@@ -87,12 +86,8 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
        { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
 
-
-       { "in": [{ "key": "ctrl+s" }],                          "action": "save-document" },
-
        { "in": [{ "key": "Esc"}, { "key": "Esc"}], "action": "editor:cancel" },
        { "in": [{ "key": "ctrl+g"} ], "action": "editor:cancel" },
-
 
 
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
@@ -106,8 +101,6 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
        { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-
-       { "in": [{ "system": "SIGTERM" } ],                     "action": "application:quit" },
 
        { "default": [],                                        "action": "text-mode:self-insert" }
      ]

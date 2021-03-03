@@ -1,5 +1,6 @@
 // Copyright (c) Carl-Erwin Griffith
 
+use crate::core::mapped_file;
 use crate::core::mapped_file::FileHandle;
 use crate::core::mapped_file::MappedFile;
 
@@ -166,15 +167,18 @@ impl<'a> Buffer<'a> {
         }
     */
 
-    pub fn sync_to_disk(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
+    pub fn sync_to_storage(&self, tmp_file_name: &str) -> ::std::io::Result<()> {
         let metadata = ::std::fs::metadata(&self.file_name).unwrap();
         let perms = metadata.permissions();
 
-        let res = MappedFile::sync_to_disk(
-            &mut self.data.as_ref().write().unwrap(),
-            &tmp_file_name,
-            &self.file_name,
-        );
+        let res =
+            MappedFile::sync_to_storage(&mut self.data.as_ref().write().unwrap(), &tmp_file_name);
+
+        // backup file
+        let backup_file_name = format!("{}.{}", self.file_name, "~");
+        std::fs::rename(&self.file_name, &backup_file_name)?;
+
+        std::fs::rename(&tmp_file_name, &self.file_name)?;
 
         // TODO: check result, handle io results properly
         // set buffer status to : permission denied etc
