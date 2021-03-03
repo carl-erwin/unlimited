@@ -1541,9 +1541,7 @@ pub fn move_marks_to_next_line(
 
             dbg_println!("compute layout from offset {}", m.offset);
 
-            let main_mark = Mark::new(0);
-
-            run_view_render_filters_direct(env, &v, m.offset, max_offset, &mut screen, main_mark);
+            run_view_render_filters_direct(env, &v, m.offset, max_offset, &mut screen);
 
             dbg_println!("screen first offset {:?}", screen.first_offset);
             dbg_println!("screen last offset {:?}", screen.last_offset);
@@ -2141,23 +2139,23 @@ fn _get_main_mark_offset(view: &View) -> u64 {
 }
 
 pub fn set_selection_points_at_marks(
-    _editor: &mut Editor,
-    _env: &mut EditorEnv,
-
+    editor: &mut Editor,
+    env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) {
     let sync = false;
 
     {
         let mut v = view.borrow_mut();
+        let vid = v.id;
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         // update selection point
         tm.select_point.clear();
         for m in tm.marks.iter() {
-            dbg_println!("set point @ offset {}", m.offset);
-            tm.select_point.push(Mark::new(m.offset));
+            dbg_println!("VID {} set point @ offset {}", vid, m.offset);
+            tm.select_point.push(m.clone());
         }
     }
 
@@ -2345,50 +2343,58 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    // move cursor to (x,y)
     let (mut x, mut y) = (x as usize, y as usize);
 
-    // 0 <= x < screen.width()
-    if x < screen.clip_rect().x {
-        x = 0;
-    } else if x >= screen.clip_rect().x + screen.clip_rect().width {
-        x = screen.clip_rect().width - 1;
-    } else {
-        x -= screen.clip_rect().x;
-    }
+    dbg_println!("VID {} : CLICK @ x({}) Y({})", v.id, x, y);
+    // move cursor to (x,y)
 
-    // 0 <= y < screen.height()
-    if y < screen.clip_rect().y {
-        y = 0;
-    } else if y > screen.clip_rect().y + screen.clip_rect().height {
-        y = screen.clip_rect().height - 1;
-    } else {
-        y -= screen.clip_rect().y;
-    }
+    /*
+         TOD: retest this
 
-    //
-    let _max_offset = screen.doc_max_offset;
-
-    let last_li = screen.get_last_used_line_index();
-    if y >= last_li {
-        if last_li >= screen.height() {
-            y = screen.height() - 1;
-        } else {
-            y = last_li;
-        }
-    }
-
-    if let Some(l) = screen.get_line(y) {
-        if l.nb_cells > 0 && x > l.nb_cells {
-            x = l.nb_cells - 1;
-        } else if l.nb_cells == 0 {
+        // 0 <= x < screen.width()
+        if x < screen.clip_rect().x {
             x = 0;
+        } else if x >= screen.clip_rect().x + screen.clip_rect().width {
+            x = screen.clip_rect().width - 1;
+        } else {
+            x -= screen.clip_rect().x;
         }
-    } else {
-    }
+
+        // 0 <= y < screen.height()
+        if y < screen.clip_rect().y {
+            y = 0;
+        } else if y > screen.clip_rect().y + screen.clip_rect().height {
+            y = screen.clip_rect().height - 1;
+        } else {
+            y -= screen.clip_rect().y;
+        }
+
+        //
+        let _max_offset = screen.doc_max_offset;
+
+        let last_li = screen.get_last_used_line_index();
+        if y >= last_li {
+            if last_li >= screen.height() {
+                y = screen.height() - 1;
+            } else {
+                y = last_li;
+            }
+        }
+
+        if let Some(l) = screen.get_line(y) {
+            if l.nb_cells > 0 && x > l.nb_cells {
+                x = l.nb_cells - 1;
+            } else if l.nb_cells == 0 {
+                x = 0;
+            }
+        } else {
+        }
+    */
 
     // check from right to left until some codepoint is found
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    tm.select_point.clear();
 
     let mut i = x + 1;
     while i > 0 {
@@ -2396,15 +2402,22 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
             // clear selection point
             // WARNING:
 
-            tm.select_point.clear();
-            env.draw_marks = true;
-
             // reset main mark
             tm.mark_index = 0;
             tm.marks.clear();
             tm.marks.push(Mark {
                 offset: cpi.offset.unwrap(),
             });
+
+            dbg_println!(
+                "VID {} : CLICK @ x({}) Y({}) set main mark at offset : {:?}",
+                v.id,
+                x,
+                y,
+                cpi.offset
+            );
+
+            break;
         }
 
         i -= 1;
@@ -2442,6 +2455,7 @@ pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
     }
 }
 
+// TODO: add enter /leave clipped region detection
 pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
     let screen = v.screen.clone();
@@ -2452,6 +2466,9 @@ pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
             // TODO: change screen (x,y) to i32 ? and filter in functions ?
 
+            let vid = v.id;
+            dbg_println!("VID {} pointer motion x({}) y({})", vid, x, y);
+
             let x = std::cmp::max(0, *x) as usize;
             let y = std::cmp::max(0, *y) as usize;
 
@@ -2460,6 +2477,7 @@ pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
                     // update selection point
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
+                    // TODO: check focus
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
                             tm.select_point.clear();
@@ -2468,7 +2486,8 @@ pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
                     }
 
                     dbg_println!(
-                        "@{:?} : pointer motion x({}) y({}) | select offset({:?})",
+                        "VID {} @{:?} : pointer motion x({}) y({}) | select offset({:?})",
+                        vid,
                         Instant::now(),
                         x,
                         y,

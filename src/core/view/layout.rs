@@ -37,7 +37,6 @@ pub struct LayoutEnv<'a> {
     pub base_offset: u64,
     pub max_offset: u64,
     pub screen: &'a mut Screen,
-    pub main_mark: Mark,
 }
 
 // TODO: add ?
@@ -218,17 +217,19 @@ impl Filter<'_> for RawDataFilter {
                 .unwrap()
                 .read(self.pos, self.read_size, &mut raw_data);
 
-            /*            dbg_println!(
+            /*
+
+                        dbg_println!(
                             "READ from offset({}) : {} / {} bytes",
                             self.pos,
                             rd,
                             self.read_size
                         );
+
+                        dbg_println!("BUFFER SIZE {}", doc.as_ref().read().unwrap().size());
+                        dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
+
             */
-
-            dbg_println!("BUFFER SIZE {}", doc.as_ref().read().unwrap().size());
-            dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
-
             if rd > 0 {
                 (*filter_out).push(FilterIoData {
                     metadata: false,
@@ -655,7 +656,7 @@ impl HighlightSelectionFilter {
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
         // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
-        let min = env.main_mark.offset; // << remove this use tm.mark_index
+        let min = tm.marks[tm.mark_index].offset;
         let max = if tm.select_point.len() == 1 {
             tm.select_point[0].offset
         } else {
@@ -1153,10 +1154,9 @@ pub fn run_view_render_filters(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
-    main_mark: Mark,
 ) {
     let view = view.borrow();
-    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen, main_mark)
+    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen)
 }
 
 // This function can be considered as the core of the editor.<br/>
@@ -1175,7 +1175,6 @@ pub fn run_view_render_filters_direct(
     base_offset: u64,
     max_offset: u64,
     screen: &mut Screen,
-    main_mark: Mark,
 ) {
     dbg_println!(
         "RENDER VID {} nb children = {}",
@@ -1194,7 +1193,7 @@ pub fn run_view_render_filters_direct(
         let split_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
 
         let (width, height) = (screen.width(), screen.height());
-        if width <= 1 || height <= 1 {
+        if width == 0 || height == 0 {
             return;
         }
 
@@ -1233,7 +1232,6 @@ pub fn run_view_render_filters_direct(
                     child_v.start_offset,
                     max_offset, // TODO take child doc size
                     &mut child_screen,
-                    main_mark.clone(),
                 );
                 // TODO: take from child_v main mode
 
@@ -1266,7 +1264,6 @@ pub fn run_view_render_filters_direct(
         base_offset,
         max_offset,
         screen,
-        main_mark,
     };
 
     // NB: we allocate this at every screen rendering
@@ -1332,7 +1329,8 @@ pub fn run_view_render_filters_direct(
     {
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
         let marks = &tm.marks;
-        editor::refresh_screen_marks(&mut layout_env.screen, marks, true);
+        let draw_marks = layout_env.screen.is_off_screen == false;
+        editor::refresh_screen_marks(&mut layout_env.screen, marks, draw_marks);
     }
 
     // update/return screen start offset

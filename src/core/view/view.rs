@@ -551,17 +551,8 @@ impl<'v, 'a> View<'v, 'a> {
         let mut screen = Screen::new(screen_width, screen_height);
         screen.is_off_screen = true;
 
-        let main_mark = Mark::new(0); // fake main mark
-
         loop {
-            run_view_render_filters_direct(
-                env,
-                &self,
-                m.offset,
-                max_offset,
-                &mut screen,
-                main_mark.clone(),
-            );
+            run_view_render_filters_direct(env, &self, m.offset, max_offset, &mut screen);
             if screen.push_count == 0 {
                 return v;
             }
@@ -668,18 +659,10 @@ pub fn get_lines_offsets(
     let screen_width = ::std::cmp::max(1, screen_width);
     let screen_height = ::std::cmp::max(4, screen_height);
     let mut screen = Screen::new(screen_width, screen_height);
-
-    let main_mark = Mark::new(0);
+    screen.is_off_screen = true;
 
     loop {
-        run_view_render_filters(
-            env,
-            &view,
-            m.offset,
-            max_offset,
-            &mut screen,
-            main_mark.clone(),
-        );
+        run_view_render_filters(env, &view, m.offset, max_offset, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
@@ -757,10 +740,7 @@ pub fn compute_view_layout(
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
-    let tm = v.mode_ctx::<TextModeContext>("text-mode");
-    let main_mark = tm.marks[tm.mark_index].clone();
-
-    run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen, main_mark);
+    run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
     // TODO: from env ?
     if let Some(last_offset) = screen.last_offset {
