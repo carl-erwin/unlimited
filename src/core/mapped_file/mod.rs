@@ -35,6 +35,7 @@ use self::libc::{
     munmap,
     open,
     posix_fadvise, // posix_madvise,
+    pread,
     size_t,
     unlink,
     write,
@@ -60,14 +61,22 @@ enum PageSource {
 
 #[derive(Debug, Clone)]
 enum Page {
-    OnStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
-    InRam(*const u8, usize, usize),              // base, len, capacity
+    // read only mapped region: use this if your are sure the storage is the local disk
+    MappedStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
+
+    // read only region: like mmap  but avoid SIGBUS, on network/usb storage
+    ReadOnlyStorageCopy(*const u8, usize, usize), // base, len, capacity
+
+    // Copy on write
+    InRam(*const u8, usize, usize), // base, len, capacity
 }
 
 impl Page {
     fn as_slice<'a>(&self) -> Option<&'a [u8]> {
         Some(match *self {
-            Page::OnStorage(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
+            Page::MappedStorage(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
+
+            Page::ReadOnlyStorageCopy(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
 
             Page::InRam(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
         })
@@ -77,10 +86,15 @@ impl Page {
 impl Drop for Page {
     fn drop(&mut self) {
         match *self {
-            Page::OnStorage(base, len, skip, ..) => {
+            Page::MappedStorage(base, len, skip, ..) => {
                 // eprintln!("munmap {:?}", base);
                 let _base =
                     unsafe { munmap(base.offset(-(skip as isize)) as *mut c_void, len + skip) };
+            }
+
+            Page::ReadOnlyStorageCopy(base, len, capacity) => {
+                let v = unsafe { Vec::from_raw_parts(base as *mut u8, len, capacity) };
+                drop(v);
             }
 
             Page::InRam(base, len, capacity) => {
@@ -158,6 +172,83 @@ impl Node {
         self.cow = None;
     }
 
+    fn do_read(&mut self, storage_offset: u64) -> Option<Rc<RefCell<Page>>> {
+        let mut v = Vec::with_capacity(self.size as usize);
+
+        // node.direct_read(&v) // TODO
+
+        // from Vec doc
+        // Pull out the various important pieces of information about `v`
+        let base = v.as_mut_ptr() as *const u8;
+        let len = v.len(); // 0
+        let capacity = v.capacity();
+
+        let nrd = unsafe {
+            pread(
+                self.fd,
+                base as *mut c_void,
+                capacity - len,
+                storage_offset as i64,
+            )
+        };
+        if nrd < 0 || nrd != (capacity - len) as isize {
+            eprintln!(
+                "read error error : disk_offset = {}, size = {}",
+                storage_offset, self.size
+            );
+            panic!("read error");
+            // TODO:
+            // return None;
+        }
+
+        // 5 - build "new" page
+        mem::forget(v);
+
+        let ro_page = Page::ReadOnlyStorageCopy(base, capacity - len, capacity - len);
+
+        let page = Rc::new(RefCell::new(ro_page));
+
+        self.page = Rc::downgrade(&page);
+
+        Some(page)
+    }
+
+    fn do_mmap(&mut self, storage_offset: u64) -> Option<Rc<RefCell<Page>>> {
+        let ptr = unsafe {
+            mmap(
+                ptr::null_mut(),
+                (self.size + self.skip) as usize,
+                PROT_READ,
+                MAP_PRIVATE,
+                self.fd,
+                storage_offset as i64,
+            )
+        };
+
+        if ptr == MAP_FAILED {
+            eprintln!(
+                "mmap error : disk_offset = {}, size = {}",
+                storage_offset, self.size
+            );
+            return None;
+        }
+
+        let page = Rc::new(RefCell::new(Page::MappedStorage(
+            unsafe { ptr.offset(self.skip as isize) as *const u8 },
+            self.size as usize,
+            self.skip as usize,
+            self.fd,
+        )));
+
+        self.page = Rc::downgrade(&page);
+
+        Some(page)
+    }
+
+    // TODO: pread is slower than mmap :  when saving we must copy the data
+    // add a function to walk through the block
+    // With special read to output: vec<u8>
+    // ie: pread(self.fd, &output[len..capacity] + set_len, storage_offset)
     fn map(&mut self) -> Option<Rc<RefCell<Page>>> {
         // ram ?
         if let Some(ref page) = self.cow {
@@ -169,42 +260,16 @@ impl Node {
             return Some(page);
         }
 
-        if self.storage_offset.is_none() {
+        if let Some(storage_offset) = self.storage_offset {
+            // TODO: pass map policy as parameter
+            // node.map(mapPolicy.use_mapped_file)
+            match std::env::var("UNLIMITED_NO_MAPPED_FILE") {
+                Ok(_) => self.do_read(storage_offset),
+                Err(_) => self.do_mmap(storage_offset),
+            }
+        } else {
             panic!("mapped_file internal error: invalid storage offset");
         }
-
-        let storage_offset = self.storage_offset.as_ref().unwrap();
-
-        // do map
-        let ptr = unsafe {
-            mmap(
-                ptr::null_mut(),
-                (self.size + self.skip) as usize,
-                PROT_READ,
-                MAP_PRIVATE,
-                self.fd,
-                *storage_offset as i64,
-            )
-        };
-
-        if ptr == MAP_FAILED {
-            eprintln!(
-                "mmap error : disk_offset = {}, size = {}",
-                *storage_offset, self.size
-            );
-            return None;
-        }
-
-        let page = Rc::new(RefCell::new(Page::OnStorage(
-            unsafe { ptr.offset(self.skip as isize) as *const u8 },
-            self.size as usize,
-            self.skip as usize,
-            self.fd,
-        )));
-
-        self.page = Rc::downgrade(&page);
-
-        Some(page)
     }
 
     // will consume v
@@ -240,7 +305,7 @@ impl Node {
             }
 
             _ => {
-                panic!("cannot be used on OnStorage page");
+                panic!("cannot be used on MappedStorage page");
             }
         }
     }
@@ -873,7 +938,8 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => 0,
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
-                    Page::OnStorage { .. } => 0,
+                    Page::MappedStorage(..) => 0,
+                    Page::ReadOnlyStorageCopy(..) => 0,
 
                     Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
                 },
@@ -886,7 +952,11 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
-                    Page::OnStorage { .. } => {
+                    Page::MappedStorage(..) => {
+                        panic!("trying to write on read only memory");
+                    }
+
+                    Page::ReadOnlyStorageCopy(..) => {
                         panic!("trying to write on read only memory");
                     }
 
@@ -1291,7 +1361,11 @@ impl<'a> MappedFile<'a> {
             }
 
             match *file.pool[idx].cow.as_ref().unwrap().borrow_mut() {
-                Page::OnStorage { .. } => {
+                Page::MappedStorage(..) => {
+                    panic!("trying to write on read only memory");
+                }
+
+                Page::ReadOnlyStorageCopy(..) => {
                     panic!("trying to write on read only memory");
                 }
 
