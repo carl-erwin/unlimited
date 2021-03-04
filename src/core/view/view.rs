@@ -18,7 +18,7 @@ use crate::core::editor::EditorEnv;
 use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 
-use crate::core::view::layout::{run_view_render_filters, run_view_render_filters_direct};
+use crate::core::view::layout::{run_compositing_stage, run_compositing_stage_direct};
 
 use std::collections::HashMap;
 
@@ -520,7 +520,7 @@ impl<'v, 'a> View<'v, 'a> {
 
     /// This function computes start/end of lines between start_offset end_offset.<br/>
     /// It (will) run the configured filters/plugins.<br/>
-    /// using the run_view_render_filters function until end_offset is reached.<br/>
+    /// using the run_compositing_stage function until end_offset is reached.<br/>
     pub fn get_lines_offsets_direct(
         &mut self,
         env: &EditorEnv,
@@ -552,7 +552,7 @@ impl<'v, 'a> View<'v, 'a> {
         screen.is_off_screen = true;
 
         loop {
-            run_view_render_filters_direct(env, &self, m.offset, max_offset, &mut screen);
+            run_compositing_stage_direct(env, &self, m.offset, max_offset, &mut screen);
             if screen.push_count == 0 {
                 return v;
             }
@@ -626,7 +626,7 @@ impl<'v, 'a> View<'v, 'a> {
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>
 /// It (will) run the configured filters/plugins.<br/>
-/// using the run_view_render_filters function until end_offset is reached.<br/>
+/// using the run_compositing_stage function until end_offset is reached.<br/>
 pub fn get_lines_offsets(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
@@ -662,7 +662,7 @@ pub fn get_lines_offsets(
     screen.is_off_screen = true;
 
     loop {
-        run_view_render_filters(env, &view, m.offset, max_offset, &mut screen);
+        run_compositing_stage(env, &view, m.offset, max_offset, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
@@ -740,7 +740,7 @@ pub fn compute_view_layout(
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
 
-    run_view_render_filters_direct(env, &v, v.start_offset, max_offset, &mut screen);
+    run_compositing_stage_direct(env, &v, v.start_offset, max_offset, &mut screen);
 
     // TODO: from env ?
     if let Some(last_offset) = screen.last_offset {

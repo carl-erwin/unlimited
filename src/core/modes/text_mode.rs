@@ -30,7 +30,7 @@ use crate::core::event::KeyModifiers;
 use crate::core::event::PointerEvent;
 
 //
-use crate::core::view::layout::run_view_render_filters_direct;
+use crate::core::view::layout::run_compositing_stage_direct;
 
 use crate::core::editor::register_action;
 use crate::core::editor::ActionMap;
@@ -1541,7 +1541,7 @@ pub fn move_marks_to_next_line(
 
             dbg_println!("compute layout from offset {}", m.offset);
 
-            run_view_render_filters_direct(env, &v, m.offset, max_offset, &mut screen);
+            run_compositing_stage_direct(env, &v, m.offset, max_offset, &mut screen);
 
             dbg_println!("screen first offset {:?}", screen.first_offset);
             dbg_println!("screen last offset {:?}", screen.last_offset);

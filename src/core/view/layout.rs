@@ -1148,15 +1148,15 @@ pub fn filter_codepoint(
     }
 }
 
-pub fn run_view_render_filters(
+pub fn run_compositing_stage(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
-    base_offset: u64,
-    max_offset: u64,
+    base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
     screen: &mut Screen,
 ) {
     let view = view.borrow();
-    run_view_render_filters_direct(env, &view, base_offset, max_offset, screen)
+    run_compositing_stage_direct(env, &view, base_offset, max_offset, screen)
 }
 
 // This function can be considered as the core of the editor.<br/>
@@ -1169,11 +1169,11 @@ pub fn run_view_render_filters(
 // 3 - highlight selection
 //  4 - tabulation
 //  5 - word wrap
-pub fn run_view_render_filters_direct(
+pub fn run_compositing_stage_direct(
     editor_env: &EditorEnv,
     view: &View,
-    base_offset: u64,
-    max_offset: u64,
+    base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
     screen: &mut Screen,
 ) {
     dbg_println!(
@@ -1226,7 +1226,7 @@ pub fn run_view_render_filters_direct(
                 assert!(h > 0);
 
                 let mut child_screen = Screen::new(w, h);
-                run_view_render_filters_direct(
+                run_compositing_stage_direct(
                     editor_env,
                     &child_v,
                     child_v.start_offset,
