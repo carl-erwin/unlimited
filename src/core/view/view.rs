@@ -304,6 +304,10 @@ impl<'v, 'a> View<'v, 'a> {
         true
     }
 
+    pub fn check_mode_ctx<T: 'static>(&mut self, name: &str) -> bool {
+        self.mode_ctx.get_mut(&name.to_owned()).is_some()
+    }
+
     pub fn mode_ctx_mut<T: 'static>(&mut self, name: &str) -> &mut T {
         match self.mode_ctx.get_mut(&name.to_owned()) {
             Some(box_any) => {
