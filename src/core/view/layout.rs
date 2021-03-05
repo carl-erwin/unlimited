@@ -21,7 +21,6 @@ use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::screen::Screen;
 
-use crate::core::editor;
 use crate::core::editor::EditorEnv;
 
 use crate::core::mark::Mark;
@@ -45,6 +44,8 @@ pub struct LayoutEnv<'a> {
 
 pub trait Filter<'a> {
     fn name(&self) -> &'static str;
+
+    fn setup(&mut self, env: &LayoutEnv, _view: &View);
 
     fn run_managed(
         &mut self,
@@ -173,20 +174,10 @@ pub struct RawDataFilter {
 }
 
 impl RawDataFilter {
-    fn new(env: &LayoutEnv, _view: &View) -> Self {
-        dbg_println!(
-            "RawDataFilter w {} h {}",
-            env.screen.width(),
-            env.screen.height()
-        );
-
-        let screen_max_cp = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
-        let read_size = std::cmp::min(env.max_offset as usize, screen_max_cp);
-
+    pub fn new() -> Self {
         RawDataFilter {
-            pos: env.base_offset,
-            //max: env.max_offset,
-            read_size,
+            pos: 0,
+            read_size: 0,
         }
     }
 }
@@ -194,6 +185,18 @@ impl RawDataFilter {
 impl Filter<'_> for RawDataFilter {
     fn name(&self) -> &'static str {
         &"RawDataFilter"
+    }
+
+    fn setup(&mut self, env: &LayoutEnv, _view: &View) {
+        dbg_println!(
+            "RawDataFilter w {} h {}",
+            env.screen.width(),
+            env.screen.height()
+        );
+
+        let screen_max_cp = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
+        self.read_size = std::cmp::min(env.max_offset as usize, screen_max_cp);
+        self.pos = env.base_offset;
     }
 
     fn run(
@@ -388,7 +391,7 @@ pub struct Utf8Filter {
 }
 
 impl Utf8Filter {
-    fn new(_env: &LayoutEnv, _view: &View) -> Self {
+    pub fn new() -> Self {
         Utf8Filter {}
     }
 }
@@ -397,6 +400,8 @@ impl Filter<'_> for Utf8Filter {
     fn name(&self) -> &'static str {
         &"Utf8Filter"
     }
+
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
 
     fn run(
         &mut self,
@@ -458,9 +463,9 @@ pub struct TabFilter {
 }
 
 impl TabFilter {
-    fn new(_env: &LayoutEnv, _view: &View) -> Self {
+    pub fn new() -> Self {
         TabFilter {
-            prev_cp: ' ',
+            prev_cp: '\u{0}',
             column_count: 0,
         }
     }
@@ -469,6 +474,11 @@ impl TabFilter {
 impl Filter<'_> for TabFilter {
     fn name(&self) -> &'static str {
         &"TabFilter"
+    }
+
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+        self.prev_cp = '\u{0}';
+        self.column_count = 0;
     }
 
     fn run(
@@ -532,14 +542,14 @@ pub struct WordWrapFilter {
 }
 
 impl WordWrapFilter {
-    fn new(env: &LayoutEnv, _view: &View) -> Self {
+    pub fn new() -> Self {
         WordWrapFilter {
-            max_column: env.screen.width() as u64,
+            max_column: 0,
             column_count: 0,
             accum_count: 0,
             prev_cp: '\0',
             prev_offset: 0,
-            accum: Vec::new(),
+            accum: vec![],
         }
     }
 }
@@ -549,6 +559,16 @@ impl Filter<'_> for WordWrapFilter {
         &"WordWrapFilter"
     }
 
+    fn setup(&mut self, env: &LayoutEnv, _view: &View) {
+        self.max_column = env.screen.width() as u64;
+        self.column_count = 0;
+        self.accum_count = 0;
+        self.prev_cp = '\0';
+        self.prev_offset = 0;
+        self.accum = Vec::new();
+    }
+
+    // TODO: disable word wrapping on non text input
     fn run(
         &mut self,
         _view: &View,
@@ -652,21 +672,10 @@ pub struct HighlightSelectionFilter {
 use crate::sort_tuple_pair;
 
 impl HighlightSelectionFilter {
-    fn new(env: &LayoutEnv, view: &View) -> Self {
-        let tm = view.mode_ctx::<TextModeContext>("text-mode");
-
-        // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
-        let min = tm.marks[tm.mark_index].offset;
-        let max = if tm.select_point.len() == 1 {
-            tm.select_point[0].offset
-        } else {
-            min
-        };
-
-        let (min, max) = sort_tuple_pair((min, max));
+    pub fn new() -> Self {
         HighlightSelectionFilter {
-            sel_start_offset: min,
-            sel_end_offset: max,
+            sel_start_offset: 0,
+            sel_end_offset: 0,
         }
     }
 }
@@ -678,13 +687,40 @@ impl Filter<'_> for HighlightSelectionFilter {
         &"HighlightSelectionFilter"
     }
 
+    fn setup(&mut self, _env: &LayoutEnv, view: &View) {
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+
+        // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
+        let min = tm.marks[tm.mark_index].offset;
+        let max = if tm.select_point.len() == 1 {
+            tm.select_point[0].offset
+        } else {
+            min
+        };
+
+        let (min, max) = sort_tuple_pair((min, max));
+        self.sel_start_offset = min;
+        self.sel_end_offset = max;
+    }
+
     fn run(
         &mut self,
-        _view: &View,
+        view: &View,
         env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
+        if env.screen.is_off_screen == true {
+            *filter_out = filter_in.clone();
+            return;
+        }
+
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        if tm.select_point.len() == 0 {
+            *filter_out = filter_in.clone();
+            return;
+        }
+
         let _colors = [
             /* Black	     */ (0, 0, 0),
             /* Light_red	 */ (255, 0, 0),
@@ -752,8 +788,9 @@ pub struct HighlightFilter {
     new_color: (u8, u8, u8),
     utf8_codec: Box<dyn TextCodec>, // internal token representation is utf8
 }
+
 impl HighlightFilter {
-    fn new(_env: &LayoutEnv, _view: &View) -> Self {
+    pub fn new() -> Self {
         HighlightFilter {
             token_io: Vec::new(),
             token_type: TokenType::Unknown,
@@ -771,13 +808,26 @@ impl Filter<'_> for HighlightFilter {
         &"HighlightFilter"
     }
 
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+        self.token_io = Vec::new();
+        self.token_type = TokenType::Unknown;
+        self.utf8_token = Vec::new();
+        self.new_color = CodepointInfo::default_color();
+        // self.utf8_codec =  Box::new(utf8::Utf8Codec::new());
+    }
+
     fn run(
         &mut self,
         _view: &View,
-        _env: &mut LayoutEnv,
+        env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
+        if env.screen.is_off_screen == true {
+            *filter_out = filter_in.clone();
+            return;
+        }
+
         for io in filter_in {
             match &*io {
                 FilterIoData {
@@ -958,17 +1008,14 @@ pub struct ScreenFilter {
 }
 
 impl ScreenFilter {
-    fn new(_env: &LayoutEnv, view: &View) -> Self {
-        let tm = view.mode_ctx::<TextModeContext>("text-mode");
-        let char_map = tm.char_map.clone();
-        let color_map = tm.color_map.clone();
-
+    pub fn new() -> Self {
         ScreenFilter {
+            // data
             first_offset: None,
             last_pushed_offset: None,
             screen_is_full: false,
-            char_map,
-            color_map,
+            char_map: None,
+            color_map: None,
         }
     }
 }
@@ -976,6 +1023,20 @@ impl ScreenFilter {
 impl Filter<'_> for ScreenFilter {
     fn name(&self) -> &'static str {
         &"ScreenFilter"
+    }
+
+    fn setup(&mut self, _env: &LayoutEnv, view: &View) {
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        let char_map = tm.char_map.clone();
+        let color_map = tm.color_map.clone();
+
+        self.first_offset = None;
+        self.last_pushed_offset = None;
+        self.screen_is_full = false;
+
+        // TODO: reload only on view change ? ref ?
+        self.char_map = char_map;
+        self.color_map = color_map;
     }
 
     fn run(
@@ -1148,6 +1209,127 @@ pub fn filter_codepoint(
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DrawMarks {}
+
+impl DrawMarks {
+    pub fn new() -> Self {
+        DrawMarks {}
+    }
+}
+
+impl Filter<'_> for DrawMarks {
+    fn name(&self) -> &'static str {
+        &"DrawMarks"
+    }
+
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        let marks = &tm.marks;
+        let draw_marks = env.screen.is_off_screen == false;
+        refresh_screen_marks(&mut env.screen, marks, draw_marks);
+    }
+}
+
+// SLOW
+// we should iterate over the screen
+// find the first mark
+fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
+    if !set {
+        screen_apply(screen, |_, _, cpi| {
+            cpi.is_mark = false;
+            true // continue
+        });
+        return;
+    }
+
+    let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
+        (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
+        _ => {
+            return;
+        }
+    };
+
+    for m in marks.iter() {
+        match screen.find_cpi_by_offset(m.offset) {
+            (Some(&_cpi), x, y) => {
+                screen.get_mut_cpinfo(x, y).unwrap().is_mark = true;
+            }
+            _ => {}
+        }
+    }
+
+    if true {
+        return;
+    }
+
+    // incremental mark rendering
+    // draw marks
+    let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
+    let mut fetch_mark = true;
+    let mut mark_it = marks.iter();
+    screen_apply(screen, |_, _, cpi| {
+        if let Some(cpi_offset) = cpi.offset {
+            if fetch_mark {
+                // get 1st  mark >= current cpi_offset
+                loop {
+                    let m = mark_it.next();
+                    if m.is_none() {
+                        return false;
+                    }
+
+                    let m = m.unwrap();
+                    if m.offset < first_offset {
+                        continue;
+                    }
+
+                    if m.offset > last_offset {
+                        return false;
+                    }
+
+                    if m.offset >= cpi_offset {
+                        mark_offset = m.offset;
+                        break;
+                    }
+                }
+                fetch_mark = false;
+            }
+
+            if cpi_offset == mark_offset {
+                cpi.is_mark = !cpi.metadata;
+            } else {
+                //
+                if mark_offset < cpi_offset {
+                    fetch_mark = true;
+                }
+            }
+        }
+
+        true
+    });
+}
+
+// move to screen module , rename walk/map ?
+fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_mut_line(l) {
+            for c in 0..line.nb_cells {
+                if let Some(cpi) = line.get_mut_cpi(c) {
+                    if on_cpi(c, l, cpi) == false {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn run_compositing_stage(
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
@@ -1169,95 +1351,108 @@ pub fn run_compositing_stage(
 // 3 - highlight selection
 //  4 - tabulation
 //  5 - word wrap
+fn compose_children(
+    editor_env: &EditorEnv,
+    view: &View,
+    _base_offset: u64, // default view.start_offset start -> Option<u64>
+    max_offset: u64,   // default view.doc.size()   end  -> Option<u64>
+    screen: &mut Screen,
+) -> bool {
+    if view.children.len() == 0 {
+        return false;
+    }
+
+    dbg_println!("COMPOSE CHILDREN OF VID {}", view.id);
+
+    // vertically
+    let split_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
+
+    let (width, height) = (screen.width(), screen.height());
+    if width == 0 || height == 0 {
+        return false;
+    }
+
+    let sizes = if split_is_vertical {
+        view::compute_layout_sizes(width, &view.layout_ops)
+    } else {
+        view::compute_layout_sizes(height, &view.layout_ops)
+    };
+
+    let mut x = 0;
+    let mut y = 0;
+
+    for (idx, v) in view.children.iter().enumerate() {
+        if idx > sizes.len() {
+            // panic!(); TODO: handle
+            break;
+        }
+
+        let mut child_v = v.borrow_mut();
+        {
+            child_v.x = x;
+            child_v.y = y;
+            let (w, h) = if split_is_vertical {
+                (sizes[idx], height)
+            } else {
+                (width, sizes[idx])
+            };
+
+            assert!(w > 0);
+            assert!(h > 0);
+
+            let mut child_screen = Screen::new(w, h);
+            run_compositing_stage_direct(
+                editor_env,
+                &child_v,
+                child_v.start_offset,
+                max_offset, // TODO take child doc size
+                &mut child_screen,
+            );
+            // TODO: take from child_v main mode
+
+            child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
+        }
+
+        let child_screen = child_v.screen.as_ref().read().unwrap();
+
+        if idx == 0 {
+            screen.first_offset = child_screen.first_offset.clone();
+        }
+
+        // composition copy child to output screen
+        screen.copy_to(x, y, &child_screen);
+        if split_is_vertical {
+            x += child_screen.width();
+        } else {
+            y += child_screen.height();
+        }
+    }
+
+    true
+}
+
+// core
 pub fn run_compositing_stage_direct(
     editor_env: &EditorEnv,
     view: &View,
     base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
-    screen: &mut Screen,
+    mut screen: &mut Screen,
 ) {
-    dbg_println!(
-        "RENDER VID {} nb children = {}",
-        view.id,
-        view.children.len()
-    );
-
     // check screen size
     if screen.width() == 0 || screen.height() == 0 {
         return;
     }
 
-    // (recursive) children rendering
-    if view.children.len() > 0 {
-        // vertically
-        let split_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
-
-        let (width, height) = (screen.width(), screen.height());
-        if width == 0 || height == 0 {
-            return;
-        }
-
-        let sizes = if split_is_vertical {
-            view::compute_layout_sizes(width, &view.layout_ops)
-        } else {
-            view::compute_layout_sizes(height, &view.layout_ops)
-        };
-
-        let mut x = 0;
-        let mut y = 0;
-
-        for (idx, v) in view.children.iter().enumerate() {
-            if idx > sizes.len() {
-                panic!();
-                break;
-            }
-
-            let mut child_v = v.borrow_mut();
-            {
-                child_v.x = x;
-                child_v.y = y;
-                let (w, h) = if split_is_vertical {
-                    (sizes[idx], height)
-                } else {
-                    (width, sizes[idx])
-                };
-
-                assert!(w > 0);
-                assert!(h > 0);
-
-                let mut child_screen = Screen::new(w, h);
-                run_compositing_stage_direct(
-                    editor_env,
-                    &child_v,
-                    child_v.start_offset,
-                    max_offset, // TODO take child doc size
-                    &mut child_screen,
-                );
-                // TODO: take from child_v main mode
-
-                //
-                child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
-            }
-
-            let child_screen = child_v.screen.as_ref().read().unwrap();
-
-            if idx == 0 {
-                screen.first_offset = child_screen.first_offset.clone();
-            }
-
-            // composition copy child to output screen
-            screen.copy_to(x, y, &child_screen);
-            if split_is_vertical {
-                x += child_screen.width();
-            } else {
-                y += child_screen.height();
-            }
-        }
-
+    // (recursive) children compositing
+    let draw = compose_children(&editor_env, &view, base_offset, max_offset, &mut screen);
+    if draw {
         return;
     }
 
-    // leaf view
+    dbg_println!("COMPOSE VID {}", view.id);
+
+    // Draw Leaf View
     let mut layout_env = LayoutEnv {
         graphic_display: editor_env.graphic_display,
         quit: false,
@@ -1266,71 +1461,37 @@ pub fn run_compositing_stage_direct(
         screen,
     };
 
-    // NB: we allocate this at every screen rendering
-    // For now it is simple/efficient enough
-    //
-    // TODO: move pipeline construction in Mode initialization
-    // reserve/update io_vec size on screen dimension changes
-    // this will obviously be mor efficient
-
-    // screen must be clear by caller: we don't want
+    // screen must be cleared by caller
     assert_eq!(0, layout_env.screen.push_count());
-
-    // move in mode init
-    let mut filters: Vec<Box<dyn Filter>> = vec![];
-
-    filters.push(Box::new(RawDataFilter::new(&layout_env, &view)));
-    filters.push(Box::new(Utf8Filter::new(&layout_env, &view)));
-
-    if layout_env.screen.is_off_screen == false
-    /* && editor_env.pending_events <= 1 */
-    {
-        filters.push(Box::new(HighlightFilter::new(&layout_env, &view)));
-
-        // TODO: find a way to unify filter signature and ActionMap callbacks
-        let tm = view.mode_ctx::<TextModeContext>("text-mode");
-        if tm.select_point.len() > 0 {
-            filters.push(Box::new(HighlightSelectionFilter::new(&layout_env, &view)));
-        }
-    }
-
-    filters.push(Box::new(TabFilter::new(&layout_env, &view)));
-
-    // TODO: disable word wrapping on non text input
-    filters.push(Box::new(WordWrapFilter::new(&layout_env, &view)));
-
-    filters.push(Box::new(ScreenFilter::new(&layout_env, &view)));
 
     // setup
     let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
     let mut filter_out = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
 
-    // TODO:
-    //for f in &mut filters {
-    //    f.setup(&view, &mut layout_env add offscreen flag);
-    //}
+    let mut compose_filters = view.compose_filters.borrow_mut();
+
+    // TODO
+    for f in compose_filters.iter_mut() {
+        f.setup(&mut layout_env, &view);
+    }
 
     // is interactive rendering possible ?
     while layout_env.quit == false {
-        //        dbg_println!("-------------------");
-        for f in &mut filters {
+        for f in compose_filters.iter_mut() {
             filter_out.clear();
-            //            dbg_println!("running {} : in({})", f.name(), filter_in.len());
             f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
-            //            dbg_println!("        {} : out({})", f.name(), filter_out.len());
+            dbg_println!(
+                "running {:32} : in({}) out({})",
+                f.name(),
+                filter_in.len(),
+                filter_out.len()
+            );
             std::mem::swap(&mut filter_in, &mut filter_out);
         }
     }
 
-    for f in &mut filters {
+    for f in compose_filters.iter_mut() {
         f.finish(&view, &mut layout_env);
-    }
-
-    {
-        let tm = view.mode_ctx::<TextModeContext>("text-mode");
-        let marks = &tm.marks;
-        let draw_marks = layout_env.screen.is_off_screen == false;
-        editor::refresh_screen_marks(&mut layout_env.screen, marks, draw_marks);
     }
 
     // update/return screen start offset

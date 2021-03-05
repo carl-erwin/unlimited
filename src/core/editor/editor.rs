@@ -17,7 +17,7 @@ use std::time::Instant;
 pub use super::*;
 
 // crate
-use crate::core::codepointinfo::CodepointInfo;
+
 use crate::core::event;
 use crate::core::event::input_map::eval_input_event;
 use crate::core::event::Event;
@@ -26,37 +26,49 @@ use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
-use crate::core::mark::Mark;
 
-use crate::core::modes::text_mode::TextModeContext; // TODO remove this impl details
 use crate::core::modes::Mode;
 
 use crate::core::screen::Screen;
 use crate::core::view;
 use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
-use crate::core::view::update_view;
+
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 use crate::core::view::View;
-// local
 
-pub type ModeFunction = fn(
+// local
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StagePosition {
+    Pre,
+    In,
+    Post,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Stage {
+    Input,
+    Compositing,
+    Render,
+}
+
+pub type InputStageFunction = fn(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View<'static, 'static>>>,
 ) -> ();
 
-// ActionMap is kept in EditorEnv
+// InputStageActionMap is kept in EditorEnv
 // TODO:
 // Have a map per view
 // and if eval fails, fallback to EditorEnv's
 // It will allow per mode actions instanciate for each view
 // transform into STACK of map ?
-pub type ActionMap<'a> = HashMap<String, ModeFunction>;
+pub type InputStageActionMap<'a> = HashMap<String, InputStageFunction>;
 
 //
-pub type RenderFunction = fn(
+pub type RenderStageFunction = fn(
     editor: &mut Editor,
     env: &mut EditorEnv,
     view: &View,
@@ -65,7 +77,7 @@ pub type RenderFunction = fn(
     output: &mut Vec<FilterIoData>,
 ) -> ();
 
-pub type RenderMap = HashMap<String, RenderFunction>;
+pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 
 //
 //
@@ -79,22 +91,10 @@ use crate::core::document::DocumentBuilder;
 pub type Id = u64;
 
 /*
+   TODO:
+   check file metadata on every operations -> file changed ... reload ?
 
- Hierarchy Reminder
-
-    core
-        editor
-            config
-            document_map<doc_id, Rc<Document>>
-            view_map<view_id, Rc<View>>
-            list<mode>
-
-        editor_env
-            input_map
-            Option<&view>
-
-
-   TODO: add Timers -> for Blinkin marks
+   add Timers -> for Blinking marks
 */
 
 /* TODO:
@@ -195,7 +195,11 @@ impl<'a> Editor<'a> {
 //////////////////////////////////////////////
 
 // TODO: handle conflicting bindings
-pub fn register_action(map: &mut ActionMap, s: &str, func: ModeFunction) {
+pub fn register_input_stage_action(
+    map: &mut InputStageActionMap,
+    s: &str,
+    func: InputStageFunction,
+) {
     map.insert(s.to_string(), func);
 }
 
@@ -228,116 +232,433 @@ pub fn update_view_and_send_draw_event(
     check_view_dimension(editor, env);
 
     let view = editor.view_map.get(&env.view_id).unwrap().clone();
-
-    update_view(editor, &mut env, &view);
+    view::compute_view_layout(editor, env, &view);
     send_draw_event(editor, &mut env, ui_tx, &view);
 }
 
-// move to core: and later transform into RenderFilter
-// SLOW
-// we should iterate over the screen
-// find the first mark
-pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
-    if !set {
-        screen_apply(screen, |_, _, cpi| {
-            cpi.is_mark = false;
-            true // continue
-        });
-        return;
-    }
+// Mode "core"
+pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = &view.borrow();
+    let doc = v.document.as_ref().unwrap();
+    let doc = doc.as_ref().read().unwrap();
 
-    let (first_offset, last_offset) = match (screen.first_offset, screen.last_offset) {
-        (Some(first_offset), Some(last_offset)) => (first_offset, last_offset),
-        _ => {
-            return;
+    if !doc.changed {
+        env.quit = true;
+    }
+}
+
+pub fn application_quit_abort(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+
+    _view: &Rc<RefCell<View>>,
+) {
+    env.quit = true;
+}
+
+pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let v = view.borrow_mut();
+
+    let doc_id = {
+        let doc = v.document.as_ref().unwrap();
+        {
+            // - needed ? already syncing ? -
+            let doc = doc.as_ref().read().unwrap();
+            if !doc.changed || doc.is_syncing {
+                // TODO: ensure all over places are checking this flag, all doc....write()
+                // better, some permissions mechanism ?
+                // doc.access_permissions = r-
+                // doc.access_permissions = -w
+                // doc.access_permissions = rw
+                return;
+            }
+        }
+
+        // - set sync flag -
+        {
+            let mut doc = doc.as_ref().write().unwrap();
+            let doc_id = doc.id;
+            doc.is_syncing = true;
+            doc_id
         }
     };
 
-    for m in marks.iter() {
-        match screen.find_cpi_by_offset(m.offset) {
-            (Some(&_cpi), x, y) => {
-                screen.get_mut_cpinfo(x, y).unwrap().is_mark = true;
-            }
-            _ => {}
+    // - send sync job to worker -
+    //
+    // NB: We must take the doc clone from Editor not View
+    // because of lifetime(editor) > lifetime(view)
+    // and view.doc is a clone from editor.document_map,
+    // doing this let us avoid the use manual lifetime annotations ('static)
+    // and errors like "data from `view` flows into `editor`"
+    if let Some(doc) = editor.document_map.get(&doc_id) {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::SyncTask {
+                doc: Arc::clone(doc),
+            },
+        };
+        editor.worker_tx.send(msg).unwrap_or(());
+    }
+}
+
+// TODO: CoreMode ? quit/force-quit
+pub fn build_core_action_map<'a>() -> InputStageActionMap<'a> {
+    let mut map: InputStageActionMap = HashMap::new();
+
+    // core
+    register_input_stage_action(&mut map, "application:quit", application_quit);
+    register_input_stage_action(&mut map, "application:quit-abort", application_quit_abort);
+
+    register_input_stage_action(&mut map, "save-document", save_document); // core ?
+
+    register_input_stage_action(&mut map, "split-vertically", split_vertically);
+    register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
+
+    map
+}
+
+pub fn split_with_direction(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv,
+    v: &'static mut View,
+    width: usize,
+    height: usize,
+    dir: view::LayoutDirection,
+    _doc: Option<Arc<RwLock<Document>>>,
+) {
+    let sizes = if dir == LayoutDirection::Vertical {
+        view::compute_layout_sizes(width, &v.layout_ops) // options ? for ret size == 0
+    } else {
+        view::compute_layout_sizes(height, &v.layout_ops) // options ? for ret size == 0
+    };
+
+    dbg_println!("split {:?} = SIZE {:?}", dir, sizes);
+    for s in &sizes {
+        if *s == 0 {
+            return;
         }
     }
 
-    if true {
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let mut x = v.x;
+    let mut y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        // vertically
+        let mut view = match dir {
+            LayoutDirection::Vertical => {
+                view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone())
+            }
+            LayoutDirection::Horizontal => {
+                view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone())
+            }
+
+            _ => {
+                return;
+            }
+        };
+
+        // horizontally
+        // create child modes
+        view.x = x;
+        view.y = y;
+
+        for m in v.mode_ctx.iter() {
+            let name = m.0;
+            let mode = editor.modes.get(name.as_str()).unwrap();
+
+            mode.configure_view(&mut view);
+
+            let ctx = mode.alloc_ctx();
+            dbg_println!("view.id = {}", view.id);
+            view.set_mode_ctx(mode.name(), ctx);
+
+            mode.configure_view(&mut view);
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        let _view = match dir {
+            LayoutDirection::Vertical => {
+                x += *size;
+            }
+            LayoutDirection::Horizontal => {
+                y += *size;
+            }
+            _ => {
+                return;
+            }
+        };
+    }
+}
+
+pub fn split_vertically(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'static, 'static>>>,
+) {
+    let mut v = view.borrow_mut();
+
+    // check if already split
+    if v.children.len() != 0 {
         return;
     }
 
-    // incremental mark rendering
-    // draw marks
-    let mut mark_offset: u64 = 0xFFFFFFFFFFFFFFFF; // replace by max u64
-    let mut fetch_mark = true;
-    let mut mark_it = marks.iter();
-    screen_apply(screen, |_, _, cpi| {
-        if let Some(cpi_offset) = cpi.offset {
-            if fetch_mark {
-                // get 1st  mark >= current cpi_offset
-                loop {
-                    let m = mark_it.next();
-                    if m.is_none() {
-                        return false;
-                    }
+    // compute left and right size as current View / 2
+    // get screen
 
-                    let m = m.unwrap();
-                    if m.offset < first_offset {
-                        continue;
-                    }
+    let (width, height) = {
+        let screen = v.screen.read().unwrap();
+        (screen.width(), screen.height())
+    };
+    //
+    if width <= 4 {
+        return;
+    }
 
-                    if m.offset > last_offset {
-                        return false;
-                    }
+    // compute_split(size, first_half, first_second);
+    let (_left_w, _right_w) = View::compute_split(width);
 
-                    if m.offset >= cpi_offset {
-                        mark_offset = m.offset;
+    // TODO: store
+    let ops_modes = vec![
+        (LayoutOperation::Percent { p: 50 }, vec!["text-mode"]),
+        //        (LayoutOperation::Fixed { size: 1 }, vec!["v-split"]), // separator, will crash no text hard coded in compositing stage
+        (LayoutOperation::Percent { p: 50 }, vec!["text-mode"]),
+    ];
+
+    v.layout_direction = LayoutDirection::Vertical;
+    v.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
+
+    vec![
+        LayoutOperation::Percent { p: 50 },
+        LayoutOperation::Fixed { size: 1 }, // separator
+        LayoutOperation::Percent { p: 50 },
+    ];
+
+    let sizes = view::compute_layout_sizes(width, &v.layout_ops); // options ? for ret size == 0
+
+    dbg_println!("splitV = SIZE {:?}", sizes);
+    for s in &sizes {
+        if *s == 0 {
+            return;
+        }
+    }
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let mut x = v.x;
+    let y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        let mut view = view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone());
+        // create child modes
+        view.x = x;
+        view.y = y;
+        view.layout_index = Some(idx);
+
+        for mode_name in &ops_modes[idx].1 {
+            if let Some(mode) = editor.modes.get(*mode_name) {
+                dbg_println!("view.id = {} : allocate mode({}) ctx", view.id, mode_name);
+
+                //
+                let ctx = mode.alloc_ctx();
+                view.set_mode_ctx(mode.name(), ctx);
+
+                mode.configure_view(&mut view);
+            }
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
                         break;
                     }
-                }
-                fetch_mark = false;
-            }
-
-            if cpi_offset == mark_offset {
-                cpi.is_mark = !cpi.metadata;
-            } else {
-                //
-                if mark_offset < cpi_offset {
-                    fetch_mark = true;
+                } else {
+                    break;
                 }
             }
         }
 
-        true
-    });
-}
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
 
-// move to screen module , rename walk/map ?
-fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
-    screen: &mut Screen,
-    mut on_cpi: F,
-) {
-    for l in 0..screen.height() {
-        if let Some(line) = screen.get_mut_line(l) {
-            for c in 0..line.nb_cells {
-                if let Some(cpi) = line.get_mut_cpi(c) {
-                    if on_cpi(c, l, cpi) == false {
-                        return;
-                    }
-                }
-            }
-        }
+        x += *size;
     }
 }
 
+pub fn split_horizontally(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'static, 'static>>>,
+) {
+    let mut v = view.borrow_mut();
+
+    // check if already split
+    if v.children.len() != 0 {
+        return;
+    }
+
+    // compute left and right size as current View / 2
+    // get screen
+
+    let (width, height) = {
+        let screen = v.screen.read().unwrap();
+        (screen.width(), screen.height())
+    };
+
+    if height <= 4 {
+        return;
+    }
+
+    // compute_split(size, first_half, first_second);
+    let (_top_h, _bottom_h) = View::compute_split(height);
+
+    // TODO: store
+    v.layout_direction = LayoutDirection::Horizontal;
+    v.layout_ops = vec![
+        LayoutOperation::Percent { p: 50 },
+        LayoutOperation::Percent { p: 50 },
+    ];
+
+    let sizes = view::compute_layout_sizes(height, &v.layout_ops);
+
+    dbg_println!("splitH = SIZE {:?}", sizes);
+    for s in &sizes {
+        if *s == 0 {
+            return;
+        }
+    }
+
+    let doc = {
+        if v.document.is_none() {
+            None
+        } else {
+            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = doc_id.read().unwrap().id;
+            if let Some(_doc) = editor.document_map.get(&doc_id) {
+                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+                Some(Arc::clone(&doc))
+            } else {
+                None
+            }
+        }
+    };
+
+    let x = v.x;
+    let mut y = v.y;
+    for (idx, size) in sizes.iter().enumerate() {
+        let mut view = view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone());
+        // create child modes
+        view.x = x;
+        view.y = y;
+
+        for m in v.mode_ctx.iter() {
+            let name = m.0;
+            let mode = editor.modes.get(name.as_str()).unwrap();
+            let ctx = mode.alloc_ctx();
+            dbg_println!("view.id = {}", view.id);
+            view.set_mode_ctx(mode.name(), ctx);
+
+            mode.configure_view(&mut view);
+        }
+
+        if idx == 0 {
+            // TODO: propagate focus up to root
+            v.focus_to = Some(view.id);
+
+            let mut parent_id = v.parent_id;
+            loop {
+                if let Some(pid) = parent_id {
+                    if let Some(pview) = editor.view_map.get(&pid) {
+                        let mut pview = pview.borrow_mut();
+                        pview.focus_to = Some(view.id);
+                        parent_id = pview.parent_id;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let id = view.id;
+        let rc = Rc::new(RefCell::new(view));
+        v.children.push(Rc::clone(&rc));
+        editor.view_map.insert(id, Rc::clone(&rc));
+
+        y += *size;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn send_draw_event(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
     ui_tx: &Sender<EventMessage>,
     view: &Rc<RefCell<View>>,
 ) {
     let view = view.borrow();
-    let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
     let new_screen = Arc::clone(&view.screen);
 
@@ -353,11 +674,10 @@ pub fn send_draw_event(
     ui_tx.send(msg).unwrap_or(());
 }
 
-fn process_input_event<'a>(
+fn process_single_input_event<'a>(
     editor: &'a mut Editor<'static>,
     mut env: &'a mut EditorEnv<'static>,
     view_id: view::Id,
-    ev: &InputEvent,
 ) -> bool {
     let mut view = &editor.view_map.get(&view_id).unwrap().clone();
 
@@ -371,6 +691,8 @@ fn process_input_event<'a>(
             // check focus: must add view(x.y)
         }
     }
+
+    let ev = &env.current_input_event; // Option ?
 
     //
     if *ev == crate::core::event::InputEvent::NoInputEvent {
@@ -421,12 +743,7 @@ fn process_input_event<'a>(
     true
 }
 
-fn send_ui_event(
-    mut editor: &mut Editor,
-    mut env: &mut EditorEnv,
-    ui_tx: &Sender<EventMessage>,
-    _events: &Vec<InputEvent>,
-) {
+fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Sender<EventMessage>) {
     dbg_println!(
         "EVAL: input process time {}\r",
         (env.process_input_end - env.process_input_start).as_millis()
@@ -598,21 +915,9 @@ fn clip_coordinates_and_get_vid(
     (vid, ev)
 }
 
-/*
-pre_process_input_event(&mut editor, &mut env, &ui_tx, &events);
-input_process(&mut editor, &mut env, &ui_tx, &events);
-pre_input_process(&mut editor, &mut env, &ui_tx, &events);
-process_input_events(&mut editor, &mut env, &ui_tx, &events);
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-*/
-fn process_input_events(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
-    ui_tx: &Sender<EventMessage>,
-    events: &Vec<InputEvent>,
-) {
-    env.pending_events = crate::core::event::pending_input_event_count();
-
+fn flatten_input_events(events: &Vec<InputEvent>) -> Vec<InputEvent> {
     let mut flat_events = vec![];
     // transform UnicodeArray of 1 element to single element
     for ev in events {
@@ -644,452 +949,202 @@ fn process_input_events(
         }
     }
 
-    env.process_input_start = Instant::now();
-    for ev in &flat_events {
-        // pre_eval_input_stage(&mut editor, &mut env, vid, ev);
+    flat_events
+}
 
-        // select root
-        let root_vid = env.view_id;
+fn run_stages(
+    stage: Stage,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view_id: view::Id,
+) -> Stage {
+    use StagePosition::In;
+    use StagePosition::Post;
+    use StagePosition::Pre;
 
-        // get child focus
-        let vid = get_focused_vid(&mut editor, &mut env, root_vid);
-        dbg_println!("FOCUS on vid {}", vid);
+    run_stage(Pre, stage, &mut editor, &mut env, view_id);
+    run_stage(In, stage, &mut editor, &mut env, view_id);
+    //
+    run_stage(Post, stage, &mut editor, &mut env, view_id)
+}
 
-        // clip event coordinates
-        let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
+fn run_stage(
+    pos: StagePosition,
+    stage: Stage,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view_id: view::Id,
+) -> Stage {
+    let view = editor.view_map.get(&view_id).unwrap().clone();
 
-        // TODO: if button press only: env.focus_on = Option<vid> ?
-        set_focus_on_vid(&mut editor, &mut env, vid);
+    dbg_println!("render_stage VID {} : {:?} {:?}", view_id, pos, stage);
 
-        // need_rendering ?
-        env.event_processed = process_input_event(&mut editor, &mut env, vid, &ev);
+    match stage {
+        Stage::Input => {
+            match pos {
+                StagePosition::Pre => {
+                    env.process_input_start = Instant::now();
 
-        // post_eval_stage(&mut editor, &mut env, vid, ev);
-        // {
-        // to check_focus_change()
-        if root_vid != env.view_id {
-            dbg_println!("view change {} ->  {}", root_vid, env.view_id);
-            check_view_dimension(editor, env);
-            env.event_processed = true;
+                    // TODO: save marks HERE before input processing
+                    view::run_stage(&mut editor, &mut env, &view, pos, stage);
+                }
+                StagePosition::In => {
+                    // - need_rendering ? -
+                    // move ev to env.current_event
+                    env.event_processed =
+                        process_single_input_event(&mut editor, &mut env, view_id);
+                    if env.pending_events > 0 {
+                        env.pending_events = crate::core::event::pending_input_event_dec(1);
+                    }
+                }
+                StagePosition::Post => {
+                    // TODO: save marks HERE after all input processing
+                    view::run_stage(&mut editor, &mut env, &view, pos, stage);
 
-            // NB: resize previous view's screen to lower memory usage
-            let view = editor.view_map.get(&root_vid).unwrap().clone();
-            let v = view.borrow_mut();
-            v.screen.write().unwrap().resize(1, 1);
-        }
-        // }
+                    env.process_input_end = Instant::now();
 
-        // pre_render_stage(&mut editor, &mut env, vid, ev);
+                    // TODO: save marks HERE before input processing
+                    // run_pre_input_stage();
 
-        if env.event_processed {
-            let start = Instant::now();
-            let view = editor.view_map.get(&env.view_id).unwrap().clone();
-            // render_view(&mut editor, &mut env, &view);
-            update_view(&mut editor, &mut env, &view);
-            let end = Instant::now();
-            dbg_println!("EVAL: update view time {}\r", (end - start).as_millis());
-        }
+                    if env.view_id != env.prev_vid {
+                        env.event_processed = true;
 
-        if env.pending_events > 0 {
-            env.pending_events = crate::core::event::pending_input_event_dec(1);
+                        dbg_println!("view change {} ->  {}", env.prev_vid, env.view_id);
+
+                        check_view_dimension(editor, env);
+                        {
+                            // NB: resize previous view's screen to lower memory usage
+                            let view = editor.view_map.get(&env.prev_vid).unwrap().clone();
+                            view.borrow_mut().screen.write().unwrap().resize(1, 1);
+
+                            // prepare next view input
+                            let view = editor.view_map.get(&env.view_id).unwrap().clone();
+                            view::run_stage(
+                                &mut editor,
+                                &mut env,
+                                &view,
+                                StagePosition::Pre,
+                                Stage::Input,
+                            );
+
+                            // view changed
+                            let id = env.view_id;
+                            run_stages(Stage::Compositing, &mut editor, &mut env, id);
+                        }
+                    }
+                }
+            }
         }
 
         //
-    }
-    env.process_input_end = Instant::now();
+        Stage::Compositing => match pos {
+            StagePosition::Pre => view::run_stage(&mut editor, &mut env, &view, pos, stage),
+            StagePosition::In => view::run_stage(&mut editor, &mut env, &view, pos, stage),
+            StagePosition::Post => view::run_stage(&mut editor, &mut env, &view, pos, stage),
+        },
 
-    send_ui_event(editor, env, ui_tx, events);
-}
+        //
+        Stage::Render => match pos {
+            StagePosition::Pre => {}
 
-pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &view.borrow();
-    let doc = v.document.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
-
-    if !doc.changed {
-        env.quit = true;
-    }
-}
-
-pub fn application_quit_abort(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-
-    _view: &Rc<RefCell<View>>,
-) {
-    env.quit = true;
-}
-
-pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.borrow_mut();
-
-    let doc_id = {
-        let doc = v.document.as_ref().unwrap();
-        {
-            // - needed ? already syncing ? -
-            let doc = doc.as_ref().read().unwrap();
-            if !doc.changed || doc.is_syncing {
-                // TODO: ensure all over places are checking this flag, all doc....write()
-                // better, some permissions mechanism ?
-                // doc.access_permissions = r-
-                // doc.access_permissions = -w
-                // doc.access_permissions = rw
-                return;
+            StagePosition::In => {
+                let ui_tx = editor.ui_tx.clone();
+                flush_ui_event(editor, env, &ui_tx);
             }
-        }
 
-        // - set sync flag -
-        {
-            let mut doc = doc.as_ref().write().unwrap();
-            let doc_id = doc.id;
-            doc.is_syncing = true;
-            doc_id
-        }
+            StagePosition::Post => {}
+        },
+    }
+
+    if pos != StagePosition::Post {
+        return stage;
+    }
+
+    match stage {
+        Stage::Input => Stage::Compositing,
+        Stage::Compositing => Stage::Render,
+        Stage::Render => Stage::Input,
+        // Stage::Restart ?
+    }
+}
+
+fn setup_focus(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    ev: &InputEvent,
+    compose: &mut bool,
+) -> view::Id {
+    let root_vid = env.view_id;
+    let vid = get_focused_vid(&mut editor, &mut env, root_vid);
+    dbg_println!("FOCUS on vid {}", vid);
+
+    if root_vid != vid {
+        // only set, not cleared
+        *compose = true;
     };
 
-    // - send sync job to worker -
-    //
-    // NB: We must take the doc clone from Editor not View
-    // because of lifetime(editor) > lifetime(view)
-    // and view.doc is a clone from editor.document_map,
-    // doing this let us avoid the use manual lifetime annotations ('static)
-    // and errors like "data from `view` flows into `editor`"
-    if let Some(doc) = editor.document_map.get(&doc_id) {
-        let msg = EventMessage {
-            seq: 0,
-            event: Event::SyncTask {
-                doc: Arc::clone(doc),
-            },
-        };
-        editor.worker_tx.send(msg).unwrap_or(());
+    let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
+    // - - TODO: if button press only: env.focus_on = Option<vid> ? -
+    set_focus_on_vid(&mut editor, &mut env, vid);
+
+    env.current_input_event = ev;
+    env.prev_vid = root_vid;
+    vid
+}
+
+// Loop over all input events
+fn run_input_stage(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    events: &Vec<InputEvent>,
+) -> Stage {
+    use StagePosition::In;
+    use StagePosition::Post;
+    use StagePosition::Pre;
+
+    // Pre
+    // self.flat_events
+    env.pending_events = crate::core::event::pending_input_event_count();
+    let flat_events = flatten_input_events(&events);
+    if flat_events.len() == 0 {
+        return Stage::Input;
+    };
+    let id = env.view_id;
+    run_stage(Pre, Stage::Input, &mut editor, &mut env, id);
+
+    // IN : move flat_events to en, StageTrait pre/in/post
+    // run(&mut editor, &mut env) -> next (stage/pos)
+    // and loop over
+    // self.recompose = true
+    let mut recompose = false;
+    for ev in flat_events.iter() {
+        let id = setup_focus(&mut editor, &mut env, &ev, &mut recompose);
+        run_stage(In, Stage::Input, &mut editor, &mut env, id);
+        run_stages(Stage::Compositing, &mut editor, &mut env, id);
     }
-}
 
-// TODO: CoreMode ? quit/force-quit
-pub fn build_core_action_map<'a>() -> ActionMap<'a> {
-    let mut map: ActionMap = HashMap::new();
+    // POST
+    let id = env.view_id;
+    run_stage(Post, Stage::Input, &mut editor, &mut env, id);
 
-    // core
-    register_action(&mut map, "application:quit", application_quit);
-    register_action(&mut map, "application:quit-abort", application_quit_abort);
-
-    register_action(&mut map, "save-document", save_document); // core ?
-
-    register_action(&mut map, "split-vertically", split_vertically);
-    register_action(&mut map, "split-horizontally", split_horizontally);
-
-    map
-}
-
-pub fn split_with_direction(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv,
-    v: &'static mut View,
-    width: usize,
-    height: usize,
-    dir: view::LayoutDirection,
-    doc: Option<Arc<RwLock<Document>>>,
-) {
-    let sizes = if dir == LayoutDirection::Vertical {
-        view::compute_layout_sizes(width, &v.layout_ops) // options ? for ret size == 0
+    if recompose {
+        Stage::Compositing
     } else {
-        view::compute_layout_sizes(height, &v.layout_ops) // options ? for ret size == 0
-    };
-
-    dbg_println!("split {:?} = SIZE {:?}", dir, sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let mut x = v.x;
-    let mut y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        // vertically
-        let mut view = match dir {
-            LayoutDirection::Vertical => {
-                view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone())
-            }
-            LayoutDirection::Horizontal => {
-                view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone())
-            }
-
-            _ => {
-                return;
-            }
-        };
-
-        // horizontally
-        // create child modes
-        view.x = x;
-        view.y = y;
-
-        for m in v.mode_ctx.iter() {
-            let name = m.0;
-            let mode = editor.modes.get(name.as_str()).unwrap();
-            let ctx = mode.alloc_ctx();
-            dbg_println!("view.id = {}", view.id);
-            view.set_mode_ctx(mode.name(), ctx);
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        let mut view = match dir {
-            LayoutDirection::Vertical => {
-                x += *size;
-            }
-            LayoutDirection::Horizontal => {
-                y += *size;
-            }
-            _ => {
-                return;
-            }
-        };
+        Stage::Render
     }
 }
 
-pub fn split_vertically(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static, 'static>>>,
+fn process_input_events(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    _ui_tx: &Sender<EventMessage>,
+    events: &Vec<InputEvent>,
 ) {
-    let mut v = view.borrow_mut();
-
-    // check if already split
-    if v.children.len() != 0 {
-        return;
-    }
-
-    // compute left and right size as current View / 2
-    // get screen
-
-    let (width, height) = {
-        let screen = v.screen.read().unwrap();
-        (screen.width(), screen.height())
-    };
-    //
-    if width <= 4 {
-        return;
-    }
-
-    // compute_split(size, first_half, first_second);
-    let (_left_w, _right_w) = View::compute_split(width);
-
-    // TODO: store
-    v.layout_direction = LayoutDirection::Vertical;
-    v.layout_ops = vec![
-        LayoutOperation::Percent { p: 50 },
-        LayoutOperation::Percent { p: 50 },
-    ];
-
-    let sizes = view::compute_layout_sizes(width, &v.layout_ops); // options ? for ret size == 0
-
-    dbg_println!("splitV = SIZE {:?}", sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let mut x = v.x;
-    let y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        let mut view = view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone());
-        // create child modes
-        view.x = x;
-        view.y = y;
-
-        for m in v.mode_ctx.iter() {
-            let name = m.0;
-            let mode = editor.modes.get(name.as_str()).unwrap();
-            let ctx = mode.alloc_ctx();
-            dbg_println!("view.id = {}", view.id);
-            view.set_mode_ctx(mode.name(), ctx);
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        x += *size;
-    }
-}
-
-pub fn split_horizontally(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static, 'static>>>,
-) {
-    let mut v = view.borrow_mut();
-
-    // check if already split
-    if v.children.len() != 0 {
-        return;
-    }
-
-    // compute left and right size as current View / 2
-    // get screen
-
-    let (width, height) = {
-        let screen = v.screen.read().unwrap();
-        (screen.width(), screen.height())
-    };
-
-    if height <= 4 {
-        return;
-    }
-
-    // compute_split(size, first_half, first_second);
-    let (_top_h, _bottom_h) = View::compute_split(height);
-
-    // TODO: store
-    v.layout_direction = LayoutDirection::Horizontal;
-    v.layout_ops = vec![
-        LayoutOperation::Percent { p: 50 },
-        LayoutOperation::Percent { p: 50 },
-    ];
-
-    let sizes = view::compute_layout_sizes(height, &v.layout_ops);
-
-    dbg_println!("splitH = SIZE {:?}", sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let x = v.x;
-    let mut y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        let mut view = view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone());
-        // create child modes
-        view.x = x;
-        view.y = y;
-
-        for m in v.mode_ctx.iter() {
-            let name = m.0;
-            let mode = editor.modes.get(name.as_str()).unwrap();
-            let ctx = mode.alloc_ctx();
-            dbg_println!("view.id = {}", view.id);
-            view.set_mode_ctx(mode.name(), ctx);
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        y += *size;
+    // TODO: move event to env ?
+    let mut stage = run_input_stage(&mut editor, &mut env, &events);
+    while stage != Stage::Input {
+        let id = env.view_id;
+        stage = run_stages(stage, &mut editor, &mut env, id);
     }
 }
 
@@ -1118,7 +1173,6 @@ pub fn main_loop(
 
                 Event::InputEvents { events } => {
                     if !editor.view_map.is_empty() {
-                        env.draw_marks = true;
                         process_input_events(&mut editor, &mut env, &ui_tx, &events);
                     }
                 }

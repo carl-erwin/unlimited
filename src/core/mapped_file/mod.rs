@@ -2014,8 +2014,6 @@ impl<'a> MappedFile<'a> {
 
     // TODO: add fix page offset function
     pub fn sync_to_storage(file: &mut MappedFile, tmp_file_name: &str) -> ::std::io::Result<()> {
-        use std::fs;
-
         let path = CString::new(tmp_file_name).unwrap();
         unsafe { unlink(path.as_ptr()) };
         let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
 
-use crate::core::editor::ActionMap;
+use crate::core::editor::InputStageActionMap;
 use crate::core::event::InputEvent;
 use crate::core::event::InputEventMap;
 use crate::core::event::InputEventRule;
@@ -82,11 +82,13 @@ pub struct EditorEnv<'a> {
 
     pub quit: bool,
 
+    pub current_input_event: InputEvent,
+
     /// This flag is set when an input event as triggered a change
     /// and the ui must be refresh
     pub event_processed: bool,
 
-    pub action_map: ActionMap<'static>, // ref to current focused widget ?
+    pub action_map: InputStageActionMap<'static>, // ref to current focused widget ?
 
     pub input_map: Rc<RefCell<InputEventMap>>,
     pub current_node: Option<Rc<InputEventRule>>,
@@ -95,19 +97,20 @@ pub struct EditorEnv<'a> {
 
     pub pending_events: usize,
     pub last_rdr_event: Instant,
+    pub current_time: Instant,
     pub process_input_start: Instant,
     pub process_input_end: Instant,
 
     //
     pub width: usize,
     pub height: usize,
-    pub view_id: usize, // doc id in view
+
+    pub prev_vid: usize,
+    pub view_id: usize,
 
     pub center_offset: Option<u64>,
     pub cur_mark_index: Option<usize>,
     pub max_offset: u64, // remove this, doc property
-
-    pub draw_marks: bool,
 }
 
 impl<'a> EditorEnv<'a> {
@@ -128,6 +131,7 @@ impl<'a> EditorEnv<'a> {
             phantom: PhantomData,
             graphic_display,
             quit: false,
+            current_input_event: InputEvent::NoInputEvent,
             event_processed: false,
 
             action_map: build_core_action_map(),
@@ -137,15 +141,16 @@ impl<'a> EditorEnv<'a> {
             trigger: vec![],
             pending_events: 0,
             last_rdr_event: Instant::now(),
+            current_time: Instant::now(),
             process_input_start: Instant::now(),
             process_input_end: Instant::now(),
             width: 0,
             height: 0,
-            view_id: 1, // NB
+            prev_vid: 1, // NB
+            view_id: 1,  // NB
             center_offset: None,
             cur_mark_index: None,
             max_offset: 0,
-            draw_marks: true,
         }
     }
 }

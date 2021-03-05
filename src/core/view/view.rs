@@ -12,8 +12,11 @@ use std::time::Instant;
 //
 use crate::core::codepointinfo;
 use crate::core::document::Document;
+
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
+use crate::core::editor::Stage;
+use crate::core::editor::StagePosition;
 
 use crate::core::mark::Mark;
 use crate::core::screen::Screen;
@@ -28,7 +31,7 @@ use super::layout;
 
 pub type Id = usize;
 
-// let ptr : ModeFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
+// let ptr : InputStageFunction = cancel_input(editor: &mut Editor, env: &mut EditorEnv, trigger: &Vec<input_event>,  view: &Rc<RefCell<View>>)
 
 // TODO: add modes
 // a view can be configured to have a "main mode" "interpreter/presenter"
@@ -235,6 +238,8 @@ pub struct View<'v, 'a> {
     //
     pub x: usize,
     pub y: usize,
+    /// layout ops index in parent_id.layout_ops
+    pub layout_index: Option<usize>,
 
     pub layout_direction: LayoutDirection,
     pub layout_ops: Vec<LayoutOperation>,
@@ -243,8 +248,10 @@ pub struct View<'v, 'a> {
 
     // move this to corresponding pre/pos stages
     // reset on each event handling
-    pub pre_render_action: Vec<Action>,
-    pub post_render_action: Vec<Action>,
+    pub pre_compose_action: Vec<Action>,
+    pub post_compose_action: Vec<Action>,
+    //
+    pub compose_filters: RefCell<Vec<Box<dyn layout::Filter<'v>>>>,
 }
 
 impl<'v, 'a> View<'v, 'a> {
@@ -281,11 +288,13 @@ impl<'v, 'a> View<'v, 'a> {
             //
             x: 0,
             y: 0,
+            layout_index: None,
             layout_direction: LayoutDirection::NotSet,
             layout_ops: vec![],
             children: vec![],
-            pre_render_action: vec![],
-            post_render_action: vec![],
+            pre_compose_action: vec![],
+            post_compose_action: vec![],
+            compose_filters: RefCell::new(vec![]),
         }
     }
 
@@ -323,7 +332,7 @@ impl<'v, 'a> View<'v, 'a> {
                 }
             }
 
-            None => panic!("not configured properly"),
+            None => panic!("mode {}, not configured properly", name),
         }
     }
 
@@ -622,7 +631,60 @@ impl<'v, 'a> View<'v, 'a> {
         let h = self.screen.read().unwrap().height() / 2;
         self.scroll_up(env, h);
     }
-} // View
+} // impl View
+
+///
+pub fn run_stage(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View>>,
+    pos: StagePosition,
+    stage: Stage,
+) {
+    match (stage, pos) {
+        (Stage::Input, StagePosition::Pre) => {
+            // SAVE MARKS
+            // TODO: Save marks HERE Before All input processing
+            // check doc.revision
+        }
+
+        (Stage::Input, StagePosition::Post) => {
+            let mut v = view.borrow_mut();
+            let max_offset = v.document().unwrap().read().unwrap().size() as u64;
+            v.start_offset = std::cmp::min(v.start_offset, max_offset);
+        }
+
+        (Stage::Compositing, StagePosition::Pre) => {
+            // TODO: save marks HERE After All input processing
+            // check doc.revision
+
+            // move to v.run_stage() : for register modes
+            crate::core::modes::text_mode::run_text_mode_actions(
+                &mut editor,
+                &mut env,
+                &view,
+                stage,
+                pos,
+            );
+        }
+
+        (Stage::Compositing, StagePosition::In) => {
+            compute_view_layout(editor, env, &view);
+        }
+
+        (Stage::Compositing, StagePosition::Post) => {
+            crate::core::modes::text_mode::run_text_mode_actions(
+                &mut editor,
+                &mut env,
+                &view,
+                stage,
+                pos,
+            );
+        }
+
+        _ => {}
+    }
+}
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>
 /// It (will) run the configured filters/plugins.<br/>
@@ -635,7 +697,7 @@ pub fn get_lines_offsets(
     screen_width: usize,
     screen_height: usize,
 ) -> Vec<(u64, u64)> {
-    let doc = &view.borrow();
+    let doc = view.borrow();
     let doc = doc.document.as_ref().unwrap();
     let doc = doc.as_ref().write().unwrap();
 
@@ -645,7 +707,7 @@ pub fn get_lines_offsets(
 
     // get start of the line @offset
     {
-        let v = &view.borrow();
+        let v = view.borrow();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         let codec = tm.text_codec.as_ref();
@@ -734,75 +796,28 @@ pub fn compute_view_layout(
     let mut v = view.borrow_mut();
 
     let doc = v.document()?;
-
     let max_offset = { doc.as_ref().read().unwrap().size() as u64 };
 
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
-
     run_compositing_stage_direct(env, &v, v.start_offset, max_offset, &mut screen);
-
-    // TODO: from env ?
     if let Some(last_offset) = screen.last_offset {
         v.end_offset = last_offset;
     }
     v.screen = Arc::new(RwLock::new(screen)); // move v.screen to view double buffer  v.screen_get() v.screen_swap(new: move)
     v.check_invariants();
-
     Some(())
 }
 
-// TODO: test-mode
+// TODO: text-mode
 // scroll bar: bg color (35, 34, 89)
 // scroll bar: cursor color (192, 192, 192)
 pub fn update_view(
-    mut editor: &mut Editor,
-    mut env: &mut EditorEnv,
-    view: &Rc<RefCell<View>>,
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    _view: &Rc<RefCell<View>>,
 ) -> Option<()> {
     let _start = Instant::now();
-
-    let nb_child = {
-        let v = view.borrow_mut();
-        if v.children.len() > 0 {
-            for child in v.children.iter() {
-                dbg_println!(" REC call to : update view depth {}", v.children.len());
-                update_view(&mut editor, &mut env, &child);
-            }
-        }
-        v.children.len()
-    };
-
-    {
-        let v = view.borrow_mut();
-        dbg_println!("update view {} nb_child {}", v.id, nb_child);
-    }
-
-    // refresh_env_variables(editor, env, view);
-    {
-        let mut v = view.borrow_mut();
-        env.max_offset = v.document()?.read().unwrap().size() as u64;
-        if v.start_offset > env.max_offset {
-            v.start_offset = env.max_offset;
-        }
-    }
-
-    // pre layout action == post input
-    {
-        run_text_mode_actions(editor, env, view, Stage::PreRender);
-    }
-
-    // already recursive
-
-    compute_view_layout(editor, env, view);
-
-    // post layout action
-    if false {
-        run_text_mode_actions(editor, env, view, Stage::PostRender);
-    }
-
-    let _end = Instant::now();
-    // env.time_to_build_screen = end.duration_since(start);
 
     Some(())
 }

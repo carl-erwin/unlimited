@@ -76,7 +76,7 @@ pub fn worker(
         if let Ok(evt) = worker_rx.recv() {
             match evt.event {
                 Event::ApplicationQuitEvent => {
-                    dbg_println!("[stooping worker thread]");
+                    dbg_println!("[stopping worker thread]");
                     break;
                 }
 
@@ -166,9 +166,13 @@ pub fn load_modes(editor: &mut Editor, env: &mut EditorEnv) {
         // allocate per view ModeCtx shared between the stages
         for (_k, v) in editor.view_map.iter() {
             let mut v = v.borrow_mut();
-            let ctx = mode.alloc_ctx();
+
             dbg_println!("v.id = {}", v.id);
+
+            let ctx = mode.alloc_ctx();
             v.set_mode_ctx(mode.name(), ctx);
+
+            mode.configure_view(&mut v);
         }
     }
 }

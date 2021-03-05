@@ -32,17 +32,29 @@ use crate::core::event::PointerEvent;
 //
 use crate::core::view::layout::run_compositing_stage_direct;
 
-use crate::core::editor::register_action;
-use crate::core::editor::ActionMap;
-
-pub type Id = u64;
-
+use crate::core::editor;
+use crate::core::editor::register_input_stage_action;
+use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
 
 // TODO: move to TextMode post actions
 use crate::core::view::Action;
 
 use super::Mode;
+
+//
+use crate::core::view::layout::LayoutEnv;
+
+use crate::core::view::layout::DrawMarks;
+use crate::core::view::layout::HighlightFilter;
+use crate::core::view::layout::HighlightSelectionFilter;
+use crate::core::view::layout::RawDataFilter;
+use crate::core::view::layout::ScreenFilter;
+use crate::core::view::layout::TabFilter;
+use crate::core::view::layout::Utf8Filter;
+use crate::core::view::layout::WordWrapFilter;
+
+pub type Id = u64;
 
 // save transaction's index
 pub enum CopyData {
@@ -69,9 +81,9 @@ impl<'a> Mode for TextMode {
         &"text-mode"
     }
 
-    fn build_action_map(&self) -> ActionMap<'static> {
-        let mut map = ActionMap::new();
-        Self::register_actions(&mut map);
+    fn build_action_map(&self) -> InputStageActionMap<'static> {
+        let mut map = InputStageActionMap::new();
+        Self::register_input_stage_actions(&mut map);
         map
     }
 
@@ -112,6 +124,33 @@ impl<'a> Mode for TextMode {
 
         Box::new(ctx)
     }
+
+    fn configure_view(&self, view: &mut View) {
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(RawDataFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(Utf8Filter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(HighlightFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(HighlightSelectionFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(TabFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(WordWrapFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(ScreenFilter::new()));
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(DrawMarks::new()));
+    }
 }
 
 pub struct TextMode {
@@ -124,151 +163,153 @@ impl TextMode {
         TextMode {}
     }
 
-    pub fn register_actions<'a>(mut map: &'a mut ActionMap<'a>) {
-        register_action(
+    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
+        register_input_stage_action(
             &mut map,
             "text-mode:display-end-of-line",
             display_end_of_line,
         );
 
-        register_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
+        register_input_stage_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-backward",
             move_marks_backward,
         );
 
-        register_action(&mut map, "text-mode:move-marks-forward", move_marks_forward);
-        register_action(
+        register_input_stage_action(&mut map, "text-mode:move-marks-forward", move_marks_forward);
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-next-line",
             move_marks_to_next_line,
         );
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-previous-line",
             move_marks_to_previous_line,
         );
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-to-token-start",
             move_to_token_start,
         );
 
-        register_action(&mut map, "text-mode:move-to-token-end", move_to_token_end);
+        register_input_stage_action(&mut map, "text-mode:move-to-token-end", move_to_token_end);
 
-        register_action(&mut map, "text-mode:page-up", scroll_to_previous_screen);
-        register_action(&mut map, "text-mode:page-down", scroll_to_next_screen);
+        register_input_stage_action(&mut map, "text-mode:page-up", scroll_to_previous_screen);
+        register_input_stage_action(&mut map, "text-mode:page-down", scroll_to_next_screen);
 
-        register_action(&mut map, "text-mode:scroll-up", scroll_up);
-        register_action(&mut map, "text-mode:scroll-down", scroll_down);
+        register_input_stage_action(&mut map, "text-mode:scroll-up", scroll_up);
+        register_input_stage_action(&mut map, "text-mode:scroll-down", scroll_down);
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-start-of-line",
             move_marks_to_start_of_line,
         );
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-end-of-line",
             move_marks_to_end_of_line,
         );
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-start-of-file",
             move_mark_to_start_of_file,
         );
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:move-marks-to-end-of-file",
             move_mark_to_end_of_file,
         );
 
-        register_action(&mut map, "text-mode:undo", undo);
-        register_action(&mut map, "text-mode:redo", redo);
-        register_action(&mut map, "text-mode:remove-codepoint", remove_codepoint);
-        register_action(
+        register_input_stage_action(&mut map, "text-mode:undo", undo);
+        register_input_stage_action(&mut map, "text-mode:redo", redo);
+        register_input_stage_action(&mut map, "text-mode:remove-codepoint", remove_codepoint);
+        register_input_stage_action(
             &mut map,
             "text-mode:remove-previous-codepoint",
             remove_previous_codepoint,
         );
 
-        register_action(&mut map, "text-mode:button-press", button_press);
-        register_action(&mut map, "text-mode:button-release", button_release);
-        register_action(
+        register_input_stage_action(&mut map, "text-mode:button-press", button_press);
+        register_input_stage_action(&mut map, "text-mode:button-release", button_release);
+        register_input_stage_action(
             &mut map,
             "text-mode:move-mark-to-clicked-area",
             button_press,
         );
 
-        register_action(&mut map, "text-mode:center-around-mark", center_around_mark);
-        register_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
+        register_input_stage_action(&mut map, "text-mode:center-around-mark", center_around_mark);
+        register_input_stage_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
 
-        register_action(&mut map, "text-mode:paste", paste);
-        register_action(
+        register_input_stage_action(&mut map, "text-mode:paste", paste);
+        register_input_stage_action(
             &mut map,
             "text-mode:remove-until-end-of-word",
             remove_until_end_of_word,
         );
-        register_action(&mut map, "scroll-to-next-screen", scroll_to_next_screen);
-        register_action(
+        register_input_stage_action(&mut map, "scroll-to-next-screen", scroll_to_next_screen);
+        register_input_stage_action(
             &mut map,
             "scroll-to-previous-screen",
             scroll_to_previous_screen,
         );
 
-        register_action(&mut map, "select-next-view", select_next_view);
+        register_input_stage_action(&mut map, "select-next-view", select_next_view);
 
-        register_action(&mut map, "select-previous-view", select_previous_view);
+        register_input_stage_action(&mut map, "select-previous-view", select_previous_view);
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:clone-and-move-mark-to-previous-line",
             clone_and_move_mark_to_previous_line,
         );
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:clone-and-move-mark-to-next-line",
             clone_and_move_mark_to_next_line,
         );
 
-        register_action(&mut map, "text-mode:pointer-motion", pointer_motion);
+        register_input_stage_action(&mut map, "text-mode:pointer-motion", pointer_motion);
 
-        register_action(
+        register_input_stage_action(
             &mut map,
             "text-mode:set-select-point-at-mark",
             set_selection_points_at_marks,
         );
 
-        register_action(&mut map, "text-mode:copy-selection", copy_selection);
+        register_input_stage_action(&mut map, "text-mode:copy-selection", copy_selection);
 
-        register_action(&mut map, "text-mode:cut-selection", cut_selection);
+        register_input_stage_action(&mut map, "text-mode:cut-selection", cut_selection);
 
-        register_action(&mut map, "editor:cancel", editor_cancel);
+        register_input_stage_action(&mut map, "editor:cancel", editor_cancel);
     }
-}
-
-#[derive(PartialEq)]
-pub enum Stage {
-    PreRender,
-    PostRender,
 }
 
 pub fn run_text_mode_actions(
     editor: &mut Editor,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
-    stage: Stage,
+    stage: editor::Stage,
+    pos: editor::StagePosition,
 ) {
     let actions: Vec<Action> = {
-        let v = &mut view.borrow_mut();
-        if stage == Stage::PreRender {
-            v.pre_render_action.drain(..).collect()
-        } else {
-            v.post_render_action.drain(..).collect()
+        match (stage, pos) {
+            (editor::Stage::Compositing, editor::StagePosition::Pre) => {
+                view.borrow_mut().pre_compose_action.drain(..).collect()
+            }
+
+            (editor::Stage::Compositing, editor::StagePosition::Post) => {
+                view.borrow_mut().post_compose_action.drain(..).collect()
+            }
+
+            _ => {
+                panic!();
+            }
         }
     };
 
@@ -340,9 +381,9 @@ pub fn run_text_mode_actions(
                 let mut doc = doc.as_ref().write().unwrap();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-                env.max_offset = doc.size() as u64;
+                let max_offset = doc.size() as u64;
                 let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-                doc.tag(env.max_offset, marks_offsets);
+                doc.tag(env.current_time, max_offset, marks_offsets);
             }
 
             Action::DedupAndSaveMarks => {
@@ -356,14 +397,14 @@ pub fn run_text_mode_actions(
                 //
                 let doc = v.document.as_ref().unwrap();
                 let mut doc = doc.as_ref().write().unwrap();
-                doc.tag(env.max_offset, marks_offsets);
+                let max_offset = doc.size() as u64;
+                doc.tag(env.current_time, max_offset, marks_offsets);
             }
 
             Action::CancelSelection => {
                 let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.select_point.clear();
-                env.draw_marks = true;
             }
         }
     }
@@ -375,13 +416,13 @@ pub fn run_text_mode_actions(
 
 pub fn save_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
-    v.pre_render_action.push(Action::SaveCurrentMarks);
+    v.pre_compose_action.push(Action::SaveCurrentMarks);
 }
 
 pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
 
-    v.pre_render_action.push(Action::ResetMarks);
+    v.pre_compose_action.push(Action::ResetMarks);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
@@ -409,14 +450,14 @@ pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<V
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
     let v = &mut view.borrow_mut();
-    v.pre_render_action.push(Action::ScrollUp { n: 3 });
+    v.pre_compose_action.push(Action::ScrollUp { n: 3 });
 }
 
 pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // TODO: 3 is from mode configuration
     // env["default-scroll-size"] -> int
     let v = &mut view.borrow_mut();
-    v.pre_render_action.push(Action::ScrollDown { n: 3 });
+    v.pre_compose_action.push(Action::ScrollDown { n: 3 });
 }
 
 // TODO: rename into handle_input_events
@@ -465,8 +506,6 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
         }
     }
 
-    env.draw_marks = true;
-
     // delete selection before insert
     copy_maybe_remove_selection(editor, env, view, false, true);
 
@@ -497,7 +536,8 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
 
             let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
 
-            doc.tag(env.max_offset, marks_offsets);
+            let max_offset = doc.size() as u64;
+            doc.tag(env.current_time, max_offset, marks_offsets);
 
             for m in tm.marks.iter_mut() {
                 if m.offset < view_start {
@@ -513,10 +553,10 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
                 grow += utf8.len() as u64;
             }
 
-            env.max_offset = doc.size() as u64;
+            let max_offset = doc.size() as u64;
             //
             let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-            doc.tag(env.max_offset, marks_offsets);
+            doc.tag(env.current_time, max_offset, marks_offsets);
         }
         v.start_offset += view_growth;
 
@@ -530,10 +570,10 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
     {
         let mut v = view.borrow_mut();
         if center {
-            v.pre_render_action.push(Action::CenterAroundMainMark);
+            v.pre_compose_action.push(Action::CenterAroundMainMark);
         };
 
-        v.pre_render_action.push(Action::CancelSelection);
+        v.pre_compose_action.push(Action::CancelSelection);
     }
 }
 
@@ -547,7 +587,7 @@ pub fn remove_previous_codepoint(
         return;
     }
 
-    let scroll_down = 0;
+    let mut scroll_down = 0;
     let v = &mut view.borrow_mut();
     let start_offset = v.start_offset;
 
@@ -555,29 +595,23 @@ pub fn remove_previous_codepoint(
         let doc = v.document.clone();
         let doc = doc.as_ref().clone().unwrap();
         let mut doc = doc.as_ref().write().unwrap();
-
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-        let codec = tm.text_codec.as_ref();
-
         if doc.size() == 0 {
             return;
         }
 
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+        let max_offset = doc.size() as u64;
+        doc.tag(env.current_time, max_offset, marks_offsets);
 
-        doc.tag(env.max_offset, marks_offsets);
-
-        let mut scroll_down = 0;
         let mut shrink = 0;
         for m in tm.marks.iter_mut() {
-            if m.offset == 0 {
-                continue;
-            }
-
             dbg_println!("before shrink m.offset= {}", m.offset);
-            m.offset -= shrink;
+            m.offset = m.offset.saturating_sub(shrink);
             dbg_println!("after shrink m.offset= {}", m.offset);
+
             if m.offset == 0 {
                 continue;
             }
@@ -606,18 +640,18 @@ pub fn remove_previous_codepoint(
             }
         }
 
-        env.max_offset = doc.size() as u64;
+        let max_offset = doc.size() as u64;
 
         let marks_offsets = tm.marks.iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
+        doc.tag(env.current_time, max_offset, marks_offsets);
     }
 
     // schedule render actions
     {
         if scroll_down > 0 {
-            v.pre_render_action.push(Action::ScrollUp { n: 1 });
+            v.pre_compose_action.push(Action::ScrollUp { n: 1 });
         }
-        v.pre_render_action.push(Action::CheckMarks);
+        v.pre_compose_action.push(Action::CheckMarks);
     }
 }
 
@@ -644,10 +678,10 @@ pub fn undo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
 
     tm.mark_index = 0;
 
-    v.pre_render_action
+    v.pre_compose_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
 
-    v.pre_render_action.push(Action::CancelSelection);
+    v.pre_compose_action.push(Action::CancelSelection);
 }
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
@@ -673,9 +707,9 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
         }
     }
 
-    v.pre_render_action
+    v.pre_compose_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
-    v.pre_render_action.push(Action::CancelSelection);
+    v.pre_compose_action.push(Action::CancelSelection);
 }
 
 /// Remove the current utf8 encoded code point.<br/>
@@ -702,7 +736,8 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
         }
 
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
+        let max_offset = doc.size() as u64;
+        doc.tag(env.current_time, max_offset, marks_offsets);
 
         let mut shrink = 0;
 
@@ -723,13 +758,13 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
             shrink += nr_removed as u64;
         }
 
-        env.max_offset = doc.size() as u64;
+        let _max_offset = doc.size() as u64;
     }
     v.start_offset -= view_shrink;
 
-    v.pre_render_action.push(Action::CheckMarks);
-    v.pre_render_action.push(Action::DedupAndSaveMarks);
-    v.pre_render_action.push(Action::CancelSelection);
+    v.pre_compose_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::DedupAndSaveMarks);
+    v.pre_compose_action.push(Action::CancelSelection);
 }
 
 /// Skip blanks (if any) and remove until end of the word.
@@ -757,7 +792,7 @@ pub fn remove_until_end_of_word(
     }
 
     let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-    doc.tag(size, marks_offsets);
+    doc.tag(env.current_time, size, marks_offsets);
 
     let mut shrink: u64 = 0;
 
@@ -822,12 +857,12 @@ pub fn remove_until_end_of_word(
 
     let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
 
-    env.max_offset = doc.size() as u64;
-    doc.tag(env.max_offset, marks_offsets);
+    let max_offset = doc.size() as u64;
+    doc.tag(env.current_time, max_offset, marks_offsets);
 
-    v.pre_render_action.push(Action::CheckMarks);
-    v.pre_render_action.push(Action::CancelSelection); //TODO register last optype
-                                                       // if doc changes cancel selection ?
+    v.pre_compose_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CancelSelection); //TODO register last optype
+                                                        // if doc changes cancel selection ?
 }
 
 // TODO: maintain main mark Option<(x,y)>
@@ -856,15 +891,15 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     }
 
     if scroll_down > 0 {
-        v.pre_render_action.push(Action::ScrollUp { n: 1 });
+        v.pre_compose_action.push(Action::ScrollUp { n: 1 });
     }
 
-    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CheckMarks);
 
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
     if tm.center_on_mark_move {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -902,23 +937,23 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
             tm.marks.len()
         };
 
-        // TODO:  v.pre_render_action.push(Action::SelectLastMark);
+        // TODO:  v.pre_compose_action.push(Action::SelectLastMark);
         tm.mark_index = nr_marks.saturating_sub(1); // TODO: dedup ?
     }
 
     //      move this check at post render to reschedule render ?
     //      if v.center_on_mark_move {
-    //           v.pre_render_action.push(Action::CenterAroundMainMark);
+    //           v.pre_compose_action.push(Action::CenterAroundMainMark);
     //      }
     {
         let v = &mut view.borrow_mut();
 
         if scroll_down > 0 {
-            v.pre_render_action
+            v.pre_compose_action
                 .push(Action::ScrollDown { n: scroll_down });
         }
 
-        v.pre_render_action.push(Action::CheckMarks);
+        v.pre_compose_action.push(Action::CheckMarks);
     }
 }
 
@@ -950,9 +985,9 @@ pub fn move_marks_to_start_of_line(
     }
 
     if center {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
-    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CheckMarks);
 }
 
 pub fn move_marks_to_end_of_line(
@@ -984,10 +1019,10 @@ pub fn move_marks_to_end_of_line(
     }
 
     if center {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 
-    v.pre_render_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CheckMarks);
 }
 
 fn move_mark_to_previous_line(
@@ -1182,7 +1217,7 @@ pub fn move_marks_to_previous_line(
 
             // TODO: move this to pre/post render
             if idx == 0 {
-                // v.pre_render_action.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
+                // v.pre_compose_action.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
                 let new_offset = marks[idx].offset;
 
                 if new_offset != prev_offset {
@@ -1191,9 +1226,9 @@ pub fn move_marks_to_previous_line(
                     let was_on_screen = screen.contains_offset(prev_offset);
                     let is_on_screen = screen.contains_offset(new_offset);
                     if was_on_screen && !is_on_screen {
-                        v.pre_render_action.push(Action::ScrollUp { n: 1 });
+                        v.pre_compose_action.push(Action::ScrollUp { n: 1 });
                     } else if !is_on_screen {
-                        v.pre_render_action.push(Action::CenterAroundMainMark);
+                        v.pre_compose_action.push(Action::CenterAroundMainMark);
                     }
                 }
             }
@@ -1211,7 +1246,7 @@ pub fn move_marks_to_previous_line(
         }
 
         // schedule actions
-        v.pre_render_action.push(Action::CheckMarks);
+        v.pre_compose_action.push(Action::CheckMarks);
     }
 }
 
@@ -1273,7 +1308,11 @@ pub fn move_mark_to_next_line(
     mark_idx: usize,
 ) -> Option<(u64, u64)> {
     // TODO: m.on_buffer_end() ?
-    let max_offset = env.max_offset;
+
+    let max_offset = {
+        let v = view.borrow();
+        v.document().as_ref().unwrap().read().unwrap().size() as u64
+    };
 
     // off_screen ?
     let mut m_offset;
@@ -1300,7 +1339,7 @@ pub fn move_mark_to_next_line(
             // ADD screen cache ?
             // screen[first mark -> last mark ] ? Ram usage ?
             // updated on resize -> slow
-            v.pre_render_action.push(action);
+            v.pre_compose_action.push(action);
         }
 
         if ok == true {
@@ -1639,12 +1678,12 @@ pub fn move_marks_to_next_line(
         let idx = tm.mark_index;
 
         if !screen.contains_offset(tm.marks[idx].offset) {
-            v.pre_render_action.push(Action::ScrollDown { n: 1 });
-            // TODO ?  v.pre_render_action.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
-            // TODO ?  v.pre_render_action.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
+            v.pre_compose_action.push(Action::ScrollDown { n: 1 });
+            // TODO ?  v.pre_compose_action.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
+            // TODO ?  v.pre_compose_action.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
         }
 
-        v.pre_render_action.push(Action::CheckMarks);
+        v.pre_compose_action.push(Action::CheckMarks);
     }
 }
 
@@ -1692,9 +1731,9 @@ pub fn clone_and_move_mark_to_previous_line(
         let was_on_screen = screen.contains_offset(prev_off);
         let is_on_screen = screen.contains_offset(tm.marks[0].offset);
         if was_on_screen && !is_on_screen {
-            v.pre_render_action.push(Action::ScrollUp { n: 1 });
+            v.pre_compose_action.push(Action::ScrollUp { n: 1 });
         } else if !is_on_screen {
-            v.pre_render_action.push(Action::CenterAroundMainMark);
+            v.pre_compose_action.push(Action::CenterAroundMainMark);
         }
     }
 }
@@ -1725,7 +1764,7 @@ pub fn clone_and_move_mark_to_next_line(
         // doc
         let doc = v.document.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
-        env.max_offset = doc.size() as u64;
+        let _max_offset = doc.size() as u64;
 
         mark_len
     };
@@ -1759,7 +1798,7 @@ pub fn clone_and_move_mark_to_next_line(
         };
 
         if !was_on_screen {
-            v.pre_render_action.push(Action::CenterAroundMainMark);
+            v.pre_compose_action.push(Action::CenterAroundMainMark);
         }
         return;
     }
@@ -1782,9 +1821,9 @@ pub fn clone_and_move_mark_to_next_line(
     };
 
     if was_on_screen && !is_on_screen {
-        v.pre_render_action.push(Action::ScrollDown { n: 1 });
+        v.pre_compose_action.push(Action::ScrollDown { n: 1 });
     } else if !is_on_screen {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -1885,13 +1924,13 @@ pub fn move_mark_to_end_of_file(
 
     //
     let n = v.screen.read().unwrap().height() / 2;
-    v.pre_render_action.push(Action::ScrollUp { n })
+    v.pre_compose_action.push(Action::ScrollUp { n })
 }
 
 pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut v = view.borrow_mut();
     let n = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
-    v.pre_render_action.push(Action::ScrollDown { n });
+    v.pre_compose_action.push(Action::ScrollDown { n });
 }
 
 /*
@@ -1926,8 +1965,9 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 
     let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
 
-    doc.tag(env.max_offset, marks_offsets);
-    // TODO: doc.tag(env.max_offset, marks_offsets, selections);
+    let max_offset = doc.size() as u64;
+    doc.tag(env.current_time, max_offset, marks_offsets);
+    // TODO: doc.tag(env.current_time, max_offset, marks_offsets, selections);
 
     let mut remove_size = Vec::with_capacity(tm.marks.len());
     let single_mark = tm.marks.len() == 1;
@@ -1971,9 +2011,9 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
     let mlen = tm.marks.len();
     assert!(tm.copy_buffer.len() == mlen);
 
-    v.pre_render_action.push(Action::SaveCurrentMarks);
-    v.pre_render_action.push(Action::CheckMarks);
-    v.pre_render_action.push(Action::CancelSelection);
+    v.pre_compose_action.push(Action::SaveCurrentMarks);
+    v.pre_compose_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CancelSelection);
 }
 
 pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
@@ -2011,7 +2051,8 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
         // TODO: run_action(Action::SaveCurrentMarks);
         // save marks: TODO helper functions
         let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-        doc.tag(env.max_offset, marks_offsets);
+        let max_offset = doc.size() as u64;
+        doc.tag(env.current_time, max_offset, marks_offsets);
     }
 
     let mut grow = 0;
@@ -2044,9 +2085,9 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
         }
     }
 
-    v.pre_render_action.push(Action::SaveCurrentMarks);
-    v.pre_render_action.push(Action::CheckMarks);
-    v.pre_render_action.push(Action::CancelSelection);
+    v.pre_compose_action.push(Action::SaveCurrentMarks);
+    v.pre_compose_action.push(Action::CheckMarks);
+    v.pre_compose_action.push(Action::CancelSelection);
 
     // // mark off_screen ?
     // let screen = v.screen.read().unwrap();
@@ -2054,7 +2095,7 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
     // };
     //
     // if center {
-    // v.pre_render_action.push(Action::CenterAroundMainMark);
+    // v.pre_compose_action.push(Action::CenterAroundMainMark);
     // };
 }
 
@@ -2096,7 +2137,7 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     }
 
     if center {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2129,7 +2170,7 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
     }
 
     if sync {
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2139,8 +2180,8 @@ fn _get_main_mark_offset(view: &View) -> u64 {
 }
 
 pub fn set_selection_points_at_marks(
-    editor: &mut Editor,
-    env: &mut EditorEnv,
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) {
     let sync = false;
@@ -2163,7 +2204,7 @@ pub fn set_selection_points_at_marks(
     /* always center ? */
     {
         let mut v = view.borrow_mut();
-        v.pre_render_action.push(Action::CenterAroundMainMark);
+        v.pre_compose_action.push(Action::CenterAroundMainMark);
     }
 }
 
@@ -2343,7 +2384,7 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    let (mut x, mut y) = (x as usize, y as usize);
+    let (x, y) = (x as usize, y as usize);
 
     dbg_println!("VID {} : CLICK @ x({}) Y({})", v.id, x, y);
     // move cursor to (x,y)

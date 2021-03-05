@@ -1,7 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
+use std::sync::Arc;
 use std::sync::RwLock;
-use std::{borrow::BorrowMut, sync::Arc};
 
 //
 use crate::core::editor::user_is_active;
@@ -73,9 +73,10 @@ impl DocumentBuilder {
             buffer_log: BufferLog::new(),
             changed: false,
             is_syncing: false,
+            last_tag_time: std::time::Instant::now(),
         };
 
-        doc.tag(0, vec![0]); // TODO: move to TextMode
+        doc.tag(std::time::Instant::now(), 0, vec![0]); // TODO: move to TextMode
 
         Some(Arc::new(RwLock::new(doc)))
     }
@@ -89,6 +90,7 @@ pub struct Document<'a> {
     pub buffer_log: BufferLog,
     pub changed: bool,
     pub is_syncing: bool,
+    pub last_tag_time: std::time::Instant,
 }
 
 // NB: doc MUST be wrapped in Arc<RwLock<XXX>>
@@ -129,10 +131,17 @@ impl<'a> Document<'a> {
         self.buffer.read(offset, nr_bytes, data)
     }
 
-    pub fn tag(&mut self, offset: u64, marks: Vec<u64>) {
+    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks: Vec<u64>) {
+        if self.last_tag_time == time {
+            // ignore contiguous event ? config
+            // return;
+        }
+
         //dbg_println!("doc.tag(..) offsets = {:?}", marks);
         self.buffer_log
-            .add(offset, BufferOperationType::Tag { marks }, None);
+            .add(offset, BufferOperationType::Tag { time, marks }, None);
+
+        self.last_tag_time = time;
     }
 
     pub fn get_tag_offsets(&mut self) -> Option<Vec<u64>> {
@@ -150,7 +159,7 @@ impl<'a> Document<'a> {
         // get inverted operation
         let op = &self.buffer_log.data[pos];
         match op.op_type {
-            BufferOperationType::Tag { ref marks } => {
+            BufferOperationType::Tag { ref marks, .. } => {
                 Some(marks.clone()) // TODO: Arc<Vec<u64>>
             }
             _ => None,
@@ -229,7 +238,7 @@ impl<'a> Document<'a> {
 
                 op.offset
             }
-            BufferOperationType::Tag { marks: _ } => {
+            BufferOperationType::Tag { marks: _, .. } => {
                 /* nothing */
                 op.offset
             }
@@ -345,7 +354,7 @@ impl<'a> Document<'a> {
 use std::ffi::CString;
 
 extern crate libc;
-use self::libc::{c_void, close, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR, S_IWUSR};
+use self::libc::{c_void, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR, S_IWUSR};
 
 // TODO:
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
