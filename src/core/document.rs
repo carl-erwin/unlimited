@@ -70,6 +70,7 @@ impl DocumentBuilder {
             id: 0,
             name: self.document_name.clone(),
             buffer,
+            cache: DocumentReadCache::new(),
             buffer_log: BufferLog::new(),
             changed: false,
             is_syncing: false,
@@ -83,10 +84,45 @@ impl DocumentBuilder {
 }
 
 #[derive(Debug)]
+struct DocumentReadCache {
+    start: u64,
+    end: u64,
+    data: Vec<u8>,
+}
+
+impl DocumentReadCache {
+    pub fn new() -> Self {
+        DocumentReadCache {
+            start: 0,
+            end: 0,
+            data: vec![],
+        }
+    }
+
+    pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> Option<usize> {
+        if offset < self.start {
+            return None;
+        }
+
+        if offset + nr_bytes as u64 > self.end {
+            return None;
+        }
+
+        let idx = (offset - self.start) as usize;
+        for i in 0..nr_bytes {
+            data.push(self.data[i + idx]);
+        }
+
+        Some(nr_bytes)
+    }
+}
+
+#[derive(Debug)]
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
     buffer: Buffer<'a>,
+    cache: DocumentReadCache,
     pub buffer_log: BufferLog,
     pub changed: bool,
     pub is_syncing: bool,
@@ -109,6 +145,16 @@ impl<'a> Document<'a> {
         Ok(())
     }
 
+    pub fn set_cache(&mut self, start: u64, end: u64) {
+        assert!(start <= end);
+        self.cache.start = start;
+        self.cache.end = end;
+        self.cache.data.clear();
+        let size = (end - start) as usize;
+        self.buffer.read(start, size, &mut self.cache.data);
+        self.cache.data.shrink_to_fit();
+    }
+
     pub fn file_name(&self) -> String {
         self.buffer.file_name.clone()
     }
@@ -128,6 +174,10 @@ impl<'a> Document<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO: use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
+        if let Some(size) = self.cache.read(offset, nr_bytes, data) {
+            return size;
+        };
+
         self.buffer.read(offset, nr_bytes, data)
     }
 
