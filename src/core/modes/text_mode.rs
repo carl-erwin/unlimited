@@ -372,6 +372,17 @@ pub fn run_text_mode_actions(
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.marks.dedup();
                 tm.mark_index = tm.marks.len().saturating_sub(1);
+
+                // TODO: Action::UpdateReadCache(s) vs multiple views
+                // TODO: adjust with v.star_offset ..
+                if tm.marks.len() > 0 {
+                    let min = tm.marks[0].offset;
+                    let max = tm.marks[tm.marks.len() - 1].offset;
+                    let doc = v.document.clone();
+                    let doc = doc.as_ref().unwrap();
+                    let mut doc = doc.as_ref().write().unwrap();
+                    doc.set_cache(min, max);
+                }
             }
 
             Action::SaveCurrentMarks => {
