@@ -244,7 +244,7 @@ pub struct View<'v, 'a> {
     pub layout_direction: LayoutDirection,
     pub layout_ops: Vec<LayoutOperation>,
     // TODO: keep them here or use view.id -> editor.view(view.id)
-    pub children: Vec<Rc<RefCell<View<'v, 'a>>>>,
+    pub children: Vec<Id>,
 
     // move this to corresponding pre/pos stages
     // reset on each event handling
@@ -375,7 +375,7 @@ impl<'v, 'a> View<'v, 'a> {
      to compute previous screen height
      new_h = screen.wheight + (nb_lines * screen.width * max_codec_encode_size)
     */
-    pub fn scroll_up(&mut self, env: &EditorEnv, nb_lines: usize) {
+    pub fn scroll_up(&mut self, editor: &Editor, env: &EditorEnv, nb_lines: usize) {
         if self.start_offset == 0 || nb_lines == 0 {
             return;
         }
@@ -441,7 +441,8 @@ impl<'v, 'a> View<'v, 'a> {
         // build_screen from this offset
         // the window MUST cover to screen => height * 2
         // TODO: always in last index ?
-        let lines = self.get_lines_offsets_direct(env, m.offset, offset_to_find, width, height);
+        let lines =
+            self.get_lines_offsets_direct(editor, env, m.offset, offset_to_find, width, height);
 
         // find line index
         let index = match lines
@@ -461,7 +462,7 @@ impl<'v, 'a> View<'v, 'a> {
         self.start_offset = lines[index].0;
     }
 
-    pub fn scroll_down(&mut self, env: &EditorEnv, nb_lines: usize) {
+    pub fn scroll_down(&mut self, editor: &Editor, env: &EditorEnv, nb_lines: usize) {
         dbg_println!("SCROLL DOWN VID = {}", self.id);
 
         // nothing to do :-( ?
@@ -481,7 +482,7 @@ impl<'v, 'a> View<'v, 'a> {
 
         if nb_lines >= self.screen.read().unwrap().height() {
             // slower : call layout builder to build  nb_lines - screen.height()
-            self.scroll_down_off_screen(env, max_offset, nb_lines);
+            self.scroll_down_off_screen(editor, env, max_offset, nb_lines);
             return;
         }
 
@@ -498,7 +499,13 @@ impl<'v, 'a> View<'v, 'a> {
         }
     }
 
-    fn scroll_down_off_screen(&mut self, env: &EditorEnv, max_offset: u64, nb_lines: usize) {
+    fn scroll_down_off_screen(
+        &mut self,
+        editor: &Editor,
+        env: &EditorEnv,
+        max_offset: u64,
+        nb_lines: usize,
+    ) {
         // will be slower than just reading the current screen
 
         let screen_width = self.screen.read().unwrap().width();
@@ -512,6 +519,7 @@ impl<'v, 'a> View<'v, 'a> {
 
         // will call all layout filters
         let lines = self.get_lines_offsets_direct(
+            editor,
             env,
             start_offset,
             end_offset,
@@ -536,6 +544,7 @@ impl<'v, 'a> View<'v, 'a> {
     /// using the run_compositing_stage function until end_offset is reached.<br/>
     pub fn get_lines_offsets_direct(
         &mut self,
+        editor: &Editor,
         env: &EditorEnv,
         start_offset: u64,
         end_offset: u64,
@@ -565,7 +574,7 @@ impl<'v, 'a> View<'v, 'a> {
         screen.is_off_screen = true;
 
         loop {
-            run_compositing_stage_direct(env, &self, m.offset, max_offset, &mut screen);
+            run_compositing_stage_direct(editor, env, &self, m.offset, max_offset, &mut screen);
             if screen.push_count == 0 {
                 return v;
             }
@@ -629,11 +638,11 @@ impl<'v, 'a> View<'v, 'a> {
         }
     }
 
-    pub fn center_around_offset(&mut self, env: &EditorEnv, offset: u64) {
+    pub fn center_around_offset(&mut self, editor: &Editor, env: &EditorEnv, offset: u64) {
         // TODO use env.center_offset
         self.start_offset = offset;
         let h = self.screen.read().unwrap().height() / 2;
-        self.scroll_up(env, h);
+        self.scroll_up(editor, env, h);
     }
 } // impl View
 
@@ -694,6 +703,7 @@ pub fn run_stage(
 /// It (will) run the configured filters/plugins.<br/>
 /// using the run_compositing_stage function until end_offset is reached.<br/>
 pub fn get_lines_offsets(
+    editor: &Editor,
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
     start_offset: u64,
@@ -728,7 +738,7 @@ pub fn get_lines_offsets(
     screen.is_off_screen = true;
 
     loop {
-        run_compositing_stage(env, &view, m.offset, max_offset, &mut screen);
+        run_compositing_stage(editor, env, &view, m.offset, max_offset, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
@@ -793,7 +803,7 @@ pub fn get_lines_offsets(
 }
 
 pub fn compute_view_layout(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) -> Option<()> {
@@ -804,7 +814,7 @@ pub fn compute_view_layout(
 
     // TODO: reuse v.screen
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
-    run_compositing_stage_direct(env, &v, v.start_offset, max_offset, &mut screen);
+    run_compositing_stage_direct(editor, env, &v, v.start_offset, max_offset, &mut screen);
     if let Some(last_offset) = screen.last_offset {
         v.end_offset = last_offset;
     }

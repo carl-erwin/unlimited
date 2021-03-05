@@ -410,8 +410,8 @@ pub fn split_with_direction(
         }
 
         let id = view.id;
+        v.children.push(id);
         let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
         editor.view_map.insert(id, Rc::clone(&rc));
 
         let _view = match dir {
@@ -537,8 +537,8 @@ pub fn split_vertically(
         }
 
         let id = view.id;
+        v.children.push(id);
         let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
         editor.view_map.insert(id, Rc::clone(&rc));
 
         x += *size;
@@ -642,8 +642,8 @@ pub fn split_horizontally(
         }
 
         let id = view.id;
+        v.children.push(id);
         let rc = Rc::new(RefCell::new(view));
-        v.children.push(Rc::clone(&rc));
         editor.view_map.insert(id, Rc::clone(&rc));
 
         y += *size;
@@ -820,7 +820,7 @@ fn clip_coordinates_xy(
                 }
 
                 for child in v.children.iter() {
-                    let child_v = child.borrow();
+                    let child_v = editor.view_map.get(&child).unwrap().borrow_mut();
                     let screen = child_v.screen.read().unwrap();
 
                     dbg_println!(
@@ -841,7 +841,7 @@ fn clip_coordinates_xy(
 
                 let mut last_id = 0;
                 for (idx, child) in v.children.iter().enumerate() {
-                    let child_v = child.borrow();
+                    let child_v = editor.view_map.get(&child).unwrap().borrow_mut();
                     let screen = child_v.screen.read().unwrap();
 
                     last_id = child_v.id;

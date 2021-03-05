@@ -318,12 +318,12 @@ pub fn run_text_mode_actions(
             Action::ScrollUp { n } => {
                 let v = &mut view.borrow_mut();
 
-                v.scroll_up(env, *n);
+                v.scroll_up(editor, env, *n);
             }
             Action::ScrollDown { n } => {
                 let v = &mut view.borrow_mut();
 
-                v.scroll_down(env, *n);
+                v.scroll_down(editor, env, *n);
             }
             Action::CenterAroundMainMark => {
                 center_around_mark(editor, env, &view);
@@ -352,7 +352,7 @@ pub fn run_text_mode_actions(
             }
             Action::MoveMarksToPreviousLine => {}
             Action::MoveMarkToNextLine { idx } => {
-                move_mark_to_next_line(env, view, *idx);
+                move_mark_to_next_line(editor, env, view, *idx);
                 env.cur_mark_index = None;
             }
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
@@ -1037,7 +1037,7 @@ pub fn move_marks_to_end_of_line(
 }
 
 fn move_mark_to_previous_line(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
 
     v: &mut View,
@@ -1135,7 +1135,14 @@ fn move_mark_to_previous_line(
         // TODO: loop until m.offset is on screen
 
         let lines = {
-            v.get_lines_offsets_direct(env, start_offset, end_offset, screen_width, screen_height)
+            v.get_lines_offsets_direct(
+                editor,
+                env,
+                start_offset,
+                end_offset,
+                screen_width,
+                screen_height,
+            )
         };
 
         // find "previous" line index
@@ -1314,6 +1321,7 @@ pub fn move_on_screen_mark_to_next_line(
 
 // remove multiple borrows
 pub fn move_mark_to_next_line(
+    editor: &Editor,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
     mark_idx: usize,
@@ -1394,6 +1402,7 @@ pub fn move_mark_to_next_line(
         let lines = {
             let mut view = view.borrow_mut();
             view.get_lines_offsets_direct(
+                editor,
                 env,
                 start_offset,
                 end_offset,
@@ -1543,12 +1552,7 @@ fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
 /*
 
 */
-pub fn move_marks_to_next_line(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-
-    view: &Rc<RefCell<View>>,
-) {
+pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     // allocate temporary screen
     let (mut screen, start_offset) = allocate_temporary_screen_and_start_offset(&view);
     screen.is_off_screen = true;
@@ -1591,7 +1595,7 @@ pub fn move_marks_to_next_line(
 
             dbg_println!("compute layout from offset {}", m.offset);
 
-            run_compositing_stage_direct(env, &v, m.offset, max_offset, &mut screen);
+            run_compositing_stage_direct(editor, env, &v, m.offset, max_offset, &mut screen);
 
             dbg_println!("screen first offset {:?}", screen.first_offset);
             dbg_println!("screen last offset {:?}", screen.last_offset);
@@ -1750,7 +1754,7 @@ pub fn clone_and_move_mark_to_previous_line(
 }
 
 pub fn clone_and_move_mark_to_next_line(
-    _editor: &mut Editor,
+    editor: &mut Editor,
     env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
@@ -1781,7 +1785,7 @@ pub fn clone_and_move_mark_to_next_line(
     };
 
     // NB: borrows: will use rendering pipeline to compute the marks_offset
-    let offsets = move_mark_to_next_line(env, view, mark_len - 1); // TODO return offset (old, new)
+    let offsets = move_mark_to_next_line(editor, env, view, mark_len - 1); // TODO return offset (old, new)
     if offsets.is_none() {
         dbg_println!(" cannot move mark to next line");
         return;
@@ -1887,7 +1891,7 @@ pub fn scroll_to_previous_screen(
     {
         let mut v = view.borrow_mut();
         let nb = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
-        v.scroll_up(env, nb);
+        v.scroll_up(editor, env, nb);
     }
 
     // TODO: add hints to trigger mar moves
@@ -2360,6 +2364,10 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
         }
     };
 
+    if !v.check_mode_ctx::<TextModeContext>("text-mode") {
+        return;
+    }
+
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     if (button as usize) < tm.button_state.len() {
@@ -2562,14 +2570,14 @@ pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &R
 }
 
 // TODO: view.center_arrout_offset()
-pub fn center_around_mark(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_around_mark(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let mut v = view.borrow_mut();
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
-    v.center_around_offset(env, offset);
+    v.center_around_offset(editor, env, offset);
 }
 
-pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn center_around_offset(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     if let Some(center_offset) = env.center_offset {
         let mut v = view.borrow_mut();
         let offset = {
@@ -2578,7 +2586,7 @@ pub fn center_around_offset(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_around_offset(env, offset); // TODO: enum { top center bottom } ? in text-mode
+        v.center_around_offset(editor, env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
 }
 

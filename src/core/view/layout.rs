@@ -21,6 +21,7 @@ use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::screen::Screen;
 
+use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 
 use crate::core::mark::Mark;
@@ -1331,6 +1332,7 @@ fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
 }
 
 pub fn run_compositing_stage(
+    editor: &Editor,
     env: &EditorEnv,
     view: &Rc<RefCell<View>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
@@ -1338,7 +1340,7 @@ pub fn run_compositing_stage(
     screen: &mut Screen,
 ) {
     let view = view.borrow();
-    run_compositing_stage_direct(env, &view, base_offset, max_offset, screen)
+    run_compositing_stage_direct(editor, env, &view, base_offset, max_offset, screen)
 }
 
 // This function can be considered as the core of the editor.<br/>
@@ -1352,6 +1354,7 @@ pub fn run_compositing_stage(
 //  4 - tabulation
 //  5 - word wrap
 fn compose_children(
+    editor: &Editor,
     editor_env: &EditorEnv,
     view: &View,
     _base_offset: u64, // default view.start_offset start -> Option<u64>
@@ -1387,7 +1390,7 @@ fn compose_children(
             break;
         }
 
-        let mut child_v = v.borrow_mut();
+        let mut child_v = editor.view_map.get(v).unwrap().borrow_mut();
         {
             child_v.x = x;
             child_v.y = y;
@@ -1402,6 +1405,7 @@ fn compose_children(
 
             let mut child_screen = Screen::new(w, h);
             run_compositing_stage_direct(
+                editor,
                 editor_env,
                 &child_v,
                 child_v.start_offset,
@@ -1433,6 +1437,7 @@ fn compose_children(
 
 // core
 pub fn run_compositing_stage_direct(
+    editor: &Editor,
     editor_env: &EditorEnv,
     view: &View,
     base_offset: u64, // default view.start_offset start -> Option<u64>
@@ -1445,7 +1450,14 @@ pub fn run_compositing_stage_direct(
     }
 
     // (recursive) children compositing
-    let draw = compose_children(&editor_env, &view, base_offset, max_offset, &mut screen);
+    let draw = compose_children(
+        &editor,
+        &editor_env,
+        &view,
+        base_offset,
+        max_offset,
+        &mut screen,
+    );
     if draw {
         return;
     }
@@ -1465,10 +1477,21 @@ pub fn run_compositing_stage_direct(
     assert_eq!(0, layout_env.screen.push_count());
 
     // setup
+    let mut compose_filters = view.compose_filters.borrow_mut();
+    if compose_filters.len() == 0 {
+        // hack
+        let mut cpi = CodepointInfo::new();
+        cpi.is_selected = true;
+        loop {
+            let (b, _) = layout_env.screen.push(cpi.clone());
+            if b == false {
+                break;
+            }
+        }
+    }
+
     let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
     let mut filter_out = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
-
-    let mut compose_filters = view.compose_filters.borrow_mut();
 
     // TODO
     for f in compose_filters.iter_mut() {
