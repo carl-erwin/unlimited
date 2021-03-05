@@ -1475,6 +1475,10 @@ pub fn run_compositing_stage_direct(
         f.setup(&mut layout_env, &view);
     }
 
+    if compose_filters.len() == 0 {
+        layout_env.quit = true;
+    }
+
     // is interactive rendering possible ?
     while layout_env.quit == false {
         for f in compose_filters.iter_mut() {
