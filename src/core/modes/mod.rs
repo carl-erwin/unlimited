@@ -1,12 +1,24 @@
 // Copyright (c) Carl-Erwin Griffith
 use std::any::Any;
 
+pub mod basic_editor;
+pub mod core_mode;
+pub mod hsplit_mode;
+pub mod mode_template;
 pub mod text_mode;
+pub mod vsplit_mode;
+
+pub use crate::core::editor::Editor;
+pub use crate::core::editor::EditorEnv;
 
 pub use crate::core::editor::InputStageActionMap;
 pub use crate::core::view::View;
 
-pub use text_mode::TextMode; // TODO remove
+pub use basic_editor::BasicEditorMode;
+pub use core_mode::CoreMode;
+pub use hsplit_mode::HsplitMode;
+pub use text_mode::TextMode;
+pub use vsplit_mode::VsplitMode;
 
 pub trait Mode {
     // Returns the mode name
@@ -16,5 +28,12 @@ pub trait Mode {
     //    fn build_render_map() -> RenderMap;
 
     fn alloc_ctx(&self) -> Box<dyn Any>;
-    fn configure_view(&self, view: &mut View);
+
+    fn configure_view(
+        &self,
+        mut editor: &mut Editor<'static>,
+        mut env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+    ) {
+    }
 }

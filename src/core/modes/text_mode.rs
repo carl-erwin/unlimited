@@ -3,6 +3,9 @@
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
 
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -10,7 +13,6 @@ use std::time::Instant;
 use crate::sort_tuple_pair;
 
 use crate::core::editor::Editor;
-
 use crate::core::editor::EditorEnv;
 
 use crate::dbg_println;
@@ -33,6 +35,7 @@ use crate::core::event::PointerEvent;
 use crate::core::view::layout::run_compositing_stage_direct;
 
 use crate::core::editor;
+
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
@@ -43,7 +46,6 @@ use crate::core::view::Action;
 use super::Mode;
 
 //
-use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::layout::DrawMarks;
 use crate::core::view::layout::HighlightFilter;
@@ -53,6 +55,9 @@ use crate::core::view::layout::ScreenFilter;
 use crate::core::view::layout::TabFilter;
 use crate::core::view::layout::Utf8Filter;
 use crate::core::view::layout::WordWrapFilter;
+
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutOperation; // <---------- move to layout // <---------- move to layout
 
 pub type Id = u64;
 
@@ -66,6 +71,7 @@ pub struct TextModeContext {
     pub center_on_mark_move: bool,
     pub scroll_on_mark_move: bool,
     pub text_codec: Box<dyn TextCodec>,
+    pub doc_revision: usize,
     pub mark_index: usize, // move to text mode
     pub marks: Vec<Mark>,
     pub select_point: Vec<Mark>,
@@ -113,6 +119,7 @@ impl<'a> Mode for TextMode {
             center_on_mark_move: false, // add movement enums and pass it to center fn
             scroll_on_mark_move: true,
             text_codec: Box::new(utf8::Utf8Codec::new()),
+            doc_revision: 0,
             marks,
             copy_buffer,
             mark_index: 0,
@@ -125,28 +132,54 @@ impl<'a> Mode for TextMode {
         Box::new(ctx)
     }
 
-    fn configure_view(&self, view: &mut View) {
+    fn configure_view(
+        &self,
+        mut editor: &mut Editor<'static>,
+        mut env: &mut EditorEnv<'static>,
+        mut view: &mut View<'static>,
+    ) {
+        dbg_println!("config text-mode for VID {}", view.id);
+
+        // setup first undo/redo tag
+        let doc = view.document.clone();
+        {
+            let doc = doc.as_ref().unwrap();
+            let mut doc = doc.as_ref().write().unwrap();
+            doc.tag(std::time::Instant::now(), 0, vec![0]);
+        }
+
+        // NB: Execution in push order
+
         view.compose_filters
             .borrow_mut()
             .push(Box::new(RawDataFilter::new()));
+        //
         view.compose_filters
             .borrow_mut()
             .push(Box::new(Utf8Filter::new()));
+        //
         view.compose_filters
             .borrow_mut()
             .push(Box::new(HighlightFilter::new()));
+        //
         view.compose_filters
             .borrow_mut()
             .push(Box::new(HighlightSelectionFilter::new()));
+        //
+
         view.compose_filters
             .borrow_mut()
             .push(Box::new(TabFilter::new()));
+
+        // NB: Word Wrap after tab expansion
         view.compose_filters
             .borrow_mut()
             .push(Box::new(WordWrapFilter::new()));
+        //
         view.compose_filters
             .borrow_mut()
             .push(Box::new(ScreenFilter::new()));
+        //
         view.compose_filters
             .borrow_mut()
             .push(Box::new(DrawMarks::new()));
@@ -290,40 +323,23 @@ impl TextMode {
     }
 }
 
-pub fn run_text_mode_actions(
+pub fn run_text_mode_actions_vec(
     editor: &mut Editor,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
-    stage: editor::Stage,
-    pos: editor::StagePosition,
+    actions: &Vec<Action>,
 ) {
-    let actions: Vec<Action> = {
-        match (stage, pos) {
-            (editor::Stage::Compositing, editor::StagePosition::Pre) => {
-                view.borrow_mut().pre_compose_action.drain(..).collect()
-            }
-
-            (editor::Stage::Compositing, editor::StagePosition::Post) => {
-                view.borrow_mut().post_compose_action.drain(..).collect()
-            }
-
-            _ => {
-                panic!();
-            }
-        }
-    };
-
     for a in actions.iter() {
         match a {
             Action::ScrollUp { n } => {
                 let v = &mut view.borrow_mut();
 
-                v.scroll_up(editor, env, *n);
+                scroll_view_up(v, editor, env, *n);
             }
             Action::ScrollDown { n } => {
                 let v = &mut view.borrow_mut();
 
-                v.scroll_down(editor, env, *n);
+                scroll_view_down(v, editor, env, *n);
             }
             Action::CenterAroundMainMark => {
                 center_around_mark(editor, env, &view);
@@ -353,7 +369,6 @@ pub fn run_text_mode_actions(
             Action::MoveMarksToPreviousLine => {}
             Action::MoveMarkToNextLine { idx } => {
                 move_mark_to_next_line(editor, env, view, *idx);
-                env.cur_mark_index = None;
             }
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
 
@@ -385,18 +400,6 @@ pub fn run_text_mode_actions(
                 }
             }
 
-            Action::SaveCurrentMarks => {
-                let v = &mut view.borrow_mut();
-                let doc = v.document.clone();
-                let doc = doc.as_ref().unwrap();
-                let mut doc = doc.as_ref().write().unwrap();
-                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-                let max_offset = doc.size() as u64;
-                let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-                doc.tag(env.current_time, max_offset, marks_offsets);
-            }
-
             Action::DedupAndSaveMarks => {
                 let v = &mut view.borrow_mut();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -410,6 +413,8 @@ pub fn run_text_mode_actions(
                 let mut doc = doc.as_ref().write().unwrap();
                 let max_offset = doc.size() as u64;
                 doc.tag(env.current_time, max_offset, marks_offsets);
+
+                dbg_println!("MARK DedupAndSaveMarks doc revision {}", doc.nr_changes());
             }
 
             Action::CancelSelection => {
@@ -421,14 +426,78 @@ pub fn run_text_mode_actions(
     }
 }
 
+pub fn run_text_mode_actions(
+    mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+    stage: editor::Stage,
+    pos: editor::StagePosition,
+) {
+    {
+        let mut v = view.borrow_mut();
+        if v.document.is_none() {
+            return;
+        }
+        let doc = v.document.clone();
+        let doc = doc.as_ref().unwrap();
+        let doc = doc.as_ref().read().unwrap();
+
+        if !v.check_mode_ctx::<TextModeContext>("text-mode") {
+            return;
+        }
+    }
+
+    let actions: Vec<Action> = {
+        match (stage, pos) {
+            (editor::Stage::Input, editor::StagePosition::Pre) => {
+                dbg_println!("INPUT PRE MARKS SAVE");
+
+                let mut v = view.borrow_mut();
+                let doc = v.document.clone();
+                let doc = doc.as_ref().unwrap();
+                let doc = doc.as_ref().read().unwrap();
+
+                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+                // TODO: save marks before changes
+                // ex: cut-line
+                // undo must restore marks before cut
+                tm.doc_revision = doc.buffer_log.data.len();
+                return;
+            }
+
+            (editor::Stage::Input, editor::StagePosition::Post) => {
+                let mut v = view.borrow_mut();
+                let doc = v.document.clone();
+                let doc = doc.as_ref().unwrap();
+                let doc = doc.as_ref().read().unwrap();
+                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                if tm.doc_revision == doc.buffer_log.data.len() {
+                    return;
+                }
+                vec![Action::DedupAndSaveMarks]
+            }
+
+            (editor::Stage::Compositing, editor::StagePosition::Pre) => {
+                view.borrow_mut().pre_compose_action.drain(..).collect()
+            }
+
+            (editor::Stage::Compositing, editor::StagePosition::Post) => {
+                view.borrow_mut().post_compose_action.drain(..).collect()
+            }
+
+            _ => {
+                panic!();
+            }
+        }
+    };
+
+    run_text_mode_actions_vec(&mut editor, &mut env, &view, &actions);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // text mode functions
-
-pub fn save_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.borrow_mut();
-    v.pre_compose_action.push(Action::SaveCurrentMarks);
-}
 
 pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
@@ -475,9 +544,11 @@ pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell
 /// Insert an single element/array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let array = {
-        assert!(env.trigger.len() > 0);
-        let idx = env.trigger.len() - 1;
-        match &env.trigger[idx] {
+        let v = view.borrow();
+
+        assert!(v.input_ctx.trigger.len() > 0);
+        let idx = v.input_ctx.trigger.len() - 1;
+        match &v.input_ctx.trigger[idx] {
             InputEvent::KeyPress {
                 mods:
                     KeyModifiers {
@@ -545,11 +616,6 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
 
             let mut grow: u64 = 0;
 
-            let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-
-            let max_offset = doc.size() as u64;
-            doc.tag(env.current_time, max_offset, marks_offsets);
-
             for m in tm.marks.iter_mut() {
                 if m.offset < view_start {
                     view_growth += utf8.len() as u64;
@@ -563,11 +629,6 @@ pub fn insert_codepoint_array(editor: &mut Editor, env: &mut EditorEnv, view: &R
 
                 grow += utf8.len() as u64;
             }
-
-            let max_offset = doc.size() as u64;
-            //
-            let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-            doc.tag(env.current_time, max_offset, marks_offsets);
         }
         v.start_offset += view_growth;
 
@@ -613,10 +674,6 @@ pub fn remove_previous_codepoint(
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
 
-        let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-        let max_offset = doc.size() as u64;
-        doc.tag(env.current_time, max_offset, marks_offsets);
-
         let mut shrink = 0;
         for m in tm.marks.iter_mut() {
             dbg_println!("before shrink m.offset= {}", m.offset);
@@ -650,11 +707,6 @@ pub fn remove_previous_codepoint(
                 scroll_down = 1;
             }
         }
-
-        let max_offset = doc.size() as u64;
-
-        let marks_offsets = tm.marks.iter().map(|m| m.offset).collect();
-        doc.tag(env.current_time, max_offset, marks_offsets);
     }
 
     // schedule render actions
@@ -678,16 +730,17 @@ pub fn undo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
     let marks = &mut tm.marks;
 
     doc.undo_until_tag();
-    doc.undo_until_tag();
     if let Some(marks_offsets) = doc.get_tag_offsets() {
-        //dbg_println!("restore marks {:?}", marks_offsets);
+        dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
             marks.push(Mark { offset });
         }
+    } else {
+        dbg_println!("TAG not found");
     }
 
-    tm.mark_index = 0;
+    tm.mark_index = 0; // ??
 
     v.pre_compose_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
@@ -708,7 +761,6 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
 
     tm.mark_index = 0;
 
-    doc.redo_until_tag();
     doc.redo_until_tag();
     if let Some(marks_offsets) = doc.get_tag_offsets() {
         //dbg_println!("restore marks {:?}", marks_offsets);
@@ -746,10 +798,6 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
             return;
         }
 
-        let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-        let max_offset = doc.size() as u64;
-        doc.tag(env.current_time, max_offset, marks_offsets);
-
         let mut shrink = 0;
 
         for m in tm.marks.iter_mut() {
@@ -782,7 +830,7 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
 /// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
 pub fn remove_until_end_of_word(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
 
     view: &Rc<RefCell<View>>,
 ) {
@@ -801,9 +849,6 @@ pub fn remove_until_end_of_word(
     if size == 0 {
         return;
     }
-
-    let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-    doc.tag(env.current_time, size, marks_offsets);
 
     let mut shrink: u64 = 0;
 
@@ -865,11 +910,6 @@ pub fn remove_until_end_of_word(
 
         m.offset = start.offset;
     }
-
-    let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-
-    let max_offset = doc.size() as u64;
-    doc.tag(env.current_time, max_offset, marks_offsets);
 
     v.pre_compose_action.push(Action::CheckMarks);
     v.pre_compose_action.push(Action::CancelSelection); //TODO register last optype
@@ -1040,7 +1080,7 @@ fn move_mark_to_previous_line(
     editor: &mut Editor,
     env: &mut EditorEnv,
 
-    v: &mut View,
+    mut v: &mut View,
     midx: usize,
     marks: &mut Vec<Mark>,
 ) {
@@ -1135,7 +1175,8 @@ fn move_mark_to_previous_line(
         // TODO: loop until m.offset is on screen
 
         let lines = {
-            v.get_lines_offsets_direct(
+            crate::core::modes::text_mode::get_lines_offsets_direct(
+                &mut v,
                 editor,
                 env,
                 start_offset,
@@ -1401,7 +1442,8 @@ pub fn move_mark_to_next_line(
         // with same width/heigh as v.screen
         let lines = {
             let mut view = view.borrow_mut();
-            view.get_lines_offsets_direct(
+            get_lines_offsets_direct(
+                &mut view,
                 editor,
                 env,
                 start_offset,
@@ -1774,7 +1816,6 @@ pub fn clone_and_move_mark_to_next_line(
         };
 
         tm.mark_index = mark_len - 1;
-        env.cur_mark_index = Some(tm.mark_index);
 
         // doc
         let doc = v.document.as_ref().unwrap();
@@ -1891,7 +1932,7 @@ pub fn scroll_to_previous_screen(
     {
         let mut v = view.borrow_mut();
         let nb = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
-        v.scroll_up(editor, env, nb);
+        scroll_view_up(&mut v, editor, env, nb);
     }
 
     // TODO: add hints to trigger mar moves
@@ -1955,11 +1996,14 @@ pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &
       check behavior when the marks offset cross each other
       the buffer log is not aware of cut/paste/multicursor
 */
-pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &mut view.borrow_mut();
-
+pub fn cut_to_end_of_line(
+    mut editor: &mut Editor,
+    mut env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+) {
     // doc read only ?
     {
+        let v = view.borrow();
         let doc = v.document.clone();
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
@@ -1967,6 +2011,16 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
             return;
         }
     }
+
+    // save marks
+    run_text_mode_actions_vec(
+        &mut editor,
+        &mut env,
+        &view,
+        &vec![Action::DedupAndSaveMarks],
+    );
+
+    let v = &mut view.borrow_mut();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
@@ -1978,16 +2032,10 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
 
     tm.copy_buffer.clear();
 
-    let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-
-    let max_offset = doc.size() as u64;
-    doc.tag(env.current_time, max_offset, marks_offsets);
-    // TODO: doc.tag(env.current_time, max_offset, marks_offsets, selections);
-
     let mut remove_size = Vec::with_capacity(tm.marks.len());
     let single_mark = tm.marks.len() == 1;
 
-    // this will join line whith multi-marks
+    // this will join line with multi-marks
     let remove_eol = false && !single_mark; // && join_lines // TODO: use option join-cut-lines
 
     // TODO: compute range, check overlaps
@@ -2026,12 +2074,11 @@ pub fn cut_to_end_of_line(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<R
     let mlen = tm.marks.len();
     assert!(tm.copy_buffer.len() == mlen);
 
-    v.pre_compose_action.push(Action::SaveCurrentMarks);
     v.pre_compose_action.push(Action::CheckMarks);
     v.pre_compose_action.push(Action::CancelSelection);
 }
 
-pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
 
     // doc read only ?
@@ -2058,16 +2105,6 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
     dbg_println!("copy_buffer.len() {}", tm.copy_buffer.len());
     if tm.copy_buffer.len() == 0 {
         return;
-    }
-
-    // TODO: post_eval stage(editor, env, view, action as member of mode);
-    // view::run_text_mode_actions(_editor, env, view, vec![]);
-    {
-        // TODO: run_action(Action::SaveCurrentMarks);
-        // save marks: TODO helper functions
-        let marks_offsets: Vec<u64> = marks.iter().map(|m| m.offset).collect();
-        let max_offset = doc.size() as u64;
-        doc.tag(env.current_time, max_offset, marks_offsets);
     }
 
     let mut grow = 0;
@@ -2100,7 +2137,6 @@ pub fn paste(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>
         }
     }
 
-    v.pre_compose_action.push(Action::SaveCurrentMarks);
     v.pre_compose_action.push(Action::CheckMarks);
     v.pre_compose_action.push(Action::CancelSelection);
 
@@ -2341,10 +2377,10 @@ pub fn cut_selection(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     copy_maybe_remove_selection(editor, env, view, true, true);
 }
 
-pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
 
-    let (button, x, y) = match env.trigger[0] {
+    let (button, x, y) = match v.input_ctx.trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {
             ButtonEvent {
                 mods:
@@ -2486,10 +2522,10 @@ pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell
     // s // to internal view.borrow_mut().state.s
 }
 
-pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn button_release(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
 
-    let (button, _x, _y) = match env.trigger[0] {
+    let (button, _x, _y) = match v.input_ctx.trigger[0] {
         InputEvent::ButtonRelease(ref button_event) => match button_event {
             ButtonEvent {
                 mods:
@@ -2509,6 +2545,10 @@ pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
         }
     };
 
+    if !v.check_mode_ctx::<TextModeContext>("text-mode") {
+        return;
+    }
+
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     if (button as usize) < tm.button_state.len() {
         tm.button_state[button as usize] = 0;
@@ -2516,13 +2556,17 @@ pub fn button_release(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
 }
 
 // TODO: add enter /leave clipped region detection
-pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
     let v = &mut view.borrow_mut();
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
+    if !v.check_mode_ctx::<TextModeContext>("text-mode") {
+        return;
+    }
+
     // TODO: match events
-    match &env.trigger[0] {
+    match &v.input_ctx.trigger[0] {
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
             // TODO: change screen (x,y) to i32 ? and filter in functions ?
 
@@ -2562,11 +2606,15 @@ pub fn pointer_motion(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCe
 }
 
 pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
-    env.view_id = std::cmp::min(env.view_id + 1, editor.view_map.len() - 1);
+    env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
+    env.view_id = editor.root_views[env.root_view_index];
+    dbg_println!("select view_id {}", env.view_id);
 }
 
-pub fn select_previous_view(_editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
-    env.view_id = std::cmp::max(env.view_id - 1, 1);
+pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RefCell<View>>) {
+    env.root_view_index = env.root_view_index.saturating_sub(1);
+    env.view_id = editor.root_views[env.root_view_index];
+    dbg_println!("select view_id {}", env.view_id);
 }
 
 // TODO: view.center_arrout_offset()
@@ -2574,7 +2622,7 @@ pub fn center_around_mark(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
     let mut v = view.borrow_mut();
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
-    v.center_around_offset(editor, env, offset);
+    center_view_around_offset(&mut v, editor, env, offset);
 }
 
 pub fn center_around_offset(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
@@ -2586,7 +2634,7 @@ pub fn center_around_offset(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        v.center_around_offset(editor, env, offset); // TODO: enum { top center bottom } ? in text-mode
+        center_view_around_offset(&mut v, editor, env, offset); // TODO: enum { top center bottom } ? in text-mode
     }
 }
 
@@ -2607,4 +2655,287 @@ pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     dbg_println!("\\n -> {}", c);
 
     tm.char_map.as_mut().unwrap().insert('\n', c);
+}
+
+/// This function computes start/end of lines between start_offset end_offset.<br/>
+/// It (will) run the configured filters/plugins.<br/>
+/// using the run_compositing_stage function until end_offset is reached.<br/>
+pub fn get_lines_offsets_direct(
+    view: &mut View,
+    editor: &Editor,
+    env: &EditorEnv,
+    start_offset: u64,
+    end_offset: u64,
+    screen_width: usize,
+    screen_height: usize,
+) -> Vec<(u64, u64)> {
+    let mut v = Vec::<(u64, u64)>::new();
+    let mut m = Mark::new(start_offset); // TODO: rename into screen_start
+
+    let max_offset = {
+        let doc = view.document.clone();
+        let doc = doc.as_ref().unwrap();
+        let doc = doc.as_ref().read().unwrap();
+
+        let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        // get start of the line @offset
+        m.move_to_start_of_line(&doc, codec);
+        doc.size() as u64
+    };
+
+    // and build tmp screens until end_offset if found
+    let screen_width = ::std::cmp::max(1, screen_width);
+    let screen_height = ::std::cmp::max(4, screen_height);
+    let mut screen = Screen::new(screen_width, screen_height);
+    screen.is_off_screen = true;
+
+    loop {
+        run_compositing_stage_direct(editor, env, &view, m.offset, max_offset, &mut screen);
+        if screen.push_count == 0 {
+            return v;
+        }
+
+        // push lines offsets
+        // FIXME: find a better way to iterate over the used lines
+        for i in 0..screen.current_line_index {
+            if !v.is_empty() && i == 0 {
+                // do not push line range twice
+                continue;
+            }
+
+            let s = screen.line[i].get_first_cpi().unwrap().offset.unwrap();
+            let e = screen.line[i].get_last_cpi().unwrap().offset.unwrap();
+
+            v.push((s, e));
+
+            if s >= end_offset || e == max_offset {
+                return v;
+            }
+        }
+
+        // eof reached ?
+        // FIXME: the api is not yet READY
+        // we must find a way to cover all filled lines
+        if screen.current_line_index < screen.height() {
+            let s = screen.line[screen.current_line_index]
+                .get_first_cpi()
+                .unwrap()
+                .offset
+                .unwrap();
+
+            let e = screen.line[screen.current_line_index]
+                .get_last_cpi()
+                .unwrap()
+                .offset
+                .unwrap();
+            v.push((s, e));
+            return v;
+        }
+
+        // TODO: activate only in debug builds
+        if 0 == 1 {
+            match screen.find_cpi_by_offset(m.offset) {
+                (Some(cpi), x, y) => {
+                    assert_eq!(x, 0);
+                    assert_eq!(y, 0);
+                    assert_eq!(cpi.offset.unwrap(), m.offset);
+                }
+                _ => panic!("implementation error"),
+            }
+        }
+
+        if let Some(l) = screen.get_last_used_line() {
+            if let Some(cpi) = l.get_first_cpi() {
+                m.offset = cpi.offset.unwrap(); // update next screen start
+            }
+        }
+
+        screen.clear(); // prepare next screen
+    }
+}
+
+// MOVE TO TEXT MODE
+/* TODO: use nb_lines
+ to compute previous screen height
+ new_h = screen.wheight + (nb_lines * screen.width * max_codec_encode_size)
+*/
+pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_lines: usize) {
+    if view.start_offset == 0 || nb_lines == 0 {
+        return;
+    }
+
+    // TODO: find abetter way to pas mode data around, macro ?
+
+    // TODO: DUMB version
+    // NEW: first try to check nb_lines in the same area
+    // repeat mark moves
+    // we can read backward view.screen.read().unwrap().width() chars
+    // if we find '\n' or \r we stop
+    // and take the next char offset -> view.start_offset
+    if nb_lines == 1 {
+        let start_offset = view.start_offset;
+        let doc = view.document.clone();
+        let doc = doc.as_ref().unwrap();
+        let doc = doc.as_ref().read().unwrap();
+
+        let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        let mut tmp = Mark::new(start_offset);
+        for _ in 0..nb_lines {
+            if tmp.offset == 0 {
+                break;
+            }
+            tmp.offset -= 1;
+            tmp.move_to_start_of_line(&doc, codec);
+        }
+
+        view.start_offset = tmp.offset;
+
+        // TODO: render screen here
+        // if not aligned full rebuild etc...
+        // diff tmp stat > s.width s.height
+        return;
+    }
+
+    ////
+    let width = view.screen.read().unwrap().width();
+    let height = view.screen.read().unwrap().height() + nb_lines;
+
+    // the offset to find is the first screen codepoint
+    let offset_to_find = view.start_offset;
+
+    // go to N previous physical lines ... here N is height
+    // rewind width*height chars
+    let mut m = Mark::new(view.start_offset);
+    let diff = (nb_lines * width * 4) as u64; // if ascci only 4 -> 1
+
+    m.offset = m.offset.saturating_sub(diff);
+
+    // get start of line
+    {
+        let doc = view.document.clone();
+        let doc = doc.as_ref().unwrap().read().unwrap();
+        let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+        m.move_to_start_of_line(&doc, codec);
+    }
+
+    // build tmp screens until first offset of the original screen if found
+    // build_screen from this offset
+    // the window MUST cover to screen => height * 2
+    // TODO: always in last index ?
+    let lines = crate::core::modes::text_mode::get_lines_offsets_direct(
+        view,
+        editor,
+        env,
+        m.offset,
+        offset_to_find,
+        width,
+        height,
+    );
+
+    // find line index
+    let index = match lines
+        .iter()
+        .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1)
+    {
+        None => 0,
+        Some(i) => {
+            if i >= nb_lines {
+                ::std::cmp::min(lines.len() - 1, i - nb_lines)
+            } else {
+                0
+            }
+        }
+    };
+
+    view.start_offset = lines[index].0;
+}
+
+pub fn scroll_view_down(view: &mut View, editor: &Editor, env: &EditorEnv, nb_lines: usize) {
+    dbg_println!("SCROLL DOWN VID = {}", view.id);
+
+    // nothing to do :-( ?
+    if nb_lines == 0 {
+        return;
+    }
+
+    let max_offset = {
+        let doc = view.document.as_ref().unwrap().read().unwrap();
+        doc.size() as u64
+    };
+
+    // avoid useless scroll
+    if view.screen.read().unwrap().has_eof() {
+        return;
+    }
+
+    if nb_lines >= view.screen.read().unwrap().height() {
+        // slower : call layout builder to build  nb_lines - screen.height()
+        scroll_down_view_off_screen(view, editor, env, max_offset, nb_lines);
+        return;
+    }
+
+    // just read the current screen
+    if let (Some(l), _) = view.screen.write().unwrap().get_used_line_clipped(nb_lines) {
+        if let Some(cpi) = l.get_first_cpi() {
+            // set first offset of screen.line[nb_lines] as next screen start
+            if let Some(offset) = cpi.offset {
+                view.start_offset = offset;
+            }
+        }
+    } else {
+        panic!();
+    }
+}
+
+fn scroll_down_view_off_screen(
+    view: &mut View,
+    editor: &Editor,
+    env: &EditorEnv,
+    max_offset: u64,
+    nb_lines: usize,
+) {
+    // will be slower than just reading the current screen
+
+    let screen_width = view.screen.read().unwrap().width();
+    let screen_height = view.screen.read().unwrap().height() + 32;
+
+    let start_offset = view.start_offset;
+    let end_offset = ::std::cmp::min(
+        view.start_offset + (4 * nb_lines * screen_width) as u64,
+        max_offset,
+    );
+
+    // will call all layout filters
+    let lines = crate::core::modes::text_mode::get_lines_offsets_direct(
+        view,
+        editor,
+        env,
+        start_offset,
+        end_offset,
+        screen_width,
+        screen_height,
+    );
+
+    // find line index and take lines[(index + nb_lines)].0 as new start of view
+    let index = match lines
+        .iter()
+        .position(|e| e.0 <= start_offset && start_offset <= e.1)
+    {
+        None => 0,
+        Some(i) => ::std::cmp::min(lines.len() - 1, i + nb_lines),
+    };
+
+    view.start_offset = lines[index].0;
+}
+
+pub fn center_view_around_offset(view: &mut View, editor: &Editor, env: &EditorEnv, offset: u64) {
+    // TODO use env.center_offset
+    view.start_offset = offset;
+    let h = view.screen.read().unwrap().height() / 2;
+    scroll_view_up(view, editor, env, h);
 }

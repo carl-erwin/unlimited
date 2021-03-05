@@ -1,6 +1,5 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use crate::core::mapped_file;
 use crate::core::mapped_file::FileHandle;
 use crate::core::mapped_file::MappedFile;
 

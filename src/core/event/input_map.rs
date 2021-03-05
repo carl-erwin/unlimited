@@ -95,6 +95,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "ctrl+x" }, { "key": "3" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "2" } ],         "action": "split-horizontally" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "0" } ],         "action": "destroy-view" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "v" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "h" } ],         "action": "split-horizontally" },
@@ -146,7 +147,7 @@ struct ParseCtx {
     action: String,
     is_default: bool,
     sequence: Vec<InputEvent>,
-    map: Rc<RefCell<InputEventMap>>,
+    map: Rc<RefCell<InputEventMap>>, // TODO: use &Rc<RefCell<InputEventMap>>
 }
 
 impl ParseCtx {

@@ -9,6 +9,8 @@ use std::thread;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 #[macro_use]
 pub(crate) mod macros;
@@ -28,6 +30,7 @@ pub mod screen;
 pub mod view;
 
 use crate::core::config::Config;
+use crate::core::document::Document;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
@@ -35,6 +38,118 @@ use crate::core::event::EventMessage;
 use crate::core::view::View;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/*
+ TODO:
+
+    "core-mode" {
+        scrollbar-mode
+        v-split-mode
+        h-split-mode
+    }
+
+text-mode =
+    "raw-data"
+    "utf8-codec"
+    "mark-mode"
+    "undo-mode"
+    ----------
+    "wrap-line"
+    "wrap-word"
+
+    --------------
+    "replay-mode"
+
+    "tab-mode"
+    "selection/high-light"
+    "fold-mode"
+    "search-mode"
+    "regex-mode"
+
+    "exec-bin-mode"
+
+    "dir-mode"
+
+    "shell-mode"
+
+    "ffi-mode"
+
+    "hex-mode"
+
+    "follow-mode"
+
+
+
+
+
+    split layout.rs -> modes
+
+  document.predefined_modes() Option<vec["internal:welcome-mode"]>
+  document.predefined_modes() Option<vec["internal:debug-message"]>
+
+  based on extension we will load predefine modes / keywords list etc ..
+
+    replay-mode
+      ctrl-x ctrl-x r :  {left,right} alt+{left,right}
+*/
+
+pub static WELCOME_MESSAGE: &str = r#"-*- Welcome to unlimitED! -*-
+
+unlimitED! is an experimental text editor (running in the terminal).
+
+
+SYNOPSIS
+unlimited [options] [file ..]
+
+
+It comes with:
+
+  - basic UTF-8 support (left-to-right)
+  - very large file support
+  - "infinite" undo/redo
+  - multi-cursors
+  - mouse selection (X11 terminal)
+
+[Quit]
+    Quit:           => ctrl+x ctrl+c
+
+    Quit (no save)  =>      ctrl+x ctrl-q
+
+    NB: wait for large file(s) sync to storage).
+
+
+[Moves]
+    Left            =>
+    Right           =>
+    Up              =>
+    Down            =>
+
+
+[Edit]
+    ctrl+o          => Open file
+
+    ctrl+u          => Undo
+    ctrl+r          => Redo
+
+[Selection/Copy/Paste]
+    with the keyboard:
+
+    with the mouse (X11 terminal):
+
+[Save]
+    ctrl+x ctrl+s   => Save
+                    synchronization of large file(s) does not block the ui.
+                    the the is in "synchronization"
+
+
+
+
+[Document Selection]
+
+
+
+NB: unlimitED! comes with ABSOLUTELY NO WARRANTY
+"#;
 
 /// This thread is the "❤" of unlimited.
 pub fn run<'a>(
@@ -55,8 +170,8 @@ pub fn run<'a>(
     };
 
     editor.worker_tx = worker_tx.clone();
-    load_files(&mut editor); // document
     load_modes(&mut editor, &mut env);
+    load_files(&mut editor, &mut env);
     editor::main_loop(&mut editor, &mut env, &core_rx, &ui_tx);
 
     // wait for worker thread
@@ -96,7 +211,7 @@ use crate::core::document::DocumentBuilder;
 
 /// TODO: replace this by load/unload doc functions
 /// the ui will open the documents on demand
-pub fn load_files(editor: &mut Editor) {
+pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.len() as u64;
 
     for f in &editor.config.files_list {
@@ -122,6 +237,12 @@ pub fn load_files(editor: &mut Editor) {
             .internal(false)
             .finalize();
         if let Some(b) = b {
+            {
+                let mut d = b.write().unwrap();
+                let s = WELCOME_MESSAGE.as_bytes();
+                d.insert(0, s.len(), s);
+                d.buffer_log_reset(); // do not allow to go back to empty buffer
+            }
             editor.document_map.insert(id, b);
             id += 1;
         }
@@ -130,49 +251,52 @@ pub fn load_files(editor: &mut Editor) {
     dbg_println!("id {}", id);
 
     // create default views
-    for doc_id in 0..editor.document_map.len() {
-        let id = doc_id as u64;
-        let doc = editor.document_map.get(&id);
-        if let Some(doc) = doc {
-            let view = View::new(None, 0 as u64, 1, 1, Some(doc.clone()));
-            dbg_println!("create view id {}", view.id);
-            editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
+    // sort by arg pos first
+    let mut docs_id: Vec<document::Id> = editor.document_map.iter().map(|(k, _v)| *k).collect();
+    docs_id.sort();
+    let mut docs: Vec<Arc<RwLock<Document>>> = vec![];
+    for id in docs_id.iter() {
+        if let Some(doc) = editor.document_map.get(id) {
+            docs.push(Arc::clone(doc));
         }
+    }
+
+    //
+    let modes = vec!["basic-editor".to_owned()];
+
+    // create views
+    for doc in docs {
+        let view = View::new(
+            &mut editor,
+            &mut env,
+            None,
+            0,
+            0,
+            1,
+            1,
+            Some(doc),
+            &modes,
+            0,
+        );
+        dbg_println!("create view id {}", view.id);
+
+        // top level views
+        editor.root_views.push(view.id);
+        editor.view_map.insert(view.id, Rc::new(RefCell::new(view)));
     }
 }
 
+use crate::core::modes::BasicEditorMode;
+use crate::core::modes::CoreMode;
+use crate::core::modes::HsplitMode;
 use crate::core::modes::TextMode;
+use crate::core::modes::VsplitMode;
 
-pub fn load_modes(editor: &mut Editor, env: &mut EditorEnv) {
+pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
+    editor.register_mode(Box::new(CoreMode::new()));
+    editor.register_mode(Box::new(BasicEditorMode::new()));
     editor.register_mode(Box::new(TextMode::new()));
-
-    for (_name, mode) in editor.modes.iter() {
-        //  TOOD: pre/post input stage
-        // register_mode_input_stage(mode);
-        let action_map = mode.build_action_map();
-        for (k, v) in action_map {
-            env.action_map.insert(k.clone(), v.clone());
-        }
-
-        // TODO: pre/post "render" stage
-        // register render "stage" function
-        // let action_map = mode.build_render_stage_map();
-        // for (k, v) in action_map {
-        //     env.render_stage_map.insert(k.clone(), v.clone());
-        // }
-
-        // create view's mode context
-        // allocate per view ModeCtx shared between the stages
-        for (_k, v) in editor.view_map.iter() {
-            let mut v = v.borrow_mut();
-
-            dbg_println!("v.id = {}", v.id);
-
-            let ctx = mode.alloc_ctx();
-            v.set_mode_ctx(mode.name(), ctx);
-
-            mode.configure_view(&mut v);
-        }
-    }
+    editor.register_mode(Box::new(VsplitMode::new()));
+    editor.register_mode(Box::new(HsplitMode::new()));
 }

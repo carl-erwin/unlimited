@@ -1,21 +1,10 @@
 // Copyright (c) Carl-Erwin Griffith
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
 use std::time::Instant;
 
-use crate::core::editor::InputStageActionMap;
-use crate::core::event::InputEvent;
-use crate::core::event::InputEventMap;
-use crate::core::event::InputEventRule;
-
-use crate::core::event::input_map::build_input_event_map;
-use crate::core::event::input_map::DEFAULT_INPUT_MAP;
-
-use crate::core::editor::build_core_action_map;
-
 use std::marker::PhantomData;
+
+use crate::core::view;
 
 // ADD view env ? TODO: refresh env after input_processing
 //TODO: define workflow
@@ -82,18 +71,10 @@ pub struct EditorEnv<'a> {
 
     pub quit: bool,
 
-    pub current_input_event: InputEvent,
-
+    pub current_input_event: crate::core::event::InputEvent,
     /// This flag is set when an input event as triggered a change
     /// and the ui must be refresh
     pub event_processed: bool,
-
-    pub action_map: InputStageActionMap<'static>, // ref to current focused widget ?
-
-    pub input_map: Rc<RefCell<InputEventMap>>,
-    pub current_node: Option<Rc<InputEventRule>>,
-    pub next_node: Option<Rc<InputEventRule>>,
-    pub trigger: Vec<InputEvent>,
 
     pub pending_events: usize,
     pub last_rdr_event: Instant,
@@ -105,22 +86,19 @@ pub struct EditorEnv<'a> {
     pub width: usize,
     pub height: usize,
 
+    //
+    pub root_view_index: usize,
+
+    //
     pub prev_vid: usize,
     pub view_id: usize,
+    pub focus_changed_to: Option<view::Id>,
 
     pub center_offset: Option<u64>,
-    pub cur_mark_index: Option<usize>,
-    pub max_offset: u64, // remove this, doc property
 }
 
 impl<'a> EditorEnv<'a> {
     pub fn new() -> Self {
-        let input_map = if let Ok(map) = build_input_event_map(DEFAULT_INPUT_MAP) {
-            map
-        } else {
-            Rc::new(RefCell::new(HashMap::new()))
-        };
-
         // X11 session
         let graphic_display = match std::env::var("DISPLAY") {
             Ok(_) => true,
@@ -131,14 +109,8 @@ impl<'a> EditorEnv<'a> {
             phantom: PhantomData,
             graphic_display,
             quit: false,
-            current_input_event: InputEvent::NoInputEvent,
+            current_input_event: crate::core::event::InputEvent::NoInputEvent,
             event_processed: false,
-
-            action_map: build_core_action_map(),
-            input_map,
-            current_node: None,
-            next_node: None,
-            trigger: vec![],
             pending_events: 0,
             last_rdr_event: Instant::now(),
             current_time: Instant::now(),
@@ -146,11 +118,12 @@ impl<'a> EditorEnv<'a> {
             process_input_end: Instant::now(),
             width: 0,
             height: 0,
+            //max
+            root_view_index: 0,
             prev_vid: 1, // NB
             view_id: 1,  // NB
             center_offset: None,
-            cur_mark_index: None,
-            max_offset: 0,
+            focus_changed_to: None,
         }
     }
 }

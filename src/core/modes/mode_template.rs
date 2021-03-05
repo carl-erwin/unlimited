@@ -1,0 +1,113 @@
+use std::any::Any;
+use std::cell::RefCell;
+
+use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
+use super::Mode;
+
+use crate::core::codepointinfo::CodepointInfo;
+use crate::core::document::Document;
+use crate::core::editor::register_input_stage_action;
+use crate::core::editor::InputStageActionMap;
+use crate::core::Editor;
+use crate::core::EditorEnv;
+
+use crate::core::event::*;
+
+use crate::core::view;
+use crate::core::view::layout::Filter;
+use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::LayoutEnv;
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutOperation;
+
+use crate::core::view::View;
+
+pub struct TemplateMode {
+    // add common fields
+}
+pub struct TemplateModeContext {
+    // add per view fields
+}
+
+impl<'a> Mode for TemplateMode {
+    fn name(&self) -> &'static str {
+        &"template-mode"
+    }
+
+    fn build_action_map(&self) -> InputStageActionMap<'static> {
+        let mut map = InputStageActionMap::new();
+        Self::register_input_stage_actions(&mut map);
+        map
+    }
+
+    fn alloc_ctx(&self) -> Box<dyn Any> {
+        dbg_println!("alloc template-mode ctx");
+        let ctx = TemplateModeContext {};
+        Box::new(ctx)
+    }
+
+    fn configure_view(
+        &self,
+        mut editor: &mut Editor<'static>,
+        mut env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+    ) {
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(TemplateComposeFilter::new()));
+    }
+}
+
+impl TemplateMode {
+    pub fn new() -> Self {
+        dbg_println!("TemplateMode");
+        TemplateMode {}
+    }
+
+    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
+        register_input_stage_action(&mut map, "template-fn1", template_input_action_fn1);
+    }
+}
+
+pub fn template_input_action_fn1(
+    _editor: &mut Editor,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View>>,
+) {
+    let v = view.borrow();
+    let doc = v.document.as_ref().unwrap();
+    let doc = doc.as_ref().read().unwrap();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct TemplateComposeFilter {}
+
+impl TemplateComposeFilter {
+    pub fn new() -> Self {
+        TemplateComposeFilter {}
+    }
+}
+
+impl Filter<'_> for TemplateComposeFilter {
+    fn name(&self) -> &'static str {
+        &"template-compose-filter"
+    }
+
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+
+    fn run(
+        &mut self,
+        _view: &View,
+        env: &mut LayoutEnv,
+        filter_in: &Vec<FilterIoData>,
+        filter_out: &mut Vec<FilterIoData>,
+    ) {
+        *filter_out = filter_in.clone();
+    }
+
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+}

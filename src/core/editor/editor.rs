@@ -35,9 +35,50 @@ use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+
 use crate::core::view::View;
 
+/* TODO:
+
+ InputStageActionMap is kept in EditorEnv
+ Have a map per view
+ and if eval fails, fallback to EditorEnv's
+ It will allow per mode actions instanciate for each view
+ transform into STACK of map ?
+
+ TODO:
+   check file metadata on every operations -> file changed ... reload ?
+
+   add Timers -> for Blinking marks
+
+   parse argument to extract line,colinfo,offset {
+    file@1246
+    file:10
+    file:10,5
+    +l file
+    +l,c file
+    @offset file
+  }
+
+    document_list: Vec<
+        struct DocumentInfo {
+            FileType: { directory(full_path), regular(full_path), internal("*debug-message*), char_device(full_path), block_device(full_path) }
+            basename,: String,
+            Title,: String,
+            id,
+            start_line    : Option<usize>
+            start_column  : Option<usize>
+            start_offset  : Option<usize
+        }
+
+    keep user arguments order, push new files,
+    this list is never cleared
+    before insertion the real path(*ln) is checked to avoid double open
+
+    ioctl mode for block devices ?
+
+    document_index: HashMap<String, document::Id>,  document::Id is the position in document_list
+*/
 // local
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StagePosition {
@@ -55,16 +96,10 @@ pub enum Stage {
 
 pub type InputStageFunction = fn(
     editor: &mut Editor<'static>,
-    env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static, 'static>>>,
-) -> ();
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+);
 
-// InputStageActionMap is kept in EditorEnv
-// TODO:
-// Have a map per view
-// and if eval fails, fallback to EditorEnv's
-// It will allow per mode actions instanciate for each view
-// transform into STACK of map ?
 pub type InputStageActionMap<'a> = HashMap<String, InputStageFunction>;
 
 //
@@ -90,50 +125,12 @@ use crate::core::document::DocumentBuilder;
 //
 pub type Id = u64;
 
-/*
-   TODO:
-   check file metadata on every operations -> file changed ... reload ?
-
-   add Timers -> for Blinking marks
-*/
-
-/* TODO:
-
-   parse argument to extract line,colinfo,offset {
-    file@1246
-    file:10
-    file:10,5
-    +l file
-    +l,c file
-    @offset file
-  }
-
-    document_list: Vec<
-        struct DocumentInfo {
-            FileType: { directory(full_path), regular(full_path), internal("*debug-message*), char_device(full_path), block_device(full_path) }
-            basename,: String,
-            Title,: String,
-            id,
-            start_line    : Option<usize>
-            start_column  : Option<usize>
-            start_offset  : Option<usize
-        }
-
-  TODO:
-    keep user arguments order, push new files,
-    this list is never cleared
-    before insertion the real path(*ln) is checked to avoid double open
-
-    ioctl mode for block devices ?
-
-    document_index: HashMap<String, document::Id>,  document::Id is the position in document_list
-
-*/
 pub struct Editor<'a> {
     pub config: Config,
     pub document_map: HashMap<document::Id, Arc<RwLock<Document<'a>>>>,
-    pub view_map: HashMap<view::Id, Rc<RefCell<View<'a, 'a>>>>,
-    pub modes: HashMap<String, Box<dyn Mode>>,
+    pub root_views: Vec<view::Id>,
+    pub view_map: HashMap<view::Id, Rc<RefCell<View<'a>>>>,
+    pub modes: HashMap<String, Rc<Box<dyn Mode>>>,
     pub core_tx: Sender<EventMessage<'a>>,
     pub ui_tx: Sender<EventMessage<'a>>,
     pub worker_tx: Sender<EventMessage<'a>>,
@@ -150,6 +147,7 @@ impl<'a> Editor<'a> {
         Editor {
             config,
             document_map: HashMap::new(),
+            root_views: vec![],
             view_map: HashMap::new(),
             modes: HashMap::new(),
             ui_tx,
@@ -186,9 +184,13 @@ impl<'a> Editor<'a> {
             self.document_map.insert(id, b);
         }
     }
+
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
         let name = mode.name();
-        self.modes.insert(name.to_owned(), mode);
+        self.modes.insert(name.to_owned(), Rc::new(mode));
+    }
+    pub fn get_mode<'e>(&mut self, name: &str) -> Option<&Rc<Box<dyn Mode>>> {
+        self.modes.get(&name.to_owned())
     }
 }
 
@@ -236,420 +238,6 @@ pub fn update_view_and_send_draw_event(
     send_draw_event(editor, &mut env, ui_tx, &view);
 }
 
-// Mode "core"
-pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = &view.borrow();
-    let doc = v.document.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
-
-    if !doc.changed {
-        env.quit = true;
-    }
-}
-
-pub fn application_quit_abort(
-    _editor: &mut Editor,
-    env: &mut EditorEnv,
-
-    _view: &Rc<RefCell<View>>,
-) {
-    env.quit = true;
-}
-
-pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
-    let v = view.borrow_mut();
-
-    let doc_id = {
-        let doc = v.document.as_ref().unwrap();
-        {
-            // - needed ? already syncing ? -
-            let doc = doc.as_ref().read().unwrap();
-            if !doc.changed || doc.is_syncing {
-                // TODO: ensure all over places are checking this flag, all doc....write()
-                // better, some permissions mechanism ?
-                // doc.access_permissions = r-
-                // doc.access_permissions = -w
-                // doc.access_permissions = rw
-                return;
-            }
-        }
-
-        // - set sync flag -
-        {
-            let mut doc = doc.as_ref().write().unwrap();
-            let doc_id = doc.id;
-            doc.is_syncing = true;
-            doc_id
-        }
-    };
-
-    // - send sync job to worker -
-    //
-    // NB: We must take the doc clone from Editor not View
-    // because of lifetime(editor) > lifetime(view)
-    // and view.doc is a clone from editor.document_map,
-    // doing this let us avoid the use manual lifetime annotations ('static)
-    // and errors like "data from `view` flows into `editor`"
-    if let Some(doc) = editor.document_map.get(&doc_id) {
-        let msg = EventMessage {
-            seq: 0,
-            event: Event::SyncTask {
-                doc: Arc::clone(doc),
-            },
-        };
-        editor.worker_tx.send(msg).unwrap_or(());
-    }
-}
-
-// TODO: CoreMode ? quit/force-quit
-pub fn build_core_action_map<'a>() -> InputStageActionMap<'a> {
-    let mut map: InputStageActionMap = HashMap::new();
-
-    // core
-    register_input_stage_action(&mut map, "application:quit", application_quit);
-    register_input_stage_action(&mut map, "application:quit-abort", application_quit_abort);
-
-    register_input_stage_action(&mut map, "save-document", save_document); // core ?
-
-    register_input_stage_action(&mut map, "split-vertically", split_vertically);
-    register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
-
-    map
-}
-
-pub fn split_with_direction(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv,
-    v: &'static mut View,
-    width: usize,
-    height: usize,
-    dir: view::LayoutDirection,
-    _doc: Option<Arc<RwLock<Document>>>,
-) {
-    let sizes = if dir == LayoutDirection::Vertical {
-        view::compute_layout_sizes(width, &v.layout_ops) // options ? for ret size == 0
-    } else {
-        view::compute_layout_sizes(height, &v.layout_ops) // options ? for ret size == 0
-    };
-
-    dbg_println!("split {:?} = SIZE {:?}", dir, sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let mut x = v.x;
-    let mut y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        // vertically
-        let mut view = match dir {
-            LayoutDirection::Vertical => {
-                view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone())
-            }
-            LayoutDirection::Horizontal => {
-                view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone())
-            }
-
-            _ => {
-                return;
-            }
-        };
-
-        // horizontally
-        // create child modes
-        view.x = x;
-        view.y = y;
-
-        for m in v.mode_ctx.iter() {
-            let name = m.0;
-            let mode = editor.modes.get(name.as_str()).unwrap();
-
-            mode.configure_view(&mut view);
-
-            let ctx = mode.alloc_ctx();
-            dbg_println!("view.id = {}", view.id);
-            view.set_mode_ctx(mode.name(), ctx);
-
-            mode.configure_view(&mut view);
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        v.children.push(id);
-        let rc = Rc::new(RefCell::new(view));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        let _view = match dir {
-            LayoutDirection::Vertical => {
-                x += *size;
-            }
-            LayoutDirection::Horizontal => {
-                y += *size;
-            }
-            _ => {
-                return;
-            }
-        };
-    }
-}
-
-pub fn split_vertically(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static, 'static>>>,
-) {
-    let mut v = view.borrow_mut();
-
-    // check if already split
-    if v.children.len() != 0 {
-        return;
-    }
-
-    // compute left and right size as current View / 2
-    // get screen
-
-    let (width, height) = {
-        let screen = v.screen.read().unwrap();
-        (screen.width(), screen.height())
-    };
-    //
-    if width <= 4 {
-        return;
-    }
-
-    // compute_split(size, first_half, first_second);
-    let (_left_w, _right_w) = View::compute_split(width);
-
-    // TODO: store
-    let ops_modes = vec![
-        (LayoutOperation::Percent { p: 50 }, vec!["text-mode"]),
-        //        (LayoutOperation::Fixed { size: 1 }, vec!["v-split"]), // separator, will crash no text hard coded in compositing stage
-        (LayoutOperation::Percent { p: 50 }, vec!["text-mode"]),
-    ];
-
-    v.layout_direction = LayoutDirection::Vertical;
-    v.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
-
-    vec![
-        LayoutOperation::Percent { p: 50 },
-        LayoutOperation::Fixed { size: 1 }, // separator
-        LayoutOperation::Percent { p: 50 },
-    ];
-
-    let sizes = view::compute_layout_sizes(width, &v.layout_ops); // options ? for ret size == 0
-
-    dbg_println!("splitV = SIZE {:?}", sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let mut x = v.x;
-    let y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        let mut view = view::View::new(Some(v.id), v.start_offset, *size, height, doc.clone());
-        // create child modes
-        view.x = x;
-        view.y = y;
-        view.layout_index = Some(idx);
-
-        for mode_name in &ops_modes[idx].1 {
-            if let Some(mode) = editor.modes.get(*mode_name) {
-                dbg_println!("view.id = {} : allocate mode({}) ctx", view.id, mode_name);
-
-                //
-                let ctx = mode.alloc_ctx();
-                view.set_mode_ctx(mode.name(), ctx);
-
-                mode.configure_view(&mut view);
-            }
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        v.children.push(id);
-        let rc = Rc::new(RefCell::new(view));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        x += *size;
-    }
-}
-
-pub fn split_horizontally(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static, 'static>>>,
-) {
-    let mut v = view.borrow_mut();
-
-    // check if already split
-    if v.children.len() != 0 {
-        return;
-    }
-
-    // compute left and right size as current View / 2
-    // get screen
-
-    let (width, height) = {
-        let screen = v.screen.read().unwrap();
-        (screen.width(), screen.height())
-    };
-
-    if height <= 4 {
-        return;
-    }
-
-    // compute_split(size, first_half, first_second);
-    let (_top_h, _bottom_h) = View::compute_split(height);
-
-    // TODO: store
-    v.layout_direction = LayoutDirection::Horizontal;
-    v.layout_ops = vec![
-        LayoutOperation::Percent { p: 50 },
-        LayoutOperation::Percent { p: 50 },
-    ];
-
-    let sizes = view::compute_layout_sizes(height, &v.layout_ops);
-
-    dbg_println!("splitH = SIZE {:?}", sizes);
-    for s in &sizes {
-        if *s == 0 {
-            return;
-        }
-    }
-
-    let doc = {
-        if v.document.is_none() {
-            None
-        } else {
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
-                Some(Arc::clone(&doc))
-            } else {
-                None
-            }
-        }
-    };
-
-    let x = v.x;
-    let mut y = v.y;
-    for (idx, size) in sizes.iter().enumerate() {
-        let mut view = view::View::new(Some(v.id), v.start_offset, width, *size, doc.clone());
-        // create child modes
-        view.x = x;
-        view.y = y;
-
-        for m in v.mode_ctx.iter() {
-            let name = m.0;
-            let mode = editor.modes.get(name.as_str()).unwrap();
-            let ctx = mode.alloc_ctx();
-            dbg_println!("view.id = {}", view.id);
-            view.set_mode_ctx(mode.name(), ctx);
-
-            mode.configure_view(&mut view);
-        }
-
-        if idx == 0 {
-            // TODO: propagate focus up to root
-            v.focus_to = Some(view.id);
-
-            let mut parent_id = v.parent_id;
-            loop {
-                if let Some(pid) = parent_id {
-                    if let Some(pview) = editor.view_map.get(&pid) {
-                        let mut pview = pview.borrow_mut();
-                        pview.focus_to = Some(view.id);
-                        parent_id = pview.parent_id;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
-
-        let id = view.id;
-        v.children.push(id);
-        let rc = Rc::new(RefCell::new(view));
-        editor.view_map.insert(id, Rc::clone(&rc));
-
-        y += *size;
-    }
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn send_draw_event(
@@ -676,20 +264,15 @@ pub fn send_draw_event(
 
 fn process_single_input_event<'a>(
     editor: &'a mut Editor<'static>,
-    mut env: &'a mut EditorEnv<'static>,
+    env: &'a mut EditorEnv<'static>,
     view_id: view::Id,
 ) -> bool {
     let mut view = &editor.view_map.get(&view_id).unwrap().clone();
 
     {
-        let v = view.borrow_mut();
-
+        let v = view.borrow();
         dbg_println!("DISPATCH EVENT TO VID {}", view_id);
         assert_eq!(v.id, view_id);
-
-        if v.children.len() > 0 {
-            // check focus: must add view(x.y)
-        }
     }
 
     let ev = &env.current_input_event; // Option ?
@@ -700,44 +283,61 @@ fn process_single_input_event<'a>(
         return false;
     }
 
-    dbg_println!("prev (accum) events = {:?}", env.trigger);
-
-    dbg_println!("eval input event input ev = {:?}", ev);
-
+    {
+        let v = view.borrow();
+        dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
+        dbg_println!("eval input event input ev = {:?}", ev);
+    }
     // TODO: track whole input seq // not tested
-    env.trigger.push((*ev).clone());
 
-    let action = eval_input_event(
-        &ev,
-        &env.input_map,
-        &mut env.current_node, // TODO: EvalEnv
-        &mut env.next_node,    // TODO: EvalEnv
-    );
+    let action_name = {
+        let mut v = view.borrow_mut();
+        v.input_ctx.trigger.push((*ev).clone());
 
-    if let Some(action) = action {
-        env.current_node = None;
-        env.next_node = None;
+        let mut in_node = v.input_ctx.current_node.clone();
+        let mut out_node = v.input_ctx.next_node.clone();
+        let action_name =
+            eval_input_event(&ev, &v.input_ctx.input_map, &mut in_node, &mut out_node);
+        // TODO: return out_node
+        // swap for next call
+        v.input_ctx.current_node = out_node;
+        v.input_ctx.next_node = None;
 
-        let start = Instant::now();
-        dbg_println!("found action {} : input ev = {:?}", action, ev);
+        action_name.clone()
+    };
 
-        match action.as_str() {
-            _ => {
-                if let Some(action) = env.action_map.get(&action) {
-                    action(editor, env, &mut view);
-                } else {
-                    // clear ?
-                }
-                env.trigger.clear();
-            }
+    let action = {
+        let mut v = view.borrow_mut();
+
+        if action_name.is_none() {
+            v.input_ctx.trigger.clear();
+            return false;
         }
+        let action_name = action_name.unwrap();
+        dbg_println!("found action : [{}]", action_name);
 
-        let end = Instant::now();
-        dbg_println!("time to run action {}", (end - start).as_millis());
-    } else {
-        // TODO: move to caller ?
-        // add eval_ctx::new to mask impl of node swapping
-        std::mem::swap(&mut env.current_node, &mut env.next_node);
+        v.input_ctx.current_node = None;
+        v.input_ctx.next_node = None;
+
+        let action_fn = v.input_ctx.action_map.get(&action_name).clone();
+        if action_fn.is_none() {
+            dbg_println!("not function pointer found for action : {}", action_name);
+            v.input_ctx.trigger.clear();
+            return false;
+        }
+        let f = action_fn.clone().unwrap();
+        f.clone()
+    };
+
+    // return action ?
+    let start = Instant::now();
+    action(editor, env, &mut view);
+    let end = Instant::now();
+    dbg_println!("time to run action {}", (end - start).as_millis());
+
+    {
+        let mut v = view.borrow_mut();
+        v.input_ctx.trigger.clear();
     }
 
     true
@@ -772,7 +372,13 @@ fn get_focused_vid(
     vid: view::Id,
 ) -> view::Id {
     let vid = vid;
-    let view = &editor.view_map.get(&vid).unwrap().clone();
+    let view = editor.view_map.get(&vid);
+    if view.is_none() {
+        return env.view_id;
+    }
+
+    let view = view.unwrap().clone();
+
     let v = view.borrow();
     if v.children.len() == 0 {
         return vid;
@@ -785,10 +391,46 @@ fn get_focused_vid(
     vid
 }
 
-pub fn set_focus_on_vid(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>, vid: view::Id) {
-    let view = &editor.view_map.get(&env.view_id).unwrap().clone();
+pub fn set_focus_on_vid(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    vid: view::Id,
+) {
+    let view = editor.view_map.get(&vid);
+    if view.is_none() {
+        return;
+    }
+    let view = Rc::clone(view.unwrap());
     let mut v = view.borrow_mut();
-    v.focus_to = Some(vid);
+    set_focus_on_view(&mut editor, &mut env, &mut v);
+}
+
+pub fn set_focus_on_view(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &mut View<'static>,
+) {
+    // TODO: propagate focus up to root
+    let vid = view.id;
+
+    //    assert!(view.children.is_empty());
+
+    let mut parent_id = view.parent_id;
+    loop {
+        if let Some(pid) = parent_id {
+            dbg_println!("set_focus update parent_id {}", pid);
+            if let Some(pview) = editor.view_map.get(&pid) {
+                let mut pview = pview.borrow_mut();
+                pview.focus_to = Some(vid);
+                parent_id = pview.parent_id;
+                dbg_println!("next  parent_id {:?}", parent_id);
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
 }
 
 // clips (x,y) to local view @ (x,y)
@@ -919,7 +561,7 @@ fn clip_coordinates_and_get_vid(
 
 fn flatten_input_events(events: &Vec<InputEvent>) -> Vec<InputEvent> {
     let mut flat_events = vec![];
-    // transform UnicodeArray of 1 element to single element
+    // transform UnicodeArray(vec<char>) -> vec.len() * Unicode(char)
     for ev in events {
         match ev {
             InputEvent::KeyPress {
@@ -975,17 +617,26 @@ fn run_stage(
     mut env: &mut EditorEnv<'static>,
     view_id: view::Id,
 ) -> Stage {
-    let view = editor.view_map.get(&view_id).unwrap().clone();
+    let view = editor.view_map.get(&view_id);
+    if view.is_none() {
+        return match stage {
+            Stage::Input => Stage::Compositing,
+            Stage::Compositing => Stage::Render,
+            Stage::Render => Stage::Input,
+            // Stage::Restart ?
+        };
+    }
+
+    let view = view.unwrap().clone();
 
     dbg_println!("render_stage VID {} : {:?} {:?}", view_id, pos, stage);
 
     match stage {
         Stage::Input => {
+            // TODO: run_stage_input
             match pos {
                 StagePosition::Pre => {
                     env.process_input_start = Instant::now();
-
-                    // TODO: save marks HERE before input processing
                     view::run_stage(&mut editor, &mut env, &view, pos, stage);
                 }
                 StagePosition::In => {
@@ -998,13 +649,9 @@ fn run_stage(
                     }
                 }
                 StagePosition::Post => {
-                    // TODO: save marks HERE after all input processing
                     view::run_stage(&mut editor, &mut env, &view, pos, stage);
 
                     env.process_input_end = Instant::now();
-
-                    // TODO: save marks HERE before input processing
-                    // run_pre_input_stage();
 
                     if env.view_id != env.prev_vid {
                         env.event_processed = true;
@@ -1045,14 +692,20 @@ fn run_stage(
 
         //
         Stage::Render => match pos {
-            StagePosition::Pre => {}
+            StagePosition::Pre => {
+                view::run_stage(&mut editor, &mut env, &view, pos, stage);
+            }
 
             StagePosition::In => {
+                view::run_stage(&mut editor, &mut env, &view, pos, stage);
+                //
                 let ui_tx = editor.ui_tx.clone();
                 flush_ui_event(editor, env, &ui_tx);
             }
 
-            StagePosition::Post => {}
+            StagePosition::Post => {
+                view::run_stage(&mut editor, &mut env, &view, pos, stage);
+            }
         },
     }
 
@@ -1121,6 +774,13 @@ fn run_input_stage(
         let id = setup_focus(&mut editor, &mut env, &ev, &mut recompose);
         run_stage(In, Stage::Input, &mut editor, &mut env, id);
         run_stages(Stage::Compositing, &mut editor, &mut env, id);
+    }
+
+    // MOVE TO POST ?
+    if let Some(focus_vid) = env.focus_changed_to {
+        set_focus_on_vid(editor, env, focus_vid);
+        env.focus_changed_to = None;
+        // Stage::Restart ?
     }
 
     // POST

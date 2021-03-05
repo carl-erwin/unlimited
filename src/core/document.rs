@@ -66,7 +66,7 @@ impl DocumentBuilder {
     pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'a>>>> {
         let buffer = Buffer::new(&self.file_name, self.mode.clone())?;
 
-        let mut doc = Document {
+        let doc = Document {
             id: 0,
             name: self.document_name.clone(),
             buffer,
@@ -76,8 +76,6 @@ impl DocumentBuilder {
             is_syncing: false,
             last_tag_time: std::time::Instant::now(),
         };
-
-        doc.tag(std::time::Instant::now(), 0, vec![0]); // TODO: move to TextMode
 
         Some(Arc::new(RwLock::new(doc)))
     }
@@ -181,15 +179,26 @@ impl<'a> Document<'a> {
         self.buffer.read(offset, nr_bytes, data)
     }
 
-    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks: Vec<u64>) {
+    pub fn buffer_log_reset(&mut self) {
+        self.buffer_log.data.clear();
+        self.buffer_log.pos = 0;
+    }
+
+    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks_offsets: Vec<u64>) {
         if self.last_tag_time == time {
             // ignore contiguous event ? config
             // return;
         }
 
-        //dbg_println!("doc.tag(..) offsets = {:?}", marks);
-        self.buffer_log
-            .add(offset, BufferOperationType::Tag { time, marks }, None);
+        //dbg_println!("// doc.tag(..) offsets = {:?}", marks_offset);
+        self.buffer_log.add(
+            offset,
+            BufferOperationType::Tag {
+                time,
+                marks_offsets,
+            },
+            None,
+        );
 
         self.last_tag_time = time;
     }
@@ -209,8 +218,10 @@ impl<'a> Document<'a> {
         // get inverted operation
         let op = &self.buffer_log.data[pos];
         match op.op_type {
-            BufferOperationType::Tag { ref marks, .. } => {
-                Some(marks.clone()) // TODO: Arc<Vec<u64>>
+            BufferOperationType::Tag {
+                ref marks_offsets, ..
+            } => {
+                Some(marks_offsets.clone()) // TODO: Arc<Vec<u64>>
             }
             _ => None,
         }
@@ -288,7 +299,9 @@ impl<'a> Document<'a> {
 
                 op.offset
             }
-            BufferOperationType::Tag { marks: _, .. } => {
+            BufferOperationType::Tag {
+                marks_offsets: _, ..
+            } => {
                 /* nothing */
                 op.offset
             }
@@ -328,7 +341,7 @@ impl<'a> Document<'a> {
         let mut ops = Vec::new();
         loop {
             if self.buffer_log.pos == 0 {
-                //dbg_println!("bufflog: undo self.buffer_log.pos == 0");
+                dbg_println!("bufflog: undo self.buffer_log.pos == 0");
                 break;
             }
 
@@ -337,9 +350,13 @@ impl<'a> Document<'a> {
 
             // get inverted operation
             let op = &self.buffer_log.data[pos];
-            //dbg_println!("bufflog: op[{}] = {:?}", pos, op);
+            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
             match op.op_type {
                 BufferOperationType::Tag { .. } => {
+                    if pos == self.buffer_log.data.len() - 1 {
+                        // if on last op and last op is tag -> skip
+                        continue;
+                    }
                     break;
                 }
                 _ => {}
@@ -352,10 +369,10 @@ impl<'a> Document<'a> {
             ops.push(inverted_op);
         }
 
-        //dbg_println!(
-        //    "bufflog: undo until tag END : self.buffer_log.pos == {}",
-        //    self.buffer_log.pos
-        //);
+        dbg_println!(
+            "bufflog: undo until tag END : self.buffer_log.pos == {}",
+            self.buffer_log.pos
+        );
 
         ops
     }
@@ -410,29 +427,21 @@ use self::libc::{c_void, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR,
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     const UNLIMITED_SYNC_BLOCK_SIZE: usize = 4096 * 256;
 
-    let block_size = match std::env::var("UNLIMITED_SYNC_BLOCK_SIZE") {
-        Ok(val) => val
-            .trim_end()
-            .parse::<usize>()
-            .unwrap_or(UNLIMITED_SYNC_BLOCK_SIZE),
-        Err(_) => UNLIMITED_SYNC_BLOCK_SIZE,
-    };
-
     // read/copy
-    let mut fd = -1;
-    {
+    let fd = {
         let doc = doc.read().unwrap();
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move to global config
 
         let path = CString::new(tmp_file_name).unwrap();
         unsafe { unlink(path.as_ptr()) };
-        fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
+        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
         if fd < 0 {
             // LOG CANNOT SAVE XXX
             dbg_println!("cannot save {}", doc.file_name());
             return;
         }
-    }
+        fd
+    };
 
     let mut idx = None;
     {

@@ -536,9 +536,6 @@ impl Filter<'_> for TabFilter {
 pub struct WordWrapFilter {
     max_column: u64,
     column_count: u64,
-    accum_count: u64,
-    prev_cp: char,
-    prev_offset: u64, // Option<u64> ?
     accum: Vec<FilterIoData>,
 }
 
@@ -547,9 +544,6 @@ impl WordWrapFilter {
         WordWrapFilter {
             max_column: 0,
             column_count: 0,
-            accum_count: 0,
-            prev_cp: '\0',
-            prev_offset: 0,
             accum: vec![],
         }
     }
@@ -563,13 +557,29 @@ impl Filter<'_> for WordWrapFilter {
     fn setup(&mut self, env: &LayoutEnv, _view: &View) {
         self.max_column = env.screen.width() as u64;
         self.column_count = 0;
-        self.accum_count = 0;
-        self.prev_cp = '\0';
-        self.prev_offset = 0;
         self.accum = Vec::new();
     }
 
-    // TODO: disable word wrapping on non text input
+    /*
+        TODO: filters dependencies: check in view's filter_array that
+        dep.index < cur_filter.index or (and WARN)
+        we can push multiple times new instance of a filter :-)
+
+        prerequisite:
+        - tab expansion before: ('\t' -> ' ' should be done before)
+
+        a line can hold max_column chars.
+        We accumulate non blank characters, ie ! '\n' ' '
+          -> accum
+
+        if ' ' -> flush | accum
+
+        if '\n' -> flush | accum | and jump
+
+        _ => accum
+
+
+    */
     fn run(
         &mut self,
         _view: &View,
@@ -579,81 +589,69 @@ impl Filter<'_> for WordWrapFilter {
     ) {
         dbg_println!("filter_in.len() {}", filter_in.len());
 
+        let mut flush_count = 0;
+
         for io in filter_in.iter() {
             if let FilterIoData {
                 data: FilterData::Unicode { cp, .. },
                 ..
             } = &*io
             {
-                match (self.prev_cp, u32_to_char(*cp)) {
-                    // TODO: split case
-                    // blank separator
-                    // new line separator
-                    // should we consider '�' like normal char ?
-                    (_, codepoint) if codepoint == ' ' || codepoint == '\n' /* || codepoint == '�' */ =>
-                    {
-                        // NB: ' ' at end of line acts like '\n'
-                        if codepoint != ' ' /* && codepoint != '�' */
-                            && self.column_count + self.accum_count >= self.max_column
-                        {
-                            // push artificial new line and flush: TODO update metadata flags
-                            if self.column_count > 0 {
-                                // insert new line only if previous data was seen
-                                let mut new_io = FilterIoData::replace_codepoint(&io, '\n');
-                                new_io.metadata = true;
-                                new_io.color = (0, 255, 0);
-                                new_io.offset = Some(self.prev_offset);
-                                filter_out.push(new_io);
-                                self.column_count = 0; // reset column counter
-                            }
+                let c = u32_to_char(*cp);
 
-                            // flush accumulated data
-                            let n = self.accum_count;
-                            filter_out.append(&mut self.accum);
-                            self.accum_count = 0;
-                            self.column_count += n;
-                            self.column_count %= self.max_column;
-
-                        } else {
-                            // current word fits
-                            let n = self.accum_count;
-                            filter_out.append(&mut self.accum);
-                            self.accum_count = 0;
-                            self.column_count += n;
-                        }
-
-                        // append current separator
-                        self.prev_offset = io.offset.unwrap();
-                        self.prev_cp = codepoint;
-                        let new_io = io.clone();
-                        filter_out.push(new_io);
-                        if codepoint == '\n' {
-                            self.column_count = 0;
-                        } else {
-                            self.column_count += 1;
-                        }
+                // flush ?
+                if self.column_count == self.max_column {
+                    // "inject" fake new line
+                    if !self.accum.is_empty() && (c != '\n' && c != ' ') && flush_count > 0 {
+                        let mut fnl = FilterIoData::replace_codepoint(&io, '\n');
+                        fnl.color = (0, 255, 0);
+                        fnl.is_selected = true;
+                        fnl.offset = self.accum[0].offset; // align offset
+                        filter_out.push(fnl);
+                        self.column_count = 0;
+                        flush_count = 0;
                     }
+                    let n = self.accum.len() as u64;
+                    self.column_count = n % self.max_column;
+                }
 
-                    (_, codepoint) => {
-                        self.prev_cp = codepoint;
-                        let new_io = io.clone();
-                        self.accum.push(new_io);
-                        self.accum_count += 1;
+                self.column_count += 1;
+
+                match c {
+                    '\n' => {
+                        let mut nl = io.clone();
+                        nl.is_selected = true;
+                        nl.color = (255, 0, 0);
+                        self.accum.push(nl);
+                        filter_out.append(&mut self.accum);
+                        self.column_count = 0;
+                        flush_count = 0;
+                    }
+                    ' ' => {
+                        // flush "word"
+                        let mut space = io.clone();
+                        space.is_selected = true;
+                        space.color = (0, 0, 255);
+                        self.accum.push(space);
+                        filter_out.append(&mut self.accum);
+                        flush_count += 1;
+                    }
+                    _ => {
+                        self.accum.push(io.clone());
                     }
                 }
             } else {
-                //                TODO: use match else is ugly
+                //  TODO: use match else is ugly
                 let new_io = io.clone();
                 self.accum.push(new_io);
-                self.accum_count += 1;
+                filter_out.append(&mut self.accum);
             }
         }
 
-        dbg_println!("self.accum.len() {}", self.accum.len());
-
-        // flush remaining accumulated data
-        filter_out.append(&mut self.accum);
-        self.accum_count = 0;
+        if !self.accum.is_empty() {
+            // EOF, etc ..
+            filter_out.append(&mut self.accum);
+        }
     }
 }
 
@@ -1375,18 +1373,25 @@ fn compose_children(
         return false;
     }
 
+    // cache size ?
     let sizes = if split_is_vertical {
         view::compute_layout_sizes(width, &view.layout_ops)
     } else {
         view::compute_layout_sizes(height, &view.layout_ops)
     };
 
+    dbg_println!(
+        "ITER over VID {}, CHILDREN {:?}, size {:?}",
+        view.id,
+        view.children,
+        sizes
+    );
+
     let mut x = 0;
     let mut y = 0;
 
     for (idx, v) in view.children.iter().enumerate() {
-        if idx > sizes.len() {
-            // panic!(); TODO: handle
+        if idx == sizes.len() {
             break;
         }
 
@@ -1478,17 +1483,6 @@ pub fn run_compositing_stage_direct(
 
     // setup
     let mut compose_filters = view.compose_filters.borrow_mut();
-    if compose_filters.len() == 0 {
-        // hack
-        let mut cpi = CodepointInfo::new();
-        cpi.is_selected = true;
-        loop {
-            let (b, _) = layout_env.screen.push(cpi.clone());
-            if b == false {
-                break;
-            }
-        }
-    }
 
     let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
     let mut filter_out = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
