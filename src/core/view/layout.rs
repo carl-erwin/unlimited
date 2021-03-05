@@ -193,9 +193,9 @@ impl Filter<'_> for RawDataFilter {
             env.screen.width(),
             env.screen.height()
         );
-
-        let screen_max_cp = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
-        self.read_size = std::cmp::min(env.max_offset as usize, screen_max_cp);
+        //      let screen_max_cp = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
+        //      self.read_size = std::cmp::min(env.max_offset as usize, screen_max_cp);
+        self.read_size = 1024 * 4;
         self.pos = env.base_offset;
     }
 
