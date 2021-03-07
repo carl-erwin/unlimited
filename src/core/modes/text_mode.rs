@@ -80,6 +80,7 @@ pub struct TextModeContext {
 
     pub char_map: Option<HashMap<char, char>>,
     pub color_map: Option<HashMap<char, (u8, u8, u8)>>,
+    pub display_word_wrap: bool,
 }
 
 impl<'a> Mode for TextMode {
@@ -127,6 +128,7 @@ impl<'a> Mode for TextMode {
             button_state: [0; 8],
             char_map: Some(char_map),
             color_map: None,
+            display_word_wrap: false,
         };
 
         Box::new(ctx)
@@ -202,6 +204,7 @@ impl TextMode {
             "text-mode:display-end-of-line",
             display_end_of_line,
         );
+        register_input_stage_action(&mut map, "text-mode:display-word-wrap", display_word_wrap);
 
         register_input_stage_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
 
@@ -2655,6 +2658,13 @@ pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     dbg_println!("\\n -> {}", c);
 
     tm.char_map.as_mut().unwrap().insert('\n', c);
+}
+
+pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    let mut v = view.borrow_mut();
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    tm.display_word_wrap = !tm.display_word_wrap;
 }
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>

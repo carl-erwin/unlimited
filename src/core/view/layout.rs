@@ -537,6 +537,7 @@ pub struct WordWrapFilter {
     max_column: u64,
     column_count: u64,
     accum: Vec<FilterIoData>,
+    display_wrap: bool,
 }
 
 impl WordWrapFilter {
@@ -545,6 +546,7 @@ impl WordWrapFilter {
             max_column: 0,
             column_count: 0,
             accum: vec![],
+            display_wrap: false,
         }
     }
 }
@@ -554,10 +556,12 @@ impl Filter<'_> for WordWrapFilter {
         &"WordWrapFilter"
     }
 
-    fn setup(&mut self, env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, env: &LayoutEnv, view: &View) {
         self.max_column = env.screen.width() as u64;
         self.column_count = 0;
         self.accum = Vec::new();
+        let tm = view.mode_ctx::<TextModeContext>("text-mode");
+        self.display_wrap = tm.display_word_wrap;
     }
 
     /*
@@ -604,8 +608,10 @@ impl Filter<'_> for WordWrapFilter {
                     // "inject" fake new line
                     if !self.accum.is_empty() && (c != '\n' && c != ' ') && flush_count > 0 {
                         let mut fnl = FilterIoData::replace_codepoint(&io, '\n');
-                        fnl.color = (0, 255, 0);
-                        fnl.is_selected = true;
+                        if self.display_wrap {
+                            fnl.color = (0, 255, 0);
+                            fnl.is_selected = true;
+                        }
                         fnl.offset = self.accum[0].offset; // align offset
                         filter_out.push(fnl);
                         self.column_count = 0;
@@ -620,8 +626,10 @@ impl Filter<'_> for WordWrapFilter {
                 match c {
                     '\n' => {
                         let mut nl = io.clone();
-                        nl.is_selected = true;
-                        nl.color = (255, 0, 0);
+                        if self.display_wrap {
+                            nl.is_selected = true;
+                            nl.color = (255, 0, 0);
+                        }
                         self.accum.push(nl);
                         filter_out.append(&mut self.accum);
                         self.column_count = 0;
@@ -630,8 +638,10 @@ impl Filter<'_> for WordWrapFilter {
                     ' ' => {
                         // flush "word"
                         let mut space = io.clone();
-                        space.is_selected = true;
-                        space.color = (0, 0, 255);
+                        if self.display_wrap {
+                            space.is_selected = true;
+                            space.color = (0, 0, 255);
+                        }
                         self.accum.push(space);
                         filter_out.append(&mut self.accum);
                         flush_count += 1;

@@ -12,6 +12,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
     "events": [
 
        { "in": [{ "key": "F9"     }],                          "action": "text-mode:display-end-of-line" },
+       { "in": [{ "key": "F8"     }],                          "action": "text-mode:display-word-wrap" },
 
        { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
