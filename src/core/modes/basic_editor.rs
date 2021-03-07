@@ -61,21 +61,13 @@ impl<'a> Mode for BasicEditorMode {
 
         // children_layout_and_modes
         let ops_modes = vec![
-            (
-                LayoutOperation::Fixed { size: 1 },
-                None,
-                vec!["hsplit-mode".to_owned()],
-            ),
+            (LayoutOperation::Fixed { size: 1 }, doc.clone(), vec![]),
             (
                 LayoutOperation::RemainMinus { minus: 3 },
                 doc.clone(),
                 vec!["core-mode".to_owned(), "text-mode".to_owned()],
             ),
-            (
-                LayoutOperation::Fixed { size: 3 },
-                None,
-                vec!["vsplit-mode".to_owned()],
-            ),
+            (LayoutOperation::Fixed { size: 3 }, None, vec![]),
         ];
 
         view.layout_direction = LayoutDirection::Horizontal;
@@ -97,7 +89,22 @@ impl<'a> Mode for BasicEditorMode {
             &modes,
         );
 
-        env.focus_changed_to = Some(view.children[1]); // post input
+        let title_vid = view.children[0];
+        let v = editor.view_map.get(&title_vid).unwrap();
+        v.borrow_mut()
+            .compose_filters
+            .borrow_mut()
+            .push(Box::new(BasicEditorTitle::new()));
+
+        view.focus_to = Some(view.children[1]); // TODO: get focus
+        env.focus_changed_to = Some(view.children[1]); // TODO:
+
+        let status_vid = view.children[2];
+        let v = editor.view_map.get(&status_vid).unwrap();
+        v.borrow_mut()
+            .compose_filters
+            .borrow_mut()
+            .push(Box::new(BasicEditorStatus::new()));
     }
 }
 
@@ -111,3 +118,122 @@ impl BasicEditorMode {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct BasicEditorTitle {
+    title: String,
+}
+
+impl BasicEditorTitle {
+    pub fn new() -> Self {
+        BasicEditorTitle {
+            title: String::new(),
+        }
+    }
+}
+
+use crate::core::VERSION;
+
+impl Filter<'_> for BasicEditorTitle {
+    fn name(&self) -> &'static str {
+        &"editor-title"
+    }
+
+    fn setup(&mut self, env: &LayoutEnv, view: &View) {
+        let mut w = env.screen.width();
+        self.title = format!("unlimitED {} ", VERSION);
+        w = w.saturating_sub(self.title.len());
+
+        let d = view.document.as_ref().unwrap().read().unwrap();
+        let mut doc_info = format!("{}", d.name);
+        let dlen = doc_info.len();
+        if w > dlen {
+            let margin = 1; // w / 2 - dlen / 2;
+            let margin = (0..margin).map(|_| " ").collect::<String>();
+            self.title.push_str(&margin);
+        }
+
+        if d.changed {
+            doc_info.push_str("* ");
+        } else {
+            doc_info.push_str("  ");
+        }
+        doc_info.push_str(&format!(" size {:<12}", d.size()));
+
+        self.title.push_str(&doc_info);
+    }
+
+    fn run(
+        &mut self,
+        view: &View,
+        env: &mut LayoutEnv,
+        _filter_in: &Vec<FilterIoData>,
+        _filter_out: &mut Vec<FilterIoData>,
+    ) {
+        for c in self.title.chars() {
+            let mut cpi = CodepointInfo::new();
+            cpi.displayed_cp = c;
+            cpi.is_selected = true;
+            //            cpi.bg_color = (100, 123, 153);
+            let (b, _) = env.screen.push(cpi.clone());
+            if b == false {
+                break;
+            }
+        }
+
+        let fill = ' ' as char;
+        loop {
+            let mut cpi = CodepointInfo::new();
+            cpi.displayed_cp = fill;
+            cpi.is_selected = true;
+            //            cpi.bg_color = (100, 123, 153);
+            let (b, _) = env.screen.push(cpi.clone());
+            if b == false {
+                break;
+            }
+        }
+
+        env.quit = true;
+    }
+
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+}
+
+struct BasicEditorStatus {}
+
+impl BasicEditorStatus {
+    pub fn new() -> Self {
+        BasicEditorStatus {}
+    }
+}
+
+impl Filter<'_> for BasicEditorStatus {
+    fn name(&self) -> &'static str {
+        &"editor-title"
+    }
+
+    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+
+    fn run(
+        &mut self,
+        _view: &View,
+        env: &mut LayoutEnv,
+        _filter_in: &Vec<FilterIoData>,
+        _filter_out: &mut Vec<FilterIoData>,
+    ) {
+        let fill = ' ' as char;
+        loop {
+            let mut cpi = CodepointInfo::new();
+            cpi.displayed_cp = fill;
+            cpi.is_selected = true;
+            //            cpi.bg_color = (100, 123, 153);
+            let (b, _) = env.screen.push(cpi.clone());
+            if b == false {
+                break;
+            }
+        }
+
+        env.quit = true;
+    }
+
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+}
