@@ -56,8 +56,6 @@ pub struct Line {
 
 impl Line {
     pub fn new(width: usize) -> Self {
-        assert_eq!(width > 0, true);
-
         let mut cells = Vec::with_capacity(width);
         for _ in 0..width {
             cells.push(LineCell::new());

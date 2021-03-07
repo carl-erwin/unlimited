@@ -62,9 +62,6 @@ impl Screen {
     }
 
     pub fn new(width: usize, height: usize) -> Screen {
-        assert!(width > 0);
-        assert!(height > 0);
-
         let mut line: Vec<Line> = Vec::new();
         for _ in 0..height {
             line.push(Line::new(width));
