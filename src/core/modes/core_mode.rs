@@ -115,7 +115,10 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
     // and view.doc is a clone from editor.document_map,
     // doing this let us avoid the use manual lifetime annotations ('static)
     // and errors like "data from `view` flows into `editor`"
-    if let Some(doc) = editor.document_map.get(&doc_id) {
+    let document_map = editor.document_map.clone();
+    let document_map = document_map.read().unwrap();
+
+    if let Some(doc) = document_map.get(&doc_id) {
         let msg = EventMessage {
             seq: 0,
             event: Event::SyncTask {
@@ -229,14 +232,17 @@ pub fn split_vertically(
         (screen.width(), screen.height())
     };
 
+    let document_map = editor.document_map.clone();
+    let document_map = document_map.read().unwrap();
+
     let doc = {
         if v.document.is_none() {
             None
         } else {
             let doc_id = v.document.as_ref().unwrap();
             let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+            if let Some(_doc) = document_map.get(&doc_id) {
+                let doc = document_map.get(&doc_id).unwrap().clone();
                 Some(Arc::clone(&doc))
             } else {
                 None
@@ -313,10 +319,13 @@ pub fn split_horizontally(
         if v.document.is_none() {
             None
         } else {
+            let document_map = editor.document_map.clone();
+            let document_map = document_map.read().unwrap();
+
             let doc_id = v.document.as_ref().unwrap();
             let doc_id = doc_id.read().unwrap().id;
-            if let Some(_doc) = editor.document_map.get(&doc_id) {
-                let doc = editor.document_map.get(&doc_id).unwrap().clone();
+            if let Some(_doc) = document_map.get(&doc_id) {
+                let doc = document_map.get(&doc_id).unwrap().clone();
                 Some(Arc::clone(&doc))
             } else {
                 None

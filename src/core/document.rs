@@ -425,8 +425,6 @@ use self::libc::{c_void, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR,
 
 // TODO:
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
-    const UNLIMITED_SYNC_BLOCK_SIZE: usize = 4096 * 256;
-
     // read/copy
     let fd = {
         let doc = doc.read().unwrap();
@@ -524,6 +522,70 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         doc.changed = false;
         doc.is_syncing = false;
     }
+}
+
+pub fn build_index(doc: &Arc<RwLock<Document>>) {
+    let mut idx = None;
+    {
+        let doc = doc.read().unwrap();
+        idx = {
+            let file = doc.buffer.data.read().unwrap();
+            let (node_index, _, _) = file.find_node_by_offset(0);
+            if node_index.is_none() {
+                return;
+            };
+            node_index
+        };
+    }
+
+    let t0 = std::time::Instant::now();
+
+    let mut byte_pop: [u64; 256] = [0; 256];
+    let byte_pop = Arc::new(std::sync::Mutex::new(Box::new(byte_pop)));
+
+    while idx != None {
+        // do not hold the doc.lock more
+        {
+            let doc = doc.read().unwrap();
+            let file = doc.buffer.data.read().unwrap();
+            let node = &file.pool[idx.unwrap()];
+
+            let mut data = Vec::with_capacity(node.size as usize);
+            unsafe {
+                data.set_len(data.capacity());
+            };
+
+            if let Some(n) = node.do_direct_copy(&mut data) {
+                dbg_println!(
+                    "build index doc('{}') node {}",
+                    doc.file_name(),
+                    idx.unwrap()
+                );
+
+                let mut byte_pop = byte_pop.lock().unwrap();
+                for b in data.iter() {
+                    byte_pop[*b as usize] += 1;
+                }
+            } else {
+                panic!("direct copy failed");
+            }
+
+            idx = node.next;
+        }
+
+        // NB: experimental throttling based on use input freq/rendering
+        // TODO <-- user configuration
+        if user_is_active() == true {
+            let wait = std::time::Duration::from_millis(16);
+            std::thread::sleep(wait);
+        }
+    }
+
+    let t1 = std::time::Instant::now();
+    dbg_println!("index time {:?}", (t1 - t0).as_secs());
+
+    let byte_pop = byte_pop.lock().unwrap();
+    dbg_println!("Number of lines {}", byte_pop[b'\n' as usize]);
 }
 
 #[cfg(test)]

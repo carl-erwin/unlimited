@@ -127,32 +127,36 @@ pub type Id = u64;
 
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: HashMap<document::Id, Arc<RwLock<Document<'a>>>>,
+    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'a>>>>>>,
     pub root_views: Vec<view::Id>,
     pub view_map: HashMap<view::Id, Rc<RefCell<View<'a>>>>,
     pub modes: HashMap<String, Rc<Box<dyn Mode>>>,
     pub core_tx: Sender<EventMessage<'a>>,
     pub ui_tx: Sender<EventMessage<'a>>,
     pub worker_tx: Sender<EventMessage<'a>>,
+    pub indexer_tx: Sender<EventMessage<'a>>,
 }
 
 impl<'a> Editor<'a> {
     ///
     pub fn new(
         config: Config,
+        //
         core_tx: Sender<EventMessage<'a>>,
         ui_tx: Sender<EventMessage<'a>>,
         worker_tx: Sender<EventMessage<'a>>,
+        indexer_tx: Sender<EventMessage<'a>>,
     ) -> Editor<'a> {
         Editor {
             config,
-            document_map: HashMap::new(),
+            document_map: Arc::new(RwLock::new(HashMap::new())),
             root_views: vec![],
             view_map: HashMap::new(),
             modes: HashMap::new(),
             ui_tx,
             core_tx,
             worker_tx,
+            indexer_tx,
         }
     }
 
@@ -166,9 +170,12 @@ impl<'a> Editor<'a> {
 
         let b = builder.finalize();
 
+        let document_map = self.document_map.clone();
+        let mut document_map = document_map.write().unwrap();
+
         if let Some(b) = b {
-            let id = self.document_map.len() as u64;
-            self.document_map.insert(id, b);
+            let id = document_map.len() as u64;
+            document_map.insert(id, b);
         }
 
         let mut builder = DocumentBuilder::new();
@@ -180,8 +187,8 @@ impl<'a> Editor<'a> {
         let b = builder.finalize();
 
         if let Some(b) = b {
-            let id = self.document_map.len() as u64;
-            self.document_map.insert(id, b);
+            let id = document_map.len() as u64;
+            document_map.insert(id, b);
         }
     }
 
@@ -848,4 +855,8 @@ pub fn main_loop(
     // send ApplicationQuitEvent to ui thread
     let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
     ui_tx.send(msg).unwrap_or(());
+
+    // send ApplicationQuitEvent to indexer thread
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+    editor.indexer_tx.send(msg).unwrap_or(());
 }

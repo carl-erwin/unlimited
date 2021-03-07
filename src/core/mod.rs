@@ -159,14 +159,25 @@ pub fn run<'a>(
     ui_tx: &Sender<EventMessage<'static>>,
 ) {
     let (worker_tx, worker_rx) = channel();
+    let (indexer_tx, indexer_rx) = channel();
 
-    let mut editor = Editor::new(config, core_tx.clone(), ui_tx.clone(), worker_tx.clone());
+    let mut editor = Editor::new(
+        config,
+        core_tx.clone(),
+        ui_tx.clone(),
+        worker_tx.clone(),
+        indexer_tx.clone(),
+    );
     let mut env = EditorEnv::new();
 
     // create worker thread
     let worker_th = {
         let core_tx = core_tx.clone();
         Some(thread::spawn(move || worker(&worker_rx, &core_tx)))
+    };
+    let indexer_th = {
+        let core_tx = core_tx.clone();
+        Some(thread::spawn(move || indexer(&indexer_rx, &core_tx)))
     };
 
     editor.worker_tx = worker_tx.clone();
@@ -177,6 +188,9 @@ pub fn run<'a>(
     // wait for worker thread
     if let Some(worker_handle) = worker_th {
         worker_handle.join().unwrap()
+    }
+    if let Some(indexer_handle) = indexer_th {
+        indexer_handle.join().unwrap()
     }
 }
 
@@ -207,12 +221,40 @@ pub fn worker(
     }
 }
 
+pub fn indexer(
+    worker_rx: &Receiver<EventMessage<'static>>,
+    _core_tx: &Sender<EventMessage<'static>>,
+) {
+    dbg_println!("[starting worker thread]");
+    loop {
+        if let Ok(evt) = worker_rx.recv() {
+            match evt.event {
+                Event::ApplicationQuitEvent => {
+                    dbg_println!("[stopping worker thread]");
+                    break;
+                }
+
+                Event::IndexTask { document_map } => {
+                    let map = document_map.read().unwrap();
+                    for (id, doc) in map.iter() {
+                        document::build_index(doc);
+                    }
+                }
+
+                _ => {
+                    panic!("worker thread received an unexpected message");
+                }
+            }
+        }
+    }
+}
+
 use crate::core::document::DocumentBuilder;
 
 /// TODO: replace this by load/unload doc functions
 /// the ui will open the documents on demand
 pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
-    let mut id = editor.document_map.len() as u64;
+    let mut id = editor.document_map.read().unwrap().len() as u64;
 
     for f in &editor.config.files_list {
         let b = DocumentBuilder::new()
@@ -222,13 +264,14 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
             .finalize();
 
         if let Some(b) = b {
-            editor.document_map.insert(id, b);
+            editor.document_map.write().unwrap().insert(id, b);
             id += 1;
         }
     }
 
     // default buffer ?
-    if editor.document_map.is_empty() {
+    let map_is_empty = editor.document_map.read().unwrap().is_empty();
+    if map_is_empty {
         // edit.get_untitled_count() -> 1
 
         let b = DocumentBuilder::new()
@@ -243,22 +286,36 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
                 d.insert(0, s.len(), s);
                 d.buffer_log_reset(); // do not allow to go back to empty buffer
             }
-            editor.document_map.insert(id, b);
+            editor.document_map.write().unwrap().insert(id, b);
             id += 1;
         }
     }
 
     dbg_println!("id {}", id);
 
+    let document_map = editor.document_map.clone();
+    let document_map = document_map.read().unwrap();
+
     // create default views
     // sort by arg pos first
-    let mut docs_id: Vec<document::Id> = editor.document_map.iter().map(|(k, _v)| *k).collect();
+    let mut docs_id: Vec<document::Id> = document_map.iter().map(|(k, _v)| *k).collect();
     docs_id.sort();
     let mut docs: Vec<Arc<RwLock<Document>>> = vec![];
     for id in docs_id.iter() {
-        if let Some(doc) = editor.document_map.get(id) {
+        if let Some(doc) = document_map.get(id) {
             docs.push(Arc::clone(doc));
         }
+    }
+
+    // launch indexer
+    {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::IndexTask {
+                document_map: Arc::clone(&editor.document_map),
+            },
+        };
+        editor.indexer_tx.send(msg).unwrap_or(());
     }
 
     //

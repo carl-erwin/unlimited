@@ -2,7 +2,7 @@
 
 #[macro_export]
 #[doc(hidden)]
-
+#[inline]
 macro_rules! dbg_println {
     ($($arg:tt)*) => ({
         let key = "UNLIMITED_DEBUG";

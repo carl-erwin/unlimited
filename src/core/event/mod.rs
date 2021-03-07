@@ -14,6 +14,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 use std::vec::Vec;
 
+use crate::core::document;
 use crate::core::document::Document;
 use crate::core::screen::Screen;
 
@@ -94,6 +95,10 @@ pub enum Event<'a> {
     /// The use can still browse the document.
     SyncTask {
         doc: Arc<RwLock<Document<'a>>>,
+    },
+    // test
+    IndexTask {
+        document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'a>>>>>>,
     },
 
     ApplicationQuitEvent,
