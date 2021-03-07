@@ -284,6 +284,7 @@ pub struct View<'a> {
     pub post_compose_action: Vec<Action>,
     //
     pub compose_filters: RefCell<Vec<Box<dyn layout::Filter<'a>>>>,
+    pub compose_priority: usize,
 }
 
 impl<'a> View<'a> {
@@ -334,6 +335,7 @@ impl<'a> View<'a> {
             pre_compose_action: vec![],
             post_compose_action: vec![],
             compose_filters: RefCell::new(vec![]),
+            compose_priority: 0,
         };
 
         // setup modes/input map/etc..

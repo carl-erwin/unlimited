@@ -1397,15 +1397,63 @@ fn compose_children(
         sizes
     );
 
+    assert_eq!(view.children.len(), sizes.len());
+
+    let mut compose_idx = vec![];
+    // 1 - compute position and size
+    // 2 - compose based on sibling dependencies/priority
     let mut x = 0;
     let mut y = 0;
+    for (idx, vid) in view.children.iter().enumerate() {
+        let mut child_v = editor.view_map.get(vid).unwrap().borrow_mut();
+        child_v.x = x;
+        child_v.y = y;
+        let (w, h) = if split_is_vertical {
+            (sizes[idx], height)
+        } else {
+            (width, sizes[idx])
+        };
 
-    for (idx, v) in view.children.iter().enumerate() {
-        if idx == sizes.len() {
-            break;
+        compose_idx.push((idx, (x, y), (w, h))); // to sort later
+
+        // TODO: resize instead of replace
+        let child_screen = Screen::new(w, h);
+        child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
+
+        if split_is_vertical {
+            x += w;
+        } else {
+            y += h;
+        }
+    }
+
+    // TODO: sort based on deps/prio
+    compose_idx.sort_by(|idxa, idxb| {
+        let vida = view.children[idxa.0];
+        let vidb = view.children[idxb.0];
+
+        let va = Rc::clone(editor.view_map.get(&vida).unwrap());
+        let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
+
+        let pa = vb.borrow().compose_priority;
+        let pb = va.borrow().compose_priority;
+        pb.cmp(&pa)
+    });
+    //
+
+    dbg_println!("COMPOSE sub VIDs {:?}, ", compose_idx);
+
+    for info in &compose_idx {
+        let idx = info.0;
+        let (x, y) = info.1;
+        let (w, h) = info.2;
+        if sizes[idx] == 0 {
+            continue;
         }
 
-        let mut child_v = editor.view_map.get(v).unwrap().borrow_mut();
+        let vid = view.children[idx];
+
+        let mut child_v = editor.view_map.get(&vid).unwrap().borrow_mut();
         {
             child_v.x = x;
             child_v.y = y;
@@ -1418,7 +1466,7 @@ fn compose_children(
             assert!(w > 0);
             assert!(h > 0);
 
-            let mut child_screen = Screen::new(w, h);
+            let mut child_screen = child_v.screen.write().unwrap();
             run_compositing_stage_direct(
                 editor,
                 editor_env,
@@ -1427,9 +1475,6 @@ fn compose_children(
                 max_offset, // TODO take child doc size
                 &mut child_screen,
             );
-            // TODO: take from child_v main mode
-
-            child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
         }
 
         let child_screen = child_v.screen.as_ref().read().unwrap();
@@ -1438,13 +1483,8 @@ fn compose_children(
             screen.first_offset = child_screen.first_offset.clone();
         }
 
-        // composition copy child to output screen
+        // composition copy child to (parent's) output screen
         screen.copy_to(x, y, &child_screen);
-        if split_is_vertical {
-            x += child_screen.width();
-        } else {
-            y += child_screen.height();
-        }
     }
 
     true
