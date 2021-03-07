@@ -387,7 +387,7 @@ impl<'a> View<'a> {
         v
     }
 
-    pub fn dimension(&mut self) -> (usize, usize) {
+    pub fn dimension(&self) -> (usize, usize) {
         let screen = self.screen.read().unwrap();
         (screen.width(), screen.height())
     }
