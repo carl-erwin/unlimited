@@ -758,12 +758,11 @@ fn run_input_stage(
     // Pre
     // self.flat_events
     env.pending_events = crate::core::event::pending_input_event_count();
-    let flat_events = flatten_input_events(&events);
+    let flat_events = events;
+    //let flat_events = flatten_input_events(&events);
     if flat_events.len() == 0 {
         return Stage::Input;
     };
-    let id = env.view_id;
-    run_stage(Pre, Stage::Input, &mut editor, &mut env, id);
 
     // IN : move flat_events to en, StageTrait pre/in/post
     // run(&mut editor, &mut env) -> next (stage/pos)
@@ -772,7 +771,7 @@ fn run_input_stage(
     let mut recompose = false;
     for ev in flat_events.iter() {
         let id = setup_focus(&mut editor, &mut env, &ev, &mut recompose);
-        run_stage(In, Stage::Input, &mut editor, &mut env, id);
+        run_stages(Stage::Input, &mut editor, &mut env, id);
         run_stages(Stage::Compositing, &mut editor, &mut env, id);
     }
 
