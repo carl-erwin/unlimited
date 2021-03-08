@@ -3,8 +3,6 @@ use std::cell::RefCell;
 
 use std::rc::Rc;
 
-
-
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
@@ -14,14 +12,9 @@ use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-
-
-
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
-
-
 
 use crate::core::view::View;
 

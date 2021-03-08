@@ -3,9 +3,6 @@
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
 
-
-
-
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -56,8 +53,7 @@ use crate::core::view::layout::TabFilter;
 use crate::core::view::layout::Utf8Filter;
 use crate::core::view::layout::WordWrapFilter;
 
-
- // <---------- move to layout // <---------- move to layout
+// <---------- move to layout // <---------- move to layout
 
 pub type Id = u64;
 
@@ -439,6 +435,8 @@ fn run_text_mode_actions(
     pos: editor::StagePosition,
     stage: editor::Stage,
 ) {
+    let mut check_invariants = !false;
+
     let actions: Vec<Action> = {
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
@@ -479,6 +477,7 @@ fn run_text_mode_actions(
                 if tm.doc_revision == doc.buffer_log.data.len() {
                     return;
                 }
+                check_invariants = true;
                 vec![Action::DedupAndSaveMarks]
             }
 
@@ -498,6 +497,18 @@ fn run_text_mode_actions(
     };
 
     run_text_mode_actions_vec(&mut editor, &mut env, &view, &actions);
+
+    if check_invariants {
+        let v = view.borrow();
+        let max_offset = v.document.as_ref().unwrap().read().unwrap().size() as u64;
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+        let marks = &tm.marks;
+        for m in marks.iter() {
+            if m.offset > max_offset as u64 {
+                panic!("m.offset {} > max_offset {}", m.offset, max_offset);
+            }
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

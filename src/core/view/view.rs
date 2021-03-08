@@ -30,8 +30,6 @@ use crate::core::view::layout::{run_compositing_stage, run_compositing_stage_dir
 
 use std::collections::HashMap;
 
-use crate::core::modes::text_mode::*;
-
 use super::layout;
 
 use crate::core::editor::InputStageActionMap;
@@ -453,18 +451,7 @@ impl<'a> View<'a> {
 
         let max_offset = self.document().as_ref().unwrap().read().unwrap().size();
 
-        // TODO: move to TEXT MODE
-        if !self.check_mode_ctx::<TextModeContext>("text-mode") {
-            return;
-        }
-
-        let tm = self.mode_ctx::<TextModeContext>("text-mode");
-        let marks = &tm.marks;
-        for m in marks.iter() {
-            if m.offset > max_offset as u64 {
-                panic!("m.offset {} > max_offset {}", m.offset, max_offset);
-            }
-        }
+        // TODO: mode check invariants
     }
 } // impl View
 

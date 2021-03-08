@@ -1,23 +1,13 @@
 use std::any::Any;
 
-
-
-
-
-
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
-
-
 
 use crate::core::editor::InputStageActionMap;
 use crate::core::modes::core_mode::split_with_direction;
 use crate::core::Editor;
 use crate::core::EditorEnv;
-
-
-
 
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterIoData;
