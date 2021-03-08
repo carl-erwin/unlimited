@@ -188,23 +188,6 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
     sizes
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Action {
-    ScrollUp { n: usize },
-    ScrollDown { n: usize },
-    CenterAroundMainMark,
-    CenterAroundMainMarkIfOffScreen,
-    CenterAround { offset: u64 },
-    MoveMarksToNextLine,
-    MoveMarksToPreviousLine,
-    MoveMarkToNextLine { idx: usize },
-    MoveMarkToPreviousLine { idx: usize },
-    ResetMarks,
-    CheckMarks,
-    DedupAndSaveMarks,
-    CancelSelection,
-}
-
 // trait ?
 // collection of functions, at each pass
 // layout
@@ -281,10 +264,6 @@ pub struct View<'a> {
     //
     pub stage_actions: Vec<(String, StageFunction)>,
 
-    // move this to corresponding pre/pos stages
-    // reset on each event handling
-    pub pre_compose_action: Vec<Action>,  // remove
-    pub post_compose_action: Vec<Action>, // remove
     //
     pub compose_filters: RefCell<Vec<Box<dyn layout::Filter<'a>>>>,
     pub compose_priority: usize,
@@ -338,11 +317,8 @@ impl<'a> View<'a> {
             //
             stage_actions: vec![],
 
-            pre_compose_action: vec![],  // remove this
-            post_compose_action: vec![], // remove this
-
             compose_filters: RefCell::new(vec![]),
-            compose_priority: 0,
+            compose_priority: 0, //  greater first
         };
 
         // setup modes/input map/etc..
