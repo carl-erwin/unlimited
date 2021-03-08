@@ -58,6 +58,7 @@ impl CoreMode {
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
         register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
         register_input_stage_action(&mut map, "destroy-view", destroy_view);
+        register_input_stage_action(&mut map, "destroy-view2", destroy_view2);
     }
 }
 
@@ -379,7 +380,7 @@ pub fn split_horizontally(
 }
 
 /*
-   TODO: must destroy/swap hierarchy, gparent/ root_view
+   TODO: must destroy/swap hierarchy, gparent/root_view
    rapid hack no hierarchy update
    partial destroy
 
@@ -394,7 +395,7 @@ pub fn split_horizontally(
              pv[v.layout_index+1] == separator -> kill pv.children index list
              pv[v.layout_index]   ==  self     -> kill pv.children index list
 
-        if pv.children.len() == 1 swap remain_idx in grand-parent (ppv)
+        if pv.children.len() == 1 swap remain_idx in grand-parent (ppv)  // TODO: if p.no_destroyed ( need special command to "close document" not destroy view)
             if ! pvv {
                 replace pv from root_view[]
             }
@@ -403,6 +404,81 @@ pub fn split_horizontally(
                 ppv.children[ pv.layout_index ] = remain_vid;
             }
 */
+pub fn destroy_view2(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    // not a split
+    if v.layout_index.is_none() {
+        return;
+    }
+
+    // get parent id
+    let pvid = *v.parent_id.as_ref().unwrap();
+
+    // get parent view
+    let pview = editor.view_map.get(&pvid).unwrap().clone();
+    let pv = pview.borrow(); // needed ?
+
+    // get grand parent
+    let ppvid = if let Some(ppvid) = pv.parent_id {
+        ppvid
+    } else {
+        0 // valid ids > 0
+    };
+
+    dbg_println!("destroy view {}", v.id);
+
+    let layout_index = *v.layout_index.as_ref().unwrap();
+    if layout_index == 1 {
+        return;
+    }
+
+    dbg_println!("destroy view {} layout_index {}", v.id, layout_index);
+
+    let keep_index = if layout_index == 0 { 2 } else { 0 };
+
+    dbg_println!("keep index = {}", keep_index);
+
+    // hack no grand parent update: TODO: swap parent an keep_index content
+    // update root_view if no grand parent
+
+    let mut destroy = vec![];
+
+    // get parent
+    {
+        let pv = editor.view_map.get(&pvid).unwrap();
+        let mut pv = pv.borrow_mut();
+        if pv.children.len() != 3 {
+            return;
+        }
+
+        dbg_println!("destroy parent VID {} children {:?}", pv.id, pv.children);
+
+        let keep_vid = pv.children[keep_index];
+        assert_ne!(keep_vid, v.id);
+
+        destroy.push(pv.children[1]); // separator
+        destroy.push(pv.children[layout_index]); // self
+
+        pv.layout_ops = vec![LayoutOperation::Percent { p: 100 }];
+        pv.children.clear();
+        pv.children.push(keep_vid);
+        env.focus_changed_to = Some(keep_vid); // post input
+    }
+
+    dbg_println!("destroy view {:?}", destroy);
+    for idx in destroy {
+        editor.view_map.remove(&idx);
+    }
+}
+
 pub fn destroy_view(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv,
@@ -414,8 +490,7 @@ pub fn destroy_view(
     }
     let pvid = *v.parent_id.as_ref().unwrap();
     if v.layout_index.is_none() {
-        panic!("");
-        return;
+        return; // TODO: allow destruction of last view ? -> regenerate a default (doc list?) ? have an destructible view ("Welcome")
     }
 
     dbg_println!("destroy view {}", v.id);

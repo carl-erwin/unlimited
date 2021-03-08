@@ -94,6 +94,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
        { "in": [{ "key": "F6" } ],                             "action": "split-horizontally" },
        { "in": [{ "key": "F7" } ],                             "action": "destroy-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "Delete" } ],    "action": "destroy-view2" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "3" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "2" } ],         "action": "split-horizontally" },

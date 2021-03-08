@@ -582,7 +582,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
     }
 
     let t1 = std::time::Instant::now();
-    dbg_println!("index time {:?}", (t1 - t0).as_secs());
+    dbg_println!("index time {:?} second(s)", (t1 - t0).as_secs());
 
     let byte_pop = byte_pop.lock().unwrap();
     dbg_println!("Number of lines {}", byte_pop[b'\n' as usize]);
