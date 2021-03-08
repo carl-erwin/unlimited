@@ -3,8 +3,8 @@
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
 
-use std::sync::Arc;
-use std::sync::RwLock;
+
+
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -56,8 +56,8 @@ use crate::core::view::layout::TabFilter;
 use crate::core::view::layout::Utf8Filter;
 use crate::core::view::layout::WordWrapFilter;
 
-use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation; // <---------- move to layout // <---------- move to layout
+
+ // <---------- move to layout // <---------- move to layout
 
 pub type Id = u64;
 
@@ -136,9 +136,9 @@ impl<'a> Mode for TextMode {
 
     fn configure_view(
         &self,
-        mut editor: &mut Editor<'static>,
-        mut env: &mut EditorEnv<'static>,
-        mut view: &mut View<'static>,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
     ) {
         dbg_println!("config text-mode for VID {}", view.id);
 
@@ -185,6 +185,9 @@ impl<'a> Mode for TextMode {
         view.compose_filters
             .borrow_mut()
             .push(Box::new(DrawMarks::new()));
+
+        view.stage_actions
+            .push((String::from("text-mode"), run_text_mode_actions));
     }
 }
 
@@ -429,27 +432,13 @@ pub fn run_text_mode_actions_vec(
     }
 }
 
-pub fn run_text_mode_actions(
-    mut editor: &mut Editor,
-    mut env: &mut EditorEnv,
-    view: &Rc<RefCell<View>>,
-    stage: editor::Stage,
+fn run_text_mode_actions(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
     pos: editor::StagePosition,
+    stage: editor::Stage,
 ) {
-    {
-        let mut v = view.borrow_mut();
-        if v.document.is_none() {
-            return;
-        }
-        let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
-
-        if !v.check_mode_ctx::<TextModeContext>("text-mode") {
-            return;
-        }
-    }
-
     let actions: Vec<Action> = {
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
@@ -470,10 +459,22 @@ pub fn run_text_mode_actions(
             }
 
             (editor::Stage::Input, editor::StagePosition::Post) => {
+                // refresh view offset after user input
                 let mut v = view.borrow_mut();
+
+                if let Some(doc) = &v.document {
+                    let max_offset = doc.read().unwrap().size() as u64;
+                    v.start_offset = std::cmp::min(v.start_offset, max_offset);
+                }
+
                 let doc = v.document.clone();
                 let doc = doc.as_ref().unwrap();
                 let doc = doc.as_ref().read().unwrap();
+
+                // fix view max offset ? remove ?
+                let max_offset = doc.size() as u64;
+                v.start_offset = std::cmp::min(v.start_offset, max_offset);
+
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 if tm.doc_revision == doc.buffer_log.data.len() {
                     return;
@@ -490,7 +491,8 @@ pub fn run_text_mode_actions(
             }
 
             _ => {
-                panic!();
+                // dbg_println!("NO action for {:?}::{:?}", pos, stage);
+                return;
             }
         }
     };

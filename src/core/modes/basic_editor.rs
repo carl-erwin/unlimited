@@ -1,24 +1,24 @@
 use std::any::Any;
-use std::cell::RefCell;
 
-use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::RwLock;
+
+
+
+
 
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
 
-use crate::core::document::Document;
-use crate::core::editor::register_input_stage_action;
+
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::modes::core_mode::split_with_direction;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::event::*;
 
-use crate::core::view;
+
+
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
@@ -114,7 +114,7 @@ impl BasicEditorMode {
         BasicEditorMode {}
     }
 
-    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {}
+    pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +164,7 @@ impl Filter<'_> for BasicEditorTitle {
 
     fn run(
         &mut self,
-        view: &View,
+        _view: &View,
         env: &mut LayoutEnv,
         _filter_in: &Vec<FilterIoData>,
         _filter_out: &mut Vec<FilterIoData>,
@@ -195,7 +195,7 @@ impl Filter<'_> for BasicEditorTitle {
         env.quit = true;
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
 }
 
 struct BasicEditorStatus {}
@@ -235,5 +235,5 @@ impl Filter<'_> for BasicEditorStatus {
         env.quit = true;
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
 }

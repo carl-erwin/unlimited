@@ -540,7 +540,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     let t0 = std::time::Instant::now();
 
-    let mut byte_pop: [u64; 256] = [0; 256];
+    let byte_pop: [u64; 256] = [0; 256];
     let byte_pop = Arc::new(std::sync::Mutex::new(Box::new(byte_pop)));
 
     while idx != None {
@@ -555,7 +555,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                 data.set_len(data.capacity());
             };
 
-            if let Some(n) = node.do_direct_copy(&mut data) {
+            if let Some(_n) = node.do_direct_copy(&mut data) {
                 dbg_println!(
                     "build index doc('{}') node {}",
                     doc.file_name(),

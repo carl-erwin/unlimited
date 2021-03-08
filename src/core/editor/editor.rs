@@ -102,6 +102,14 @@ pub type InputStageFunction = fn(
 
 pub type InputStageActionMap<'a> = HashMap<String, InputStageFunction>;
 
+pub type StageFunction = fn(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+    pos: StagePosition,
+    stage: Stage,
+) -> ();
+
 //
 pub type RenderStageFunction = fn(
     editor: &mut Editor,
@@ -636,7 +644,7 @@ fn run_stage(
 
     let view = view.unwrap().clone();
 
-    dbg_println!("render_stage VID {} : {:?} {:?}", view_id, pos, stage);
+    dbg_println!("run_stage VID {} : {:?} {:?}", view_id, pos, stage);
 
     match stage {
         Stage::Input => {
@@ -758,9 +766,7 @@ fn run_input_stage(
     mut env: &mut EditorEnv<'static>,
     events: &Vec<InputEvent>,
 ) -> Stage {
-    use StagePosition::In;
     use StagePosition::Post;
-    use StagePosition::Pre;
 
     // Pre
     // self.flat_events

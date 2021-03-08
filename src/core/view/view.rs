@@ -1,5 +1,6 @@
 // Copyright (c) Carl-Erwin Griffith
 
+use core::panic;
 //
 use std::any::Any;
 use std::cell::RefCell;
@@ -19,6 +20,7 @@ use crate::core::document::Document;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::editor::Stage;
+use crate::core::editor::StageFunction;
 use crate::core::editor::StagePosition;
 
 use crate::core::mark::Mark;
@@ -278,10 +280,13 @@ pub struct View<'a> {
     // TODO: keep them here or use view.id -> editor.view(view.id)
     pub children: Vec<Id>,
 
+    //
+    pub stage_actions: Vec<(String, StageFunction)>,
+
     // move this to corresponding pre/pos stages
     // reset on each event handling
-    pub pre_compose_action: Vec<Action>,
-    pub post_compose_action: Vec<Action>,
+    pub pre_compose_action: Vec<Action>,  // remove
+    pub post_compose_action: Vec<Action>, // remove
     //
     pub compose_filters: RefCell<Vec<Box<dyn layout::Filter<'a>>>>,
     pub compose_priority: usize,
@@ -296,7 +301,7 @@ impl<'a> View<'a> {
 
     /// Create a new View at a gin offset in the Document.<br/>
     pub fn new(
-        mut editor: &mut Editor<'static>,
+        editor: &mut Editor<'static>,
         env: &mut EditorEnv<'static>,
         parent_id: Option<Id>,
         x: usize, // relative to parent, i32 allow negative moves?
@@ -332,8 +337,12 @@ impl<'a> View<'a> {
             layout_direction: LayoutDirection::NotSet,
             layout_ops: vec![],
             children: vec![],
-            pre_compose_action: vec![],
-            post_compose_action: vec![],
+            //
+            stage_actions: vec![],
+
+            pre_compose_action: vec![],  // remove this
+            post_compose_action: vec![], // remove this
+
             compose_filters: RefCell::new(vec![]),
             compose_priority: 0,
         };
@@ -461,70 +470,25 @@ impl<'a> View<'a> {
 
 ///
 pub fn run_stage(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
-    view: &Rc<RefCell<View>>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
     pos: StagePosition,
     stage: Stage,
 ) {
-    match (stage, pos) {
-        (Stage::Input, StagePosition::Pre) => {
-            // move to v.run_stage() : for register modes
-            // TODO: mode_configure ->  v.register_run_stage_action(cb)
-            crate::core::modes::text_mode::run_text_mode_actions(
-                &mut editor,
-                &mut env,
-                &view,
-                stage,
-                pos,
-            );
+    // TODO: Rc ?
+    // exec order ?, path ?
+    let actions = view.borrow().stage_actions.clone();
+
+    // disable for composition ?
+    for a in actions {
+        a.1(editor, env, view, pos, stage);
+    }
+
+    match (pos, stage) {
+        (StagePosition::In, Stage::Compositing) => {
+            compute_view_layout(editor, env, &view); // can be merged with stage_actions ?
         }
-
-        (Stage::Input, StagePosition::Post) => {
-            // refresh view offset
-            {
-                let mut v = view.borrow_mut();
-                let max_offset = v.document().unwrap().read().unwrap().size() as u64;
-                v.start_offset = std::cmp::min(v.start_offset, max_offset);
-            }
-            // save marks
-            crate::core::modes::text_mode::run_text_mode_actions(
-                &mut editor,
-                &mut env,
-                &view,
-                stage,
-                pos,
-            );
-        }
-
-        (Stage::Compositing, StagePosition::Pre) => {
-            // TODO: save marks HERE After All input processing
-            // check doc.revision
-
-            // move to v.run_stage() : for register modes
-            crate::core::modes::text_mode::run_text_mode_actions(
-                &mut editor,
-                &mut env,
-                &view,
-                stage,
-                pos,
-            );
-        }
-
-        (Stage::Compositing, StagePosition::In) => {
-            compute_view_layout(editor, env, &view);
-        }
-
-        (Stage::Compositing, StagePosition::Post) => {
-            crate::core::modes::text_mode::run_text_mode_actions(
-                &mut editor,
-                &mut env,
-                &view,
-                stage,
-                pos,
-            );
-        }
-
         _ => {}
     }
 }

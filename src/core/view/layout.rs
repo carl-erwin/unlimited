@@ -1446,7 +1446,7 @@ fn compose_children(
     for info in &compose_idx {
         let idx = info.0;
         let (x, y) = info.1;
-        let (w, h) = info.2;
+        let (_w, _h) = info.2;
         if sizes[idx] == 0 {
             continue;
         }

@@ -2,26 +2,26 @@ use std::any::Any;
 use std::cell::RefCell;
 
 use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::RwLock;
+
+
 
 use super::Mode;
 
-use crate::core::codepointinfo::CodepointInfo;
-use crate::core::document::Document;
+
+
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::event::*;
 
-use crate::core::view;
+
+
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterIoData;
 use crate::core::view::layout::LayoutEnv;
-use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+
+
 
 use crate::core::view::View;
 
@@ -51,8 +51,8 @@ impl<'a> Mode for TemplateMode {
 
     fn configure_view(
         &self,
-        mut editor: &mut Editor<'static>,
-        mut env: &mut EditorEnv<'static>,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
         view.compose_filters
@@ -74,12 +74,12 @@ impl TemplateMode {
 
 pub fn template_input_action_fn1(
     _editor: &mut Editor,
-    env: &mut EditorEnv,
+    _env: &mut EditorEnv,
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.borrow();
     let doc = v.document.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let _doc = doc.as_ref().read().unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,12 +102,12 @@ impl Filter<'_> for TemplateComposeFilter {
     fn run(
         &mut self,
         _view: &View,
-        env: &mut LayoutEnv,
+        _env: &mut LayoutEnv,
         filter_in: &Vec<FilterIoData>,
         filter_out: &mut Vec<FilterIoData>,
     ) {
         *filter_out = filter_in.clone();
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
 }

@@ -93,6 +93,7 @@ pub static DEFAULT_INPUT_MAP: &str = r#"[{
 
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
        { "in": [{ "key": "F6" } ],                             "action": "split-horizontally" },
+       { "in": [{ "key": "F7" } ],                             "action": "destroy-view" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "3" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "2" } ],         "action": "split-horizontally" },
@@ -465,7 +466,7 @@ fn parse_event_entry_input_pointer_motion(
     ctx.sequence.push(ev)
 }
 
-fn parse_event_entry(mut ctx: &mut ParseCtx, name: &String, value: &serde_json::Value) {
+fn parse_event_entry(mut ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     //dbg_println!("fount event '{}'", name);
     let vec = if let Value::Array(ref vec) = value {
         vec
@@ -510,7 +511,7 @@ fn parse_event_entry_action(mut ctx: &mut ParseCtx, _name: &String, value: &serd
 fn parse_event_entry_default_action(
     mut ctx: &mut ParseCtx,
     _name: &String,
-    value: &serde_json::Value,
+    _value: &serde_json::Value,
 ) {
     // //dbg_println!("parse_event_entry_default_action = '{}'", value);
     ctx.is_default = true;
@@ -654,7 +655,7 @@ mod tests {
             },
         };
 
-        let keypress_event_hash = compute_input_event_hash(&keypress_event);
+        let _keypress_event_hash = compute_input_event_hash(&keypress_event);
 
         //dbg_println!("keypress_event hash = {:?}", keypress_event_hash);
 
@@ -678,7 +679,7 @@ mod tests {
 
         let keypress_event_hash = compute_input_event_hash(&keypress_event);
 
-        let rule = h.get(&keypress_event_hash);
+        let _rule = h.get(&keypress_event_hash);
 
         //dbg_println!("{:?}", rule);
 
@@ -714,7 +715,7 @@ mod tests {
 
         let val = compute_input_event_hash(&button_event);
 
-        let button_value = h.get(&val);
+        let _button_value = h.get(&val);
 
         let button_ref_event_hash = compute_input_event_hash(&button_ref_event);
         let button_event_hash = compute_input_event_hash(&button_event);
@@ -737,7 +738,7 @@ mod tests {
         let map = build_input_event_map(DEFAULT_INPUT_MAP)?;
 
         //dbg_println!("****** print map");
-        for (k, v) in map.borrow().iter() {
+        for (_k, _v) in map.borrow().iter() {
             //dbg_println!("{:?} -> {:?}", k, v);
         }
 
@@ -780,7 +781,7 @@ mod tests {
 
             for ev in &iev {
                 let action = eval_input_event(&ev, &rc_map, &mut current_node, &mut next_node);
-                if let Some(action) = action {
+                if let Some(_action) = action {
                     //dbg_println!("found action {}", action);
                 } else {
                     std::mem::swap(&mut current_node, &mut next_node);

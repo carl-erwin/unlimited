@@ -236,7 +236,7 @@ pub fn indexer(
 
                 Event::IndexTask { document_map } => {
                     let map = document_map.read().unwrap();
-                    for (id, doc) in map.iter() {
+                    for (_id, doc) in map.iter() {
                         document::build_index(doc);
                     }
                 }
