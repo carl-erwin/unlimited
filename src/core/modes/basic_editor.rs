@@ -51,7 +51,7 @@ impl<'a> Mode for BasicEditorMode {
 
         // children_layout_and_modes
         let ops_modes = vec![
-            (LayoutOperation::Fixed { size: 1 }, doc.clone(), vec![]),
+            (LayoutOperation::Fixed { size: 1 + 1 /* nano-like */ }, doc.clone(), vec![]),
             (
                 LayoutOperation::RemainMinus { minus: 3 },
                 doc.clone(),
@@ -111,12 +111,16 @@ impl BasicEditorMode {
 
 struct BasicEditorTitle {
     title: String,
+    width: usize,
+    height: usize,
 }
 
 impl BasicEditorTitle {
     pub fn new() -> Self {
         BasicEditorTitle {
             title: String::new(),
+            width: 0,
+            height: 0,
         }
     }
 }
@@ -129,7 +133,10 @@ impl Filter<'_> for BasicEditorTitle {
     }
 
     fn setup(&mut self, env: &LayoutEnv, view: &View) {
-        let mut w = env.screen.width();
+        self.width = env.screen.width();
+        self.height = env.screen.height();
+
+        let mut w = self.width;
         self.title = format!("unlimitED {} ", VERSION);
         w = w.saturating_sub(self.title.len());
 
@@ -159,6 +166,7 @@ impl Filter<'_> for BasicEditorTitle {
         _filter_in: &Vec<FilterIoData>,
         _filter_out: &mut Vec<FilterIoData>,
     ) {
+        let len = self.title.len();
         for c in self.title.chars() {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
@@ -170,16 +178,23 @@ impl Filter<'_> for BasicEditorTitle {
             }
         }
 
+        if len >= self.width {
+            env.quit = true;
+            return;
+        }
+        let remain = self.width - len;
+
         let fill = ' ' as char;
-        loop {
-            let mut cpi = CodepointInfo::new();
-            cpi.displayed_cp = fill;
-            cpi.is_selected = true;
-            //            cpi.bg_color = (100, 123, 153);
-            let (b, _) = env.screen.push(cpi.clone());
-            if b == false {
-                break;
-            }
+            for i in 0..remain {
+                let mut cpi = CodepointInfo::new();
+                cpi.displayed_cp = fill;
+                cpi.is_selected = true;
+                //            cpi.bg_color = (100, 123, 153);
+                let (b, _) = env.screen.push(cpi.clone());
+                if b == false {
+                    env.quit = true;
+                    return;
+                }
         }
 
         env.quit = true;
