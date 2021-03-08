@@ -34,7 +34,9 @@ impl CodepointInfo {
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
-        (30, 34, 39)
+        // (30, 34, 39)
+        (40, 44, 49)
+        //(45, 55, 67)
     }
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
