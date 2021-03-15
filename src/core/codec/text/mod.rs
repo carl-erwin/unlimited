@@ -1,6 +1,7 @@
 // Copyright (c) Carl-Erwin Griffith
 
 // mode declaration
+pub mod ascii;
 pub mod utf8;
 
 // std

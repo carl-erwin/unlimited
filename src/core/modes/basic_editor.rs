@@ -51,7 +51,13 @@ impl<'a> Mode for BasicEditorMode {
 
         // children_layout_and_modes
         let ops_modes = vec![
-            (LayoutOperation::Fixed { size: 1 + 1 /* nano-like */ }, doc.clone(), vec![]),
+            (
+                LayoutOperation::Fixed {
+                    size: 1 + 0, /* nano-like */
+                },
+                doc.clone(),
+                vec![],
+            ),
             (
                 LayoutOperation::RemainMinus { minus: 3 },
                 doc.clone(),
@@ -166,11 +172,16 @@ impl Filter<'_> for BasicEditorTitle {
         _filter_in: &Vec<FilterIoData>,
         _filter_out: &mut Vec<FilterIoData>,
     ) {
+        let _bg_color = (100, 123, 153);
+
         let len = self.title.len();
         for c in self.title.chars() {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
-            cpi.is_selected = true;
+            cpi.metadata = true;
+            cpi.size = 0;
+            cpi.color = CodepointInfo::default_bg_color();
+            cpi.bg_color = CodepointInfo::default_color();
             //            cpi.bg_color = (100, 123, 153);
             let (b, _) = env.screen.push(cpi.clone());
             if b == false {
@@ -184,17 +195,18 @@ impl Filter<'_> for BasicEditorTitle {
         }
         let remain = self.width - len;
 
-        let fill = ' ' as char;
-            for i in 0..remain {
-                let mut cpi = CodepointInfo::new();
-                cpi.displayed_cp = fill;
-                cpi.is_selected = true;
-                //            cpi.bg_color = (100, 123, 153);
-                let (b, _) = env.screen.push(cpi.clone());
-                if b == false {
-                    env.quit = true;
-                    return;
-                }
+        let _fill = ' ' as char;
+        for _i in 0..remain {
+            let mut cpi = CodepointInfo::new();
+            cpi.color = CodepointInfo::default_bg_color();
+            cpi.bg_color = CodepointInfo::default_color();
+            cpi.metadata = true;
+
+            let (b, _) = env.screen.push(cpi.clone());
+            if b == false {
+                env.quit = true;
+                return;
+            }
         }
 
         env.quit = true;
@@ -213,7 +225,7 @@ impl BasicEditorStatus {
 
 impl Filter<'_> for BasicEditorStatus {
     fn name(&self) -> &'static str {
-        &"editor-title"
+        &"editor-status"
     }
 
     fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
@@ -229,8 +241,10 @@ impl Filter<'_> for BasicEditorStatus {
         loop {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = fill;
-            cpi.is_selected = true;
-            //            cpi.bg_color = (100, 123, 153);
+            cpi.metadata = true;
+            cpi.color = CodepointInfo::default_bg_color();
+            cpi.bg_color = CodepointInfo::default_color();
+
             let (b, _) = env.screen.push(cpi.clone());
             if b == false {
                 break;

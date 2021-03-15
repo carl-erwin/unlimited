@@ -427,7 +427,7 @@ pub fn destroy_view2(
     let pv = pview.borrow(); // needed ?
 
     // get grand parent
-    let ppvid = if let Some(ppvid) = pv.parent_id {
+    let _ppvid = if let Some(ppvid) = pv.parent_id {
         ppvid
     } else {
         0 // valid ids > 0

@@ -6,13 +6,13 @@ use std::sync::RwLock;
 //
 use crate::core::editor::user_is_active;
 
-use crate::core::buffer::Buffer;
-pub use crate::core::buffer::OpenMode;
+use super::buffer::Buffer;
+use super::buffer::OpenMode;
 
 //
-use crate::core::bufferlog::BufferLog;
-pub use crate::core::bufferlog::BufferOperation;
-pub use crate::core::bufferlog::BufferOperationType;
+pub use super::bufferlog::BufferLog;
+pub use super::bufferlog::BufferOperation;
+pub use super::bufferlog::BufferOperationType;
 
 //
 pub type Id = u64; // TODO change to usize
@@ -146,10 +146,10 @@ impl<'a> Document<'a> {
     pub fn set_cache(&mut self, start: u64, end: u64) {
         assert!(start <= end);
         self.cache.start = start;
-        self.cache.end = end;
         self.cache.data.clear();
         let size = (end - start) as usize;
-        self.buffer.read(start, size, &mut self.cache.data);
+        let sz = self.buffer.read(start, size, &mut self.cache.data);
+        self.cache.end = start + sz as u64;
         self.cache.data.shrink_to_fit();
     }
 
@@ -540,17 +540,19 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     let t0 = std::time::Instant::now();
 
-    let byte_pop: [u64; 256] = [0; 256];
-    let byte_pop = Arc::new(std::sync::Mutex::new(Box::new(byte_pop)));
+    let mut total_byte_count: [u64; 256] = [0; 256];
 
     while idx != None {
-        // do not hold the doc.lock more
+        let mut byte_count: [u64; 256] = [0; 256];
+        let mut data = vec![];
+
+        // read node bytes
         {
             let doc = doc.read().unwrap();
             let file = doc.buffer.data.read().unwrap();
             let node = &file.pool[idx.unwrap()];
 
-            let mut data = Vec::with_capacity(node.size as usize);
+            data.reserve(node.size as usize);
             unsafe {
                 data.set_len(data.capacity());
             };
@@ -561,31 +563,37 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                     doc.file_name(),
                     idx.unwrap()
                 );
-
-                let mut byte_pop = byte_pop.lock().unwrap();
-                for b in data.iter() {
-                    byte_pop[*b as usize] += 1;
-                }
             } else {
+                // TODO: return error
                 panic!("direct copy failed");
             }
-
-            idx = node.next;
         }
 
-        // NB: experimental throttling based on use input freq/rendering
-        // TODO <-- user configuration
+        // count node bytes (no lock)
+        for b in data.iter() {
+            byte_count[*b as usize] += 1;
+            total_byte_count[*b as usize] += 1;
+        }
+
         if user_is_active() == true {
             let wait = std::time::Duration::from_millis(16);
             std::thread::sleep(wait);
         }
+
+        // update node info
+        {
+            let doc = doc.read().unwrap();
+            let mut file = doc.buffer.data.write().unwrap();
+            let mut node = &mut file.pool[idx.unwrap()];
+            node.byte_count = byte_count;
+            idx = node.next;
+        }
     }
 
     let t1 = std::time::Instant::now();
-    dbg_println!("index time {:?} second(s)", (t1 - t0).as_secs());
+    dbg_println!("index time {:?} ms", (t1 - t0).as_millis());
 
-    let byte_pop = byte_pop.lock().unwrap();
-    dbg_println!("Number of lines {}", byte_pop[b'\n' as usize]);
+    dbg_println!("Number of lines {}", total_byte_count[b'\n' as usize]);
 }
 
 #[cfg(test)]

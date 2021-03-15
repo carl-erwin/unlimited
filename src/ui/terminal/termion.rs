@@ -173,7 +173,7 @@ fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut 
     write!(stdout, "{}", termion::style::Reset).unwrap();
 
     for l in 0..screen.max_height() {
-        let line = screen.get_mut_unclipped_line(l).unwrap();
+        let line = screen.get_unclipped_line_mut(l).unwrap();
 
         terminal_cursor_to(&mut stdout, 1, (1 + l) as u16);
 

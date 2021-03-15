@@ -6,6 +6,8 @@ use crate::core::document::Document;
 use crate::core::codec::text::SyncDirection;
 use crate::core::codec::text::TextCodec;
 
+const DEBUG: bool = false;
+
 //
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Mark {
@@ -15,7 +17,7 @@ pub struct Mark {
 fn is_blank(cp: char) -> bool {
     // TODO: put definition of word in array of char and use any(is_word_vec)
     match cp {
-        ' ' | '\r' | '\n' | '\t' => true,
+        ' ' /*| '\r'*/ | '\n' | '\t' => true,
         _ => false,
     }
 }
@@ -32,7 +34,17 @@ pub fn read_char_forward(
     }
 
     let mut data = Vec::with_capacity(4);
-    doc.read(from_offset, data.capacity(), &mut data); // TODO: decode up to capacity ?
+    let sz = doc.read(from_offset, data.capacity(), &mut data); // TODO: decode up to capacity ?
+
+    if DEBUG {
+        dbg_println!(
+            "DOC read {} bytes from offset {} {:x?}",
+            sz,
+            from_offset,
+            data
+        );
+    }
+
     codec.decode(SyncDirection::Forward, &data, 0)
 }
 
@@ -44,18 +56,35 @@ pub fn read_char_backward(
 ) -> (char, u64, usize) {
     if from_offset == 0 {
         // return None;
-        return (b'\0' as char, 0, 0);
+        return ('\u{0}', 0, 0);
     }
 
-    //
+    if DEBUG {
+        dbg_println!("mark :: read_char_backward from_offset {}", from_offset);
+    }
+
     let rewind_offset = from_offset.saturating_sub(4);
     let rewind_size = from_offset - rewind_offset;
 
+    if DEBUG {
+        dbg_println!("mark :: rewind_offset {}", rewind_offset);
+        dbg_println!("mark :: rewind_size {}", rewind_size);
+    }
+
     // fill buf
     let mut data = Vec::with_capacity(4);
-    let _rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+    let rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+
+    if DEBUG {
+        dbg_println!("mark :: read_char_backward rd {} data {:?}", rd, data);
+    }
+
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
+
+    if DEBUG {
+        dbg_println!("code.decode = {:?}", ret);
+    }
 
     /* result are always relative to from_offset/direction */
     (ret.0, from_offset - ret.2 as u64, ret.2)
@@ -120,22 +149,25 @@ impl Mark {
     }
 
     pub fn move_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
-        // TODO: if '\r\n' must move + 1 in codec
-        let (_, _, size) = read_char_forward(&doc, self.offset, codec);
-        self.offset += size as u64;
+        if self.offset < doc.size() as u64 {
+            // TODO: if '\r\n' must move + 1 in codec
+            let (_, _, size) = read_char_forward(&doc, self.offset, codec);
+            self.offset += size as u64;
+        }
 
         self
     }
 
     // TODO: check multi-byte utf8 sequence
     pub fn move_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
-        let (_, offset, _size) = read_char_backward(&doc, self.offset, codec);
-        //dbg_println!(
-        //    "self.offset({}) = offset({}), size({})",
-        //    self.offset,
-        //    offset,
-        //    size
-        //);
+        let (c, offset, size) = read_char_backward(&doc, self.offset, codec);
+        dbg_println!(
+            "move_backward : char = '{:?}', self.offset({}) = offset({}), size({})",
+            c,
+            self.offset,
+            offset,
+            size
+        );
         self.offset = offset;
 
         self
@@ -175,8 +207,7 @@ impl Mark {
                     self.offset += size as u64;
                     break;
                 }
-
-                '\r' => {
+                /*                '\r' => {
                     if prev_cp == '\n' {
                         self.offset += (size + prev_cp_size) as u64;
                     } else {
@@ -184,7 +215,7 @@ impl Mark {
                     }
                     break;
                 }
-
+                */
                 _ => {}
             }
 
@@ -213,7 +244,8 @@ impl Mark {
                 break;
             }
             match cp {
-                '\r' | '\n' => {
+                /*'\r' | */
+                '\n' => {
                     // TODO: handle \r\n
                     break;
                 }

@@ -102,7 +102,11 @@ impl Filter<'_> for HsplitModeComposeFilter {
         let mut cpi = CodepointInfo::new();
         cpi.is_selected = false;
         //            cpi.bg_color = (100, 123, 153);
-        cpi.displayed_cp = '-';
+        cpi.cp = '─';
+        cpi.displayed_cp = '─';
+        cpi.metadata = true;
+        cpi.size = 0;
+
         loop {
             let (b, _) = env.screen.push(cpi.clone());
             if b == false {

@@ -24,7 +24,7 @@ use unlimited::core::event::EventMessage;
 /// Program entry point
 /// It parses the command line to build the configuration.
 /// Creates the core thread.
-/// Nb: the ui created and ran the main thread
+/// Nb: the created ui runs the main thread
 fn main() {
     // parse user command line
     let config = parse_command_line();

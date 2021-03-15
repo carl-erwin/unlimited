@@ -15,8 +15,6 @@ use std::sync::RwLock;
 #[macro_use]
 pub(crate) mod macros;
 
-pub mod buffer;
-pub mod bufferlog;
 pub mod codec;
 pub mod codepointinfo;
 pub mod config;
@@ -24,7 +22,6 @@ pub mod document;
 pub mod editor;
 pub mod event;
 pub mod mapped_file;
-pub mod mark;
 pub mod modes;
 pub mod screen;
 pub mod view;
@@ -307,8 +304,8 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
         }
     }
 
-    // launch indexer
-    {
+    // index this document
+    if true {
         let msg = EventMessage {
             seq: 0,
             event: Event::IndexTask {
@@ -320,6 +317,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
 
     //
     let modes = vec!["basic-editor".to_owned()];
+    //let modes = vec!["core-mode".to_owned(), "text-mode".to_owned()];
 
     // create views
     for doc in docs {

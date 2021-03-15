@@ -14,7 +14,6 @@ use std::time::Instant;
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
-use crate::core::codepointinfo;
 use crate::core::document::Document;
 
 use crate::core::editor::Editor;
@@ -23,7 +22,6 @@ use crate::core::editor::Stage;
 use crate::core::editor::StageFunction;
 use crate::core::editor::StagePosition;
 
-use crate::core::mark::Mark;
 use crate::core::screen::Screen;
 
 use crate::core::view::layout::{run_compositing_stage, run_compositing_stage_direct};
@@ -344,6 +342,7 @@ impl<'a> View<'a> {
                 v.input_ctx.action_map.insert(name.clone(), fnptr.clone());
             }
 
+            dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
             // TODO: user define
             // let input_map = mode.build_input_map(); TODO
             let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
@@ -425,7 +424,7 @@ impl<'a> View<'a> {
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
 
-        let max_offset = self.document().as_ref().unwrap().read().unwrap().size();
+        let _max_offset = self.document().as_ref().unwrap().read().unwrap().size();
 
         // TODO: mode check invariants
     }
@@ -456,96 +455,6 @@ pub fn run_stage(
     }
 }
 
-// OLD FUNCTION
-// illustrates how to compute consecutive screen between [start_offset, end_offset]
-// and return screen lines
-pub fn get_lines_offsets(
-    editor: &Editor,
-    env: &EditorEnv,
-    view: &Rc<RefCell<View>>,
-    start_offset: u64,
-    end_offset: u64,
-    screen_width: usize,
-    screen_height: usize,
-) -> Vec<(u64, u64)> {
-    let doc = view.borrow();
-    let doc = doc.document.as_ref().unwrap();
-    let doc = doc.as_ref().write().unwrap();
-
-    let mut v = Vec::<(u64, u64)>::new();
-
-    let mut m = Mark::new(start_offset); // TODO: rename into screen_start_offset
-
-    let max_offset = doc.size() as u64;
-
-    // and build tmp screens until end_offset if found
-    let screen_width = ::std::cmp::max(1, screen_width);
-    let screen_height = ::std::cmp::max(4, screen_height);
-    let mut screen = Screen::new(screen_width, screen_height);
-    screen.is_off_screen = true;
-
-    loop {
-        run_compositing_stage(editor, env, &view, m.offset, max_offset, &mut screen);
-        if screen.push_count == 0 {
-            return v;
-        }
-        // push lines offsets
-        // FIXME: find a better way to iterate over the used lines
-        for i in 0..screen.current_line_index {
-            if !v.is_empty() && i == 0 {
-                // do not push line range twice
-                continue;
-            }
-            let s = screen.line[i].get_first_cpi().unwrap().offset.unwrap();
-            let e = screen.line[i].get_last_cpi().unwrap().offset.unwrap();
-            v.push((s, e));
-
-            if s >= end_offset || e == max_offset {
-                return v;
-            }
-        }
-
-        // eof reached ?
-        // FIXME: the api is not yet READY
-        // we must find a way to cover all filled lines
-        if screen.current_line_index < screen.height() {
-            let s = screen.line[screen.current_line_index]
-                .get_first_cpi()
-                .unwrap()
-                .offset
-                .unwrap();
-
-            let e = screen.line[screen.current_line_index]
-                .get_last_cpi()
-                .unwrap()
-                .offset
-                .unwrap();
-            v.push((s, e));
-            return v;
-        }
-
-        // TODO: activate only in debug builds
-        if 0 == 1 {
-            match screen.find_cpi_by_offset(m.offset) {
-                (Some(cpi), x, y) => {
-                    assert_eq!(x, 0);
-                    assert_eq!(y, 0);
-                    assert_eq!(cpi.offset.unwrap(), m.offset);
-                }
-                _ => panic!("implementation error"),
-            }
-        }
-
-        if let Some(l) = screen.get_last_used_line() {
-            if let Some(cpi) = l.get_first_cpi() {
-                m.offset = cpi.offset.unwrap(); // update next screen start
-            }
-        }
-
-        screen.clear(); // prepare next screen
-    }
-}
-
 pub fn compute_view_layout(
     editor: &mut Editor,
     env: &mut EditorEnv,
@@ -557,6 +466,8 @@ pub fn compute_view_layout(
     let max_offset = { doc.as_ref().read().unwrap().size() as u64 };
 
     // TODO: reuse v.screen
+    let dimension = v.screen.read().unwrap().dimension();
+    dbg_println!("DIMENSION {:?}", dimension);
     let mut screen = Box::new(Screen::with_dimension(v.screen.read().unwrap().dimension()));
     run_compositing_stage_direct(editor, env, &v, v.start_offset, max_offset, &mut screen);
     if let Some(last_offset) = screen.last_offset {
@@ -578,41 +489,6 @@ pub fn update_view(
     let _start = Instant::now();
 
     Some(())
-}
-
-pub fn screen_putchar(
-    screen: &mut Screen,
-    c: char,
-    offset: u64,
-    size: usize,
-    is_selected: bool,
-) -> bool {
-    let (ok, _) = screen.push(layout::filter_codepoint(
-        None,
-        None,
-        c,
-        Some(offset),
-        size,
-        is_selected,
-        codepointinfo::CodepointInfo::default_color(),
-        codepointinfo::CodepointInfo::default_bg_color(),
-        true,
-    ));
-    ok
-}
-
-//////////////////////////////////
-// TODO: screen_putstr_with_attr metadata etc ...
-// return array of built &cpi ? to allow attr changes pass ?
-pub fn screen_putstr(mut screen: &mut Screen, s: &str) -> bool {
-    for c in s.chars() {
-        let ok = screen_putchar(&mut screen, c, 0xffff_ffff_ffff_ffff, 0, false);
-        if !ok {
-            return false;
-        }
-    }
-
-    true
 }
 
 #[test]

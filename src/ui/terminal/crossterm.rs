@@ -227,11 +227,34 @@ fn draw_view(
     }
 }
 
+/*
+
+impl Command for Clear {
+    fn write_ansi(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        f.write_str(match self.0 {
+            ClearType::All => ansi::CLEAR_ALL_CSI_SEQUENCE,
+            ClearType::FromCursorDown => ansi::CLEAR_FROM_CURSOR_DOWN_CSI_SEQUENCE,
+            ClearType::FromCursorUp => ansi::CLEAR_FROM_CURSOR_UP_CSI_SEQUENCE,
+            ClearType::CurrentLine => ansi::CLEAR_FROM_CURRENT_LINE_CSI_SEQUENCE,
+            ClearType::UntilNewLine => ansi::CLEAR_UNTIL_NEW_LINE_CSI_SEQUENCE,
+        })
+    }
+
+    #[cfg(windows)]
+    fn execute_winapi(&self, _writer: impl FnMut() -> Result<()>) -> Result<()> {
+        sys::clear(self.0)
+    }
+}
+
+*/
+
 fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
     queue!(stdout, ResetColor)?;
+    //    queue!(stdout, Clear(ClearType::All))?;
 
     for li in 0..screen.height() {
         queue!(stdout, MoveTo(0, li as u16))?;
+        //queue!(stdout, Clear(ClearType::CurrentLine))?;
 
         let line = screen.get_line(li).unwrap();
 
@@ -253,7 +276,7 @@ fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Resul
 
             // draw with style
             let s = cpi.displayed_cp.to_string();
-            if cpi.is_mark {
+            if cpi.is_mark || cpi.is_selected {
                 queue!(
                     stdout,
                     SetBackgroundColor(bg_color),
@@ -273,7 +296,6 @@ fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Resul
 
     /* Update the screen. */
     stdout.flush()?;
-
     Ok(())
 }
 
@@ -349,10 +371,10 @@ fn draw_screen(
     for l in 0..screen.max_height() {
         queue!(stdout, MoveTo(0, l as u16))?;
 
-        let line = screen.get_mut_unclipped_line(l).unwrap();
+        let line = screen.get_unclipped_line_mut(l).unwrap();
 
         if check_hash {
-            let prev_line = last_screen.get_mut_unclipped_line(l).unwrap();
+            let prev_line = last_screen.get_unclipped_line_mut(l).unwrap();
             if prev_line.hash() == line.hash() {
                 //dbg_println!("line[{}] SKIP ...", l);
                 continue;
@@ -395,7 +417,7 @@ fn draw_screen(
             prev_cpi = *cpi;
 
             if !column_change && !change {
-                if let Some(prev_line) = last_screen.get_mut_unclipped_line(l) {
+                if let Some(prev_line) = last_screen.get_unclipped_line_mut(l) {
                     if let Some(prev_screen_cpi) = prev_line.get_unclipped_cpi(c) {
                         if cpis_have_same_style(cpi, prev_screen_cpi) {
                             queue!(stdout, MoveTo((c + 1) as u16, l as u16))?;
@@ -650,7 +672,9 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
             ::crossterm::event::MouseEventKind::Drag(_button) => {
                 // TODO: no Drag event in the editor yet ?
-                // TODO: filter drgged button
+                // TODO: filter dragged button
+
+                // return InputEvent::NoInputEvent;
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
@@ -660,6 +684,8 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
 
             ::crossterm::event::MouseEventKind::Moved => {
+                // return InputEvent::NoInputEvent;
+
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
                     x: i32::from(event.column),
@@ -757,22 +783,22 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
 
       - Level-triggered polling was removed from mio (in 0.7.xx version)
       - On linux the (default) 0 1 2 fd points to the same pseudo terminal
-        And thus we cannot change the blocking mode if the input fd (0)
+        And thus we cannot change the blocking mode of the input fd (0)
 
-      - When pasting big chunks of text with graphical terminal. The editor seams stucked.
+      - When pasting big chunks of text with graphical terminal. The editor seams "frozen".
         because the input file descriptor is in blocking mode.
 
-        if the user input it bigger than the available input buffer space. the read syscal blocks.
+        if the user input it exactly the size of crossterm's internal buffer, the next call to 'read' will block.
+        Because the internal buffer is full, crossterm expect more bytes and loops on "read"
 
-      - It is not possible to use println!() function fammily in non-blocking mode.
+      - It is not possible to use println!() function family in non-blocking mode.
        println!() must ensure the data is flushed and will panic on EAGAIN error.
 
-       *) One solution is for crossterm to let the user specify the input buffer/size
-         In the case of unlimited we could use a 2M input buffer ?
+       *) One solution is for crossterm to let the user specify the input buffer/size (compile time ?)
+         In the case of unlimitED we could use a 2M input buffer ?
 
-       *) An other solution (hack)
+       *) An other solution (hack) (my fork on github)
         change input fd from blocking to no-blocking mode, do read loop and restore mode on exit.
-
 */
 fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
@@ -787,7 +813,10 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
         if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 prev_ev_time = Instant::now();
-                let evt = translate_crossterm_event(cross_evt);
+                let evt = translate_crossterm_event(cross_evt); // TODO: add hints to send event asap (resize)
+                if evt == InputEvent::NoInputEvent {
+                    continue;
+                }
                 accum.push(evt);
             }
         }
@@ -796,7 +825,7 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
 
         wait_ms = min_wait_ms;
         if count == 1 {
-            // delay flush of 1st input event
+            // delay flush of 1st input event (min_wait_ms)
             // real start
             start = Instant::now();
             continue;

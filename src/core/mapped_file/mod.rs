@@ -61,11 +61,11 @@ enum PageSource {
 
 #[derive(Debug, Clone)]
 enum Page {
-    // read only mapped region: use this if your are sure the storage is the local disk
+    // read only mapped region: use this if your are sure the storage is a local disk
     // already adjusted  (base + skip) / (len - skip)
     MappedStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
 
-    // read only region: like mmap  but avoid SIGBUS, on network/usb storage
+    // read only region: like mmap  but avoid SIGBUS, on network/usb storage errors
     ReadOnlyStorageCopy(*const u8, usize), // base, len
 
     // Copy on write
@@ -132,7 +132,7 @@ type NodeLocalOffset = u64;
 pub type FileHandle<'a> = Arc<RwLock<MappedFile<'a>>>;
 pub type FileIterator<'a> = MappedFileIterator<'a>;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Node {
     // state ?
     used: bool,
@@ -154,6 +154,8 @@ pub struct Node {
 
     page: Weak<RefCell<Page>>,
     cow: Option<Rc<RefCell<Page>>>,
+
+    pub byte_count: [u64; 256],
 }
 
 impl Node {
@@ -172,6 +174,10 @@ impl Node {
         self.skip = 0;
         self.page = Weak::new();
         self.cow = None;
+
+        for b in &mut self.byte_count {
+            *b = 0;
+        }
     }
 
     // use this to read data directly skipping temporary
@@ -545,6 +551,7 @@ impl<'a> MappedFile<'a> {
             cow: None,
             storage_offset: None,
             skip: 0,
+            byte_count: [0; 256],
         };
 
         let (id, _) = file
@@ -733,6 +740,7 @@ impl<'a> MappedFile<'a> {
             cow: None,
             storage_offset: None,
             skip: 0,
+            byte_count: [0; 256],
         };
         let (l, _) = pool.allocate(left_node, &MappedFile::assert_node_is_unused);
 
@@ -752,6 +760,7 @@ impl<'a> MappedFile<'a> {
             cow: None,
             storage_offset: None,
             skip: 0,
+            byte_count: [0; 256],
         };
 
         let (r, _) = pool.allocate(right_node, &MappedFile::assert_node_is_unused);
@@ -797,6 +806,8 @@ impl<'a> MappedFile<'a> {
         }
     }
 
+
+    // TODO: non recursive version
     fn find_sub_node_by_offset(
         &self,
         n: NodeIndex,
@@ -1209,6 +1220,7 @@ impl<'a> MappedFile<'a> {
             cow: None,
             storage_offset: None,
             skip: 0,
+            byte_count: [0; 256],
         };
 
         let (subroot_idx, _) = file

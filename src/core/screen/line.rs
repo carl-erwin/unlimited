@@ -118,6 +118,7 @@ impl Line {
         self.width = width;
         self.read_only = false;
         self.hash_cache = 0;
+        self.hash_unclipped_cache = 0;
     }
 
     /// returns (start_index, width) tupple
@@ -156,13 +157,15 @@ impl Line {
     }
 
     pub fn push(&mut self, cpi: CodepointInfo) -> (bool, LineCellIndex) {
+        assert!(self.start_index == 0);
+
         if self.nb_cells < self.width() && !self.read_only {
             self.cells[self.start_index + self.nb_cells].cpi = cpi;
             self.cells[self.start_index + self.nb_cells].is_used = true;
 
             self.nb_cells += 1;
 
-            if self.nb_cells == self.width {
+            if self.nb_cells == self.width() {
                 self.read_only = true;
             }
 

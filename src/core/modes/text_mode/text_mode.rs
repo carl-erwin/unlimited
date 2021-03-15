@@ -16,7 +16,7 @@ use crate::dbg_println;
 
 use crate::core::screen::Screen;
 
-use crate::core::mark::Mark;
+use super::mark::Mark;
 
 use crate::core::codec::text::utf8;
 use crate::core::codec::text::SyncDirection; // TODO: remove
@@ -37,6 +37,8 @@ use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
 
+use crate::core::codec::text::u32_to_char;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Action {
     ScrollUp { n: usize },
@@ -52,23 +54,22 @@ pub enum Action {
     CheckMarks,
     DedupAndSaveMarks,
     CancelSelection,
+    UpdateReadCache,
 }
 
-use super::Mode;
+use super::super::Mode;
 
-//
-
-// TODO: move to text_mode
-use crate::core::view::layout::DrawMarks;
-use crate::core::view::layout::HighlightFilter;
-use crate::core::view::layout::HighlightSelectionFilter;
-use crate::core::view::layout::RawDataFilter;
-use crate::core::view::layout::ScreenFilter;
-use crate::core::view::layout::TabFilter;
-use crate::core::view::layout::Utf8Filter;
-use crate::core::view::layout::WordWrapFilter;
-
-// <---------- move to layout // <---------- move to layout
+// split to sub modes
+use crate::core::modes::text_mode::CharMapFilter;
+use crate::core::modes::text_mode::DrawMarks;
+use crate::core::modes::text_mode::HighlightFilter;
+use crate::core::modes::text_mode::HighlightSelectionFilter;
+use crate::core::modes::text_mode::RawDataFilter;
+use crate::core::modes::text_mode::ScreenFilter;
+use crate::core::modes::text_mode::TabFilter;
+use crate::core::modes::text_mode::TextCodecFilter;
+use crate::core::modes::text_mode::Utf8Filter;
+use crate::core::modes::text_mode::WordWrapFilter;
 
 pub type Id = u64;
 
@@ -89,7 +90,8 @@ pub struct TextModeContext {
     pub copy_buffer: Vec<CopyData>,
     pub button_state: [u32; 8],
 
-    pub char_map: Option<HashMap<char, char>>,
+    // TODO ? char_map_and_color HashMap<char, String, Option<(u8,u8,u8)>>,
+    pub char_map: Option<HashMap<char, String>>,
     pub color_map: Option<HashMap<char, (u8, u8, u8)>>,
     pub display_word_wrap: bool,
 
@@ -116,24 +118,61 @@ impl<'a> Mode for TextMode {
 
         let mut char_map = HashMap::new();
 
-        for _c in '\0'..' ' {
-            // char_map.insert(c, '.');
+        for c in '\0'..' ' {
+            let s = format!("<0x{:02}>", c as u32);
+            // char_map.insert(c, s);
+            //char_map.insert(c, "^@".to_string());
+            // char_map.insert(u32_to_char(c as u32), '\u{fffd}'.to_string());
         }
 
-        //
-        char_map.insert('\u{7f}', '�');
+        char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
+        char_map.insert('\u{7f}', "<DEL>".to_string());
 
-        char_map.insert('\r', ' ');
-        char_map.insert('\r', '\u{2190}');
-
-        char_map.insert('\n', ' ');
-
-        char_map.insert('\t', ' ');
+        if !true {
+            // config toggle ?
+            char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
+            char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
+            char_map.insert('\u{02}', "<STX>".to_string()); // (start of text)
+            char_map.insert('\u{03}', "<ETX>".to_string()); // (end of text)
+            char_map.insert('\u{04}', "<EOT>".to_string()); // (end of transmission)
+            char_map.insert('\u{05}', "<ENQ>".to_string()); // (enquiry)
+            char_map.insert('\u{06}', "<ACK>".to_string()); // (acknowledge)
+            char_map.insert('\u{07}', "<BEL>".to_string()); // '\a' (bell)
+            char_map.insert('\u{08}', "<BS>".to_string()); //  '\b' (backspace)
+                                                           /* tab */
+            char_map.insert('\u{09}', "<HT>".to_string()); //  '\t' (horizontal tab)
+                                                           /* new line */
+            // char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
+            /* */
+            char_map.insert('\u{0B}', "<VT>".to_string()); //  '\v' (vertical tab)
+            char_map.insert('\u{0C}', "<FF>".to_string()); //  '\f' (form feed)
+            char_map.insert('\u{0D}', "<CR>".to_string()); //  '\r' (carriage ret)
+            char_map.insert('\u{0E}', "<SO>".to_string()); //  (shift out)
+            char_map.insert('\u{0F}', "<SI>".to_string()); //  (shift in)
+            char_map.insert('\u{10}', "<DLE>".to_string()); // (data link escape)
+            char_map.insert('\u{11}', "<DC1>".to_string()); // (device control 1)
+            char_map.insert('\u{12}', "<DC2>".to_string()); // (device control 2)
+            char_map.insert('\u{13}', "<DC3>".to_string()); // (device control 3)
+            char_map.insert('\u{14}', "<DC4>".to_string()); // (device control 4)
+            char_map.insert('\u{15}', "<NAK>".to_string()); // (negative ack.)
+            char_map.insert('\u{16}', "<SYN>".to_string()); // (synchronous idle)
+            char_map.insert('\u{17}', "<ETB>".to_string()); // (end of trans. blk)
+            char_map.insert('\u{18}', "<CAN>".to_string()); // (cancel)
+            char_map.insert('\u{19}', "<EM>".to_string()); //  (end of medium)
+            char_map.insert('\u{1A}', "<SUB>".to_string()); // (substitute)
+            char_map.insert('\u{1B}', "<ESC>".to_string()); // (escape)
+            char_map.insert('\u{1C}', "<FS>".to_string()); //  (file separator)
+            char_map.insert('\u{1D}', "<GS>".to_string()); //  (group separator)
+            char_map.insert('\u{1E}', "<RS>".to_string()); //  (record separator)
+            char_map.insert('\u{1F}', "<US>".to_string()); //  (unit separator)
+            char_map.insert('\u{7f}', "<DEL>".to_string());
+        }
 
         let ctx = TextModeContext {
             center_on_mark_move: false, // add movement enums and pass it to center fn
             scroll_on_mark_move: true,
             text_codec: Box::new(utf8::Utf8Codec::new()),
+            //text_codec: Box::new(ascii::AsciiCodec::new()),
             doc_revision: 0,
             marks,
             copy_buffer,
@@ -158,6 +197,16 @@ impl<'a> Mode for TextMode {
     ) {
         dbg_println!("config text-mode for VID {}", view.id);
 
+        let use_utf8_codec = true;
+
+        let use_highlight_keywords = true;
+        let use_highlight_selection = true; // mandatory
+        let use_tabulation_exp = true;
+        let use_char_map = true;
+        let use_word_wrap = true;
+
+        let use_draw_marks = true; // mandatory
+
         // setup first undo/redo tag
         let doc = view.document.clone();
         {
@@ -168,41 +217,77 @@ impl<'a> Mode for TextMode {
 
         // NB: Execution in push order
 
+        // mandatory data reader
         view.compose_filters
             .borrow_mut()
             .push(Box::new(RawDataFilter::new()));
         //
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(Utf8Filter::new()));
-        //
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(HighlightFilter::new()));
-        //
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(HighlightSelectionFilter::new()));
+
+        if use_utf8_codec {
+            //
+            // DEBUG codec error
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(Utf8Filter::new()));
+        } else {
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(TextCodecFilter::new()));
+        }
+
+        if use_highlight_keywords {
+            //
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(HighlightFilter::new()));
+        }
+
+        if use_highlight_selection {
+            //
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(HighlightSelectionFilter::new()));
+            //
+        }
+
+        if use_tabulation_exp {
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(TabFilter::new()));
+        }
+
+        if use_char_map {
+            // NB: Word Wrap after tab expansion
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(CharMapFilter::new()));
+        }
         //
 
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(TabFilter::new()));
-
-        // NB: Word Wrap after tab expansion
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(WordWrapFilter::new()));
+        if use_word_wrap {
+            // NB: Word Wrap after tab expansion
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(WordWrapFilter::new()));
+        }
         //
 
+        // Comment(s)
+
+        // Folding
+
+        // mandatory screen filler
         view.compose_filters
             .borrow_mut()
             .push(Box::new(ScreenFilter::new()));
-        //
-        view.compose_filters
-            .borrow_mut()
-            .push(Box::new(DrawMarks::new()));
 
+        if use_draw_marks {
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(DrawMarks::new()));
+        }
+
+        // fix dedup marks, scrolling etc ...
         view.stage_actions
             .push((String::from("text-mode"), run_text_mode_actions));
     }
@@ -352,17 +437,29 @@ pub fn run_text_mode_actions_vec(
     view: &Rc<RefCell<View>>,
     actions: &Vec<Action>,
 ) {
+    let mut update_read_cache = !false;
+
     for a in actions.iter() {
         match a {
             Action::ScrollUp { n } => {
                 let v = &mut view.borrow_mut();
 
                 scroll_view_up(v, editor, env, *n);
+
+                {
+                    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                    tm.pre_compose_action.push(Action::UpdateReadCache);
+                }
             }
             Action::ScrollDown { n } => {
                 let v = &mut view.borrow_mut();
 
                 scroll_view_down(v, editor, env, *n);
+
+                {
+                    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                    tm.pre_compose_action.push(Action::UpdateReadCache);
+                }
             }
             Action::CenterAroundMainMark => {
                 center_around_mark(editor, env, &view);
@@ -411,15 +508,44 @@ pub fn run_text_mode_actions_vec(
                 tm.marks.dedup();
                 tm.mark_index = tm.marks.len().saturating_sub(1);
 
-                // TODO: Action::UpdateReadCache(s) vs multiple views
-                // TODO: adjust with v.star_offset ..
-                if tm.marks.len() > 0 {
-                    let min = tm.marks[0].offset;
-                    let max = tm.marks[tm.marks.len() - 1].offset;
-                    let doc = v.document.clone();
-                    let doc = doc.as_ref().unwrap();
-                    let mut doc = doc.as_ref().write().unwrap();
-                    doc.set_cache(min, max);
+                //tm.pre_compose_action.push(Action::UpdateReadCache);
+                update_read_cache = true;
+                //panic!();
+            }
+
+            Action::UpdateReadCache => {
+                if true {
+                    let v = &mut view.borrow_mut();
+                    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                    tm.mark_index = tm.marks.len().saturating_sub(1);
+
+                    // TODO: Action::UpdateReadCache(s) vs multiple views
+                    // TODO: adjust with v.star_offset ..
+                    if tm.marks.len() > 0 {
+                        let mut min = tm.marks[0].offset;
+                        let mut max = tm.marks[tm.marks.len() - 1].offset;
+                        let doc = v.document.clone();
+                        let doc = doc.as_ref().unwrap();
+                        let mut doc = doc.as_ref().write().unwrap();
+
+                        // screen cache
+                        if false {
+                            let screen = v.screen.read().unwrap();
+                            let w = screen.width();
+                            let h = screen.height();
+                            let max_char = (w * h * 4) as u64; // 4 = tm.codec_max_encode_size();
+                            let max_char = max_char * 4; // nb previous screen ?
+                            min = min.saturating_sub(max_char);
+                            max = max.saturating_add(max_char); // no eof checks
+                            dbg_println!("READ CACHE W={}, H={}", w, h);
+                        }
+
+                        dbg_println!("READ CACHE MIN={}, MAX={}", min, max);
+                        dbg_println!("READ CACHE SIZE = {} bytes", (max - min));
+                        dbg_println!("READ CACHE SIZE = {} Kib", (max - min) / 1024);
+                        dbg_println!("READ CACHE SIZE = {} Mib", (max - min) / (1024 * 1024));
+                        doc.set_cache(min, max); // TODO: optimize read with discard cache + append
+                    }
                 }
             }
 
@@ -447,6 +573,43 @@ pub fn run_text_mode_actions_vec(
             }
         }
     }
+
+    if update_read_cache {
+        let v = &mut view.borrow_mut();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        tm.mark_index = tm.marks.len().saturating_sub(1);
+
+        // TODO: Action::UpdateReadCache(s) vs multiple views
+        // TODO: adjust with v.star_offset ..
+        if tm.marks.len() > 0 {
+            let mut min = tm.marks[0].offset;
+            let mut max = tm.marks[tm.marks.len() - 1].offset;
+            let doc = v.document.clone();
+            let doc = doc.as_ref().unwrap();
+            let mut doc = doc.as_ref().write().unwrap();
+
+            // screen cache
+            if true {
+                let screen = v.screen.read().unwrap();
+                let w = screen.width();
+                let h = screen.height();
+                let max_char = (w * h * 4) as u64; // 4 = tm.codec_max_encode_size();
+                let max_char = max_char * 4; // nb previous screen ?
+                                             //min = min.saturating_sub(max_char);
+                                             //max = max.saturating_add(max_char); // no eof checks
+
+                max += w as u64;
+
+                dbg_println!("READ CACHE W={}, H={}", w, h);
+            }
+
+            dbg_println!("READ CACHE MIN={}, MAX={}", min, max);
+            dbg_println!("READ CACHE SIZE = {} bytes", (max - min));
+            dbg_println!("READ CACHE SIZE = {} Kib", (max - min) / 1024);
+            dbg_println!("READ CACHE SIZE = {} Mib", (max - min) / (1024 * 1024));
+            doc.set_cache(min, max); // TODO: optimize read with discard cache + append
+        }
+    }
 }
 
 fn run_text_mode_actions(
@@ -461,8 +624,6 @@ fn run_text_mode_actions(
     let actions: Vec<Action> = {
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
-                dbg_println!("INPUT PRE MARKS SAVE");
-
                 let mut v = view.borrow_mut();
                 let doc = v.document.clone();
                 let doc = doc.as_ref().unwrap();
@@ -499,6 +660,7 @@ fn run_text_mode_actions(
                     return;
                 }
                 check_invariants = true;
+                dbg_println!("SAVE MARKS");
                 vec![Action::DedupAndSaveMarks]
             }
 
@@ -944,7 +1106,7 @@ pub fn remove_until_end_of_word(
             }
 
             match cp {
-                ' ' | '\t' | '\r' | '\n' => {
+                ' ' | '\t' | /*'\r' |*/ '\n' => {
                     break;
                 }
 
@@ -1019,6 +1181,8 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     let doc = doc.as_ref().unwrap();
     let doc = doc.as_ref().read().unwrap();
 
+    dbg_println!("doc.size() {}", doc.size());
+
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     let codec = tm.text_codec.as_ref();
@@ -1027,10 +1191,18 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
 
     let nr_marks = {
         for (idx, m) in tm.marks.iter_mut().enumerate() {
-            // mark move off_screen ? scroll down 1 line
-            m.move_forward(&doc, codec);
+            let before = m.offset;
+            dbg_println!("before forward : m.offset = {}", before);
 
-            if idx == midx && m.offset >= end_offset && !screen_has_eof {
+            // mark move off_screen ? scroll down 1 line
+            m.move_forward(&doc, codec); // TODO: check error
+
+            dbg_println!("after forward : m.offset = {}", m.offset);
+
+            // TODO: end_offset is not set properly at startup
+            // main mark + on screen ?
+            if before > 0 && idx == midx && m.offset != before && m.offset > end_offset && !screen_has_eof {
+                dbg_println!("m.offset {} > v.end_offset {}", m.offset, end_offset);
                 scroll_down = 1;
             }
         }
@@ -1048,6 +1220,8 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     //      }
 
     if scroll_down > 0 {
+        dbg_println!("schedule scrolldown n = {}", scroll_down);
+
         tm.pre_compose_action
             .push(Action::ScrollDown { n: scroll_down });
     }
@@ -1406,6 +1580,10 @@ pub fn move_on_screen_mark_to_next_line(
 
     dbg_println!("update mark : offset => {} -> {}", old_offset, m.offset);
 
+    if old_offset == m.offset {
+        return (!true, Some((old_offset, m.offset)), None);
+    }
+
     // ok
     (true, Some((old_offset, m.offset)), None)
 }
@@ -1442,6 +1620,8 @@ pub fn move_mark_to_next_line(
             return None;
         }
 
+        dbg_println!("TRYING TO MOVE TO NEXT LINE MARK offset {}", m.offset);
+
         let (ok, offsets, action) = move_on_screen_mark_to_next_line(&mut m, &screen);
         if let Some(action) = action {
             // Add stage RenderStage :: PreRender PostRender
@@ -1453,11 +1633,14 @@ pub fn move_mark_to_next_line(
         }
 
         if ok == true {
+            dbg_println!("MARK FOUND ON SCREEN");
             return offsets;
         }
     }
 
     if true {
+        dbg_println!("MARK IS OFFSCREEN");
+
         // mark is off_screen
         let (screen_width, screen_height) = {
             let view = view.borrow_mut();
@@ -1479,6 +1662,8 @@ pub fn move_mark_to_next_line(
             tmp.move_to_start_of_line(&doc, codec);
             tmp.offset
         };
+
+        dbg_println!("MARK IS OFFSCREEN");
 
         // a codepoint can use 4 bytes the virtual end is
         // + 1 full line away
@@ -1506,10 +1691,7 @@ pub fn move_mark_to_next_line(
         dbg_println!("GET {} lines ", lines.len());
 
         // find the cursor index
-        let index = match lines
-            .iter()
-            .position(|e| e.0 <= m_offset && m_offset <= e.1)
-        {
+        let index = match lines.iter().position(|e| e.0 <= m_offset && m_offset < e.1) {
             None => return None,
             Some(i) => {
                 if i == lines.len() - 1 {
@@ -1566,7 +1748,6 @@ pub fn move_mark_to_next_line(
         }
 
         tmp_mark.offset = std::cmp::min(tmp_mark.offset, line_end_off);
-
         m_offset = tmp_mark.offset;
     }
 
@@ -1631,11 +1812,11 @@ fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
     let codec = tm.text_codec.as_ref();
 
     // get "real" line start
-    m.move_to_start_of_line(&doc, codec);
+    // m.move_to_start_of_line(&doc, codec);
 
     let doc_size = doc.size() as u64;
     if doc_size > 0 {
-        assert!(m.offset < doc_size);
+        assert!(m.offset <= doc_size); // == EOF
     }
 
     doc_size
@@ -1689,10 +1870,17 @@ pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &
 
             run_compositing_stage_direct(editor, env, &v, m.offset, max_offset, &mut screen);
 
+            dbg_println!("\n\n\n---------");
+
             dbg_println!("screen first offset {:?}", screen.first_offset);
             dbg_println!("screen last offset {:?}", screen.last_offset);
+            dbg_println!("screen current_line_index {:?}", screen.current_line_index);
+
             dbg_println!("max_offset {}", max_offset);
 
+            if screen.push_count() == 0 {
+                return;
+            }
             assert_ne!(0, screen.push_count()); // at least EOF
 
             // TODO: pass doc &doc to avoid double borrow
@@ -1704,9 +1892,12 @@ pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &
             if last_line.is_none() {
                 dbg_println!("no last line");
                 panic!();
-                //break;
             }
             let last_line = last_line.unwrap();
+
+            if last_line.nb_cells == 0 {
+                panic!(""); // empty line
+            }
 
             // go to next screen
             // using the firt offset of the last line
@@ -1743,6 +1934,13 @@ pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &
             let mut idx_end = idx_start + 1;
             let next_screen_start_cpi = last_line.get_first_cpi().unwrap();
             while idx_end < idx_max {
+                dbg_println!(
+                    "check marks[{}].offset({}) >= next_screen_start_cpi({})",
+                    idx_end,
+                    marks[idx_end].offset,
+                    next_screen_start_cpi.offset.unwrap()
+                );
+
                 if marks[idx_end].offset >= next_screen_start_cpi.offset.unwrap() {
                     break;
                 }
@@ -1768,7 +1966,9 @@ pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &
 
             idx_start = idx_end; // next mark index
 
+            let old_offset = m.offset;
             m.offset = next_screen_start_cpi.offset.unwrap(); // update next screen start
+            dbg_println!("update marks {} -> {}]", old_offset, m.offset);
         }
     }
 
@@ -1785,11 +1985,15 @@ pub fn move_marks_to_next_line(editor: &mut Editor, env: &mut EditorEnv, view: &
         let idx = tm.mark_index;
 
         if !screen.contains_offset(tm.marks[idx].offset) {
+            dbg_println!(
+                "tm.marks[idx].offset {} NOT FOUND scroll down n=1",
+                tm.marks[idx].offset
+            );
+
             tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
             // TODO ?  tm.pre_compose_action.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
             // TODO ?  tm.pre_compose_action.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
-        }
-
+        };
         tm.pre_compose_action.push(Action::CheckMarks);
     }
 }
@@ -2035,9 +2239,7 @@ pub fn move_mark_to_end_of_file(
     marks.clear();
     marks.push(Mark { offset });
 
-    //
-
-    tm.pre_compose_action.push(Action::ScrollUp { n })
+    tm.pre_compose_action.push(Action::ScrollUp { n });
 }
 
 pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
@@ -2505,49 +2707,6 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
     dbg_println!("VID {} : CLICK @ x({}) Y({})", v.id, x, y);
     // move cursor to (x,y)
 
-    /*
-         TOD: retest this
-
-        // 0 <= x < screen.width()
-        if x < screen.clip_rect().x {
-            x = 0;
-        } else if x >= screen.clip_rect().x + screen.clip_rect().width {
-            x = screen.clip_rect().width - 1;
-        } else {
-            x -= screen.clip_rect().x;
-        }
-
-        // 0 <= y < screen.height()
-        if y < screen.clip_rect().y {
-            y = 0;
-        } else if y > screen.clip_rect().y + screen.clip_rect().height {
-            y = screen.clip_rect().height - 1;
-        } else {
-            y -= screen.clip_rect().y;
-        }
-
-        //
-        let _max_offset = screen.doc_max_offset;
-
-        let last_li = screen.get_last_used_line_index();
-        if y >= last_li {
-            if last_li >= screen.height() {
-                y = screen.height() - 1;
-            } else {
-                y = last_li;
-            }
-        }
-
-        if let Some(l) = screen.get_line(y) {
-            if l.nb_cells > 0 && x > l.nb_cells {
-                x = l.nb_cells - 1;
-            } else if l.nb_cells == 0 {
-                x = 0;
-            }
-        } else {
-        }
-    */
-
     // check from right to left until some codepoint is found
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2683,6 +2842,7 @@ pub fn center_around_mark(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
     let mut v = view.borrow_mut();
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
+    dbg_println!("CENTER AROUND MAIN MARK OFFSET {}", offset);
     center_view_around_offset(&mut v, editor, env, offset);
 }
 
@@ -2703,8 +2863,8 @@ pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     let mut v = view.borrow_mut();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-    let c = if let Some(c) = tm.char_map.as_mut().unwrap().get(&'\n') {
-        if *c == ' ' {
+    let s = if let Some(s) = tm.char_map.as_mut().unwrap().get(&'\n') {
+        if *s == " " {
             '\u{2936}'
         } else {
             ' '
@@ -2713,9 +2873,9 @@ pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
         ' '
     };
 
-    dbg_println!("\\n -> {}", c);
+    dbg_println!("\\n -> {}", s);
 
-    tm.char_map.as_mut().unwrap().insert('\n', c);
+    tm.char_map.as_mut().unwrap().insert('\n', s.to_string());
 }
 
 pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
@@ -2740,7 +2900,7 @@ pub fn get_lines_offsets_direct(
     let mut v = Vec::<(u64, u64)>::new();
     let mut m = Mark::new(start_offset); // TODO: rename into screen_start
 
-    let max_offset = {
+    let doc_size = {
         let doc = view.document.clone();
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
@@ -2748,7 +2908,7 @@ pub fn get_lines_offsets_direct(
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
 
-        // get start of the line @offset
+        // get start of the line offset
         m.move_to_start_of_line(&doc, codec);
         doc.size() as u64
     };
@@ -2759,59 +2919,68 @@ pub fn get_lines_offsets_direct(
     let mut screen = Screen::new(screen_width, screen_height);
     screen.is_off_screen = true;
 
+    dbg_println!(" doc_size {} ", doc_size);
+
+    let mut count = 0;
+
+    // loop until  end_offset is found
     loop {
-        run_compositing_stage_direct(editor, env, &view, m.offset, max_offset, &mut screen);
+        count += 1;
+        dbg_println!("get_lines_offsets_direct IN LOOP {}", count);
+
+        run_compositing_stage_direct(editor, env, &view, m.offset, doc_size, &mut screen);
         if screen.push_count == 0 {
             return v;
         }
 
+        dbg_println!(" screen.current_line_index {} ", screen.current_line_index);
+        dbg_println!(" screen.push_count {} ", screen.push_count);
+
         // push lines offsets
         // FIXME: find a better way to iterate over the used lines
+        if screen.current_line_index == 0 {
+            let s = screen.line[0].get_first_cpi().unwrap().offset.unwrap();
+            let e = screen.line[0].get_last_cpi().unwrap().offset.unwrap();
+            v.push((s, e));
+            return v;
+        }
+
         for i in 0..screen.current_line_index {
             if !v.is_empty() && i == 0 {
                 // do not push line range twice
+                // we take the last line as next screen start
                 continue;
             }
 
             let s = screen.line[i].get_first_cpi().unwrap().offset.unwrap();
             let e = screen.line[i].get_last_cpi().unwrap().offset.unwrap();
 
-            v.push((s, e));
+            dbg_println!("s({}) , e({})", s, e);
 
-            if s >= end_offset || e == max_offset {
+            v.push((s, e));
+            if s >= end_offset || e == doc_size {
+                // EOF found on line[i]
                 return v;
             }
         }
 
-        // eof reached ?
-        // FIXME: the api is not yet READY
-        // we must find a way to cover all filled lines
-        if screen.current_line_index < screen.height() {
-            let s = screen.line[screen.current_line_index]
-                .get_first_cpi()
-                .unwrap()
-                .offset
-                .unwrap();
-
-            let e = screen.line[screen.current_line_index]
-                .get_last_cpi()
-                .unwrap()
-                .offset
-                .unwrap();
-            v.push((s, e));
-            return v;
+        dbg_println!("start_offset {}", start_offset);
+        dbg_println!("end_offset {}", end_offset);
+        dbg_println!("doc_size {}", doc_size);
+        dbg_println!("v.len() = {}", v.len());
+        dbg_println!("screen.height() = {}", screen.height());
+        dbg_println!("screen.current_line_index {}", screen.current_line_index);
+        for (idx, (s, e)) in v.iter().enumerate() {
+            dbg_println!("found line[{}] @ [({}, {})]", idx, s, e);
         }
 
-        // TODO: activate only in debug builds
-        if 0 == 1 {
-            match screen.find_cpi_by_offset(m.offset) {
-                (Some(cpi), x, y) => {
-                    assert_eq!(x, 0);
-                    assert_eq!(y, 0);
-                    assert_eq!(cpi.offset.unwrap(), m.offset);
-                }
-                _ => panic!("implementation error"),
-            }
+        // eof reached ?
+        if screen.has_eof() {
+            // virtual EOF line
+            // we know EOF is an a single line
+            // no return on previous for loop
+            v.push((doc_size, doc_size));
+            return v;
         }
 
         if let Some(l) = screen.get_last_used_line() {
@@ -2821,7 +2990,31 @@ pub fn get_lines_offsets_direct(
         }
 
         screen.clear(); // prepare next screen
-    }
+    } // END LOOP
+}
+
+// OLD FUNCTION
+// illustrates how to compute consecutive screen between [start_offset, end_offset]
+// and return screen lines
+pub fn get_lines_offsets(
+    editor: &Editor,
+    env: &EditorEnv,
+    view: &Rc<RefCell<View>>,
+    start_offset: u64,
+    end_offset: u64,
+    screen_width: usize,
+    screen_height: usize,
+) -> Vec<(u64, u64)> {
+    let mut view = view.borrow_mut();
+    get_lines_offsets_direct(
+        &mut view,
+        &editor,
+        &env,
+        start_offset,
+        end_offset,
+        screen_width,
+        screen_height,
+    )
 }
 
 // MOVE TO TEXT MODE
@@ -2834,6 +3027,12 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         return;
     }
 
+    dbg_println!(
+        "SCROLL VIEW UP N={} START OFFSET {}",
+        nb_lines,
+        view.start_offset
+    );
+
     // TODO: find abetter way to pas mode data around, macro ?
 
     // TODO: DUMB version
@@ -2842,8 +3041,10 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
     // we can read backward view.screen.read().unwrap().width() chars
     // if we find '\n' or \r we stop
     // and take the next char offset -> view.start_offset
+
+    let start_offset = view.start_offset;
+
     if nb_lines == 1 {
-        let start_offset = view.start_offset;
         let doc = view.document.clone();
         let doc = doc.as_ref().unwrap();
         let doc = doc.as_ref().read().unwrap();
@@ -2859,6 +3060,8 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
             tmp.offset -= 1;
             tmp.move_to_start_of_line(&doc, codec);
         }
+
+        assert!(tmp.offset != view.start_offset);
 
         view.start_offset = tmp.offset;
 
@@ -2879,8 +3082,15 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
     // rewind width*height chars
     let mut m = Mark::new(view.start_offset);
     let diff = (nb_lines * width * 4) as u64; // if ascci only 4 -> 1
+    dbg_println!(
+        "diff = nb_lines({}) * width({}) * 4 = {}",
+        nb_lines,
+        width,
+        diff
+    );
 
     m.offset = m.offset.saturating_sub(diff);
+    dbg_println!("TMP start offset = {}", m.offset);
 
     // get start of line
     {
@@ -2889,7 +3099,11 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
         m.move_to_start_of_line(&doc, codec);
+
+        dbg_println!("Fixed start of line offset = {}", m.offset);
     }
+
+    dbg_println!("offset to_find = {}", offset_to_find);
 
     // build tmp screens until first offset of the original screen if found
     // build_screen from this offset
@@ -2905,12 +3119,22 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         height,
     );
 
+    if lines.len() == 0 {
+        dbg_println!("lines.len() == 0");
+        view.start_offset = start_offset;
+        return;
+    }
+
+    for (idx, l) in lines.iter().enumerate() {
+        dbg_println!("LINES[{}] = {:?}", idx, l);
+    }
+
     // find line index
     let index = match lines
         .iter()
         .position(|e| e.0 <= offset_to_find && offset_to_find <= e.1)
     {
-        None => 0,
+        None => 0, // first virtual screen line
         Some(i) => {
             if i >= nb_lines {
                 ::std::cmp::min(lines.len() - 1, i - nb_lines)
@@ -2919,6 +3143,7 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
             }
         }
     };
+    dbg_println!("SET NEW START OFFSET {}", lines[index].0);
 
     view.start_offset = lines[index].0;
 }
@@ -2938,26 +3163,58 @@ pub fn scroll_view_down(view: &mut View, editor: &Editor, env: &EditorEnv, nb_li
 
     // avoid useless scroll
     if view.screen.read().unwrap().has_eof() {
+        dbg_println!("SCROLLDOWN {} : view has EOF", nb_lines);
         return;
     }
 
+    let H = view.screen.read().unwrap().height();
     if nb_lines >= view.screen.read().unwrap().height() {
+        dbg_println!("SCROLLDOWN {} > view.H {}:  TRY OFFSCREEN", nb_lines, H);
+
         // slower : call layout builder to build  nb_lines - screen.height()
         scroll_down_view_off_screen(view, editor, env, max_offset, nb_lines);
         return;
     }
 
-    // just read the current screen
-    if let (Some(l), _) = view.screen.write().unwrap().get_used_line_clipped(nb_lines) {
-        if let Some(cpi) = l.get_first_cpi() {
-            // set first offset of screen.line[nb_lines] as next screen start
-            if let Some(offset) = cpi.offset {
-                view.start_offset = offset;
+    dbg_println!("SCROLLDOWN {} <= view.H {}:  TRY ONSCREEN", nb_lines, H);
+
+    for idx in 0..=(H - nb_lines) {
+        // just read the current screen
+        if let (Some(l), _) = view
+            .screen
+            .write()
+            .unwrap()
+            .get_used_line_clipped(nb_lines + idx)
+        {
+            if let Some(cpi) = l.get_first_cpi() {
+                // set first offset of screen.line[nb_lines] as next screen start
+                if let Some(offset) = cpi.offset {
+                    if offset > view.start_offset {
+                        view.start_offset = offset;
+                        return;
+                    }
+                }
             }
         }
-    } else {
-        panic!();
     }
+
+    dbg_println!("SCROLLDOWN {} : H={} DUMP lines start", nb_lines, H);
+
+    for h in 0..H {
+        if let Some(l) = view.screen.write().unwrap().get_line(h) {
+            if let Some(cpi) = l.get_first_cpi() {
+                dbg_println!(
+                    "line[Y={}][X=0] cpi @{:?} size {} meta {}",
+                    h,
+                    cpi.offset,
+                    cpi.size,
+                    cpi.metadata
+                )
+            }
+        }
+    }
+
+    // EOF reached
 }
 
 fn scroll_down_view_off_screen(
