@@ -676,8 +676,9 @@ fn run_stage(
                         check_view_dimension(editor, env);
                         {
                             // NB: resize previous view's screen to lower memory usage
-                            let view = editor.view_map.get(&env.prev_vid).unwrap().clone();
-                            view.borrow_mut().screen.write().unwrap().resize(1, 1);
+                            if let Some(view) = editor.view_map.get(&env.prev_vid) {
+                                view.borrow_mut().screen.write().unwrap().resize(1, 1);
+                            }
 
                             // prepare next view input
                             let view = editor.view_map.get(&env.view_id).unwrap().clone();

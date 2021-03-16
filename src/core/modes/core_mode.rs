@@ -58,7 +58,6 @@ impl CoreMode {
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
         register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
         register_input_stage_action(&mut map, "destroy-view", destroy_view);
-        register_input_stage_action(&mut map, "destroy-view2", destroy_view2);
     }
 }
 
@@ -404,137 +403,141 @@ pub fn split_horizontally(
                 ppv.children[ pv.layout_index ] = remain_vid;
             }
 */
-pub fn destroy_view2(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv,
-    view: &Rc<RefCell<View<'static>>>,
-) {
-    let v = view.borrow_mut();
-    if v.parent_id.is_none() {
-        return;
-    }
-
-    // not a split
-    if v.layout_index.is_none() {
-        return;
-    }
-
-    // get parent id
-    let pvid = *v.parent_id.as_ref().unwrap();
-
-    // get parent view
-    let pview = editor.view_map.get(&pvid).unwrap().clone();
-    let pv = pview.borrow(); // needed ?
-
-    // get grand parent
-    let _ppvid = if let Some(ppvid) = pv.parent_id {
-        ppvid
-    } else {
-        0 // valid ids > 0
-    };
-
-    dbg_println!("destroy view {}", v.id);
-
-    let layout_index = *v.layout_index.as_ref().unwrap();
-    if layout_index == 1 {
-        return;
-    }
-
-    dbg_println!("destroy view {} layout_index {}", v.id, layout_index);
-
-    let keep_index = if layout_index == 0 { 2 } else { 0 };
-
-    dbg_println!("keep index = {}", keep_index);
-
-    // hack no grand parent update: TODO: swap parent an keep_index content
-    // update root_view if no grand parent
-
-    let mut destroy = vec![];
-
-    // get parent
-    {
-        let pv = editor.view_map.get(&pvid).unwrap();
-        let mut pv = pv.borrow_mut();
-        if pv.children.len() != 3 {
-            return;
-        }
-
-        dbg_println!("destroy parent VID {} children {:?}", pv.id, pv.children);
-
-        let keep_vid = pv.children[keep_index];
-        assert_ne!(keep_vid, v.id);
-
-        destroy.push(pv.children[1]); // separator
-        destroy.push(pv.children[layout_index]); // self
-
-        pv.layout_ops = vec![LayoutOperation::Percent { p: 100 }];
-        pv.children.clear();
-        pv.children.push(keep_vid);
-        env.focus_changed_to = Some(keep_vid); // post input
-    }
-
-    dbg_println!("destroy view {:?}", destroy);
-    for idx in destroy {
-        editor.view_map.remove(&idx);
-    }
-}
-
 pub fn destroy_view(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv,
     view: &Rc<RefCell<View<'static>>>,
 ) {
+    // current view/id
     let v = view.borrow_mut();
+    let vid = v.id;
+
+    if v.destroyable == false {
+        return;
+    }
+
+    // check parent
     if v.parent_id.is_none() {
+        // nothing to do
+        // check root_views presence
+        dbg_println!("No parent, ignore");
+
         return;
     }
-    let pvid = *v.parent_id.as_ref().unwrap();
+
+    // no index in parent : not a split, etc..
     if v.layout_index.is_none() {
-        return; // TODO: allow destruction of last view ? -> regenerate a default (doc list?) ? have an destructible view ("Welcome")
-    }
-
-    dbg_println!("destroy view {}", v.id);
-
-    let layout_index = *v.layout_index.as_ref().unwrap();
-    if layout_index == 1 {
+        dbg_println!("No layout index found, ignore");
         return;
     }
 
-    dbg_println!("destroy view {} layout_index {}", v.id, layout_index);
-
-    let keep_index = if layout_index == 0 { 2 } else { 0 };
-
-    dbg_println!("keep index = {}", keep_index);
-
-    // hack no grand parent update: TODO: swap parent an keep_index content
-    // update root_view if no grand parent
+    let v_layout_index = v.layout_index.unwrap();
 
     let mut destroy = vec![];
 
-    // get parent
-    {
-        let pv = editor.view_map.get(&pvid).unwrap();
-        let mut pv = pv.borrow_mut();
-        if pv.children.len() != 3 {
-            return;
-        }
+    // get parent view/id
+    let pvid = *v.parent_id.as_ref().unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap().clone();
+    let mut pv = pv.borrow_mut();
 
-        dbg_println!("destroy parent VID {} children {:?}", pv.id, pv.children);
-
-        let keep_vid = pv.children[keep_index];
-        assert_ne!(keep_vid, v.id);
-
-        destroy.push(pv.children[1]); // separator
-        destroy.push(pv.children[layout_index]); // self
-
-        pv.layout_ops = vec![LayoutOperation::Percent { p: 100 }];
-        pv.children.clear();
-        pv.children.push(keep_vid);
-        env.focus_changed_to = Some(keep_vid); // post input
+    if pv.children.len() != 3 {
+        dbg_println!(" pv.children.len({}) != 3", pv.children.len());
+        // not handled yet
+        return;
     }
 
-    dbg_println!("destroy view {:?}", destroy);
-    for idx in destroy {
-        editor.view_map.remove(&idx);
+    if let Some(ppvid) = pv.parent_id {
+        // get grand parent view/id
+        let ppv = editor.view_map.get(&ppvid).unwrap().clone();
+        let mut ppv = ppv.borrow_mut();
+
+        let pv_layout_index = pv.layout_index.unwrap();
+
+        let mut kept_vid = None;
+
+        // TODO: get sibling ids
+        // mark siblings for delete
+        for (idx, view_id) in pv.children.iter().enumerate() {
+            if idx == v_layout_index {
+                dbg_println!("prepare delete of view id {}", *view_id);
+                destroy.push(*view_id);
+            } else if idx == 1 {
+                // separator index
+                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                destroy.push(*view_id);
+            } else {
+                dbg_println!("keep view id {}", *view_id);
+                kept_vid = Some(*view_id);
+            }
+        }
+
+        if let Some(kept_vid) = kept_vid {
+            // replace parent in grand-parent
+            ppv.children[pv_layout_index] = kept_vid;
+            pv.parent_id = Some(ppvid);
+            // update grand parent focus: // TODO: find a better way
+            ppv.focus_to = Some(kept_vid);
+
+            // update link to grand-parent  (new parent)
+            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
+            let mut kept_v = kept_v.borrow_mut();
+            kept_v.parent_id = Some(ppvid);
+            kept_v.layout_index = Some(pv_layout_index);
+
+            kept_v.destroyable = pv.destroyable; // NB: take parent policy
+
+            dbg_println!("prepare delete of view id {} (parent)", pvid);
+            dbg_println!("set focus to view id {}", kept_vid);
+            destroy.push(pvid);
+            env.focus_changed_to = Some(kept_vid); // post input
+        }
+    } else {
+        // TODO: get sibling ids
+        // mark self+siblings for delete
+        let mut kept_vid = None;
+
+        for (idx, view_id) in pv.children.iter().enumerate() {
+            if idx == v_layout_index {
+                dbg_println!("prepare delete of view id {}", *view_id);
+                destroy.push(*view_id);
+            } else if idx == 1 {
+                // separator index
+                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                destroy.push(*view_id);
+            } else {
+                dbg_println!("keep view id {}", *view_id);
+                kept_vid = Some(*view_id);
+            }
+        }
+
+        if let Some(kept_vid) = kept_vid {
+            dbg_println!("root view update");
+            dbg_println!("delete {}", pvid);
+            destroy.push(pvid);
+
+            for i in 0..editor.root_views.len() {
+                if editor.root_views[i] == pvid {
+                    dbg_println!("update root view slot {}", i);
+
+                    editor.root_views[i] = kept_vid;
+                    env.view_id = kept_vid;
+                    break;
+                }
+            }
+
+            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
+            let mut kept_v = kept_v.borrow_mut();
+            kept_v.parent_id = None;
+            kept_v.layout_index = None;
+
+            env.focus_changed_to = Some(kept_vid); // post input
+        }
+    };
+
+    dbg_println!("destroy view(s) {:?}", destroy);
+    for vid in destroy {
+        editor.view_map.remove(&vid);
     }
 }

@@ -48,7 +48,7 @@ pub fn read_char_forward(
     codec.decode(SyncDirection::Forward, &data, 0)
 }
 
-// TODO: codec...
+// TODO: codec..., remove temporary vec -> slice
 pub fn read_char_backward(
     doc: &Document,
     from_offset: u64,
@@ -119,7 +119,7 @@ pub fn read_char(
 impl Mark {
     /* TODO: add TextCodec trait
 
-     RawCodec {
+     Codec {
         encode(Writer: , offset, bytes: vec<u8>)
         decode(Writer: , offset, bytes: &mut vec<u8>) // n = vec::capacity
 
@@ -128,6 +128,7 @@ impl Mark {
 
         sync(offset, n, BACKWARD | FORWARD) -> offset' // also used  to skip
         fn write(codepoint: u32, out: &mut [u8; 4]) -> usize;
+
      }
 
 
@@ -138,7 +139,9 @@ impl Mark {
         read(offset, BACKWARD | FORWARD) -> (char, offset', encode_size=abs(offset - offset') )
         sync(offset, n, BACKWARD | FORWARD) -> offset' // also used  to skip
         fn write(codepoint: u32, out: &mut [u8; 4]) -> usize;
-     }
+
+        eol_bytes(&mut [u8;4]) -> usize
+    }
 
 
 

@@ -85,6 +85,12 @@ impl<'a> Mode for BasicEditorMode {
             &modes,
         );
 
+        for i in 0..view.children.len() {
+            let vid = view.children[i];
+            let v = editor.view_map.get(&vid).unwrap();
+            v.borrow_mut().destroyable = false;
+        }
+
         let title_vid = view.children[0];
         let v = editor.view_map.get(&title_vid).unwrap();
         v.borrow_mut()

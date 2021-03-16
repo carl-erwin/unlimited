@@ -1,5 +1,6 @@
 // Copyright (c) Carl-Erwin Griffith
 
+#[derive(Debug)]
 pub struct Config {
     pub files_list: Vec<String>,
     pub ui_frontend: String,

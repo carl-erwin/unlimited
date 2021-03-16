@@ -232,9 +232,10 @@ impl InputContext {
 // can zoom ?
 pub struct View<'a> {
     pub id: Id,
+    pub destroyable: bool,
     pub parent_id: Option<Id>,
     pub focus_to: Option<Id>, // child id
-
+    //pub root_view_index: Option<usize>, // ?
     pub document: Option<Arc<RwLock<Document<'static>>>>, // if none and no children ... panic ?
     pub mode_ctx: HashMap<String, Box<dyn Any>>,
     //
@@ -295,6 +296,7 @@ impl<'a> View<'a> {
 
         let mut v = View {
             parent_id,
+            destroyable: true,
             focus_to: None,
             id,
             document,
@@ -339,7 +341,7 @@ impl<'a> View<'a> {
 
             let action_map = mode.build_action_map();
             for (name, fnptr) in action_map {
-                v.input_ctx.action_map.insert(name.clone(), fnptr.clone());
+                v.input_ctx.action_map.insert(name.clone(), fnptr);
             }
 
             dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
