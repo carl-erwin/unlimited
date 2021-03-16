@@ -2811,8 +2811,13 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefC
             let x = std::cmp::max(0, *x) as usize;
             let y = std::cmp::max(0, *y) as usize;
 
-            if let Some(cpi) = screen.get_cpinfo(x, y) {
-                {
+            // get fist offset readline the line from right to left
+            for i in (0..=x).rev() {
+                if let Some(cpi) = screen.get_cpinfo(i, y) {
+                    if cpi.offset.is_none() {
+                        continue;
+                    }
+
                     // update selection point
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2832,6 +2837,8 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefC
                         y,
                         cpi.offset
                     );
+
+                    break;
                 }
             }
         }
