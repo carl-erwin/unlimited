@@ -1201,7 +1201,12 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
 
             // TODO: end_offset is not set properly at startup
             // main mark + on screen ?
-            if before > 0 && idx == midx && m.offset != before && m.offset > end_offset && !screen_has_eof {
+            if before > 0
+                && idx == midx
+                && m.offset != before
+                && m.offset > end_offset
+                && !screen_has_eof
+            {
                 dbg_println!("m.offset {} > v.end_offset {}", m.offset, end_offset);
                 scroll_down = 1;
             }

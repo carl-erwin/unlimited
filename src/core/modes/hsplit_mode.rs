@@ -13,7 +13,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::layout::Filter;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::View;
@@ -96,8 +96,8 @@ impl Filter<'_> for HsplitModeComposeFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIoData>,
-        _filter_out: &mut Vec<FilterIoData>,
+        _filter_in: &Vec<FilterIo>,
+        _filter_out: &mut Vec<FilterIo>,
     ) {
         let mut cpi = CodepointInfo::new();
         cpi.is_selected = false;

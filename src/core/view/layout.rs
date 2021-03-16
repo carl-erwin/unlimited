@@ -45,8 +45,8 @@ pub trait Filter<'a> {
         &mut self,
         view: &Rc<RefCell<View>>,
         mut env: &mut LayoutEnv,
-        input: &Vec<FilterIoData>,
-        output: &mut Vec<FilterIoData>,
+        input: &Vec<FilterIo>,
+        output: &mut Vec<FilterIo>,
     ) -> () {
         let mut view = view.borrow();
         self.run(&mut view, &mut env, input, output);
@@ -56,8 +56,8 @@ pub trait Filter<'a> {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        input: &Vec<FilterIoData>,
-        output: &mut Vec<FilterIoData>,
+        input: &Vec<FilterIo>,
+        output: &mut Vec<FilterIo>,
     ) -> () {
         // default
         *output = input.clone();
@@ -96,7 +96,7 @@ pub enum FilterData {
 }
 
 #[derive(Debug, Clone)]
-pub struct FilterIoData {
+pub struct FilterIo {
     // general info
     pub metadata: bool,
 
@@ -111,9 +111,9 @@ pub struct FilterIoData {
     // TODO: add style infos ?
 }
 
-impl FilterIoData {
-    pub fn replace_codepoint(io: &FilterIoData, new_cp: char) -> FilterIoData {
-        if let &FilterIoData {
+impl FilterIo {
+    pub fn replace_codepoint(io: &FilterIo, new_cp: char) -> FilterIo {
+        if let &FilterIo {
             // general info
             metadata,
             is_selected,
@@ -130,7 +130,7 @@ impl FilterIoData {
                 },
         } = io
         {
-            return FilterIoData {
+            return FilterIo {
                 // general info
                 metadata,
                 is_selected,
@@ -171,8 +171,8 @@ pub fn run_compositing_stage(
     screen: &mut Screen,
 ) {
     {
-       let view = view.borrow();
-       run_compositing_stage_direct(editor, env, &view, base_offset, max_offset, screen)
+        let view = view.borrow();
+        run_compositing_stage_direct(editor, env, &view, base_offset, max_offset, screen)
     }
     {
         let mut view = view.borrow_mut();
@@ -180,7 +180,6 @@ pub fn run_compositing_stage(
             view.end_offset = offset;
         }
     }
-
 }
 
 // This function can be considered as the core of the editor.<br/>

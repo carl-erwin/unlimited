@@ -1,7 +1,7 @@
 use crate::core::codec::text::u32_to_char;
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::View;
 
@@ -33,11 +33,11 @@ impl Filter<'_> for TabFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         for io in filter_in.iter() {
-            if let FilterIoData {
+            if let FilterIo {
                 data: FilterData::Unicode { real_cp, .. },
                 ..
             } = &*io
@@ -56,7 +56,7 @@ impl Filter<'_> for TabFilter {
                         let padding = tab_size - (self.column_count % tab_size);
 
                         for (idx, _) in (0..padding).enumerate() {
-                            let mut new_io = FilterIoData::replace_codepoint(io, ' ');
+                            let mut new_io = FilterIo::replace_codepoint(io, ' ');
                             if env.graphic_display {
                                 new_io.color = (242, 71, 132); // purple-like
                             } else {

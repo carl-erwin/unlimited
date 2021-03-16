@@ -10,7 +10,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::layout::Filter;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
@@ -169,8 +169,8 @@ impl Filter<'_> for BasicEditorTitle {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIoData>,
-        _filter_out: &mut Vec<FilterIoData>,
+        _filter_in: &Vec<FilterIo>,
+        _filter_out: &mut Vec<FilterIo>,
     ) {
         let _bg_color = (100, 123, 153);
 
@@ -234,8 +234,8 @@ impl Filter<'_> for BasicEditorStatus {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIoData>,
-        _filter_out: &mut Vec<FilterIoData>,
+        _filter_in: &Vec<FilterIo>,
+        _filter_out: &mut Vec<FilterIo>,
     ) {
         let fill = ' ' as char;
         loop {

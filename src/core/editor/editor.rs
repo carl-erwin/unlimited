@@ -31,7 +31,7 @@ use crate::core::modes::Mode;
 
 use crate::core::screen::Screen;
 use crate::core::view;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::LayoutDirection;
@@ -116,8 +116,8 @@ pub type RenderStageFunction = fn(
     env: &mut EditorEnv,
     view: &View,
     env: &mut LayoutEnv,
-    input: &Vec<FilterIoData>,
-    output: &mut Vec<FilterIoData>,
+    input: &Vec<FilterIo>,
+    output: &mut Vec<FilterIo>,
 ) -> ();
 
 pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;

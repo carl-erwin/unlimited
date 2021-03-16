@@ -1,6 +1,6 @@
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::codepointinfo::CodepointInfo;
@@ -40,7 +40,7 @@ impl Filter<'_> for RawDataFilter {
         self.read_max = env.screen.width() * env.screen.height() * 4; // 4: max utf8 encode size
         self.read_count = 0;
         self.read_size = 1024 * 4; // env ?
-                                   //Utf8DecodeContextself.read_size = env.screen.width() * env.screen.height();
+                                   // self.read_size = env.screen.width() * env.screen.height();
 
         self.pos = env.base_offset;
     }
@@ -49,11 +49,11 @@ impl Filter<'_> for RawDataFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        _noinput: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        _noinput: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         // There is no input HERE
-        // we convert the document buffer to ouput
+        // we convert the document data into  buffer FilterIo
 
         // we read screen.width() bytes // TODO: width * codec_max_encode_size() for now
         let doc = view.document.clone();
@@ -82,7 +82,7 @@ impl Filter<'_> for RawDataFilter {
                         dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
             */
             if rd > 0 {
-                (*filter_out).push(FilterIoData {
+                (*filter_out).push(FilterIo {
                     metadata: false,
                     is_selected: false,
                     color: CodepointInfo::default_color(),
@@ -96,7 +96,7 @@ impl Filter<'_> for RawDataFilter {
             if rd < self.read_size {
                 env.quit = true;
 
-                (*filter_out).push(FilterIoData {
+                (*filter_out).push(FilterIo {
                     metadata: true,
                     is_selected: false,
                     color: CodepointInfo::default_color(),

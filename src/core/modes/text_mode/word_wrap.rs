@@ -1,6 +1,6 @@
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::View;
@@ -13,7 +13,7 @@ use crate::core::codepointinfo::CodepointInfo;
 pub struct WordWrapFilter {
     max_column: u64,
     column_count: u64,
-    accum: Vec<FilterIoData>,
+    accum: Vec<FilterIo>,
     display_wrap: bool,
     flush_count: usize,
     last_pushed_offset: u64,
@@ -60,12 +60,12 @@ impl Filter<'_> for WordWrapFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         // dbg_println!("filter_in.len() {}", filter_in.len());
         for io in filter_in.iter() {
-            if let FilterIoData {
+            if let FilterIo {
                 data: FilterData::Unicode { real_cp, .. },
                 ..
             } = &*io
@@ -86,7 +86,7 @@ impl Filter<'_> for WordWrapFilter {
                     if !self.accum.is_empty() && (c != '\n' && c != ' ') && self.flush_count > 0 {
                         let off = self.accum[0].offset.unwrap();
                         if off > 0 {
-                            let mut fnl = FilterIoData {
+                            let mut fnl = FilterIo {
                                 // general info
                                 metadata: true,
                                 is_selected: false,
@@ -102,7 +102,7 @@ impl Filter<'_> for WordWrapFilter {
                                 },
                             };
 
-                            let fscp = FilterIoData {
+                            let fscp = FilterIo {
                                 metadata: true,
                                 is_selected: false,
                                 offset: Some(off),

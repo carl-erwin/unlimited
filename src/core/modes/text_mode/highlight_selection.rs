@@ -1,5 +1,5 @@
 use crate::core::view::layout::Filter;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::codepointinfo::CodepointInfo;
@@ -58,8 +58,8 @@ impl Filter<'_> for HighlightSelectionFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         if env.screen.is_off_screen == true {
             *filter_out = filter_in.clone();

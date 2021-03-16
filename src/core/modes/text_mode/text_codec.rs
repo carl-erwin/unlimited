@@ -2,7 +2,7 @@ use crate::core::codec::text::utf8;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::View;
 
@@ -20,10 +20,10 @@ impl TextCodecFilter {
     }
 }
 
-fn text_codec_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIoData {
+fn text_codec_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
     assert!(size > 0);
 
-    FilterIoData {
+    FilterIo {
         // general info
         metadata: false,
         is_selected: false,
@@ -51,8 +51,8 @@ impl Filter<'_> for TextCodecFilter {
         &mut self,
         view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         // ref ? in setup
         let _tm = view.mode_ctx::<TextModeContext>("text-mode");
@@ -128,10 +128,10 @@ impl Utf8FilterCtx {
     }
 }
 
-fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIoData {
+fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
     assert!(size > 0);
 
-    FilterIoData {
+    FilterIo {
         // general info
         metadata: false,
         is_selected: false,
@@ -148,7 +148,7 @@ fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIoData {
     }
 }
 
-fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, val: u8, filter_out: &mut Vec<FilterIoData>) {
+fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, val: u8, filter_out: &mut Vec<FilterIo>) {
     ctx.accum[ctx.cp_size] = val;
     ctx.accum_size += 1;
     loop {
@@ -273,8 +273,8 @@ impl Filter<'_> for Utf8Filter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        mut filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        mut filter_out: &mut Vec<FilterIo>,
     ) {
         // put in common
         if filter_in.is_empty() {

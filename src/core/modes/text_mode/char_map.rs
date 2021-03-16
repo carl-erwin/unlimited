@@ -1,6 +1,6 @@
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use std::collections::HashMap;
 
@@ -42,12 +42,12 @@ impl Filter<'_> for CharMapFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         for io in filter_in.iter() {
             match io {
-                FilterIoData {
+                FilterIo {
                     metadata,
                     is_selected,
                     color,
@@ -98,7 +98,7 @@ pub fn transform_io_data(
     color: (u8, u8, u8),
     bg_color: (u8, u8, u8),
     metadata: bool,
-) -> Vec<FilterIoData> {
+) -> Vec<FilterIo> {
     let mut cp_vec = Vec::new();
 
     let orig_metadata = metadata;
@@ -167,7 +167,7 @@ pub fn transform_io_data(
     for (idx, displayed_cp) in s.chars().enumerate() {
         let size = if idx == 0 { orig_size } else { 0 };
         let metadata = if idx == 0 { orig_metadata } else { true };
-        cp_vec.push(FilterIoData {
+        cp_vec.push(FilterIo {
             metadata,
             is_selected,
             color,

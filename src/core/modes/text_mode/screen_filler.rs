@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::View;
 
@@ -62,8 +62,8 @@ impl Filter<'_> for ScreenFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        _filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        _filter_out: &mut Vec<FilterIo>,
     ) {
         if filter_in.is_empty() {
             return;
@@ -104,7 +104,7 @@ impl Filter<'_> for ScreenFilter {
             }
 
             match &io {
-                &FilterIoData {
+                &FilterIo {
                     data: FilterData::EndOfStream,
                     ..
                 } => {
@@ -129,7 +129,7 @@ impl Filter<'_> for ScreenFilter {
                     env.screen.set_has_eof();
                 }
 
-                &FilterIoData {
+                &FilterIo {
                     data:
                         FilterData::Unicode {
                             real_cp,

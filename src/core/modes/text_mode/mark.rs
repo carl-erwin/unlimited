@@ -377,8 +377,8 @@ impl Mark {
 #[test]
 fn test_marks() {
     use crate::core::codec::text::utf8::Utf8Codec;
-    use crate::core::document::DocumentBuilder;
     use crate::core::document::buffer::OpenMode;
+    use crate::core::document::DocumentBuilder;
 
     // TODO: move to utf8 tests
     // add more tests move etc

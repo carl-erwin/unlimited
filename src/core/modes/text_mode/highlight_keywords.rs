@@ -1,6 +1,6 @@
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 
 use crate::core::view::layout::LayoutEnv;
 
@@ -33,7 +33,7 @@ enum TokenType {
 }
 
 pub struct HighlightFilter {
-    token_io: Vec<FilterIoData>,
+    token_io: Vec<FilterIo>,
     token_type: TokenType,
     utf8_token: Vec<u8>,
     new_color: (u8, u8, u8),
@@ -71,8 +71,8 @@ impl Filter<'_> for HighlightFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         if env.screen.is_off_screen == true {
             *filter_out = filter_in.clone();
@@ -81,7 +81,7 @@ impl Filter<'_> for HighlightFilter {
 
         for io in filter_in {
             match &*io {
-                FilterIoData {
+                FilterIo {
                     data: FilterData::Unicode { real_cp, .. },
                     ..
                 } => {
@@ -131,7 +131,7 @@ impl Filter<'_> for HighlightFilter {
                     // build token utf8 string
                     for tok in self.token_io.iter() {
                         match tok {
-                            &FilterIoData {
+                            &FilterIo {
                                 data: FilterData::Unicode { real_cp, .. },
                                 ..
                             } => {
@@ -233,7 +233,7 @@ impl Filter<'_> for HighlightFilter {
                     self.new_color = CodepointInfo::default_color();
                 }
 
-                FilterIoData {
+                FilterIo {
                     data: FilterData::EndOfStream,
                     ..
                 } => {

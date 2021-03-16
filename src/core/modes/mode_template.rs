@@ -11,7 +11,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::layout::Filter;
-use crate::core::view::layout::FilterIoData;
+use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::View;
@@ -94,8 +94,8 @@ impl Filter<'_> for TemplateComposeFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIoData>,
-        filter_out: &mut Vec<FilterIoData>,
+        filter_in: &Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
         *filter_out = filter_in.clone();
     }
