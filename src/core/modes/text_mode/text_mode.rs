@@ -2707,9 +2707,18 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
+    let (w, h) = screen.dimension();
+
     let (x, y) = (x as usize, y as usize);
 
-    dbg_println!("VID {} : CLICK @ x({}) Y({})", v.id, x, y);
+    dbg_println!(
+        "VID {} : CLICK @ x({}) Y({})  W({}) H({})",
+        v.id,
+        x,
+        y,
+        w,
+        h
+    );
     // move cursor to (x,y)
 
     // check from right to left until some codepoint is found
@@ -2717,11 +2726,14 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
 
     tm.select_point.clear();
 
-    let mut i = x + 1;
-    while i > 0 {
-        if let Some(cpi) = screen.get_used_cpinfo(x, y) {
+    for i in (0..=x).rev() {
+        if let Some(cpi) = screen.get_cpinfo(i, y) {
             // clear selection point
             // WARNING:
+
+            if cpi.offset.is_none() {
+                continue;
+            }
 
             // reset main mark
             tm.mark_index = 0;
@@ -2733,15 +2745,13 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
             dbg_println!(
                 "VID {} : CLICK @ x({}) Y({}) set main mark at offset : {:?}",
                 v.id,
-                x,
+                i,
                 y,
                 cpi.offset
             );
 
             break;
         }
-
-        i -= 1;
     }
 
     // s // to internal view.borrow_mut().state.s
