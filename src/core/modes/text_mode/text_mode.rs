@@ -213,6 +213,7 @@ impl<'a> Mode for TextMode {
             let doc = doc.as_ref().unwrap();
             let mut doc = doc.as_ref().write().unwrap();
             doc.tag(std::time::Instant::now(), 0, vec![0]);
+            doc.changed = false; // do not count 1st tag
         }
 
         // NB: Execution in push order
@@ -2829,11 +2830,9 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefC
 
                             // if on last line scroll down 1 line
                             if y + 1 >= screen.height() {
-                                tm.pre_compose_action
-                                .push(Action::ScrollDown { n: 1 });
+                                tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
                             } else if y == 0 {
-                                tm.pre_compose_action
-                                .push(Action::ScrollUp { n: 1 });
+                                tm.pre_compose_action.push(Action::ScrollUp { n: 1 });
                             }
                         }
                     }

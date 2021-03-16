@@ -283,7 +283,6 @@ fn process_single_input_event<'a>(
     view_id: view::Id,
 ) -> bool {
     let mut view = &editor.view_map.get(&view_id).unwrap().clone();
-
     {
         let v = view.borrow();
         dbg_println!("DISPATCH EVENT TO VID {}", view_id);
@@ -291,8 +290,6 @@ fn process_single_input_event<'a>(
     }
 
     let ev = &env.current_input_event; // Option ?
-
-    //
     if *ev == crate::core::event::InputEvent::NoInputEvent {
         // ignore no input event event :-)
         return false;
@@ -301,52 +298,113 @@ fn process_single_input_event<'a>(
     // record input sequence
     {
         let mut v = view.borrow_mut();
-        // TODO: track whole input seq // not tested
-
         dbg_println!("eval input event input ev = {:?}", ev);
         dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
         v.input_ctx.trigger.push((*ev).clone());
         dbg_println!("cur (accum) events = {:?}", v.input_ctx.trigger);
     }
 
+    // action_name = check_input_map_stack(editor, env, v);
+    // {
     let action_name = {
         let mut v = view.borrow_mut();
 
-        let mut in_node = v.input_ctx.current_node.clone();
-        let mut out_node = v.input_ctx.next_node.clone();
-        let action_name =
-            eval_input_event(&ev, &v.input_ctx.input_map, &mut in_node, &mut out_node);
-        // TODO: return out_node
-        // swap for next call
-        v.input_ctx.current_node = out_node;
-        v.input_ctx.next_node = None;
+        let mut stack_pos = if let Some(stack_pos) = v.input_ctx.stack_pos {
+            // current map
+            stack_pos + 1
+        } else {
+            // top
+            v.input_ctx.input_map.as_ref().borrow().len()
+        };
 
-        action_name.clone()
+        if stack_pos == 0 {
+            v.input_ctx.trigger.clear();
+            return false;
+        }
+
+        v.input_ctx.stack_pos = Some(stack_pos);
+
+        let mut in_node = v.input_ctx.current_node.clone();
+        dbg_println!("last current_node = {:?}", in_node);
+
+        let mut action_name = None;
+
+        // TODO: function
+        let mut trigger_pos = v.input_ctx.trigger.len() - 1;
+        let trigger_pos_max = v.input_ctx.trigger.len();
+
+        dbg_println!("trigger_pos     = {}", trigger_pos);
+        dbg_println!("trigger_pos_max = {}", trigger_pos_max);
+
+        while stack_pos > 0 {
+            v.input_ctx.stack_pos = Some(stack_pos);
+
+            stack_pos -= 1;
+
+            for ev_pos in trigger_pos..trigger_pos_max {
+                let ev = &v.input_ctx.trigger[ev_pos];
+                dbg_println!("playing event[{}] = {:?}", ev_pos, ev);
+                let mut out_node = None;
+                let input_map = &v.input_ctx.input_map.borrow()[stack_pos];
+                action_name = eval_input_event(&ev, &input_map, &mut in_node, &mut out_node);
+                dbg_println!("--------------------------------------------------------");
+                if action_name.is_some() {
+                    // stop a first match
+                    dbg_println!("after play : found action {:?}", action_name);
+                    break;
+                }
+                dbg_println!("after play : in_node = {:?}", in_node);
+                dbg_println!("after play : out_node = {:?}", out_node);
+                if out_node.is_none() {
+                    // no match
+                    break;
+                }
+                in_node = out_node;
+            }
+
+            if action_name.is_some() {
+                dbg_println!(
+                    "found action {:?} at input stack level {}",
+                    action_name,
+                    stack_pos
+                );
+                break;
+            }
+
+            dbg_println!("no action at input stack level {}", stack_pos);
+
+            // restart the whole sequence for next level
+            if stack_pos > 0 {
+                trigger_pos = 0;
+                in_node = None;
+            } else {
+                v.input_ctx.stack_pos = None;
+            }
+        }
+
+        v.input_ctx.current_node = in_node; // save last input node
+
+        action_name
     };
 
     if action_name.is_none() {
-        let mut v = view.borrow_mut();
-        if v.input_ctx.current_node.is_none() {
-            v.input_ctx.trigger.clear();
-        }
+        dbg_println!("no action found -> return false");
+        return false;
     }
 
+    // exec_input_action()
     let action = {
         let mut v = view.borrow_mut();
 
-        if action_name.is_none() {
-            return false;
-        }
         let action_name = action_name.unwrap();
         dbg_println!("found action : [{}]", action_name);
-
-        v.input_ctx.current_node = None;
-        v.input_ctx.next_node = None;
 
         let action_fn = v.input_ctx.action_map.get(&action_name).clone();
         if action_fn.is_none() {
             dbg_println!("not function pointer found for action : {}", action_name);
             v.input_ctx.trigger.clear();
+            v.input_ctx.current_node = None;
+            v.input_ctx.stack_pos = None;
             return false;
         }
         let f = action_fn.clone().unwrap();
@@ -362,6 +420,8 @@ fn process_single_input_event<'a>(
     {
         let mut v = view.borrow_mut();
         v.input_ctx.trigger.clear();
+        v.input_ctx.current_node = None;
+        v.input_ctx.stack_pos = None;
     }
 
     true

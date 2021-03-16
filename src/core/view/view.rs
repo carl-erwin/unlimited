@@ -207,9 +207,9 @@ static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 
 pub struct InputContext {
     pub action_map: InputStageActionMap<'static>, // ref to current focused widget ?
-    pub input_map: Rc<RefCell<InputEventMap>>,
+    pub input_map: Rc<RefCell<Vec<InputEventMap>>>,
+    pub stack_pos: Option<usize>,
     pub current_node: Option<Rc<InputEventRule>>,
-    pub next_node: Option<Rc<InputEventRule>>,
     pub trigger: Vec<InputEvent>,
 }
 
@@ -217,9 +217,9 @@ impl InputContext {
     pub fn new() -> Self {
         InputContext {
             action_map: HashMap::new(),
-            input_map: Rc::new(RefCell::new(HashMap::new())),
+            input_map: Rc::new(RefCell::new(Vec::new())),
+            stack_pos: None,
             current_node: None,
-            next_node: None,
             trigger: vec![],
         }
     }
@@ -344,11 +344,16 @@ impl<'a> View<'a> {
                 v.input_ctx.action_map.insert(name.clone(), fnptr);
             }
 
-            dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
-            // TODO: user define
-            // let input_map = mode.build_input_map(); TODO
-            let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
-            v.input_ctx.input_map = input_map;
+            if mode_name != "core" {
+                dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
+                // TODO: user define
+                // let input_map = mode.build_input_map(); TODO
+                {
+                    let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
+                    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+                    input_map_stack.push(input_map);
+                }
+            }
 
             // TODO: merge modes input maps / (conflicts ?)
             // parser ctx build from current v.input_ctx.input_map

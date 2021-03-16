@@ -12,9 +12,7 @@ pub static DEFAULT_INPUT_MAP: &str = std::include_str!("../../../res/default_inp
 
 // TODO: map error to editor error
 // unlimited::error::SyntaxError(file, line, col, str_details);
-pub fn build_input_event_map(
-    json: &str,
-) -> Result<Rc<RefCell<InputEventMap>>, serde_json::error::Error> {
+pub fn build_input_event_map(json: &str) -> Result<InputEventMap, serde_json::error::Error> {
     let mut ctx = ParseCtx::new();
 
     // Parse the string of data into serde_json::Value.
@@ -24,7 +22,7 @@ pub fn build_input_event_map(
     let vec = if let Value::Array(ref vec) = json {
         vec
     } else {
-        return Ok(Rc::new(RefCell::new(InputEventMap::new())));
+        return Ok(InputEventMap::new());
     };
 
     // parse 1st level entries
@@ -50,7 +48,7 @@ struct ParseCtx {
     action: String,
     is_default: bool,
     sequence: Vec<InputEvent>,
-    map: Rc<RefCell<InputEventMap>>, // TODO: use &Rc<RefCell<InputEventMap>>
+    map: InputEventMap,
 }
 
 impl ParseCtx {
@@ -59,7 +57,7 @@ impl ParseCtx {
             action: String::new(),
             is_default: false,
             sequence: Vec::new(),
-            map: Rc::new(RefCell::new(InputEventMap::new())),
+            map: InputEventMap::new(),
         }
     }
 
@@ -123,7 +121,7 @@ impl ParseCtx {
             }
         }
 
-        let map = &mut self.map.borrow_mut();
+        let map = &mut self.map;
         read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
 
         //
@@ -462,14 +460,13 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
 
 pub fn eval_input_event(
     ev: &InputEvent,
-    input_map: &Rc<RefCell<InputEventMap>>,
+    input_map: &InputEventMap,
     in_node: &mut Option<Rc<InputEventRule>>,
     out_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
     dbg_println!("\n\n -------------------------- eval_input_event --------------------------");
 
-    dbg_println!("found in_node {:?}", in_node);
-    dbg_println!("input map  {:?}", input_map);
+    //dbg_println!("input map  {:?}", input_map);
 
     let event_hash = compute_input_event_hash(ev);
     dbg_println!("event_hash = {}", event_hash);
@@ -502,7 +499,7 @@ pub fn eval_input_event(
     } else {
         dbg_println!("--- 1st level event ---");
 
-        match input_map.borrow().get(&event_hash) {
+        match input_map.get(&event_hash) {
             Some(event) => {
                 if let Some(action) = &event.as_ref().action {
                     //dbg_println!("found action");
@@ -514,25 +511,21 @@ pub fn eval_input_event(
                 }
 
                 *out_node = Some(Rc::clone(event));
-
                 dbg_println!("found out_node {:?}", out_node);
             }
             None => {
-                dbg_println!("TODO: look for default action");
-
                 let ev = InputEvent::FallbackEvent;
                 let event_hash = compute_input_event_hash(&ev);
 
                 *out_node = None;
                 *in_node = None;
 
-                match input_map.borrow().get(&event_hash) {
+                match input_map.get(&event_hash) {
                     Some(event) => {
                         if let Some(action) = &event.as_ref().action {
                             dbg_println!("default found action {}", action);
                             return Some(action.to_string());
                         }
-                        dbg_println!("cancel sequence");
                     }
                     None => {
                         dbg_println!("no default action defined");
@@ -645,7 +638,7 @@ mod tests {
         let map = build_input_event_map(DEFAULT_INPUT_MAP)?;
 
         //dbg_println!("****** print map");
-        for (_k, _v) in map.borrow().iter() {
+        for (_k, _v) in map.iter() {
             //dbg_println!("{:?} -> {:?}", k, v);
         }
 
@@ -681,13 +674,14 @@ mod tests {
                 },
             });
 
-            let rc_map = Rc::new(map);
+            let stack = vec![map];
+            let rc_map = Rc::new(RefCell::new(stack));
 
             let mut current_node: Option<Rc<InputEventRule>> = None;
             let mut next_node: Option<Rc<InputEventRule>> = None;
 
             for ev in &iev {
-                let action = eval_input_event(&ev, &rc_map, &mut current_node, &mut next_node);
+                let action = eval_input_event(&ev, &rc_map, 0, &mut current_node, &mut next_node);
                 if let Some(_action) = action {
                     //dbg_println!("found action {}", action);
                 } else {

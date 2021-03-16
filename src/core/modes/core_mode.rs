@@ -69,6 +69,8 @@ pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Ref
 
     if !doc.changed {
         env.quit = true;
+    } else {
+        dbg_println!("DOC CHANGED !\n");
     }
 }
 
