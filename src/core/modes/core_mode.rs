@@ -379,29 +379,7 @@ pub fn split_horizontally(
 }
 
 /*
-   TODO: must destroy/swap hierarchy, gparent/root_view
-   rapid hack no hierarchy update
-   partial destroy
-
-        if !pv {
-            remove from root_view
-            keep at least 1 view
-        }
-
-        1) scan siblings
-             saturating_sub(1) + sort();
-             pv[v.layout_index-1] == separator -> kill pv.children index list
-             pv[v.layout_index+1] == separator -> kill pv.children index list
-             pv[v.layout_index]   ==  self     -> kill pv.children index list
-
-        if pv.children.len() == 1 swap remain_idx in grand-parent (ppv)  // TODO: if p.no_destroyed ( need special command to "close document" not destroy view)
-            if ! pvv {
-                replace pv from root_view[]
-            }
-            else {
-                ppv.children[ pv.layout_index ] -> kill vid list;
-                ppv.children[ pv.layout_index ] = remain_vid;
-            }
+    TODO: document this function
 */
 pub fn destroy_view(
     editor: &mut Editor<'static>,
@@ -410,7 +388,6 @@ pub fn destroy_view(
 ) {
     // current view/id
     let v = view.borrow_mut();
-    let vid = v.id;
 
     if v.destroyable == false {
         return;

@@ -298,16 +298,19 @@ fn process_single_input_event<'a>(
         return false;
     }
 
+    // record input sequence
     {
-        let v = view.borrow();
-        dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
+        let mut v = view.borrow_mut();
+        // TODO: track whole input seq // not tested
+
         dbg_println!("eval input event input ev = {:?}", ev);
+        dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
+        v.input_ctx.trigger.push((*ev).clone());
+        dbg_println!("cur (accum) events = {:?}", v.input_ctx.trigger);
     }
-    // TODO: track whole input seq // not tested
 
     let action_name = {
         let mut v = view.borrow_mut();
-        v.input_ctx.trigger.push((*ev).clone());
 
         let mut in_node = v.input_ctx.current_node.clone();
         let mut out_node = v.input_ctx.next_node.clone();
@@ -321,11 +324,17 @@ fn process_single_input_event<'a>(
         action_name.clone()
     };
 
+    if action_name.is_none() {
+        let mut v = view.borrow_mut();
+        if v.input_ctx.current_node.is_none() {
+            v.input_ctx.trigger.clear();
+        }
+    }
+
     let action = {
         let mut v = view.borrow_mut();
 
         if action_name.is_none() {
-            v.input_ctx.trigger.clear();
             return false;
         }
         let action_name = action_name.unwrap();
