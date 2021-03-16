@@ -2182,6 +2182,7 @@ mod tests {
             cow: None,
             storage_offset: None,
             skip: 0,
+            byte_count: [0;256],
         };
 
         let (id, _) = pool.allocate(root_node, &MappedFile::assert_node_is_unused);

@@ -112,7 +112,7 @@ pub fn read_char(
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
 
-    /* result aare always relative to from_offset/direction */
+    /* result are always relative to from_offset/direction */
     (ret.0, from_offset - ret.2 as u64, ret.2)
 }
 
@@ -378,7 +378,7 @@ impl Mark {
 fn test_marks() {
     use crate::core::codec::text::utf8::Utf8Codec;
     use crate::core::document::DocumentBuilder;
-    use crate::core::document::OpenMode;
+    use crate::core::document::buffer::OpenMode;
 
     // TODO: move to utf8 tests
     // add more tests move etc
@@ -399,7 +399,7 @@ fn test_marks() {
 
         let mut bb = doc.as_ref().write().unwrap();
 
-        let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0x61];
+        let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac];
         bb.insert(0, 6, &data);
 
         let mut rdata = vec![];
@@ -408,13 +408,6 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        for i in 4..6 {
-            let mut m = Mark { offset: i };
-            println!("** mark @ {} **", m.offset);
-            m.move_backward(&bb, codec);
-            println!("** mark @ {} **", m.offset);
-            assert_eq!(m.offset, 3);
-        }
         let mut m = Mark { offset: 3 };
 
         println!("** mark @ {} **", m.offset);
@@ -446,7 +439,7 @@ fn test_marks() {
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
         println!("** mark @ {} **", m.offset);
-        assert_eq!(m.offset, 2);
+        assert_eq!(m.offset, 3);
     }
 
     {
