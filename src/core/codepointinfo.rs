@@ -47,7 +47,7 @@ impl CodepointInfo {
 
     pub fn new() -> Self {
         CodepointInfo {
-            metadata: false,
+            metadata: true,
             cp: ' ',
             displayed_cp: ' ',
             offset: None,
