@@ -37,7 +37,8 @@ use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
 
-use crate::core::codec::text::u32_to_char;
+use crate::core::event::input_map::build_input_event_map;
+use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Action {
@@ -197,6 +198,17 @@ impl<'a> Mode for TextMode {
     ) {
         dbg_println!("config text-mode for VID {}", view.id);
 
+        // Config input map
+        dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
+        // TODO: user define
+        // let input_map = mode.build_input_map(); TODO
+        {
+            let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
+            let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push(input_map);
+        }
+
+        //
         let use_utf8_codec = true;
 
         let use_highlight_keywords = true;

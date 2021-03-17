@@ -10,10 +10,6 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Instant;
 
-//
-use crate::core::event::input_map::build_input_event_map;
-use crate::core::event::input_map::DEFAULT_INPUT_MAP;
-
 use crate::core::document::Document;
 
 use crate::core::editor::Editor;
@@ -24,7 +20,7 @@ use crate::core::editor::StagePosition;
 
 use crate::core::screen::Screen;
 
-use crate::core::view::layout::{run_compositing_stage, run_compositing_stage_direct};
+use crate::core::view::layout::run_compositing_stage_direct;
 
 use std::collections::HashMap;
 
@@ -342,17 +338,6 @@ impl<'a> View<'a> {
             let action_map = mode.build_action_map();
             for (name, fnptr) in action_map {
                 v.input_ctx.action_map.insert(name.clone(), fnptr);
-            }
-
-            if mode_name != "core" {
-                dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
-                // TODO: user define
-                // let input_map = mode.build_input_map(); TODO
-                {
-                    let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
-                    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-                    input_map_stack.push(input_map);
-                }
             }
 
             // TODO: merge modes input maps / (conflicts ?)
