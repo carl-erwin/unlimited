@@ -230,6 +230,9 @@ impl<'a> Document<'a> {
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO: use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
+        // TODO: update cache if possible
+        self.set_cache(0, 0); // invalidate cache,
+
         // log insert op
         let mut ins_data = Vec::with_capacity(nr_bytes);
         ins_data.extend(&data[..nr_bytes]);
@@ -256,6 +259,9 @@ impl<'a> Document<'a> {
         nr_bytes: usize,
         removed_data: Option<&mut Vec<u8>>,
     ) -> usize {
+        // TODO: update cache if possible
+        self.set_cache(0, 0); // invalidate cache,
+
         let mut rm_data = Vec::with_capacity(nr_bytes);
 
         let nr_bytes_removed = self.buffer.remove(offset, nr_bytes, Some(&mut rm_data));
