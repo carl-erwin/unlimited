@@ -704,10 +704,10 @@ fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     for c in s.chars().take(screen.width()) {
         let mut cpi = CodepointInfo::new();
         cpi.metadata = true;
-        cpi.is_selected = true;
+        cpi.style.is_selected = true;
         cpi.cp = c;
         cpi.displayed_cp = c;
-        cpi.color = color;
+        cpi.style.color = color;
         screen.push(cpi);
         push_count += 1;
     }
@@ -716,11 +716,11 @@ fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     for _ in push_count..screen.width() {
         let mut cpi = CodepointInfo::new();
         cpi.metadata = true;
-        cpi.is_selected = true;
+        cpi.style.is_selected = true;
 
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
-        cpi.color = color;
+        cpi.style.color = color;
         screen.push(cpi);
     }
 }

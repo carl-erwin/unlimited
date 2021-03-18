@@ -9,6 +9,7 @@ use super::TextModeContext;
 use crate::core::codec::text::u32_to_char;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
 
 pub struct WordWrapFilter {
     max_column: u64,
@@ -41,8 +42,11 @@ impl Filter<'_> for WordWrapFilter {
         self.max_column = env.screen.width() as u64;
         self.column_count = 0;
         self.accum = Vec::new();
-        let tm = view.mode_ctx::<TextModeContext>("text-mode");
-        self.display_wrap = tm.display_word_wrap;
+
+        if view.check_mode_ctx::<TextModeContext>("text-mode") {
+            let tm = view.mode_ctx::<TextModeContext>("text-mode");
+            self.display_wrap = tm.display_word_wrap;
+        }
     }
 
     /*
@@ -84,15 +88,17 @@ impl Filter<'_> for WordWrapFilter {
                 if self.column_count == self.max_column {
                     // "inject" fake "line separator"
                     if !self.accum.is_empty() && (c != '\n' && c != ' ') && self.flush_count > 0 {
-                        let off = self.accum[0].offset.unwrap();
+                        let off = if io.offset.is_some() {
+                            self.accum[0].offset.unwrap()
+                        } else {
+                            0
+                        };
                         if off > 0 {
                             let mut fnl = FilterIo {
                                 // general info
                                 metadata: true,
-                                is_selected: false,
+                                style: TextStyle::new(), // TODO: customize
                                 offset: Some(off),
-                                color: CodepointInfo::default_color(), // TODO: customize
-                                bg_color: CodepointInfo::default_bg_color(), // TODO: customize
                                 size: 0,
                                 data: FilterData::Unicode {
                                     displayed_cp: '\\' as u32,
@@ -104,10 +110,8 @@ impl Filter<'_> for WordWrapFilter {
 
                             let fscp = FilterIo {
                                 metadata: true,
-                                is_selected: false,
+                                style: TextStyle::new(),
                                 offset: Some(off),
-                                color: CodepointInfo::default_color(),
-                                bg_color: CodepointInfo::default_bg_color(),
                                 size: 0,
                                 data: FilterData::Unicode {
                                     displayed_cp: ' ' as u32,
@@ -118,8 +122,8 @@ impl Filter<'_> for WordWrapFilter {
                             };
 
                             if true || self.display_wrap {
-                                fnl.color = (255, 255, 0);
-                                //fnl.bg_color = (0, 255, 0);
+                                fnl.style.color = (255, 255, 0);
+                                //fnl.style.bg_color = (0, 255, 0);
                             }
                             // dbg_println!("WORD WRAP FAKE NEW LINE @OFFSET {:?}", fnl.offset);
                             // dbg_println!(
@@ -150,8 +154,8 @@ impl Filter<'_> for WordWrapFilter {
                     '\n' => {
                         let mut nl = io.clone();
                         if self.display_wrap {
-                            nl.is_selected = true;
-                            nl.color = (255, 0, 0);
+                            nl.style.is_selected = true;
+                            nl.style.color = (255, 0, 0);
                         }
                         self.accum.push(nl);
                         //
@@ -163,16 +167,20 @@ impl Filter<'_> for WordWrapFilter {
                         filter_out.append(&mut self.accum);
                         self.column_count = 0;
                         self.flush_count = 0;
-                        self.last_pushed_offset = io.offset.unwrap() + 1;
+                        if io.offset.is_some() {
+                            self.last_pushed_offset = io.offset.unwrap() + 1;
+                        }
                     }
                     ' ' => {
                         // flush "word"
                         let mut space = io.clone();
                         if self.display_wrap {
-                            space.is_selected = true;
-                            space.color = (0, 0, 255);
+                            space.style.is_selected = true;
+                            space.style.color = (0, 0, 255);
                         }
-                        self.last_pushed_offset = io.offset.unwrap() + 1;
+                        if io.offset.is_some() {
+                            self.last_pushed_offset = io.offset.unwrap() + 1;
+                        }
                         self.accum.push(space);
                         //
                         // dbg_println!(

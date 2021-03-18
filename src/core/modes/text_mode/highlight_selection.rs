@@ -3,6 +3,8 @@ use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 use crate::core::view::View;
 
 use super::TextModeContext;
@@ -72,41 +74,22 @@ impl Filter<'_> for HighlightSelectionFilter {
             return;
         }
 
-        let _colors = [
-            /* Black	     */ (0, 0, 0),
-            /* Light_red	 */ (255, 0, 0),
-            /* Light_green	 */ (0, 255, 0),
-            /* Yellow	     */ (255, 255, 0),
-            /* Light_blue	 */ (0, 0, 255),
-            /* Light_magenta */ (255, 0, 255),
-            /* Light_cyan	 */ (0, 255, 255),
-            /* High_white	 */ (255, 255, 255),
-            /* Gray	         */ (128, 128, 128),
-            /* Red	         */ (128, 0, 0),
-            /* Green	     */ (0, 128, 0),
-            /* Brown	     */ (128, 128, 0),
-            /* Blue	         */ (0, 0, 128),
-            /* Magenta       */ (128, 0, 128),
-            /* Cyan	         */ (0, 128, 128),
-            /* White	     */ (192, 192, 192),
-        ];
-
-        for i in filter_in {
-            match i.offset {
+        for (idx, io) in filter_in.iter().enumerate() {
+            match io.offset {
                 Some(offset) if offset >= self.sel_start_offset && offset < self.sel_end_offset => {
-                    let mut i = i.clone();
+                    let mut io = io.clone();
                     if env.graphic_display {
-                        i.bg_color = CodepointInfo::default_selected_bg_color();
+                        io.style.bg_color = TextStyle::default_selected_bg_color();
                     } else {
-                        //let idx = offset as usize % _colors.len();
-                        i.bg_color = (0, 0, 255);
+                        io.style.bg_color = (0, 0, 255);
                     }
+                    io.style.is_selected = true;
 
-                    filter_out.push(i);
+                    filter_out.push(io);
                 }
 
                 _ => {
-                    filter_out.push(i.clone());
+                    filter_out.push(io.clone());
                 }
             }
         }

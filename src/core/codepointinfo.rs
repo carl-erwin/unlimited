@@ -3,30 +3,29 @@
 /// A CodepointInfo contains displayed character attributes.<br/>
 /// The displayed screen is composed of LineCell(s), that contain CodepointInfo(s).
 
-#[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
-pub struct CodepointInfo {
-    pub metadata: bool, // offset cannot be used, TODO: use enum to tag Eof, Normal
-
-    // pub is_eof ?
-    pub cp: char,            // the real codepoint
-    pub displayed_cp: char,  // the displayed codepoint
-    pub offset: Option<u64>, // TODO: Option<(u64, usize)>, back end size (codec)
-    pub size: usize,         // TODO: Option<(u64, usize)>, back end size (codec)
-
-    // TODO: add n/m fragments ie tabs ?
-    // TODO: add real_size ? in bytes
-
-    // regroup in DisplayStyle ?
-    pub is_mark: bool,
+// TODO:
+#[derive(Debug, Default, Hash, Clone, Copy, Eq, PartialEq)]
+pub struct TextStyle {
     pub is_selected: bool,
-    // TODO: add underline
-    // TODO: add bold ?
-    // TODO: add italic ?
-    pub color: (u8, u8, u8),    // (R,G,B)
-    pub bg_color: (u8, u8, u8), // (R,G,B)
+    pub is_inverse: bool,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub color: (u8, u8, u8),    // RGB
+    pub bg_color: (u8, u8, u8), // RGB
 }
 
-impl CodepointInfo {
+impl TextStyle {
+    pub fn new() -> Self {
+        TextStyle {
+            is_selected: false,
+            is_inverse: false,
+            is_bold: false,
+            is_italic: false,
+            color: Self::default_color(),
+            bg_color: Self::default_bg_color(),
+        }
+    }
+
     pub fn default_color() -> (u8, u8, u8) {
         // (192, 192, 192) // White
         // (128, 128, 128)    // Gray
@@ -45,6 +44,29 @@ impl CodepointInfo {
         (sbg.0 + add, sbg.1 + add, sbg.2 + add)
     }
 
+    pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
+        let sbg = Self::default_bg_color();
+        let add = 5;
+        (sbg.0 + add, sbg.1 + add, sbg.2 + add)
+    }
+}
+
+#[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub struct CodepointInfo {
+    pub metadata: bool, // offset cannot be used, TODO: use enum to tag Eof, Normal
+
+    // pub is_eof ?
+    pub cp: char,            // the real codepoint
+    pub displayed_cp: char,  // the displayed codepoint
+    pub offset: Option<u64>, // TODO: Option<(u64, usize)>, back end size (codec)
+    pub size: usize,         // TODO: Option<(u64, usize)>, back end size (codec)
+
+    // TODO: add n/m fragments ie tabs ?
+    // TODO: add real_size ? in bytes
+    pub style: TextStyle,
+}
+
+impl CodepointInfo {
     pub fn new() -> Self {
         CodepointInfo {
             metadata: true,
@@ -52,10 +74,8 @@ impl CodepointInfo {
             displayed_cp: ' ',
             offset: None,
             size: 0,
-            is_mark: false,
-            is_selected: false,
-            color: CodepointInfo::default_color(),
-            bg_color: CodepointInfo::default_bg_color(),
+            //
+            style: TextStyle::new(),
         }
     }
 }

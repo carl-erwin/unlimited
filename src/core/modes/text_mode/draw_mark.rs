@@ -3,6 +3,8 @@ use crate::core::view::layout::LayoutEnv;
 
 use super::mark::Mark;
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 use crate::core::screen::Screen;
 use crate::core::view::View;
 
@@ -24,6 +26,10 @@ impl Filter<'_> for DrawMarks {
     fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
 
     fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {
+        if env.screen.is_off_screen == true {
+            return;
+        }
+
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
         let marks = &tm.marks;
         let draw_marks = env.screen.is_off_screen == false;
@@ -36,7 +42,7 @@ impl Filter<'_> for DrawMarks {
 fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     if !set {
         screen_apply(screen, |_, _, cpi| {
-            cpi.is_mark = false;
+            cpi.style.is_inverse = false;
             true // continue
         });
         return;
@@ -66,15 +72,24 @@ fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
 
         let doc_max_offset = screen.doc_max_offset;
         // TODO: screen iterator
-        screen_apply(screen, |_, _, cpi| {
+        let mut lines_with_marks = vec![];
+
+        screen_apply(screen, |_, l, cpi| {
             if let Some(offset) = cpi.offset {
                 if offset == m.offset {
-                    cpi.is_mark = true;
+                    if let Some(last) = lines_with_marks.last() {
+                        if *last != l {
+                            lines_with_marks.push(l);
+                        }
+                    } else {
+                        lines_with_marks.push(l);
+                    }
+                    cpi.style.is_inverse = true;
                     if cpi.cp == '\n' {
                         // stop at first new line // line is filled with same offsets
                         return false;
                     }
-                    if offset == doc_max_offset {
+                    if offset > doc_max_offset {
                         // EOF: the screen can be filled with EOFs
                         return false;
                     }
@@ -82,6 +97,17 @@ fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
             }
             true // continue
         });
+
+        // highlight mark-line
+        for l in lines_with_marks {
+            if let Some(l) = screen.get_line_mut(l) {
+                for cell in &mut l.cells {
+                    if !cell.cpi.style.is_selected {
+                        cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
+                    }
+                }
+            }
+        }
     }
 }
 

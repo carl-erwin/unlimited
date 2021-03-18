@@ -18,6 +18,7 @@ use crate::core::screen::Screen;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 
+use crate::core::codepointinfo::TextStyle;
 use crate::core::view;
 use crate::core::view::View;
 
@@ -99,26 +100,21 @@ pub enum FilterData {
 pub struct FilterIo {
     // general info
     pub metadata: bool,
-
-    pub is_selected: bool,
-    pub color: (u8, u8, u8),
-    pub bg_color: (u8, u8, u8),
-
+    pub style: TextStyle,
+    //
     pub offset: Option<u64>,
     pub size: usize,
-
+    //
     pub data: FilterData,
     // TODO: add style infos ?
 }
 
 impl FilterIo {
-    pub fn replace_codepoint(io: &FilterIo, new_cp: char) -> FilterIo {
+    pub fn replace_displayed_codepoint(io: &FilterIo, disp_cp: char) -> FilterIo {
         if let &FilterIo {
             // general info
             metadata,
-            is_selected,
-            color,
-            bg_color,
+            style,
             offset: from_offset,
             size: cp_size,
             data:
@@ -133,14 +129,12 @@ impl FilterIo {
             return FilterIo {
                 // general info
                 metadata,
-                is_selected,
+                style,
                 offset: from_offset,
-                color,
-                bg_color,
                 size: cp_size,
                 data: FilterData::Unicode {
-                    real_cp: new_cp as u32,
-                    displayed_cp: real_cp,
+                    real_cp,
+                    displayed_cp: disp_cp as u32,
                     fragment_flag,
                     fragment_count,
                 },
@@ -384,7 +378,7 @@ pub fn run_compositing_stage_direct(
         for f in compose_filters.iter_mut() {
             filter_out.clear();
 
-            if false {
+            if !false {
                 dbg_println!(
                     "running {:32} : in({}) out({})",
                     f.name(),

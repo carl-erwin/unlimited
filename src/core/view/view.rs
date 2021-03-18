@@ -266,9 +266,7 @@ pub struct View<'a> {
 
 impl<'a> View<'a> {
     pub fn document(&self) -> Option<Arc<RwLock<Document<'static>>>> {
-        let doc = self.document.clone();
-        let doc = doc?;
-        Some(doc)
+        self.document.clone()
     }
 
     /// Create a new View at a gin offset in the Document.<br/>
@@ -324,7 +322,7 @@ impl<'a> View<'a> {
             }
 
             let mode = {
-                let mode = editor.get_mode(mode_name).clone();
+                let mode = editor.get_mode(mode_name);
                 if mode.is_none() {
                     panic!("cannot find mode {}", mode_name);
                 }
@@ -415,7 +413,7 @@ impl<'a> View<'a> {
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
 
-        let _max_offset = self.document().as_ref().unwrap().read().unwrap().size();
+        let _max_offset = self.document().unwrap().read().unwrap().size();
 
         // TODO: mode check invariants
     }
@@ -454,7 +452,7 @@ pub fn compute_view_layout(
     let mut v = view.borrow_mut();
 
     let doc = v.document()?;
-    let max_offset = { doc.as_ref().read().unwrap().size() as u64 };
+    let max_offset = { doc.read().unwrap().size() as u64 };
 
     // TODO: reuse v.screen
     let dimension = v.screen.read().unwrap().dimension();

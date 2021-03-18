@@ -1,5 +1,7 @@
 use crate::core::codec::text::utf8;
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 use crate::core::view::layout::Filter;
 use crate::core::view::layout::FilterData;
 use crate::core::view::layout::FilterIo;
@@ -26,9 +28,7 @@ fn text_codec_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
     FilterIo {
         // general info
         metadata: false,
-        is_selected: false,
-        color: CodepointInfo::default_color(),
-        bg_color: CodepointInfo::default_bg_color(),
+        style: TextStyle::new(),
         offset: Some(offset),
         size,
         data: FilterData::Unicode {
@@ -134,9 +134,7 @@ fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
     FilterIo {
         // general info
         metadata: false,
-        is_selected: false,
-        color: CodepointInfo::default_color(),
-        bg_color: CodepointInfo::default_bg_color(),
+        style: TextStyle::new(),
         offset: Some(offset),
         size,
         data: FilterData::Unicode {

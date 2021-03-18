@@ -263,12 +263,6 @@ impl<'a> Mode for TextMode {
             //
         }
 
-        if use_tabulation_exp {
-            view.compose_filters
-                .borrow_mut()
-                .push(Box::new(TabFilter::new()));
-        }
-
         if use_char_map {
             // NB: Word Wrap after tab expansion
             view.compose_filters
@@ -276,6 +270,12 @@ impl<'a> Mode for TextMode {
                 .push(Box::new(CharMapFilter::new()));
         }
         //
+
+        if use_tabulation_exp {
+            view.compose_filters
+                .borrow_mut()
+                .push(Box::new(TabFilter::new()));
+        }
 
         if use_word_wrap {
             // NB: Word Wrap after tab expansion
@@ -1149,7 +1149,7 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 
     let start_offset = v.start_offset;
 
-    let doc = v.document.clone();
+    let doc = v.document();
     let doc = doc.as_ref().unwrap();
     let doc = doc.as_ref().read().unwrap();
 
@@ -1617,7 +1617,7 @@ pub fn move_mark_to_next_line(
 
     let max_offset = {
         let v = view.borrow();
-        v.document().as_ref().unwrap().read().unwrap().size() as u64
+        v.document().unwrap().read().unwrap().size() as u64
     };
 
     // off_screen ?

@@ -180,17 +180,21 @@ fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut 
         for c in 0..line.max_width() {
             let cpi = line.get_unclipped_cpi(c).unwrap();
 
-            if cpi.is_mark || cpi.is_selected {
+            if cpi.style.is_inverse {
                 write!(stdout, "{}", termion::style::Invert).unwrap();
             } else {
                 write!(stdout, "{}", termion::style::NoInvert).unwrap();
             }
 
-            let bg = cpi.bg_color;
+            let bg = cpi.style.bg_color;
             write!(
                 stdout,
                 "{}{}{}",
-                termion::color::Fg(termion::color::Rgb(cpi.color.0, cpi.color.1, cpi.color.2)),
+                termion::color::Fg(termion::color::Rgb(
+                    cpi.style.color.0,
+                    cpi.style.color.1,
+                    cpi.style.color.2
+                )),
                 termion::color::Bg(termion::color::Rgb(bg.0, bg.1, bg.2)),
                 cpi.displayed_cp
             )

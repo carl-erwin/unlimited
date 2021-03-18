@@ -45,31 +45,38 @@ impl Filter<'_> for TabFilter {
                 if
                 /*self.prev_cp == '\r' ||*/
                 self.prev_cp == '\n' {
+                    dbg_println!(" TAB LF at col {}, reset col", self.column_count);
                     self.column_count = 0;
                 }
 
                 match (self.prev_cp, u32_to_char(*real_cp)) {
                     (_, '\t') => {
                         self.prev_cp = '\t';
-
+                        // TODO: setup
                         let tab_size = 8;
                         let padding = tab_size - (self.column_count % tab_size);
 
+                        dbg_println!(" TAB column count = {}", self.column_count);
+                        dbg_println!(" TAB padding = {}", padding);
+
                         for (idx, _) in (0..padding).enumerate() {
-                            let mut new_io = FilterIo::replace_codepoint(io, ' ');
+                            // \t -> ' '
+                            let mut new_io = FilterIo::replace_displayed_codepoint(io, ' ');
                             if env.graphic_display {
-                                new_io.color = (242, 71, 132); // purple-like
+                                new_io.style.color = (242, 71, 132); // purple-like
                             } else {
-                                new_io.color = (128, 0, 128); // magenta
+                                new_io.style.color = (128, 0, 128); // magenta
                             }
                             new_io.size = if idx == 0 { io.size } else { 0 };
                             new_io.metadata = if idx == 0 { io.metadata } else { true };
                             filter_out.push(new_io);
+                            dbg_println!("  TAB push spc");
                             self.column_count += 1;
                         }
                     }
 
                     (_, codepoint) => {
+                        dbg_println!(" TAB char({}) at col {}", codepoint, self.column_count);
                         self.prev_cp = codepoint;
                         filter_out.push(io.clone());
                         self.column_count += 1;
@@ -77,6 +84,7 @@ impl Filter<'_> for TabFilter {
                 }
             } else {
                 // not unicode
+                dbg_println!(" TAB EXP no unicode: {:?}", io);
                 filter_out.push(io.clone());
             }
         }

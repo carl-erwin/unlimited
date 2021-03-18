@@ -3,6 +3,7 @@ use std::any::Any;
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
 
 use crate::core::editor::InputStageActionMap;
 use crate::core::modes::core_mode::split_with_direction;
@@ -10,12 +11,18 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::layout::Filter;
+use crate::core::view::layout::FilterData;
 use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 
+use crate::core::screen::Screen;
 use crate::core::view::View;
+
+use crate::core::modes::text_mode::ScreenFilter;
+use crate::core::modes::text_mode::TabFilter;
+use crate::core::modes::text_mode::WordWrapFilter;
 
 pub struct BasicEditorMode {
     // add common fields
@@ -47,7 +54,7 @@ impl<'a> Mode for BasicEditorMode {
         mut env: &mut EditorEnv<'static>,
         mut view: &mut View<'static>,
     ) {
-        let doc = view.document.clone();
+        let doc = view.document();
 
         // children_layout_and_modes
         let ops_modes = vec![
@@ -107,6 +114,23 @@ impl<'a> Mode for BasicEditorMode {
             .compose_filters
             .borrow_mut()
             .push(Box::new(BasicEditorStatus::new()));
+
+        // do tab expansion status line
+        v.borrow_mut()
+            .compose_filters
+            .borrow_mut()
+            .push(Box::new(TabFilter::new()));
+
+        v.borrow_mut()
+            .compose_filters
+            .borrow_mut()
+            .push(Box::new(WordWrapFilter::new()));
+
+        // mandatory screen filler
+        v.borrow_mut()
+            .compose_filters
+            .borrow_mut()
+            .push(Box::new(ScreenFilter::new()));
     }
 }
 
@@ -184,11 +208,8 @@ impl Filter<'_> for BasicEditorTitle {
         for c in self.title.chars() {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
-            cpi.metadata = true;
-            cpi.size = 0;
-            cpi.color = CodepointInfo::default_bg_color();
-            cpi.bg_color = CodepointInfo::default_color();
-            //            cpi.bg_color = (100, 123, 153);
+            cpi.style.color = TextStyle::default_bg_color();
+            cpi.style.bg_color = TextStyle::default_color();
             let (b, _) = env.screen.push(cpi.clone());
             if b == false {
                 break;
@@ -204,9 +225,8 @@ impl Filter<'_> for BasicEditorTitle {
         let _fill = ' ' as char;
         for _i in 0..remain {
             let mut cpi = CodepointInfo::new();
-            cpi.color = CodepointInfo::default_bg_color();
-            cpi.bg_color = CodepointInfo::default_color();
-            cpi.metadata = true;
+            cpi.style.color = TextStyle::default_bg_color();
+            cpi.style.bg_color = TextStyle::default_color();
 
             let (b, _) = env.screen.push(cpi.clone());
             if b == false {
@@ -241,24 +261,99 @@ impl Filter<'_> for BasicEditorStatus {
         _view: &View,
         env: &mut LayoutEnv,
         _filter_in: &Vec<FilterIo>,
-        _filter_out: &mut Vec<FilterIo>,
+        filter_out: &mut Vec<FilterIo>,
     ) {
-        let fill = ' ' as char;
-        loop {
-            let mut cpi = CodepointInfo::new();
-            cpi.displayed_cp = fill;
-            cpi.metadata = true;
-            cpi.color = CodepointInfo::default_bg_color();
-            cpi.bg_color = CodepointInfo::default_color();
+        // if no status defined print this default
 
-            let (b, _) = env.screen.push(cpi.clone());
-            if b == false {
-                break;
-            }
+        let mut buff = vec![];
+
+        let default_style = CodepointInfo::new();
+        // skip line
+        for _ in 0..env.screen.width() {
+            filter_out.append(&mut print_io(&"─", &default_style));
         }
+
+        let mut style_key = CodepointInfo::new();
+        // inverse colors
+        style_key.style.color = TextStyle::default_bg_color();
+        style_key.style.bg_color = TextStyle::default_color();
+
+        let style_action = CodepointInfo::new();
+        // normal colors
+        //        style_key.color = TextStyle::default_bg_color();
+        //        style_key.bg_color = TextStyle::default_color();
+
+        // 2nd line
+        let arr: Vec<(&str, &str)> = vec![
+            ("ctrl+x ctrl+s", " Save "),
+            // ("◀ ▶ ▲ ▼ ", " cursor moves "),
+            // ("ctrl+ ▲ ▼ ", " screen moves "),
+            ("ctrl+u", " Undo "),
+            ("ctrl+r", " Redo "),
+            ("ctrl+spc", " Start sel "),
+            ("alt+w", " Copy "),
+            ("ctrl+w", " Cut "),
+            ("ctrl+y", " Paste "),
+        ];
+
+        for e in arr {
+            buff.append(&mut print_io(&e.0, &style_key));
+            buff.append(&mut print_io(&e.1, &style_action));
+        }
+
+        buff.truncate(env.screen.width());
+        filter_out.append(&mut buff);
+        // pad until next line
+
+        //       let diff =  env.screen.width() - buff.len();
+        //       for i in 0..diff {
+        //           filter_out.append(&mut print_io(&" ", &default_style));
+        //       }
+
+        // 3rd line
+        let mut buff = vec![];
+        let arr: Vec<(&str, &str)> = vec![("ctrl+x ctrl+c", " Quit   ")];
+        for e in arr {
+            buff.append(&mut print_io(&e.0, &style_key));
+            buff.append(&mut print_io(&e.1, &style_action));
+        }
+        buff.truncate(env.screen.width());
+        filter_out.append(&mut buff);
 
         env.quit = true;
     }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+}
+
+// current_line
+fn print_io(text: &str, cpi: &CodepointInfo) -> Vec<FilterIo> {
+    let mut v = Vec::with_capacity(text.len());
+
+    for (_idx, c) in text.chars().enumerate() {
+        let mut cpi = cpi.clone();
+        cpi.cp = c;
+        cpi.displayed_cp = c;
+        if c == '\t' || c == '\n' {
+            cpi.displayed_cp = ' ';
+        }
+
+        v.push(FilterIo {
+            metadata: true,
+            style: cpi.style.clone(),
+            offset: None,
+            size: 0,
+            data: FilterData::Unicode {
+                real_cp: cpi.cp as u32,
+                displayed_cp: cpi.displayed_cp as u32,
+                fragment_flag: false,
+                fragment_count: 0,
+            },
+        });
+    }
+
+    dbg_println!("PRINT IO '{}' -> v = {:?}", text, v);
+    dbg_println!("--------------------------");
+
+    v
 }

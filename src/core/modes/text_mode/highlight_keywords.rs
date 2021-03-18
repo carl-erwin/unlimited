@@ -9,6 +9,7 @@ use crate::core::codec::text::utf8;
 use crate::core::codec::text::TextCodec;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
 
 use crate::core::view::View;
 
@@ -46,7 +47,7 @@ impl HighlightFilter {
             token_io: Vec::new(),
             token_type: TokenType::Unknown,
             utf8_token: Vec::new(),
-            new_color: CodepointInfo::default_color(),
+            new_color: TextStyle::default_color(),
             utf8_codec: Box::new(utf8::Utf8Codec::new()),
         }
     }
@@ -63,7 +64,7 @@ impl Filter<'_> for HighlightFilter {
         self.token_io = Vec::new();
         self.token_type = TokenType::Unknown;
         self.utf8_token = Vec::new();
-        self.new_color = CodepointInfo::default_color();
+        self.new_color = TextStyle::default_color();
         // self.utf8_codec =  Box::new(utf8::Utf8Codec::new());
     }
 
@@ -221,7 +222,7 @@ impl Filter<'_> for HighlightFilter {
 
                     // flush token: set color
                     for mut io in self.token_io.iter_mut() {
-                        io.color = self.new_color;
+                        io.style.color = self.new_color;
                     }
                     filter_out.append(&mut self.token_io);
 
@@ -230,7 +231,7 @@ impl Filter<'_> for HighlightFilter {
 
                     // reset state
                     self.utf8_token.clear();
-                    self.new_color = CodepointInfo::default_color();
+                    self.new_color = TextStyle::default_color();
                 }
 
                 FilterIo {
@@ -239,7 +240,7 @@ impl Filter<'_> for HighlightFilter {
                 } => {
                     // flush pending token: set color
                     for mut io in self.token_io.iter_mut() {
-                        io.color = self.new_color;
+                        io.style.color = self.new_color;
                     }
                     filter_out.append(&mut self.token_io);
 

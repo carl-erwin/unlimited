@@ -9,6 +9,8 @@ use crate::core::view::View;
 
 use crate::core::codec::text::u32_to_char;
 
+use crate::core::codepointinfo::TextStyle;
+
 pub struct CharMapFilter {
     char_map: Option<HashMap<char, String>>, // TODO: add CharMap type
     color_map: Option<HashMap<char, (u8, u8, u8)>>,
@@ -49,9 +51,7 @@ impl Filter<'_> for CharMapFilter {
             match io {
                 FilterIo {
                     metadata,
-                    is_selected,
-                    color,
-                    bg_color,
+                    style,
                     offset,
                     size,
                     data:
@@ -69,9 +69,9 @@ impl Filter<'_> for CharMapFilter {
                         u32_to_char(*displayed_cp),
                         *offset,
                         *size,
-                        *is_selected,
-                        *color,
-                        *bg_color,
+                        style.is_selected,
+                        style.color,
+                        style.bg_color,
                         *metadata,
                     );
 
@@ -126,11 +126,9 @@ pub fn transform_io_data(
         panic!("");
     }
 
-    // char_map.insert('\t', "<TAB>".to_string());
-
     let fallback = |c: char, disp: char, color: (u8, u8, u8)| -> (String, (u8, u8, u8)) {
         match c {
-            '\u{9}' => ("<TAB>".to_string(), color),
+            '\u{9}' => (" ".to_string(), color),
             '\u{7f}' => ("<DEL>".to_string(), (0x00, 0xff, 0xff)), // TODO: add user configuration for new-line representation
             '\r' => ("<CR>".to_string(), (0x00, 0xaa, 0xff)), // TODO: add user configuration for new-line representation
             '\n' => ('\u{2936}'.to_string(), color), // TODO: add user configuration for new-line representation
@@ -167,11 +165,16 @@ pub fn transform_io_data(
     for (idx, displayed_cp) in s.chars().enumerate() {
         let size = if idx == 0 { orig_size } else { 0 };
         let metadata = if idx == 0 { orig_metadata } else { true };
+
+        let mut style = TextStyle::new();
+        style.is_selected = is_selected;
+        style.is_inverse = false;
+        style.color = color;
+        style.bg_color = bg_color;
+
         cp_vec.push(FilterIo {
             metadata,
-            is_selected,
-            color,
-            bg_color,
+            style,
             offset,
             size,
             data: FilterData::Unicode {

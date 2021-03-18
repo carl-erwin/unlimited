@@ -100,8 +100,8 @@ impl Filter<'_> for HsplitModeComposeFilter {
         _filter_out: &mut Vec<FilterIo>,
     ) {
         let mut cpi = CodepointInfo::new();
-        cpi.is_selected = false;
-        //            cpi.bg_color = (100, 123, 153);
+        cpi.style.is_selected = false;
+        //            cpi.style.bg_color = (100, 123, 153);
         cpi.cp = '─';
         cpi.displayed_cp = '─';
         cpi.metadata = true;

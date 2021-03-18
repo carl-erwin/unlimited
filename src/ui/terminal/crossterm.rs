@@ -54,13 +54,13 @@ use crate::core::codepointinfo::CodepointInfo;
 //
 use crate::ui::UiState;
 
-fn stdin_thread(tx: &Sender<EventMessage>) {
+fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
     // TODO: generate_test from logs grep | awk >>
     //    let v = autotest_0001();
     //    send_input_events(&v, &tx);
 
     loop {
-        get_input_events(&tx).unwrap();
+        get_input_events(&core_tx, &ui_tx).unwrap();
     }
 }
 
@@ -69,7 +69,7 @@ fn stdin_thread(tx: &Sender<EventMessage>) {
 
 pub fn main_loop(
     ui_rx: &Receiver<EventMessage<'static>>,
-    _ui_tx: &Sender<EventMessage<'static>>,
+    ui_tx: &Sender<EventMessage<'static>>,
     core_tx: &Sender<EventMessage<'static>>,
 ) -> Result<()> {
     let mut seq: usize = 0;
@@ -80,8 +80,10 @@ pub fn main_loop(
     }
 
     let core_tx_clone = core_tx.clone();
+    let ui_tx_clone = ui_tx.clone();
+
     thread::spawn(move || {
-        stdin_thread(&core_tx_clone);
+        stdin_thread(&core_tx_clone, &ui_tx_clone);
         return;
     });
 
@@ -89,10 +91,8 @@ pub fn main_loop(
     let mut ui_state = UiState::new();
 
     // ui ctx : TODO move to struct UiCtx
-    let mut last_screen = Box::new(Screen::new(1, 1));
+    let mut last_screen = Box::new(Screen::new(0, 0));
     let mut last_screen_rdr_time = Instant::now();
-
-    let mut request_layout = true;
 
     let stdout = stdout();
     let mut stdout = stdout.lock();
@@ -101,7 +101,7 @@ pub fn main_loop(
 
     execute!(
         stdout,
-        EnableMouseCapture,
+        EnableMouseCapture, // TODO: add option for mouse capture --(en|dis)able-mouse
         Hide,
         SetAttribute(Attribute::Reset),
         Clear(ClearType::All)
@@ -109,30 +109,20 @@ pub fn main_loop(
 
     crossterm::terminal::enable_raw_mode()?;
 
+    // first request
+    // check terminal size
+    let (width, height) = crossterm::terminal::size().ok().unwrap();
+    let msg = EventMessage::new(
+        get_next_seq(&mut seq),
+        Event::UpdateViewEvent {
+            width: width as usize,
+            height: height as usize,
+        },
+    );
+    core_tx.send(msg).unwrap_or(()); // if removed not screen is displayed
+
     while !ui_state.quit {
-        // check terminal size
-        let (width, height) = crossterm::terminal::size().ok().unwrap();
-
-        if ui_state.terminal_width != width || ui_state.terminal_height != height {
-            ui_state.terminal_width = width;
-            ui_state.terminal_height = height;
-            request_layout = true;
-        }
-
-        // need layout ?
-        if request_layout {
-            let msg = EventMessage::new(
-                get_next_seq(&mut seq),
-                Event::UpdateViewEvent {
-                    width: ui_state.terminal_width as usize,
-                    height: ui_state.terminal_height as usize,
-                },
-            );
-            core_tx.send(msg).unwrap_or(());
-            request_layout = false;
-        }
-
-        if let Ok(evt) = ui_rx.recv_timeout(Duration::from_millis(500)) {
+        if let Ok(evt) = ui_rx.recv() {
             match evt.event {
                 Event::ApplicationQuitEvent => {
                     ui_state.quit = true;
@@ -140,6 +130,14 @@ pub fn main_loop(
                         EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
                     core_tx.send(msg).unwrap_or(());
                     break;
+                }
+
+                UpdateViewEvent { width, height } => {
+                    let msg = EventMessage::new(
+                        get_next_seq(&mut seq),
+                        Event::UpdateViewEvent { width, height },
+                    );
+                    core_tx.send(msg).unwrap_or(());
                 }
 
                 DrawEvent { screen, time: _ } => {
@@ -188,8 +186,6 @@ pub fn main_loop(
 
                 _ => {}
             }
-        } else {
-            // on input timeout
         }
     }
 
@@ -213,44 +209,23 @@ pub fn main_loop(
     TODO:
     1 : be explicit
     2 : create editor internal result type Result<>
-    3 : use idomatic    func()? style
+    3 : use idiomatic    func()? style
 */
 fn draw_view(
     mut last_screen: &mut Screen,
     mut screen: &mut Screen,
     mut stdout: &mut std::io::StdoutLock,
 ) {
-    if true {
+    if !true {
         let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
     } else {
         let _ = _draw_screen_dumb(&screen, &mut stdout);
     }
 }
 
-/*
-
-impl Command for Clear {
-    fn write_ansi(&self, f: &mut impl fmt::Write) -> fmt::Result {
-        f.write_str(match self.0 {
-            ClearType::All => ansi::CLEAR_ALL_CSI_SEQUENCE,
-            ClearType::FromCursorDown => ansi::CLEAR_FROM_CURSOR_DOWN_CSI_SEQUENCE,
-            ClearType::FromCursorUp => ansi::CLEAR_FROM_CURSOR_UP_CSI_SEQUENCE,
-            ClearType::CurrentLine => ansi::CLEAR_FROM_CURRENT_LINE_CSI_SEQUENCE,
-            ClearType::UntilNewLine => ansi::CLEAR_UNTIL_NEW_LINE_CSI_SEQUENCE,
-        })
-    }
-
-    #[cfg(windows)]
-    fn execute_winapi(&self, _writer: impl FnMut() -> Result<()>) -> Result<()> {
-        sys::clear(self.0)
-    }
-}
-
-*/
-
 fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
-    queue!(stdout, ResetColor)?;
-    //    queue!(stdout, Clear(ClearType::All))?;
+    // queue!(stdout, ResetColor)?;
+    //queue!(stdout, Clear(ClearType::All))?;
 
     for li in 0..screen.height() {
         queue!(stdout, MoveTo(0, li as u16))?;
@@ -263,20 +238,20 @@ fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Resul
 
             // color
             let color = Color::Rgb {
-                r: cpi.color.0,
-                g: cpi.color.1,
-                b: cpi.color.2,
+                r: cpi.style.color.0,
+                g: cpi.style.color.1,
+                b: cpi.style.color.2,
             };
             // color
             let bg_color = Color::Rgb {
-                r: cpi.bg_color.0,
-                g: cpi.bg_color.1,
-                b: cpi.bg_color.2,
+                r: cpi.style.bg_color.0,
+                g: cpi.style.bg_color.1,
+                b: cpi.style.bg_color.2,
             };
 
             // draw with style
             let s = cpi.displayed_cp.to_string();
-            if cpi.is_mark || cpi.is_selected {
+            if cpi.style.is_inverse {
                 queue!(
                     stdout,
                     SetBackgroundColor(bg_color),
@@ -296,6 +271,7 @@ fn _draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Resul
 
     /* Update the screen. */
     stdout.flush()?;
+
     Ok(())
 }
 
@@ -316,18 +292,11 @@ fn screen_height_change(screen0: &Screen, screen1: &Screen) -> bool {
 }
 
 fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
-    // pub metadata: bool, // offset cannot be used
     // pub cp: char,
     let dcp = a.displayed_cp == b.displayed_cp;
-    // pub offset: u64,
-    let m = a.is_mark == b.is_mark;
+    let same_style = a.style == b.style;
 
-    let s = a.is_selected == b.is_selected;
-    //
-    let c = a.color == b.color;
-    let bc = a.bg_color == b.bg_color;
-
-    dcp && m && s && c && bc
+    dcp && same_style
 }
 
 fn draw_screen(
@@ -345,16 +314,16 @@ fn draw_screen(
     let column_change = width_change;
 
     // set default color
-    {
+    if false {
         let color = Color::Rgb {
-            r: prev_cpi.color.0,
-            g: prev_cpi.color.1,
-            b: prev_cpi.color.2,
+            r: prev_cpi.style.color.0,
+            g: prev_cpi.style.color.1,
+            b: prev_cpi.style.color.2,
         };
         let bg_color = Color::Rgb {
-            r: prev_cpi.bg_color.0,
-            g: prev_cpi.bg_color.1,
-            b: prev_cpi.bg_color.2,
+            r: prev_cpi.style.bg_color.0,
+            g: prev_cpi.style.bg_color.1,
+            b: prev_cpi.style.bg_color.2,
         };
 
         queue!(
@@ -402,14 +371,16 @@ fn draw_screen(
             }
 
             // default style
-            if cpi.is_mark != prev_cpi.is_mark || cpi.is_selected != prev_cpi.is_selected {
+            if cpi.style.is_inverse != prev_cpi.style.is_inverse {
                 set_style = true;
                 set_color = true;
                 change = true;
             }
 
             // detect color change
-            if prev_cpi.color != cpi.color || prev_cpi.bg_color != cpi.bg_color {
+            if prev_cpi.style.color != cpi.style.color
+                || prev_cpi.style.bg_color != cpi.style.bg_color
+            {
                 set_color = true;
                 change = true;
             }
@@ -434,7 +405,7 @@ fn draw_screen(
             {
                 if set_style {
                     set_style = false;
-                    if cpi.is_mark || cpi.is_selected {
+                    if cpi.style.is_inverse {
                         queue!(stdout, SetAttribute(Attribute::Reverse))?;
                     } else {
                         queue!(stdout, SetAttribute(Attribute::NoReverse))?;
@@ -444,15 +415,15 @@ fn draw_screen(
                 if set_color {
                     set_color = false;
                     let color = Color::Rgb {
-                        r: cpi.color.0,
-                        g: cpi.color.1,
-                        b: cpi.color.2,
+                        r: cpi.style.color.0,
+                        g: cpi.style.color.1,
+                        b: cpi.style.color.2,
                     };
 
                     let bg_color = Color::Rgb {
-                        r: cpi.bg_color.0,
-                        g: cpi.bg_color.1,
-                        b: cpi.bg_color.2,
+                        r: cpi.style.bg_color.0,
+                        g: cpi.style.bg_color.1,
+                        b: cpi.style.bg_color.2,
                     };
                     queue!(
                         stdout,
@@ -509,8 +480,13 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
     } //
 }
 
-fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
+fn translate_crossterm_event(
+    evt: ::crossterm::event::Event,
+    pending_resize: &mut bool,
+) -> InputEvent {
     // translate termion event
+    *pending_resize = false;
+
     match evt {
         ::crossterm::event::Event::Key(ke) => match ke.code {
             ::crossterm::event::KeyCode::Char(c) => {
@@ -694,37 +670,70 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
         },
 
-        ::crossterm::event::Event::Resize(_width, _height) => {
+        ::crossterm::event::Event::Resize(width, height) => {
             // println!("New size {}x{}", width, height)
             // TODO: not really an input
+            *pending_resize = true;
+            return InputEvent::RefreshUi {
+                width: width as usize,
+                height: height as usize,
+            };
         }
     }
 
-    return InputEvent::NoInputEvent;
+    // return InputEvent::NoInputEvent;
 }
 
-fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
+fn send_input_events(
+    accum: &Vec<InputEvent>,
+    tx: &Sender<EventMessage>,
+    ui_tx: &Sender<EventMessage>,
+) {
     let mut v = Vec::<InputEvent>::new();
 
     // merge consecutive characters as "array" of chars
     let mut codepoints = Vec::<char>::new();
 
     if accum.len() == 1 {
-        // send
-        let ev_count = v.len();
-        let msg = EventMessage::new(
-            0,
-            Event::InputEvents {
-                events: accum.clone(),
-            },
-        );
-        crate::core::event::pending_input_event_inc(ev_count);
-        tx.send(msg).unwrap_or(());
+        match accum[0] {
+            InputEvent::RefreshUi { width, height } => {
+                let msg = EventMessage::new(0, Event::UpdateViewEvent { width, height });
+
+                // ui_tx.send(msg).unwrap_or(()); ?
+
+                // send to core
+                crate::core::event::pending_input_event_inc(1);
+                tx.send(msg).unwrap_or(());
+            }
+
+            _ => {
+                // send
+                let msg = EventMessage::new(
+                    0,
+                    Event::InputEvents {
+                        events: accum.clone(),
+                    },
+                );
+                crate::core::event::pending_input_event_inc(1);
+                tx.send(msg).unwrap_or(());
+                return;
+            }
+        }
         return;
     }
 
+    let mut refresh = false;
+    let mut new_width = 0;
+    let mut new_height = 0;
+
     for evt in accum {
         match evt {
+            InputEvent::RefreshUi { width, height } => {
+                refresh = true;
+                new_width = *width;
+                new_height = *height;
+            }
+
             InputEvent::KeyPress {
                 key: Key::Unicode(c),
                 mods:
@@ -755,6 +764,18 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
                 v.push(evt.clone());
             }
         }
+    }
+
+    // resize are urgent
+    if refresh {
+        let msg = EventMessage::new(
+            0,
+            Event::UpdateViewEvent {
+                width: new_width,
+                height: new_height,
+            },
+        );
+        tx.send(msg).unwrap_or(());
     }
 
     // append
@@ -800,29 +821,32 @@ fn send_input_events(accum: &Vec<InputEvent>, tx: &Sender<EventMessage>) {
        *) An other solution (hack) (my fork on github)
         change input fd from blocking to no-blocking mode, do read loop and restore mode on exit.
 */
-fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
+fn get_input_events(
+    tx: &Sender<EventMessage>,
+    ui_tx: &Sender<EventMessage>,
+) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(4096);
-    let mut wait_ms = 10000;
-    let min_wait_ms = 4;
+    let mut wait_ms = 60_000;
+    let mut min_wait_ms = 4;
 
     let mut start = Instant::now();
     let mut prev_ev_time = start;
 
     let mut count = 0;
+    let mut pending_resize = false;
     loop {
         if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 prev_ev_time = Instant::now();
-                let evt = translate_crossterm_event(cross_evt); // TODO: add hints to send event asap (resize)
-                if evt == InputEvent::NoInputEvent {
-                    continue;
-                }
+                let evt = translate_crossterm_event(cross_evt, &mut pending_resize);
                 accum.push(evt);
+                if pending_resize {
+                    min_wait_ms = 16; // wait for over resize events
+                }
             }
         }
 
         count += 1;
-
         wait_ms = min_wait_ms;
         if count == 1 {
             // delay flush of 1st input event (min_wait_ms)
@@ -832,25 +856,16 @@ fn get_input_events(tx: &Sender<EventMessage>) -> ::crossterm::Result<()> {
         }
 
         let d = prev_ev_time.elapsed();
-        //dbg_println!(
-        //    "INPUT: elapsed time between 2 events {:?} accum.len({})",
-        //    d,
-        //    accum.len()
-        //);
         if d < Duration::from_millis(1) || start.elapsed() < Duration::from_millis(min_wait_ms) {
             // batch input
             continue;
         }
 
-        //dbg_println!(
-        //    "INPUT: start.elapsed() > min_wait_ms -> flush accum.len({})",
-        //    accum.len()
-        //);
         break;
     }
 
     if !accum.is_empty() {
-        send_input_events(&accum, tx);
+        send_input_events(&accum, tx, ui_tx);
     }
 
     Ok(())

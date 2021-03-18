@@ -4,6 +4,8 @@ use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 use crate::core::view::View;
 
 pub struct RawDataFilter {
@@ -84,9 +86,7 @@ impl Filter<'_> for RawDataFilter {
             if rd > 0 {
                 (*filter_out).push(FilterIo {
                     metadata: false,
-                    is_selected: false,
-                    color: CodepointInfo::default_color(),
-                    bg_color: CodepointInfo::default_bg_color(),
+                    style: TextStyle::new(),
                     offset: Some(self.pos),
                     size: rd,
                     data: FilterData::ByteArray { vec: raw_data },
@@ -98,9 +98,7 @@ impl Filter<'_> for RawDataFilter {
 
                 (*filter_out).push(FilterIo {
                     metadata: true,
-                    is_selected: false,
-                    color: CodepointInfo::default_color(),
-                    bg_color: CodepointInfo::default_bg_color(),
+                    style: TextStyle::new(),
                     offset: Some(self.pos + rd as u64),
                     size: 0,
                     data: FilterData::EndOfStream,
