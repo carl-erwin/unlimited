@@ -33,6 +33,5 @@ pub trait Mode {
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         _view: &mut View<'static>,
-    ) {
-    }
+    );
 }

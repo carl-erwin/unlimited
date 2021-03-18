@@ -10,6 +10,12 @@ use super::*;
 
 pub static DEFAULT_INPUT_MAP: &str = std::include_str!("../../../res/default_input_map.json");
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefaultActionMode {
+    IgnoreDefaultAction,
+    RunDefaultAction,
+}
+
 // TODO: map error to editor error
 // unlimited::error::SyntaxError(file, line, col, str_details);
 pub fn build_input_event_map(json: &str) -> Result<InputEventMap, serde_json::error::Error> {
@@ -461,14 +467,16 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
 pub fn eval_input_event(
     ev: &InputEvent,
     input_map: &InputEventMap,
+    default_action_mode: DefaultActionMode,
     in_node: &mut Option<Rc<InputEventRule>>,
     out_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
-    dbg_println!("\n\n -------------------------- eval_input_event --------------------------");
+    dbg_println!("   eval_input_event --------------------------");
 
-    //dbg_println!("input map  {:?}", input_map);
+    // dbg_println!("input map  {:?}", input_map);
 
     let event_hash = compute_input_event_hash(ev);
+
     dbg_println!("event_hash = {}", event_hash);
 
     // not first level ?
@@ -497,6 +505,7 @@ pub fn eval_input_event(
             *in_node = None;
         }
     } else {
+        // NB: fallback happens only at first level
         dbg_println!("--- 1st level event ---");
 
         match input_map.get(&event_hash) {
@@ -519,6 +528,10 @@ pub fn eval_input_event(
 
                 *out_node = None;
                 *in_node = None;
+
+                if default_action_mode == DefaultActionMode::IgnoreDefaultAction {
+                    return None;
+                };
 
                 match input_map.get(&event_hash) {
                     Some(event) => {
@@ -674,14 +687,11 @@ mod tests {
                 },
             });
 
-            let stack = vec![map];
-            let rc_map = Rc::new(RefCell::new(stack));
-
             let mut current_node: Option<Rc<InputEventRule>> = None;
             let mut next_node: Option<Rc<InputEventRule>> = None;
 
             for ev in &iev {
-                let action = eval_input_event(&ev, &rc_map, 0, &mut current_node, &mut next_node);
+                let action = eval_input_event(&ev, &map, true, &mut current_node, &mut next_node);
                 if let Some(_action) = action {
                     //dbg_println!("found action {}", action);
                 } else {

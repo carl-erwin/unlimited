@@ -125,12 +125,9 @@
        {"quit save": "---------------------------------------------------------------------------------"},
 
 
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
 
 
-       {"fallback/default -> insert charater": "-------------------------------------------------------------"},
+       {"fallback/default -> insert character": "-------------------------------------------------------"},
 
        { "default": [],                                        "action": "text-mode:self-insert" }
      ]

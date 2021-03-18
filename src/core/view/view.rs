@@ -353,7 +353,6 @@ impl<'a> View<'a> {
                 v.set_mode_ctx(mode.name(), ctx);
 
                 dbg_println!("mode[{}] configure VID {}", mode.name(), v.id);
-
                 mode.configure_view(editor, env, &mut v);
             }
         }

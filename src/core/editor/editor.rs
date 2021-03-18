@@ -20,6 +20,8 @@ pub use super::*;
 
 use crate::core::event;
 use crate::core::event::input_map::eval_input_event;
+use crate::core::event::input_map::DefaultActionMode;
+
 use crate::core::event::Event;
 use crate::core::event::Event::DrawEvent;
 use crate::core::event::EventMessage;
@@ -277,6 +279,91 @@ pub fn send_draw_event(
     ui_tx.send(msg).unwrap_or(());
 }
 
+use crate::core::event::InputEventRule;
+
+fn eval_input_stack_level(
+    v: &mut View,
+    default_action_mode: DefaultActionMode,
+    mut trigger_pos: usize,
+    trigger_pos_max: usize,
+    mut stack_index: usize,
+    mut in_node: &mut Option<Rc<InputEventRule>>,
+) -> Option<String> {
+    let mut action_name = None;
+
+    while stack_index > 0 {
+        stack_index -= 1;
+
+        dbg_println!("--------------------------------------------------------");
+        dbg_println!("checking stack_index = {}", stack_index);
+
+        for ev_pos in trigger_pos..trigger_pos_max {
+            let ev = &v.input_ctx.trigger[ev_pos];
+            dbg_println!("playing event[{}] = {:?}", ev_pos, ev);
+            let mut out_node = None;
+            let input_map = &v.input_ctx.input_map.borrow()[stack_index];
+            action_name = eval_input_event(
+                &ev,
+                &input_map,
+                default_action_mode,
+                &mut in_node,
+                &mut out_node,
+            );
+
+            if action_name.is_some() {
+                // stop a first match
+                dbg_println!("after play : found action {:?}", action_name);
+                break;
+            }
+            dbg_println!("after play : in_node = {:?}", in_node);
+            dbg_println!("after play : out_node = {:?}", out_node);
+
+            if out_node.is_none() {
+                // no match
+                dbg_println!("no match");
+            }
+            dbg_println!("save out_node");
+            *in_node = out_node;
+        }
+
+        if action_name.is_some() {
+            dbg_println!(
+                "found action {:?} at input stack level {}",
+                action_name,
+                stack_index
+            );
+            break;
+        }
+
+        if in_node.is_some() {
+            dbg_println!("found sequence start at input stack index {}", stack_index);
+            v.input_ctx.stack_pos = Some(stack_index);
+            return None;
+        }
+
+        dbg_println!("no action at input stack index {}", stack_index);
+
+        // restart the whole sequence for next level
+        if stack_index > 0 {
+            trigger_pos = 0;
+            *in_node = None;
+            dbg_println!("restart input at stack index {}", stack_index - 1);
+        } else {
+            dbg_println!(
+                "no sequence found in stack  (default: {:?})",
+                default_action_mode
+            );
+            if in_node.is_none() {
+                v.input_ctx.stack_pos = None;
+            } else {
+                v.input_ctx.stack_pos = Some(stack_index);
+            }
+        }
+    }
+
+    action_name
+}
+
 fn process_single_input_event<'a>(
     editor: &'a mut Editor<'static>,
     env: &'a mut EditorEnv<'static>,
@@ -309,86 +396,100 @@ fn process_single_input_event<'a>(
     let action_name = {
         let mut v = view.borrow_mut();
 
-        let mut stack_pos = if let Some(stack_pos) = v.input_ctx.stack_pos {
+        let stack_pos = if let Some(stack_pos) = v.input_ctx.stack_pos {
             // current map
+            dbg_println!("reuse stack level {}", stack_pos + 1);
             stack_pos + 1
         } else {
             // top
-            v.input_ctx.input_map.as_ref().borrow().len()
+            let pos = v.input_ctx.input_map.as_ref().borrow().len();
+            dbg_println!("start from stack top level {}", pos);
+            pos
         };
 
         if stack_pos == 0 {
             v.input_ctx.trigger.clear();
+            v.input_ctx.stack_pos = None;
             return false;
         }
 
         v.input_ctx.stack_pos = Some(stack_pos);
 
         let mut in_node = v.input_ctx.current_node.clone();
-        dbg_println!("last current_node = {:?}", in_node);
-
-        let mut action_name = None;
+        dbg_println!("last node = {:?}", in_node);
 
         // TODO: function
-        let mut trigger_pos = v.input_ctx.trigger.len() - 1;
+        let trigger_pos = v.input_ctx.trigger.len() - 1;
         let trigger_pos_max = v.input_ctx.trigger.len();
 
         dbg_println!("trigger_pos     = {}", trigger_pos);
         dbg_println!("trigger_pos_max = {}", trigger_pos_max);
 
-        while stack_pos > 0 {
-            v.input_ctx.stack_pos = Some(stack_pos);
+        // first pass (no default/fallback action)
+        let action_name = eval_input_stack_level(
+            &mut v,
+            DefaultActionMode::IgnoreDefaultAction,
+            trigger_pos,
+            trigger_pos_max,
+            stack_pos,
+            &mut in_node,
+        );
 
-            stack_pos -= 1;
-
-            for ev_pos in trigger_pos..trigger_pos_max {
-                let ev = &v.input_ctx.trigger[ev_pos];
-                dbg_println!("playing event[{}] = {:?}", ev_pos, ev);
-                let mut out_node = None;
-                let input_map = &v.input_ctx.input_map.borrow()[stack_pos];
-                action_name = eval_input_event(&ev, &input_map, &mut in_node, &mut out_node);
-                dbg_println!("--------------------------------------------------------");
-                if action_name.is_some() {
-                    // stop a first match
-                    dbg_println!("after play : found action {:?}", action_name);
-                    break;
-                }
-                dbg_println!("after play : in_node = {:?}", in_node);
-                dbg_println!("after play : out_node = {:?}", out_node);
-                if out_node.is_none() {
-                    // no match
-                    break;
-                }
-                in_node = out_node;
-            }
-
-            if action_name.is_some() {
-                dbg_println!(
-                    "found action {:?} at input stack level {}",
-                    action_name,
-                    stack_pos
-                );
-                break;
-            }
-
-            dbg_println!("no action at input stack level {}", stack_pos);
-
-            // restart the whole sequence for next level
-            if stack_pos > 0 {
-                trigger_pos = 0;
-                in_node = None;
-            } else {
-                v.input_ctx.stack_pos = None;
-            }
+        if in_node.is_some() {
+            v.input_ctx.current_node = in_node.clone(); // save last input node
+            dbg_println!("save node {:?}", in_node);
         }
 
-        v.input_ctx.current_node = in_node; // save last input node
+        dbg_println!(
+            "1st pass action_name '{:?}' in_node {:?}",
+            action_name,
+            in_node
+        );
 
-        action_name
+        // 2nd  pass with default/fallback action enabled
+        let action_name2 = if action_name.is_none() && in_node.is_none() {
+            dbg_println!("try default rules/ replay all triggers");
+            v.input_ctx.stack_pos = None;
+
+            let name = eval_input_stack_level(
+                &mut v,
+                DefaultActionMode::RunDefaultAction,
+                0, // NB: restart whole sequence
+                trigger_pos_max,
+                stack_pos,
+                &mut in_node,
+            );
+
+            if in_node.is_some() {
+                v.input_ctx.current_node = in_node.clone(); // save last input node
+                dbg_println!("save node {:?}", in_node);
+            }
+
+            dbg_println!("2nd pass action_name '{:?}' in_node {:?}", name, in_node);
+
+            name
+        } else {
+            action_name.clone()
+        };
+
+        if action_name2.is_none() && in_node.is_none() {
+            v.input_ctx.trigger.clear();
+            v.input_ctx.current_node = None;
+            v.input_ctx.stack_pos = None;
+            dbg_println!("clear input ctx");
+        }
+
+        action_name2
     };
 
     if action_name.is_none() {
-        dbg_println!("no action found -> return false");
+        let v = view.borrow();
+        if v.input_ctx.current_node.is_some() {
+            dbg_println!(" no action found , but sequence started -> return false");
+        } else {
+            dbg_println!("no action found -> return false");
+        }
+
         return false;
     }
 

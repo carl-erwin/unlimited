@@ -316,8 +316,8 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
     }
 
     //
-    let modes = vec!["basic-editor".to_owned()];
-    //let modes = vec!["core-mode".to_owned(), "text-mode".to_owned()];
+    // let modes = vec!["basic-editor".to_owned()];
+    let modes = vec!["core-mode".to_owned(), "text-mode".to_owned()];
 
     // create views
     for doc in docs {

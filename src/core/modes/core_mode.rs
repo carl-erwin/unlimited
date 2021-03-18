@@ -15,10 +15,22 @@ use crate::core::EditorEnv;
 
 use crate::core::event::*;
 
+use crate::core::event::input_map::build_input_event_map;
 use crate::core::view;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 use crate::core::view::View;
+
+pub static CORE_INPUT_MAP: &str = r#"
+[
+  {
+    "events": [
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" }
+    ]
+  }
+]"#;
 
 impl<'a> Mode for CoreMode {
     fn name(&self) -> &'static str {
@@ -35,6 +47,24 @@ impl<'a> Mode for CoreMode {
         dbg_println!("alloc core-mode ctx");
         let ctx = CoreModeContext {};
         Box::new(ctx)
+    }
+
+    fn configure_view(
+        &self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+    ) {
+        dbg_println!("config core-mode for VID {}", view.id);
+
+        // Config input map
+        dbg_println!("CORE_INPUT_MAP\n{}", CORE_INPUT_MAP);
+        // TODO: user define
+        {
+            let input_map = build_input_event_map(CORE_INPUT_MAP).unwrap();
+            let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push(input_map);
+        }
     }
 }
 
