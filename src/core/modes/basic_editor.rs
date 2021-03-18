@@ -352,8 +352,8 @@ fn print_io(text: &str, cpi: &CodepointInfo) -> Vec<FilterIo> {
         });
     }
 
-    dbg_println!("PRINT IO '{}' -> v = {:?}", text, v);
-    dbg_println!("--------------------------");
+    //(il faut tester)dbg_println!("PRINT IO '{}' -> v = {:?}", text, v);
+    //(il faut tester)dbg_println!("--------------------------");
 
     v
 }
