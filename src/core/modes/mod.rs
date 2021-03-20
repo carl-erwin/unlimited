@@ -5,6 +5,7 @@ pub mod basic_editor;
 pub mod core_mode;
 pub mod hsplit_mode;
 pub mod mode_template;
+pub mod status_mode;
 pub mod text_mode;
 pub mod vsplit_mode;
 
@@ -17,6 +18,7 @@ pub use crate::core::view::View;
 pub use basic_editor::BasicEditorMode;
 pub use core_mode::CoreMode;
 pub use hsplit_mode::HsplitMode;
+pub use status_mode::StatusMode;
 pub use text_mode::TextMode;
 pub use vsplit_mode::VsplitMode;
 

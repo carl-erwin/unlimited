@@ -303,9 +303,12 @@ impl<'a> Mode for TextMode {
         // Folding
 
         // mandatory screen filler
+        let mut screen_filter = ScreenFilter::new();
+        screen_filter.display_eof = true;
+
         view.compose_filters
             .borrow_mut()
-            .push(Box::new(ScreenFilter::new()));
+            .push(Box::new(screen_filter));
 
         if use_draw_marks {
             view.compose_filters

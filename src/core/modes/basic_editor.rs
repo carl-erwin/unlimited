@@ -1,4 +1,6 @@
 use std::any::Any;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 use super::Mode;
 
@@ -23,6 +25,8 @@ use crate::core::view::View;
 use crate::core::modes::text_mode::ScreenFilter;
 use crate::core::modes::text_mode::TabFilter;
 use crate::core::modes::text_mode::WordWrapFilter;
+
+use crate::core::document::DocumentBuilder;
 
 pub struct BasicEditorMode {
     // add common fields
@@ -56,6 +60,15 @@ impl<'a> Mode for BasicEditorMode {
     ) {
         let doc = view.document();
 
+        let status_doc = DocumentBuilder::new()
+            .document_name("")
+            .file_name("/dev/null")
+            .internal(true)
+            //           .use_buffer_log(false)
+            .finalize();
+
+        let status_doc = status_doc;
+
         // children_layout_and_modes
         let ops_modes = vec![
             (
@@ -63,14 +76,18 @@ impl<'a> Mode for BasicEditorMode {
                     size: 1 + 0, /* nano-like */
                 },
                 doc.clone(),
-                vec![],
+                vec![], // TODO: title-mode
             ),
             (
                 LayoutOperation::RemainMinus { minus: 3 },
                 doc.clone(),
                 vec!["core-mode".to_owned(), "text-mode".to_owned()],
             ),
-            (LayoutOperation::Fixed { size: 3 }, None, vec![]), // status mode ?
+            (
+                LayoutOperation::Fixed { size: 3 },
+                status_doc,
+                vec!["status-mode".to_owned()],
+            ),
         ];
 
         view.layout_direction = LayoutDirection::Horizontal;
@@ -114,29 +131,6 @@ impl<'a> Mode for BasicEditorMode {
         // TODO: status mode + configure
         // setup status view
         let status_vid = view.children[2];
-        let v = editor.view_map.get(&status_vid).unwrap();
-        v.borrow_mut()
-            .compose_filters
-            .borrow_mut()
-            .push(Box::new(BasicEditorStatus::new()));
-
-        // do tab expansion status line
-        v.borrow_mut()
-            .compose_filters
-            .borrow_mut()
-            .push(Box::new(TabFilter::new()));
-
-        v.borrow_mut()
-            .compose_filters
-            .borrow_mut()
-            .push(Box::new(WordWrapFilter::new()));
-
-        // mandatory screen filler
-        v.borrow_mut()
-            .compose_filters
-            .borrow_mut()
-            .push(Box::new(ScreenFilter::new()));
-
         // set status_vid
         view.status_view_id = Some(status_vid);
     }

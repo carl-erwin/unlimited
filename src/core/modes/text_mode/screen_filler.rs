@@ -25,6 +25,7 @@ pub struct ScreenFilter {
     // data
     first_offset: Option<u64>,
     screen_is_full: bool,
+    pub display_eof: bool,
 }
 
 impl ScreenFilter {
@@ -33,6 +34,7 @@ impl ScreenFilter {
             // data
             first_offset: None,
             screen_is_full: false,
+            display_eof: false,
         }
     }
 }
@@ -100,10 +102,12 @@ impl Filter<'_> for ScreenFilter {
                     let mut style = TextStyle::new();
                     style.color = (255, 255, 0);
 
+                    let eof_char = if self.display_eof { '$' } else { ' ' };
+
                     let eof_cpi = CodepointInfo {
                         metadata: true,
-                        cp: u32_to_char('$' as u32),
-                        displayed_cp: u32_to_char('$' as u32),
+                        cp: u32_to_char(eof_char as u32),
+                        displayed_cp: u32_to_char(eof_char as u32),
                         offset: Some(env.max_offset),
                         size: 0,
                         style,

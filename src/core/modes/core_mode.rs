@@ -92,10 +92,17 @@ impl CoreMode {
 }
 
 // Mode "core"
-pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+pub fn application_quit(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
     // TODO: change this
     // walk editor.change_doc hashset<doci_id>
     // if editor.change_docs.len() != 0
+
+    let status_vid = view::get_status_view(&editor, view);
+    dbg_println!("STATUS VID = {:?}", status_vid);
 
     let v = &view.borrow();
     let doc = v.document().unwrap();
@@ -105,6 +112,19 @@ pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Ref
         env.quit = true;
     } else {
         dbg_println!("DOC CHANGED !\n");
+        dbg_println!("STATUS VID = {:?}", status_vid);
+        if let Some(svid) = status_vid {
+            let sview = editor.view_map.get(&svid).unwrap();
+            let doc = sview.borrow().document().unwrap();
+            let mut doc = doc.write().unwrap();
+            let sz = doc.size();
+            doc.remove(0, sz, None);
+            let text = "\nModified files exist. Really quit ? y/n\n";
+            let bytes = text.as_bytes();
+            doc.insert(0, bytes.len(), &bytes);
+        }
+
+        // push new input map for y/n
     }
 }
 
@@ -407,11 +427,6 @@ pub fn split_horizontally(
         &docs,
         &modes,
     );
-
-    /*
-     TODO
-         + swap children[0]
-    */
 }
 
 /*

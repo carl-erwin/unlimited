@@ -412,18 +412,31 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn get_view_at_mouse_position(&mut self, _x: i32, _y: i32) -> Option<&'a View<'a>> {
-        None
-    }
-
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
-
         let _max_offset = self.document().unwrap().read().unwrap().size();
-
         // TODO: mode check invariants
     }
 } // impl View
+
+pub fn get_status_view(editor: &Editor<'static>, view: &Rc<RefCell<View<'static>>>) -> Option<Id> {
+    let view = view.borrow();
+
+    if view.status_view_id.is_some() {
+        return view.status_view_id;
+    }
+
+    let mut v = view;
+    while let Some(pvid) = v.parent_id {
+        let pv = editor.view_map.get(&pvid).unwrap();
+        v = pv.borrow();
+        if v.status_view_id.is_some() {
+            return v.status_view_id;
+        }
+    }
+
+    None
+}
 
 ///
 pub fn run_stage(
