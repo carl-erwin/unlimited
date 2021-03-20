@@ -93,9 +93,13 @@ impl CoreMode {
 
 // Mode "core"
 pub fn application_quit(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefCell<View>>) {
+    // TODO: change this
+    // walk editor.change_doc hashset<doci_id>
+    // if editor.change_docs.len() != 0
+
     let v = &view.borrow();
-    let doc = v.document.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = v.document().unwrap();
+    let doc = doc.read().unwrap();
 
     if !doc.changed {
         env.quit = true;
@@ -117,10 +121,10 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
     let v = view.borrow_mut();
 
     let doc_id = {
-        let doc = v.document.as_ref().unwrap();
+        let doc = v.document().unwrap();
         {
             // - needed ? already syncing ? -
-            let doc = doc.as_ref().read().unwrap();
+            let doc = doc.read().unwrap();
             if !doc.changed || doc.is_syncing {
                 // TODO: ensure all over places are checking this flag, all doc....write()
                 // better, some permissions mechanism ?
@@ -133,7 +137,7 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCel
 
         // - set sync flag -
         {
-            let mut doc = doc.as_ref().write().unwrap();
+            let mut doc = doc.write().unwrap();
             let doc_id = doc.id;
             doc.is_syncing = true;
             doc_id
@@ -271,7 +275,7 @@ pub fn split_vertically(
         if v.document.is_none() {
             None
         } else {
-            let doc_id = v.document.as_ref().unwrap();
+            let doc_id = v.document().unwrap();
             let doc_id = doc_id.read().unwrap().id;
             if let Some(_doc) = document_map.get(&doc_id) {
                 let doc = document_map.get(&doc_id).unwrap().clone();
@@ -354,8 +358,8 @@ pub fn split_horizontally(
             let document_map = editor.document_map.clone();
             let document_map = document_map.read().unwrap();
 
-            let doc_id = v.document.as_ref().unwrap();
-            let doc_id = doc_id.read().unwrap().id;
+            let doc = v.document().unwrap();
+            let doc_id = doc.read().unwrap().id;
             if let Some(_doc) = document_map.get(&doc_id) {
                 let doc = document_map.get(&doc_id).unwrap().clone();
                 Some(Arc::clone(&doc))

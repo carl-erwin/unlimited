@@ -176,7 +176,8 @@ impl Filter<'_> for BasicEditorTitle {
         self.title = format!("unlimitED {} ", VERSION);
         w = w.saturating_sub(self.title.len());
 
-        let d = view.document.as_ref().unwrap().read().unwrap();
+        let d = view.document().unwrap();
+        let d = d.read().unwrap();
         let mut doc_info = format!("{}", d.name);
         let dlen = doc_info.len();
         if w > dlen {

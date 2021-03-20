@@ -80,7 +80,7 @@ impl Filter<'_> for RawDataFilter {
                             rd,
                             self.read_size
                         );
-                        dbg_println!("BUFFER SIZE {}", doc.as_ref().read().unwrap().size());
+                        dbg_println!("BUFFER SIZE {}", doc.read().unwrap().size());
                         dbg_println!("POS {} + RD {}  = {}", self.pos, rd, self.pos + rd as u64);
             */
             if rd > 0 {

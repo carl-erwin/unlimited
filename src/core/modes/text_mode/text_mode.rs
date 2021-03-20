@@ -551,8 +551,8 @@ pub fn run_text_mode_actions_vec(
                         let mut min = tm.marks[0].offset;
                         let mut max = tm.marks[tm.marks.len() - 1].offset;
                         let doc = v.document.clone();
-                        let doc = doc.as_ref().unwrap();
-                        let mut doc = doc.as_ref().write().unwrap();
+                        let doc = doc.unwrap();
+                        let mut doc = doc.write().unwrap();
 
                         // screen cache
                         if false {
@@ -585,8 +585,8 @@ pub fn run_text_mode_actions_vec(
                 dbg_println!("MARKS {:?}", marks_offsets);
 
                 //
-                let doc = v.document.as_ref().unwrap();
-                let mut doc = doc.as_ref().write().unwrap();
+                let doc = v.document().unwrap();
+                let mut doc = doc.write().unwrap();
                 let max_offset = doc.size() as u64;
                 doc.tag(env.current_time, max_offset, marks_offsets);
 
@@ -602,8 +602,8 @@ pub fn run_text_mode_actions_vec(
                 dbg_println!("MARKS {:?}", marks_offsets);
 
                 //
-                let doc = v.document.as_ref().unwrap();
-                let mut doc = doc.as_ref().write().unwrap();
+                let doc = v.document().unwrap();
+                let mut doc = doc.write().unwrap();
                 let max_offset = doc.size() as u64;
                 doc.tag(env.current_time, max_offset, marks_offsets);
 
@@ -628,9 +628,8 @@ pub fn run_text_mode_actions_vec(
         if tm.marks.len() > 0 {
             let mut min = tm.marks[0].offset;
             let mut max = tm.marks[tm.marks.len() - 1].offset;
-            let doc = v.document.clone();
-            let doc = doc.as_ref().unwrap();
-            let mut doc = doc.as_ref().write().unwrap();
+            let doc = v.document().unwrap();
+            let mut doc = doc.write().unwrap();
 
             // screen cache
             if true {
@@ -668,8 +667,8 @@ fn run_text_mode_actions(
             (editor::Stage::Input, editor::StagePosition::Pre) => {
                 let mut v = view.borrow_mut();
                 let doc = v.document.clone();
-                let doc = doc.as_ref().unwrap();
-                let doc = doc.as_ref().read().unwrap();
+                let doc = doc.unwrap();
+                let doc = doc.read().unwrap();
 
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -718,7 +717,8 @@ fn run_text_mode_actions(
 
     {
         let v = view.borrow();
-        let max_offset = v.document.as_ref().unwrap().read().unwrap().size() as u64;
+        let doc = v.document().unwrap();
+        let max_offset = doc.read().unwrap().size() as u64;
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         let marks = &tm.marks;
         for m in marks.iter() {
@@ -823,8 +823,8 @@ pub fn insert_codepoint_array(
     {
         let v = view.borrow();
         let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = doc.unwrap();
+        let doc = doc.read().unwrap();
         if doc.is_syncing {
             return;
         }
@@ -858,7 +858,7 @@ pub fn insert_codepoint_array(
         {
             let mut doc = v.document.clone();
             let doc = doc.as_mut().unwrap();
-            let mut doc = doc.as_ref().write().unwrap();
+            let mut doc = doc.write().unwrap();
 
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.prev_action = ActionType::DocumentModification;
@@ -952,8 +952,8 @@ pub fn remove_previous_codepoint(
 
     {
         let doc = v.document.clone();
-        let doc = doc.as_ref().clone().unwrap();
-        let mut doc = doc.as_ref().write().unwrap();
+        let doc = doc.clone().unwrap();
+        let mut doc = doc.write().unwrap();
         if doc.size() == 0 {
             return;
         }
@@ -1013,7 +1013,7 @@ pub fn undo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
@@ -1044,7 +1044,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
@@ -1079,7 +1079,7 @@ pub fn remove_codepoint(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RefC
     {
         let mut doc = v.document.clone();
         let doc = doc.as_mut().unwrap();
-        let mut doc = doc.as_ref().write().unwrap();
+        let mut doc = doc.write().unwrap();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1130,7 +1130,7 @@ pub fn remove_until_end_of_word(
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1213,9 +1213,8 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 
     let start_offset = v.start_offset;
 
-    let doc = v.document();
-    let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = v.document().unwrap();
+    let doc = doc.read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1257,8 +1256,8 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
 
     //
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = doc.unwrap();
+    let doc = doc.read().unwrap();
 
     dbg_println!("doc.size() {}", doc.size());
 
@@ -1325,8 +1324,8 @@ pub fn move_marks_to_start_of_line(
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap().read().unwrap();
+    let doc = v.document().unwrap();
+    let doc = doc.read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -1359,8 +1358,8 @@ pub fn move_marks_to_end_of_line(
     let screen = v.screen.clone();
     let screen = screen.read().unwrap();
 
-    let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap().read().unwrap();
+    let doc = v.document().unwrap();
+    let doc = doc.read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1439,8 +1438,8 @@ fn move_mark_to_previous_line(
         let end_offset = m_offset;
         let (start_offset, screen_width, screen_height) = {
             let start_offset = {
-                let doc = v.document.as_ref().unwrap();
-                let doc = doc.as_ref().read().unwrap();
+                let doc = v.document().unwrap();
+                let doc = doc.read().unwrap();
 
                 let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -1511,8 +1510,8 @@ fn move_mark_to_previous_line(
 
         // compute column
         let new_x = {
-            let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().read().unwrap();
+            let doc = v.document().unwrap();
+            let doc = doc.read().unwrap();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -1533,8 +1532,8 @@ fn move_mark_to_previous_line(
         };
 
         {
-            let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().read().unwrap();
+            let doc = v.document().unwrap();
+            let doc = doc.read().unwrap();
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
             let codec = tm.text_codec.as_ref();
@@ -1740,8 +1739,8 @@ pub fn move_mark_to_next_line(
         // get start_of_line(m.offset) -> u64
         let start_offset = {
             let v = &view.borrow();
-            let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().read().unwrap();
+            let doc = v.document().unwrap();
+            let doc = doc.read().unwrap();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
@@ -1794,8 +1793,8 @@ pub fn move_mark_to_next_line(
         // compute column
         let new_x = {
             let v = &view.borrow();
-            let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().read().unwrap();
+            let doc = v.document().unwrap();
+            let doc = doc.read().unwrap();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -1824,8 +1823,8 @@ pub fn move_mark_to_next_line(
         let mut tmp_mark = Mark::new(line_start_off);
 
         let v = &view.borrow();
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = v.document().unwrap();
+        let doc = doc.read().unwrap();
 
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -1892,8 +1891,8 @@ fn get_marks_min_offset_and_max_idx(view: &Rc<RefCell<View>>) -> (u64, usize) {
 fn sync_mark(view: &Rc<RefCell<View>>, m: &mut Mark) -> u64 {
     let v = view.borrow();
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = doc.unwrap();
+    let doc = doc.read().unwrap();
 
     // ctx
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
@@ -2181,8 +2180,8 @@ pub fn clone_and_move_mark_to_next_line(
         tm.mark_index = mark_len - 1;
 
         // doc
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = v.document().unwrap();
+        let doc = doc.read().unwrap();
         prev_buffer_log_index = doc.buffer_log.pos;
 
         mark_len
@@ -2200,8 +2199,8 @@ pub fn clone_and_move_mark_to_next_line(
         {
             // discard buffer log changes
             let v = view.borrow();
-            let doc = v.document.as_ref().unwrap();
-            let mut doc = doc.as_ref().write().unwrap();
+            let doc = v.document().unwrap();
+            let mut doc = doc.write().unwrap();
             if prev_buffer_log_index > 0 {
                 //                doc.buffer_log.data.truncate(prev_buffer_log_index-1);
             }
@@ -2348,8 +2347,8 @@ pub fn move_mark_to_end_of_file(
     let mut v = view.borrow_mut();
 
     let offset = {
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = v.document().unwrap();
+        let doc = doc.read().unwrap();
         doc.size() as u64
     };
     v.start_offset = offset;
@@ -2390,8 +2389,8 @@ pub fn cut_to_end_of_line(
     {
         let v = view.borrow();
         let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = doc.unwrap();
+        let doc = doc.read().unwrap();
         if doc.is_syncing {
             return;
         }
@@ -2409,7 +2408,7 @@ pub fn cut_to_end_of_line(
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2469,8 +2468,8 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>
     // doc read only ?
     {
         let doc = v.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = doc.unwrap();
+        let doc = doc.read().unwrap();
         if doc.is_syncing {
             return;
         }
@@ -2478,7 +2477,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2547,8 +2546,8 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     let screen = screen.read().unwrap();
 
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = doc.unwrap();
+    let doc = doc.read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2586,8 +2585,8 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
     let screen = screen.read().unwrap();
 
     let doc = v.document.clone();
-    let doc = doc.as_ref().unwrap();
-    let doc = doc.as_ref().read().unwrap();
+    let doc = doc.unwrap();
+    let doc = doc.read().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -2660,8 +2659,8 @@ pub fn copy_maybe_remove_selection_symetric(
 
     // doc
     let doc = v.document.clone();
-    let doc = doc.as_ref().clone().unwrap();
-    let mut doc = doc.as_ref().write().unwrap();
+    let doc = doc.clone().unwrap();
+    let mut doc = doc.write().unwrap();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -3000,8 +2999,8 @@ pub fn center_around_offset(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<
     if let Some(center_offset) = env.center_offset {
         let mut v = view.borrow_mut();
         let offset = {
-            let doc = v.document.as_ref().unwrap();
-            let doc = doc.as_ref().read().unwrap();
+            let doc = v.document().unwrap();
+            let doc = doc.read().unwrap();
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
@@ -3052,8 +3051,8 @@ pub fn get_lines_offsets_direct(
 
     let doc_size = {
         let doc = view.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = doc.unwrap();
+        let doc = doc.read().unwrap();
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
@@ -3196,8 +3195,8 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
 
     if nb_lines == 1 {
         let doc = view.document.clone();
-        let doc = doc.as_ref().unwrap();
-        let doc = doc.as_ref().read().unwrap();
+        let doc = doc.unwrap();
+        let doc = doc.read().unwrap();
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
@@ -3244,8 +3243,8 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
 
     // get start of line
     {
-        let doc = view.document.clone();
-        let doc = doc.as_ref().unwrap().read().unwrap();
+        let doc = view.document().unwrap();
+        let doc = doc.read().unwrap();
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
         m.move_to_start_of_line(&doc, codec);
@@ -3307,7 +3306,8 @@ pub fn scroll_view_down(view: &mut View, editor: &Editor, env: &EditorEnv, nb_li
     }
 
     let max_offset = {
-        let doc = view.document.as_ref().unwrap().read().unwrap();
+        let doc = view.document().unwrap();
+        let doc = doc.read().unwrap();
         doc.size() as u64
     };
 

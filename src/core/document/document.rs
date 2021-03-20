@@ -497,7 +497,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
     // update
     {
-        let mut doc = doc.as_ref().write().unwrap();
+        let mut doc = doc.write().unwrap();
 
         let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
         let perms = metadata.permissions();
@@ -618,7 +618,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write().unwrap();
+        let mut doc = doc.unwrap().write().unwrap();
 
         const STR_LEN: usize = 1000;
 
@@ -679,7 +679,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write().unwrap();
+        let mut doc = doc.unwrap().write().unwrap();
 
         const NB_STR: usize = 10000;
 

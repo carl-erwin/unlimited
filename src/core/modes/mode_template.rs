@@ -69,8 +69,8 @@ pub fn template_input_action_fn1(
     view: &Rc<RefCell<View>>,
 ) {
     let v = view.borrow();
-    let doc = v.document.as_ref().unwrap();
-    let _doc = doc.as_ref().read().unwrap();
+    let doc = v.document().unwrap();
+    let _doc = doc.read().unwrap();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
