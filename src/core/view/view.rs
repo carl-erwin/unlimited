@@ -230,7 +230,20 @@ pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,
     pub parent_id: Option<Id>,
-    pub focus_to: Option<Id>, // child id
+    pub focus_to: Option<Id>,       // child id
+    pub status_view_id: Option<Id>, // write to this view's document to interact with the user
+    /*
+      any view that can display some text,
+      TODO: use special document for this
+      split text-mode into
+      text-display-mode: scrolling ops etc
+      text-edit-mode   : marks , selection etc...
+      if edit is on display marks
+      disable buffer log for this special document
+
+      maybe allow to change compose filter of status_view_id ?
+      for custom status display ?
+    */
     //pub root_view_index: Option<usize>, // ?
     pub document: Option<Arc<RwLock<Document<'static>>>>, // if none and no children ... panic ?
     pub mode_ctx: HashMap<String, Box<dyn Any>>,
@@ -248,12 +261,11 @@ pub struct View<'a> {
     //
     pub x: usize,
     pub y: usize,
-    /// layout ops index in parent_id.layout_ops
+    /// layout ops index in parent_id.layout_ops[]
     pub layout_index: Option<usize>,
 
     pub layout_direction: LayoutDirection,
     pub layout_ops: Vec<LayoutOperation>,
-    // TODO: keep them here or use view.id -> editor.view(view.id)
     pub children: Vec<Id>,
 
     //
@@ -292,6 +304,7 @@ impl<'a> View<'a> {
             parent_id,
             destroyable: true,
             focus_to: None,
+            status_view_id: None,
             id,
             document,
             screen,
@@ -332,17 +345,10 @@ impl<'a> View<'a> {
             // move to mode.configure()
             // merge all actions
             // move to mode
-
             let action_map = mode.build_action_map();
             for (name, fnptr) in action_map {
                 v.input_ctx.action_map.insert(name.clone(), fnptr);
             }
-
-            // TODO: merge modes input maps / (conflicts ?)
-            // parser ctx build from current v.input_ctx.input_map
-            // let map = v.input_ctx.input_map.clone();
-            // let map = map.borrow_mut();
-            // for i in input_map.borrow_mut().iter() {}
 
             // create view's mode context
             // allocate per view ModeCtx shared between the stages

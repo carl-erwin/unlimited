@@ -70,7 +70,7 @@ impl<'a> Mode for BasicEditorMode {
                 doc.clone(),
                 vec!["core-mode".to_owned(), "text-mode".to_owned()],
             ),
-            (LayoutOperation::Fixed { size: 3 }, None, vec![]),
+            (LayoutOperation::Fixed { size: 3 }, None, vec![]), // status mode ?
         ];
 
         view.layout_direction = LayoutDirection::Horizontal;
@@ -92,12 +92,14 @@ impl<'a> Mode for BasicEditorMode {
             &modes,
         );
 
+        // mark children as non destroyable
         for i in 0..view.children.len() {
             let vid = view.children[i];
             let v = editor.view_map.get(&vid).unwrap();
             v.borrow_mut().destroyable = false;
         }
 
+        // set focus on text view : TODO: title mode + configure
         let title_vid = view.children[0];
         let v = editor.view_map.get(&title_vid).unwrap();
         v.borrow_mut()
@@ -105,9 +107,12 @@ impl<'a> Mode for BasicEditorMode {
             .borrow_mut()
             .push(Box::new(BasicEditorTitle::new()));
 
+        // set focus on text view
         view.focus_to = Some(view.children[1]); // TODO: get focus
         env.focus_changed_to = Some(view.children[1]); // TODO:
 
+        // TODO: status mode + configure
+        // setup status view
         let status_vid = view.children[2];
         let v = editor.view_map.get(&status_vid).unwrap();
         v.borrow_mut()
@@ -131,6 +136,9 @@ impl<'a> Mode for BasicEditorMode {
             .compose_filters
             .borrow_mut()
             .push(Box::new(ScreenFilter::new()));
+
+        // set status_vid
+        view.status_view_id = Some(status_vid);
     }
 }
 
