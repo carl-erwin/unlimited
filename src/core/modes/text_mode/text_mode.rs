@@ -35,6 +35,7 @@ use crate::core::editor;
 
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
+use crate::core::editor::InputStageFunction;
 use crate::core::view::View;
 
 use crate::core::event::input_map::build_input_event_map;
@@ -323,7 +324,7 @@ impl<'a> Mode for TextMode {
 }
 
 pub struct TextMode {
-    // add common filed
+    // add common field
 }
 
 impl TextMode {
@@ -333,131 +334,93 @@ impl TextMode {
     }
 
     pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
-        register_input_stage_action(
-            &mut map,
-            "text-mode:display-end-of-line",
-            display_end_of_line,
-        );
+        let v: Vec<(&str, InputStageFunction)> = vec![
+            // tools
+            ("text-mode:display-end-of-line", display_end_of_line),
+            ("text-mode:display-word-wrap", display_word_wrap),
+            // navigation
+            // marks
+            ("text-mode:move-marks-backward", move_marks_backward),
+            ("text-mode:move-marks-forward", move_marks_forward),
+            ("text-mode:move-marks-to-next-line", move_marks_to_next_line),
+            (
+                "text-mode:move-marks-to-previous-line",
+                move_marks_to_previous_line,
+            ),
+            ("text-mode:move-to-token-start", move_to_token_start),
+            ("text-mode:move-to-token-end", move_to_token_end),
+            (
+                "text-mode:move-marks-to-start-of-line",
+                move_marks_to_start_of_line,
+            ),
+            (
+                "text-mode:move-marks-to-end-of-line",
+                move_marks_to_end_of_line,
+            ),
+            (
+                "text-mode:move-marks-to-start-of-file",
+                move_mark_to_start_of_file,
+            ),
+            (
+                "text-mode:move-marks-to-end-of-file",
+                move_mark_to_end_of_file,
+            ),
+            (
+                "text-mode:clone-and-move-mark-to-previous-line",
+                clone_and_move_mark_to_previous_line,
+            ),
+            (
+                "text-mode:clone-and-move-mark-to-next-line",
+                clone_and_move_mark_to_next_line,
+            ),
 
-        register_input_stage_action(&mut map, "text-mode:display-word-wrap", display_word_wrap);
+            // selection
+            (
+                "text-mode:set-select-point-at-mark",
+                set_selection_points_at_marks,
+            ),
+            ("text-mode:copy-selection", copy_selection),
+            ("text-mode:cut-selection", cut_selection),
 
-        register_input_stage_action(&mut map, "text-mode:self-insert", insert_codepoint_array);
 
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-backward",
-            move_marks_backward,
-        );
+            // screen
+            ("text-mode:page-up", scroll_to_previous_screen),
+            ("text-mode:page-down", scroll_to_next_screen),
+            ("text-mode:scroll-up", scroll_up),
+            ("text-mode:scroll-down", scroll_down),
+            //
+            ("select-next-view", select_next_view),
+            ("select-previous-view", select_previous_view),
+            ("text-mode:center-around-mark", center_around_mark),
+            ("text-mode:move-mark-to-clicked-area", button_press),
+            // edition
+            ("text-mode:self-insert", insert_codepoint_array),
+            ("text-mode:remove-codepoint", remove_codepoint),
+            (
+                "text-mode:remove-previous-codepoint",
+                remove_previous_codepoint,
+            ),
+            ("text-mode:paste", paste),
+            ("text-mode:cut-to-end-of-line", cut_to_end_of_line),
+            (
+                "text-mode:remove-until-end-of-word",
+                remove_until_end_of_word,
+            ),
+            // undo/redo
+            ("text-mode:undo", undo),
+            ("text-mode:redo", redo),
+            // mouse handling
+            ("text-mode:button-press", button_press),
+            ("text-mode:button-release", button_release),
+            ("text-mode:pointer-motion", pointer_motion),
 
-        register_input_stage_action(&mut map, "text-mode:move-marks-forward", move_marks_forward);
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-next-line",
-            move_marks_to_next_line,
-        );
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-previous-line",
-            move_marks_to_previous_line,
-        );
+            // TODO: usage not well defined
+            ("editor:cancel", editor_cancel),
+        ];
 
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-to-token-start",
-            move_to_token_start,
-        );
-        register_input_stage_action(&mut map, "text-mode:move-to-token-end", move_to_token_end);
-
-        //
-        register_input_stage_action(&mut map, "text-mode:page-up", scroll_to_previous_screen);
-        register_input_stage_action(&mut map, "text-mode:page-down", scroll_to_next_screen);
-
-        register_input_stage_action(&mut map, "text-mode:scroll-up", scroll_up);
-        register_input_stage_action(&mut map, "text-mode:scroll-down", scroll_down);
-
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-start-of-line",
-            move_marks_to_start_of_line,
-        );
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-end-of-line",
-            move_marks_to_end_of_line,
-        );
-
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-start-of-file",
-            move_mark_to_start_of_file,
-        );
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-marks-to-end-of-file",
-            move_mark_to_end_of_file,
-        );
-
-        register_input_stage_action(&mut map, "text-mode:undo", undo);
-        register_input_stage_action(&mut map, "text-mode:redo", redo);
-        register_input_stage_action(&mut map, "text-mode:remove-codepoint", remove_codepoint);
-        register_input_stage_action(
-            &mut map,
-            "text-mode:remove-previous-codepoint",
-            remove_previous_codepoint,
-        );
-
-        register_input_stage_action(&mut map, "text-mode:button-press", button_press);
-        register_input_stage_action(&mut map, "text-mode:button-release", button_release);
-        register_input_stage_action(
-            &mut map,
-            "text-mode:move-mark-to-clicked-area",
-            button_press,
-        );
-
-        register_input_stage_action(&mut map, "text-mode:center-around-mark", center_around_mark);
-        register_input_stage_action(&mut map, "text-mode:cut-to-end-of-line", cut_to_end_of_line);
-
-        register_input_stage_action(&mut map, "text-mode:paste", paste);
-        register_input_stage_action(
-            &mut map,
-            "text-mode:remove-until-end-of-word",
-            remove_until_end_of_word,
-        );
-        register_input_stage_action(&mut map, "scroll-to-next-screen", scroll_to_next_screen);
-        register_input_stage_action(
-            &mut map,
-            "scroll-to-previous-screen",
-            scroll_to_previous_screen,
-        );
-
-        register_input_stage_action(&mut map, "select-next-view", select_next_view);
-
-        register_input_stage_action(&mut map, "select-previous-view", select_previous_view);
-
-        register_input_stage_action(
-            &mut map,
-            "text-mode:clone-and-move-mark-to-previous-line",
-            clone_and_move_mark_to_previous_line,
-        );
-        register_input_stage_action(
-            &mut map,
-            "text-mode:clone-and-move-mark-to-next-line",
-            clone_and_move_mark_to_next_line,
-        );
-
-        register_input_stage_action(&mut map, "text-mode:pointer-motion", pointer_motion);
-
-        register_input_stage_action(
-            &mut map,
-            "text-mode:set-select-point-at-mark",
-            set_selection_points_at_marks,
-        );
-
-        register_input_stage_action(&mut map, "text-mode:copy-selection", copy_selection);
-
-        register_input_stage_action(&mut map, "text-mode:cut-selection", cut_selection);
-
-        register_input_stage_action(&mut map, "editor:cancel", editor_cancel);
+        for e in v {
+            register_input_stage_action(&mut map, e.0, e.1);
+        }
     }
 }
 
