@@ -226,6 +226,13 @@ impl InputContext {
 // in future version marks will be stored in buffer meta data.<br/>
 // TODO editor.env.current.view_id = view.id
 // can zoom ?
+//
+// TODO: add view.subscribe_to_vid
+// TODO: add view.publish_to_vid
+//
+// follow mode fills
+// TODO: add view.prev_content_vid
+// TODO: add view.next_content_vid
 pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,

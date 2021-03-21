@@ -21,7 +21,7 @@ use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 use crate::core::view::View;
 
-pub static CORE_INPUT_MAP: &str = r#"
+static CORE_INPUT_MAP: &str = r#"
 [
   {
     "events": [
@@ -30,6 +30,18 @@ pub static CORE_INPUT_MAP: &str = r#"
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" }
     ]
   }
+]"#;
+
+static CORE_QUIT_ABORT_MAP: &str = r#"
+[
+  {
+    "events": [
+     { "in": [{ "key": "y" } ],    "action": "application:quit-abort-yes" },
+     { "in": [{ "key": "n" } ],    "action": "application:quit-abort-no" },
+     { "default": [],              "action": "application:quit-abort-no" }
+   ]
+  }
+
 ]"#;
 
 impl<'a> Mode for CoreMode {
@@ -55,16 +67,10 @@ impl<'a> Mode for CoreMode {
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        dbg_println!("config core-mode for VID {}", view.id);
-
-        // Config input map
-        dbg_println!("CORE_INPUT_MAP\n{}", CORE_INPUT_MAP);
-        // TODO: user define
-        {
-            let input_map = build_input_event_map(CORE_INPUT_MAP).unwrap();
-            let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-            input_map_stack.push(input_map);
-        }
+        // setup input map for core actions
+        let input_map = build_input_event_map(CORE_INPUT_MAP).unwrap();
+        let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.push(input_map);
     }
 }
 
@@ -83,7 +89,21 @@ impl CoreMode {
 
     pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
         register_input_stage_action(&mut map, "application:quit", application_quit);
-        register_input_stage_action(&mut map, "application:quit-abort", application_quit_abort);
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort",
+            application_quit_abort_yes,
+        );
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort-yes",
+            application_quit_abort_yes,
+        );
+        register_input_stage_action(
+            &mut map,
+            "application:quit-abort-no",
+            application_quit_abort_no,
+        );
         register_input_stage_action(&mut map, "save-document", save_document); // core ?
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
         register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
@@ -93,48 +113,91 @@ impl CoreMode {
 
 // Mode "core"
 pub fn application_quit(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
     view: &Rc<RefCell<View<'static>>>,
 ) {
     // TODO: change this
-    // walk editor.change_doc hashset<doci_id>
+    // editor.changed_doc : HashSet<document::Id>
     // if editor.change_docs.len() != 0
 
-    let status_vid = view::get_status_view(&editor, view);
-    dbg_println!("STATUS VID = {:?}", status_vid);
-
-    let v = &view.borrow();
-    let doc = v.document().unwrap();
+    let doc = { view.borrow().document().unwrap() };
     let doc = doc.read().unwrap();
-
     if !doc.changed {
         env.quit = true;
     } else {
-        dbg_println!("DOC CHANGED !\n");
-        dbg_println!("STATUS VID = {:?}", status_vid);
-        if let Some(svid) = status_vid {
-            let sview = editor.view_map.get(&svid).unwrap();
-            let doc = sview.borrow().document().unwrap();
-            let mut doc = doc.write().unwrap();
-            let sz = doc.size();
-            doc.remove(0, sz, None);
-            let text = "\nModified files exist. Really quit ? y/n\n";
-            let bytes = text.as_bytes();
-            doc.insert(0, bytes.len(), &bytes);
-        }
-
-        // push new input map for y/n
+        application_quit_abort_setup(&mut editor, &mut env, &view);
     }
 }
 
-pub fn application_quit_abort(
+pub fn application_quit_abort_setup(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let status_vid = view::get_status_view(&editor, view);
+
+    dbg_println!("DOC CHANGED !\n");
+    dbg_println!("STATUS VID = {:?}", status_vid);
+
+    if let Some(svid) = status_vid {
+        let status_view = editor.view_map.get(&svid).unwrap();
+        //
+        let doc = status_view.borrow().document().unwrap();
+        let mut doc = doc.write().unwrap();
+        // clear doc
+        let sz = doc.size();
+        doc.remove(0, sz, None);
+        // set status text
+        let text = "\nModified documents exist. Really quit? y/n\n";
+        let bytes = text.as_bytes();
+        doc.insert(0, bytes.len(), &bytes);
+
+        // push new input map for y/n
+        {
+            let mut v = view.borrow_mut();
+            dbg_println!("configure quit-abort VID {}", v.id);
+            v.input_ctx.stack_pos = None;
+            let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
+            let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push(input_map);
+            // TODO: add lock flag
+            // to not exec lower input level
+        }
+    } else {
+        // TODO: log missing status mode
+    }
+}
+
+pub fn application_quit_abort_yes(
     _editor: &mut Editor,
     env: &mut EditorEnv,
-
     _view: &Rc<RefCell<View>>,
 ) {
     env.quit = true;
+}
+
+pub fn application_quit_abort_no(
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    {
+        let v = view.borrow_mut();
+        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.pop();
+    }
+
+    // reset status view : TODO: view::reset_status_view(&editor, view);
+    let status_vid = view::get_status_view(&editor, view);
+    if let Some(status_vid) = status_vid {
+        let status_view = editor.view_map.get(&status_vid).unwrap();
+        let doc = status_view.borrow().document().unwrap();
+        let mut doc = doc.write().unwrap();
+        // clear buffer
+        let sz = doc.size();
+        doc.remove(0, sz, None);
+    }
 }
 
 pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RefCell<View>>) {

@@ -6,15 +6,15 @@ use super::super::Mode;
 
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
-use crate::dbg_println;
 use crate::core::editor::InputStageActionMap;
-use crate::core::view::View;
 use crate::core::modes::text_mode::RawDataFilter;
 use crate::core::modes::text_mode::ScreenFilter;
 use crate::core::modes::text_mode::TabFilter;
 use crate::core::modes::text_mode::TextCodecFilter;
 use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::modes::text_mode::WordWrapFilter;
+use crate::core::view::View;
+use crate::dbg_println;
 
 pub struct StatusModeContext {}
 
