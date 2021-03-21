@@ -555,6 +555,12 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         // read node bytes
         {
             let doc = doc.read().unwrap();
+
+            // TODO:
+            // if doc.abort_indexing == true {
+            //     break;
+            // }
+
             let file = doc.buffer.data.read().unwrap();
             let node = &file.pool[idx.unwrap()];
 
