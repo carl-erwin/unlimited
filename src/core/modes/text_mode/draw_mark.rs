@@ -37,7 +37,6 @@ impl Filter<'_> for DrawMarks {
     }
 }
 
-
 fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     if !set {
         screen_apply(screen, |_, _, cpi| {

@@ -109,7 +109,7 @@ pub enum LayoutDirection {
     Horizontal,
 }
 // store this in parent and reuse in resize
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum LayoutOperation {
     // We want a fixed size of sz cells vertically/horizontally in the parent
     // used = size

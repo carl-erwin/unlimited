@@ -108,6 +108,11 @@ impl CoreMode {
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
         register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
         register_input_stage_action(&mut map, "destroy-view", destroy_view);
+
+        register_input_stage_action(&mut map, "increase-left", increase_left);
+        register_input_stage_action(&mut map, "decrease-left", decrease_left);
+        register_input_stage_action(&mut map, "increase-right", increase_right);
+        register_input_stage_action(&mut map, "decrease-right", decrease_right);
     }
 }
 
@@ -490,6 +495,142 @@ pub fn split_horizontally(
         &docs,
         &modes,
     );
+}
+
+fn increase_layout_op(op: LayoutOperation, max_size: usize) -> LayoutOperation {
+    match op {
+        LayoutOperation::Fixed { size } if size < max_size => {
+            LayoutOperation::Fixed { size: size + 1 }
+        }
+        LayoutOperation::Percent { p } if p < 100 => LayoutOperation::Percent { p: p + 1 },
+        LayoutOperation::RemainPercent { p } if p < 100 => {
+            LayoutOperation::RemainPercent { p: p + 1 }
+        }
+        LayoutOperation::RemainMinus { minus } if minus < max_size => {
+            LayoutOperation::RemainMinus { minus: minus + 1 }
+        }
+        _ => {
+            return op;
+        }
+    }
+}
+
+fn decrease_layout_op(op: LayoutOperation, _max_size: usize) -> LayoutOperation {
+    match op {
+        LayoutOperation::Fixed { size } if size > 2 => LayoutOperation::Fixed { size: size - 1 },
+        LayoutOperation::Percent { p } if p > 2 => LayoutOperation::Percent { p: p - 1 },
+        LayoutOperation::RemainPercent { p } if p > 2 => {
+            LayoutOperation::RemainPercent { p: p - 1 }
+        }
+        LayoutOperation::RemainMinus { minus } if minus > 2 => {
+            LayoutOperation::RemainMinus { minus: minus - 1 }
+        }
+        _ => {
+            return op;
+        }
+    }
+}
+
+pub fn increase_left(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx < 2 {
+        return;
+    }
+    let lidx = lidx - 2; // take left sibling
+
+    let max_size = pv.screen.read().unwrap().width();
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn decrease_left(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx < 2 {
+        return;
+    }
+    let lidx = lidx - 2; // take left sibling
+
+    let max_size = pv.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn increase_right(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx != 0 {
+        return;
+    }
+
+    let max_size = pv.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size);
+    pv.layout_ops[lidx] = new_op;
+}
+
+pub fn decrease_right(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RefCell<View<'static>>>,
+) {
+    let v = view.borrow_mut();
+    if v.parent_id.is_none() {
+        return;
+    }
+
+    let pvid = v.parent_id.unwrap();
+    let pv = editor.view_map.get(&pvid).unwrap();
+    let mut pv = pv.borrow_mut();
+
+    let lidx = v.layout_index.unwrap();
+    dbg_println!("lidx = {}", lidx);
+    if lidx != 0 {
+        return;
+    }
+
+    let max_size = pv.screen.read().unwrap().width();
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size);
+    pv.layout_ops[lidx] = new_op;
 }
 
 /*
