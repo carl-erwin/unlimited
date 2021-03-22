@@ -72,6 +72,8 @@ impl DocumentBuilder {
             buffer,
             cache: DocumentReadCache::new(),
             buffer_log: BufferLog::new(),
+            use_buffer_log: true,
+            abort_indexing: false,
             changed: false,
             is_syncing: false,
             last_tag_time: std::time::Instant::now(),
@@ -122,8 +124,10 @@ pub struct Document<'a> {
     buffer: Buffer<'a>,
     cache: DocumentReadCache,
     pub buffer_log: BufferLog,
+    pub use_buffer_log: bool,
     pub changed: bool,
     pub is_syncing: bool,
+    pub abort_indexing: bool,
     pub last_tag_time: std::time::Instant,
 }
 
@@ -184,7 +188,12 @@ impl<'a> Document<'a> {
         self.buffer_log.pos = 0;
     }
 
-    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks_offsets: Vec<u64>) {
+    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks_offsets: Vec<u64>) -> bool {
+        if !self.use_buffer_log {
+            // return log disabled ?
+            return false;
+        }
+
         if self.last_tag_time == time {
             // ignore contiguous event ? config
             // return;
@@ -201,6 +210,7 @@ impl<'a> Document<'a> {
         );
 
         self.last_tag_time = time;
+        true
     }
 
     pub fn get_tag_offsets(&mut self) -> Option<Vec<u64>> {
@@ -237,11 +247,13 @@ impl<'a> Document<'a> {
         let mut ins_data = Vec::with_capacity(nr_bytes);
         ins_data.extend(&data[..nr_bytes]);
 
-        self.buffer_log.add(
-            offset,
-            BufferOperationType::Insert,
-            Some(Arc::new(ins_data)),
-        );
+        if self.use_buffer_log {
+            self.buffer_log.add(
+                offset,
+                BufferOperationType::Insert,
+                Some(Arc::new(ins_data)),
+            );
+        }
 
         let sz = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
         if sz > 0 {
@@ -270,8 +282,11 @@ impl<'a> Document<'a> {
             v.extend(rm_data.clone());
         }
 
-        self.buffer_log
-            .add(offset, BufferOperationType::Remove, Some(Arc::new(rm_data)));
+        if self.use_buffer_log {
+            self.buffer_log
+                .add(offset, BufferOperationType::Remove, Some(Arc::new(rm_data)));
+        }
+
         if nr_bytes_removed > 0 {
             self.changed = true;
         }
