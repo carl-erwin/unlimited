@@ -25,6 +25,7 @@ use crate::core::view::View;
 use crate::core::modes::text_mode::ScreenFilter;
 use crate::core::modes::text_mode::TabFilter;
 use crate::core::modes::text_mode::WordWrapFilter;
+use crate::core::modes::HsplitMode;
 
 use crate::core::document::DocumentBuilder;
 
@@ -69,6 +70,8 @@ impl<'a> Mode for BasicEditorMode {
 
         let status_doc = status_doc;
 
+        // hsplt
+
         // children_layout_and_modes
         let ops_modes = vec![
             (
@@ -79,12 +82,17 @@ impl<'a> Mode for BasicEditorMode {
                 vec![], // TODO: title-mode
             ),
             (
-                LayoutOperation::RemainMinus { minus: 3 },
+                LayoutOperation::RemainMinus { minus: 2 },
                 doc.clone(),
                 vec!["core-mode".to_owned(), "text-mode".to_owned()],
             ),
             (
-                LayoutOperation::Fixed { size: 3 },
+                LayoutOperation::Fixed { size: 1 },
+                None,
+                vec!["hsplit-mode".to_owned()],
+            ),
+            (
+                LayoutOperation::RemainPercent { p: 100 },
                 status_doc,
                 vec!["status-mode".to_owned()],
             ),
@@ -116,6 +124,12 @@ impl<'a> Mode for BasicEditorMode {
             v.borrow_mut().destroyable = false;
         }
 
+
+        // TODO: put some kind of label on
+        // like view.label = 'text-view'
+        // like view.label = 'status-line'
+        // view.children_by_label<String, (vid, index)>
+
         // set focus on text view : TODO: title mode + configure
         let title_vid = view.children[0];
         let v = editor.view_map.get(&title_vid).unwrap();
@@ -130,7 +144,7 @@ impl<'a> Mode for BasicEditorMode {
 
         // TODO: status mode + configure
         // setup status view
-        let status_vid = view.children[2];
+        let status_vid = view.children[view.children.len() - 1];
         // set status_vid
         view.status_view_id = Some(status_vid);
     }
@@ -170,7 +184,7 @@ impl Filter<'_> for BasicEditorTitle {
         &"editor-title"
     }
 
-    fn setup(&mut self, env: &LayoutEnv, view: &View) {
+    fn setup(&mut self, env: &mut LayoutEnv, view: &View) {
         self.width = env.screen.width();
         self.height = env.screen.height();
 
@@ -242,121 +256,4 @@ impl Filter<'_> for BasicEditorTitle {
     }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
-}
-
-struct BasicEditorStatus {}
-
-impl BasicEditorStatus {
-    pub fn new() -> Self {
-        BasicEditorStatus {}
-    }
-}
-
-impl Filter<'_> for BasicEditorStatus {
-    fn name(&self) -> &'static str {
-        &"editor-status"
-    }
-
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
-
-    fn run(
-        &mut self,
-        _view: &View,
-        env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIo>,
-        filter_out: &mut Vec<FilterIo>,
-    ) {
-        // if no status defined print this default
-
-        let mut buff = vec![];
-
-        let default_style = CodepointInfo::new();
-        // skip line
-        for _ in 0..env.screen.width() {
-            filter_out.append(&mut print_io(&"─", &default_style));
-        }
-
-        let mut style_key = CodepointInfo::new();
-        // inverse colors
-        style_key.style.color = TextStyle::default_bg_color();
-        style_key.style.bg_color = TextStyle::default_color();
-
-        let style_action = CodepointInfo::new();
-        // normal colors
-        //        style_key.color = TextStyle::default_bg_color();
-        //        style_key.bg_color = TextStyle::default_color();
-
-        // 2nd line
-        let arr: Vec<(&str, &str)> = vec![
-            ("ctrl+x ctrl+s", " Save "),
-            // ("◀ ▶ ▲ ▼ ", " cursor moves "),
-            // ("ctrl+ ▲ ▼ ", " screen moves "),
-            ("ctrl+u", " Undo "),
-            ("ctrl+r", " Redo "),
-            ("ctrl+spc", " Start sel "),
-            ("alt+w", " Copy "),
-            ("ctrl+w", " Cut "),
-            ("ctrl+y", " Paste "),
-        ];
-
-        for e in arr {
-            buff.append(&mut print_io(&e.0, &style_key));
-            buff.append(&mut print_io(&e.1, &style_action));
-        }
-
-        buff.truncate(env.screen.width());
-        filter_out.append(&mut buff);
-        // pad until next line
-
-        //       let diff =  env.screen.width() - buff.len();
-        //       for i in 0..diff {
-        //           filter_out.append(&mut print_io(&" ", &default_style));
-        //       }
-
-        // 3rd line
-        let mut buff = vec![];
-        let arr: Vec<(&str, &str)> = vec![("ctrl+x ctrl+c", " Quit   ")];
-        for e in arr {
-            buff.append(&mut print_io(&e.0, &style_key));
-            buff.append(&mut print_io(&e.1, &style_action));
-        }
-        buff.truncate(env.screen.width());
-        filter_out.append(&mut buff);
-
-        env.quit = true;
-    }
-
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
-}
-
-// current_line
-fn print_io(text: &str, cpi: &CodepointInfo) -> Vec<FilterIo> {
-    let mut v = Vec::with_capacity(text.len());
-
-    for (_idx, c) in text.chars().enumerate() {
-        let mut cpi = cpi.clone();
-        cpi.cp = c;
-        cpi.displayed_cp = c;
-        if c == '\t' || c == '\n' {
-            cpi.displayed_cp = ' ';
-        }
-
-        v.push(FilterIo {
-            metadata: true,
-            style: cpi.style.clone(),
-            offset: None,
-            size: 0,
-            data: FilterData::Unicode {
-                real_cp: cpi.cp as u32,
-                displayed_cp: cpi.displayed_cp as u32,
-                fragment_flag: false,
-                fragment_count: 0,
-            },
-        });
-    }
-
-    //(il faut tester)dbg_println!("PRINT IO '{}' -> v = {:?}", text, v);
-    //(il faut tester)dbg_println!("--------------------------");
-
-    v
 }

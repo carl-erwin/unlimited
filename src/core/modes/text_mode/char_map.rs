@@ -30,7 +30,7 @@ impl Filter<'_> for CharMapFilter {
         &"CharMapFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, view: &View) {
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
         let char_map = tm.char_map.clone();
         let color_map = tm.color_map.clone();

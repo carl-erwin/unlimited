@@ -373,7 +373,6 @@ impl TextMode {
                 "text-mode:clone-and-move-mark-to-next-line",
                 clone_and_move_mark_to_next_line,
             ),
-
             // selection
             (
                 "text-mode:set-select-point-at-mark",
@@ -381,8 +380,6 @@ impl TextMode {
             ),
             ("text-mode:copy-selection", copy_selection),
             ("text-mode:cut-selection", cut_selection),
-
-
             // screen
             ("text-mode:page-up", scroll_to_previous_screen),
             ("text-mode:page-down", scroll_to_next_screen),
@@ -413,7 +410,6 @@ impl TextMode {
             ("text-mode:button-press", button_press),
             ("text-mode:button-release", button_release),
             ("text-mode:pointer-motion", pointer_motion),
-
             // TODO: usage not well defined
             ("editor:cancel", editor_cancel),
         ];

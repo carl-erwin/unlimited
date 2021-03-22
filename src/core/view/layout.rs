@@ -40,7 +40,7 @@ pub struct LayoutEnv<'a> {
 pub trait Filter<'a> {
     fn name(&self) -> &'static str;
 
-    fn setup(&mut self, env: &LayoutEnv, _view: &View);
+    fn setup(&mut self, env: &mut LayoutEnv, _view: &View);
 
     fn run_managed(
         &mut self,
@@ -60,9 +60,8 @@ pub trait Filter<'a> {
         input: &Vec<FilterIo>,
         output: &mut Vec<FilterIo>,
     ) -> () {
-        // default
         *output = input.clone();
-    }
+     }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
         // default
@@ -362,8 +361,8 @@ pub fn run_compositing_stage_direct(
     let mut filter_in = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
     let mut filter_out = Vec::with_capacity(layout_env.screen.width() * layout_env.screen.height());
 
-    // TODO
     for f in compose_filters.iter_mut() {
+        dbg_println!("setup {}", f.name());
         f.setup(&mut layout_env, &view);
     }
 

@@ -32,7 +32,7 @@ impl Filter<'_> for RawDataFilter {
         &"RawDataFilter"
     }
 
-    fn setup(&mut self, env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, env: &mut LayoutEnv, _view: &View) {
         dbg_println!(
             "RawDataFilter w {} h {}",
             env.screen.width(),

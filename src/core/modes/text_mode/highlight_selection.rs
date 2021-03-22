@@ -40,7 +40,7 @@ impl Filter<'_> for HighlightSelectionFilter {
         &"HighlightSelectionFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, view: &View) {
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
 
         // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges

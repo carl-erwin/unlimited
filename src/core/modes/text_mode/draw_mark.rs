@@ -23,7 +23,7 @@ impl Filter<'_> for DrawMarks {
         &"DrawMarks"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {}
 
     fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {
         if env.screen.is_off_screen == true {

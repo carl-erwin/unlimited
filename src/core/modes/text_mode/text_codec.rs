@@ -45,7 +45,7 @@ impl Filter<'_> for TextCodecFilter {
         &"TextCodecFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {}
 
     fn run(
         &mut self,
@@ -263,7 +263,7 @@ impl Filter<'_> for Utf8Filter {
         &"Utf8Filter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {
         self.ctx = Utf8FilterCtx::new();
     }
 

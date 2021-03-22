@@ -90,7 +90,7 @@ impl Filter<'_> for HsplitModeComposeFilter {
         &"hsplit-compose-filter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {}
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {}
 
     fn run(
         &mut self,

@@ -16,6 +16,14 @@ use crate::core::modes::text_mode::WordWrapFilter;
 use crate::core::view::View;
 use crate::dbg_println;
 
+use crate::core::view::layout::Filter;
+use crate::core::view::layout::FilterData;
+use crate::core::view::layout::FilterIo;
+use crate::core::view::layout::LayoutEnv;
+
+use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 pub struct StatusModeContext {}
 
 impl<'a> Mode for StatusMode {
@@ -47,8 +55,6 @@ impl<'a> Mode for StatusMode {
         let use_tabulation_exp = true;
         let use_word_wrap = true;
 
-        // NB: Execution in push order
-
         // mandatory data reader
         view.compose_filters
             .borrow_mut()
@@ -79,7 +85,6 @@ impl<'a> Mode for StatusMode {
                 .borrow_mut()
                 .push(Box::new(WordWrapFilter::new()));
         }
-        //
 
         let mut screen_filter = ScreenFilter::new();
         screen_filter.display_eof = false;

@@ -44,7 +44,7 @@ impl Filter<'_> for ScreenFilter {
         &"ScreenFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {
         self.first_offset = None;
         self.screen_is_full = false;
     }
@@ -65,7 +65,6 @@ impl Filter<'_> for ScreenFilter {
 
         // here ?
         if self.first_offset.is_none() {
-            env.screen.clear();
             env.screen.first_offset = base_offset.clone();
             self.first_offset = base_offset.clone();
         }

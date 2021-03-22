@@ -38,7 +38,7 @@ impl Filter<'_> for WordWrapFilter {
         &"WordWrapFilter"
     }
 
-    fn setup(&mut self, env: &LayoutEnv, view: &View) {
+    fn setup(&mut self, env: &mut LayoutEnv, view: &View) {
         self.max_column = env.screen.width() as u64;
         self.column_count = 0;
         self.accum = Vec::new();

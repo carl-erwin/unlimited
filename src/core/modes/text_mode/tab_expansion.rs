@@ -24,7 +24,7 @@ impl Filter<'_> for TabFilter {
         &"TabFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {
         self.prev_cp = '\u{0}';
         self.column_count = 0;
     }

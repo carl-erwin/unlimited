@@ -60,7 +60,7 @@ impl Filter<'_> for HighlightFilter {
         &"HighlightFilter"
     }
 
-    fn setup(&mut self, _env: &LayoutEnv, _view: &View) {
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {
         self.token_io = Vec::new();
         self.token_type = TokenType::Unknown;
         self.utf8_token = Vec::new();

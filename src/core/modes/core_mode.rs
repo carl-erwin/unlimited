@@ -149,7 +149,7 @@ pub fn application_quit_abort_setup(
         let sz = doc.size();
         doc.remove(0, sz, None);
         // set status text
-        let text = "\nModified documents exist. Really quit? y/n\n";
+        let text = "Modified documents exist. Really quit? y/n";
         let bytes = text.as_bytes();
         doc.insert(0, bytes.len(), &bytes);
 

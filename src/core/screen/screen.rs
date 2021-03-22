@@ -333,7 +333,7 @@ impl Screen {
                             last_offset
                         );
 
-                        panic!();
+                        // panic!(); allow unsorted offsets ?
                     }
                 }
                 _ => {}
