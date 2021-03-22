@@ -61,7 +61,7 @@ pub trait Filter<'a> {
         output: &mut Vec<FilterIo>,
     ) -> () {
         *output = input.clone();
-     }
+    }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
         // default

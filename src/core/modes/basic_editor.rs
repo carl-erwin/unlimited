@@ -124,7 +124,6 @@ impl<'a> Mode for BasicEditorMode {
             v.borrow_mut().destroyable = false;
         }
 
-
         // TODO: put some kind of label on
         // like view.label = 'text-view'
         // like view.label = 'status-line'

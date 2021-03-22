@@ -37,8 +37,7 @@ impl Filter<'_> for DrawMarks {
     }
 }
 
-// SLOW
-// we should iterate over the screen
+
 fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     if !set {
         screen_apply(screen, |_, _, cpi| {
@@ -62,49 +61,68 @@ fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         }
     };
 
-    for m in marks.iter() {
-        if m.offset < first_offset {
+    let idx_max = marks.len();
+    let mut idx = 0;
+    while idx < idx_max {
+        if marks[idx].offset < first_offset {
+            idx += 1;
             continue;
         }
-        if m.offset > last_offset {
-            break;
-        }
+        break;
+    }
 
-        let doc_max_offset = screen.doc_max_offset;
-        // TODO: screen iterator
-        let mut lines_with_marks = vec![];
-
+    let doc_max_offset = screen.doc_max_offset;
+    let mut lines_with_marks = vec![];
+    if idx < idx_max && marks[idx].offset <= last_offset {
         screen_apply(screen, |_, l, cpi| {
             if let Some(offset) = cpi.offset {
-                if offset == m.offset {
-                    if let Some(last) = lines_with_marks.last() {
+                if *&marks[idx].offset > last_offset {
+                    return false;
+                }
+
+                if offset == *&marks[idx].offset {
+                    // save line index
+                    if let Some(last) = (*&lines_with_marks).last() {
                         if *last != l {
-                            lines_with_marks.push(l);
+                            &lines_with_marks.push(l);
                         }
                     } else {
-                        lines_with_marks.push(l);
+                        &lines_with_marks.push(l);
                     }
+
                     cpi.style.is_inverse = true;
                     if cpi.cp == '\n' {
                         // stop at first new line // line is filled with same offsets
-                        return false;
+                        return true;
                     }
                     if offset > doc_max_offset {
                         // EOF: the screen can be filled with EOFs
                         return false;
                     }
+                } else {
+                    // get next mark
+                    while idx < idx_max {
+                        if marks[idx].offset > offset {
+                            break;
+                        }
+                        idx += 1;
+                    }
+                    if idx == idx_max {
+                        return false;
+                    }
                 }
             }
-            true // continue
-        });
 
-        // highlight mark-line
-        for l in lines_with_marks {
-            if let Some(l) = screen.get_line_mut(l) {
-                for cell in &mut l.cells {
-                    if !cell.cpi.style.is_selected {
-                        cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
-                    }
+            true
+        });
+    }
+
+    // highlight mark-line
+    for l in lines_with_marks {
+        if let Some(l) = screen.get_line_mut(l) {
+            for cell in &mut l.cells {
+                if !cell.cpi.style.is_selected {
+                    cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
                 }
             }
         }
