@@ -85,6 +85,10 @@ pub struct EditorEnv<'a> {
     //
     pub width: usize,
     pub height: usize,
+    pub global_x: Option<i32>,
+    pub global_y: Option<i32>,
+    pub diff_x: i32,
+    pub diff_y: i32,
 
     //
     pub root_view_index: usize,
@@ -94,6 +98,7 @@ pub struct EditorEnv<'a> {
     pub view_id: usize,
     pub focus_on: usize,
     pub focus_changed_to: Option<view::Id>,
+    pub focus_locked_on: Option<view::Id>,
 
     pub center_offset: Option<u64>,
 }
@@ -119,6 +124,10 @@ impl<'a> EditorEnv<'a> {
             process_input_end: Instant::now(),
             width: 0,
             height: 0,
+            global_x: None,
+            global_y: None,
+            diff_x: 0,
+            diff_y: 0,
             //max
             root_view_index: 0,
             prev_vid: 1, // NB
@@ -126,6 +135,7 @@ impl<'a> EditorEnv<'a> {
             center_offset: None,
             focus_changed_to: None,
             focus_on: 0,
+            focus_locked_on: None,
         }
     }
 }

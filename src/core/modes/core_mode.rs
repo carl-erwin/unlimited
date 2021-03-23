@@ -161,6 +161,9 @@ pub fn application_quit_abort_setup(
         // push new input map for y/n
         {
             let mut v = view.borrow_mut();
+            // lock focus on v
+            // env.focus_locked_on = Some(v.id);
+
             dbg_println!("configure quit-abort VID {}", v.id);
             v.input_ctx.stack_pos = None;
             let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
@@ -191,6 +194,8 @@ pub fn application_quit_abort_no(
         let v = view.borrow_mut();
         let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
         input_map_stack.pop();
+        // unlock focus
+        // env.focus_locked_on = None;
     }
 
     // reset status view : TODO: view::reset_status_view(&editor, view);
@@ -379,7 +384,7 @@ pub fn split_vertically(
     // children_layout_and_modes
     let ops_modes = vec![
         (
-            LayoutOperation::Percent { p: 50 },
+            LayoutOperation::Percent { p: 50.0 },
             doc.clone(),
             parent_modes.clone(),
         ),
@@ -391,7 +396,7 @@ pub fn split_vertically(
             vec!["vsplit-mode".to_owned()],
         ),
         (
-            LayoutOperation::RemainPercent { p: 100 },
+            LayoutOperation::RemainPercent { p: 100.0 },
             doc.clone(),
             parent_modes.clone(),
         ),
@@ -462,7 +467,7 @@ pub fn split_horizontally(
     // children_layout_and_modes
     let ops_modes = vec![
         (
-            LayoutOperation::Percent { p: 50 },
+            LayoutOperation::Percent { p: 50.0 },
             doc.clone(),
             parent_modes.clone(),
         ),
@@ -474,7 +479,7 @@ pub fn split_horizontally(
             vec!["hsplit-mode".to_owned()],
         ),
         (
-            LayoutOperation::RemainPercent { p: 100 },
+            LayoutOperation::RemainPercent { p: 100.0 },
             doc.clone(),
             parent_modes.clone(),
         ),
@@ -497,38 +502,107 @@ pub fn split_horizontally(
     );
 }
 
-fn increase_layout_op(op: LayoutOperation, max_size: usize) -> LayoutOperation {
-    match op {
+// quit hack ignoring other children
+pub fn increase_layout_op(
+    op: LayoutOperation,
+    max_size: usize,
+    cur_size: usize,
+    diff: usize,
+) -> LayoutOperation {
+    dbg_println!(
+        "INC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
+        op,
+        max_size,
+        cur_size,
+        diff
+    );
+
+    let new_op = match op {
         LayoutOperation::Fixed { size } if size < max_size => {
             LayoutOperation::Fixed { size: size + 1 }
         }
-        LayoutOperation::Percent { p } if p < 100 => LayoutOperation::Percent { p: p + 1 },
-        LayoutOperation::RemainPercent { p } if p < 100 => {
-            LayoutOperation::RemainPercent { p: p + 1 }
+        LayoutOperation::Percent { p } => {
+            if cur_size + diff >= max_size {
+                return op;
+            }
+            let expect_p = ((cur_size + diff) as f32 * p) / cur_size as f32;
+            dbg_println!("LAYOUT expect_p = {}", expect_p);
+            LayoutOperation::Percent { p: expect_p }
         }
-        LayoutOperation::RemainMinus { minus } if minus < max_size => {
-            LayoutOperation::RemainMinus { minus: minus + 1 }
+        LayoutOperation::RemainPercent { p } if p < 99.0 => {
+            let unit = max_size as f32 / 100.0;
+            LayoutOperation::RemainPercent { p: p + unit }
         }
-        _ => {
-            return op;
+        LayoutOperation::RemainMinus { minus } => {
+            dbg_println!(
+                "LAYOUT = max_size{} - minus*100{} / 100 = {}",
+                minus * 100,
+                max_size,
+                max_size.saturating_sub(minus * 100) / 100
+            );
+            LayoutOperation::RemainMinus {
+                minus: ((minus * 100 + max_size) / 100) - 1,
+            }
         }
-    }
+        _ => op,
+    };
+
+    dbg_println!("INC LAYOUT NEW OP {:?}", new_op);
+
+    new_op
 }
 
-fn decrease_layout_op(op: LayoutOperation, _max_size: usize) -> LayoutOperation {
-    match op {
+// quit hack ignoring other children
+pub fn decrease_layout_op(
+    op: LayoutOperation,
+    max_size: usize,
+    cur_size: usize,
+    diff: usize,
+) -> LayoutOperation {
+    dbg_println!(
+        "DEC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
+        op,
+        max_size,
+        cur_size,
+        diff
+    );
+
+    let new_op = match op {
         LayoutOperation::Fixed { size } if size > 2 => LayoutOperation::Fixed { size: size - 1 },
-        LayoutOperation::Percent { p } if p > 2 => LayoutOperation::Percent { p: p - 1 },
-        LayoutOperation::RemainPercent { p } if p > 2 => {
-            LayoutOperation::RemainPercent { p: p - 1 }
+        LayoutOperation::Percent { p } => {
+            if cur_size <= diff {
+                return op;
+            }
+
+            let expect_p = ((cur_size - diff) as f32 * p) / cur_size as f32;
+            dbg_println!("LAYOUT expect_p = {}", expect_p);
+            LayoutOperation::Percent { p: expect_p }
         }
-        LayoutOperation::RemainMinus { minus } if minus > 2 => {
-            LayoutOperation::RemainMinus { minus: minus - 1 }
+
+        LayoutOperation::RemainPercent { p } if p > 2.0 => {
+            let unit = (max_size as f32) / 100.0;
+            LayoutOperation::RemainPercent { p: p - unit }
         }
-        _ => {
-            return op;
+        LayoutOperation::RemainMinus { minus } => {
+            dbg_println!(
+                "LAYOUT = minus*100 {} + max_size {} / 100 = {}",
+                minus * 100,
+                max_size,
+                (minus * 100 + max_size) / 100
+            );
+            if ((minus * 100 + max_size) / 100) + 1 > 100 {
+                return op;
+            }
+            LayoutOperation::RemainMinus {
+                minus: ((minus * 100 + max_size) / 100) + 1,
+            }
         }
-    }
+        _ => op,
+    };
+
+    dbg_println!("DEC LAYOUT NEW OP {:?}", new_op);
+
+    new_op
 }
 
 pub fn increase_left(
@@ -553,7 +627,7 @@ pub fn increase_left(
     let lidx = lidx - 2; // take left sibling
 
     let max_size = pv.screen.read().unwrap().width();
-    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size);
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, max_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
 
@@ -579,7 +653,8 @@ pub fn decrease_left(
     let lidx = lidx - 2; // take left sibling
 
     let max_size = pv.screen.read().unwrap().width();
-    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size);
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
 
@@ -604,7 +679,8 @@ pub fn increase_right(
     }
 
     let max_size = pv.screen.read().unwrap().width();
-    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size);
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
 
@@ -629,7 +705,8 @@ pub fn decrease_right(
     }
 
     let max_size = pv.screen.read().unwrap().width();
-    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size);
+    let cur_size = v.screen.read().unwrap().width();
+    let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
 

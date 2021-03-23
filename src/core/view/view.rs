@@ -119,12 +119,12 @@ pub enum LayoutOperation {
     // We want a fixed percentage of sz cells vertically/horizontally
     // used = (parent.sz/100) * sz
     // remain = parent.sz - used
-    Percent { p: usize },
+    Percent { p: f32 },
 
     // We want a fixed percentage of sz cells vertically/horizontally
     // used = (remain/100 * sz)
     // (remain <- remain - (remain/100 * sz))
-    RemainPercent { p: usize },
+    RemainPercent { p: f32 },
 
     // We want a fixed percentage of sz cells vertically/horizontally
     // used = (remain - minus)
@@ -157,13 +157,15 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
             }
 
             LayoutOperation::Percent { p } => {
-                let used = (*p * start) / 100;
+                let used = (*p * start as f32) / 100.0;
+                let used = used as usize;
                 remain = remain.saturating_sub(used);
                 sizes.push(used);
             }
 
             LayoutOperation::RemainPercent { p } => {
-                let used = (*p * remain) / 100;
+                let used = (*p * remain as f32) / 100.0;
+                let used = used as usize;
                 remain = remain.saturating_sub(used);
                 sizes.push(used);
             }

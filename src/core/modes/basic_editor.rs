@@ -92,7 +92,7 @@ impl<'a> Mode for BasicEditorMode {
                 vec!["hsplit-mode".to_owned()],
             ),
             (
-                LayoutOperation::RemainPercent { p: 100 },
+                LayoutOperation::RemainPercent { p: 100.0 },
                 status_doc,
                 vec!["status-mode".to_owned()],
             ),

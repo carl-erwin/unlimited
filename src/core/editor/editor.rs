@@ -619,17 +619,65 @@ pub fn set_focus_on_view(
     }
 }
 
-// clips (x,y) to local view @ (x,y)
-// returns the view's id at
-fn clip_coordinates_xy(
+// always compute ?
+fn clip_locked_coordinates_xy(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     root_vid: view::Id,
     _vid: view::Id,
     x: &mut i32,
     y: &mut i32,
 ) -> view::Id {
+    let mut id = env.focus_locked_on.unwrap();
+
+    dbg_println!("CLIPPING LOCKED ----------------------------------BEGIN");
+
+    dbg_println!(
+        "CLIPPING LOCKED ---------------------------------- X({}) Y({})",
+        x,
+        y
+    );
+    dbg_println!(
+        "CLIPPING LOCKED ---------------------------------- GL X({}) GL Y({})",
+        x,
+        y
+    );
+
+    env.diff_x = *x - env.global_x.unwrap();
+    env.diff_y = *y - env.global_y.unwrap();
+
+    dbg_println!(
+        "CLIPPING LOCKED ---------------------------------- DIFF X({}) Y({})",
+        env.diff_x,
+        env.diff_y
+    );
+    dbg_println!("CLIPPING LOCKED ----------------------------------END");
+
+    id
+}
+
+// clips (x,y) to local view @ (x,y)
+// returns the view's id at
+fn clip_coordinates_xy(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    root_vid: view::Id,
+    vid: view::Id,
+    mut x: &mut i32,
+    mut y: &mut i32,
+) -> view::Id {
     let mut id = root_vid;
+
+    if env.focus_locked_on.is_some() {
+        return clip_locked_coordinates_xy(&mut editor, &mut env, root_vid, vid, &mut x, &mut y);
+    }
+
+    let root_x = *x;
+    let root_y = *y;
+    env.diff_x = 0;
+    env.diff_y = 0;
+    env.global_x = Some(root_x);
+    env.global_y = Some(root_y);
 
     // check layout type
     dbg_println!("CLIPPING -----------------------------------BEGIN");

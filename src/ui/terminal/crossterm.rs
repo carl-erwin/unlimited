@@ -486,6 +486,7 @@ fn translate_crossterm_event(
 ) -> InputEvent {
     // translate termion event
     *pending_resize = false;
+    //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
 
     match evt {
         ::crossterm::event::Event::Key(ke) => match ke.code {
@@ -651,6 +652,8 @@ fn translate_crossterm_event(
                 // TODO: filter dragged button
 
                 // return InputEvent::NoInputEvent;
+
+                dbg_println!("DRAG");
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
