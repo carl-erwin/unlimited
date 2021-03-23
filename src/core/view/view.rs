@@ -237,8 +237,9 @@ pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,
     pub parent_id: Option<Id>,
-    pub focus_to: Option<Id>,       // child id
+    pub focus_to: Option<Id>,       // child id TODO: redirect input ?
     pub status_view_id: Option<Id>, // write to this view's document to interact with the user
+
     /*
       any view that can display some text,
       TODO: use special document for this
@@ -274,6 +275,7 @@ pub struct View<'a> {
     pub layout_direction: LayoutDirection,
     pub layout_ops: Vec<LayoutOperation>,
     pub children: Vec<Id>,
+    pub main_child: Option<usize>, // index in children
 
     //
     pub stage_actions: Vec<(String, StageFunction)>,
@@ -328,6 +330,7 @@ impl<'a> View<'a> {
             layout_direction: LayoutDirection::NotSet,
             layout_ops: vec![],
             children: vec![],
+            main_child: None,
             //
             stage_actions: vec![],
 

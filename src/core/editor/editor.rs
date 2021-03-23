@@ -592,7 +592,7 @@ pub fn set_focus_on_vid(
 
 pub fn set_focus_on_view(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &mut View<'static>,
 ) {
     // TODO: propagate focus up to root
@@ -608,6 +608,7 @@ pub fn set_focus_on_view(
                 let mut pview = pview.borrow_mut();
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
+                env.focus_on = vid; // Option ?
                 dbg_println!("next  parent_id {:?}", parent_id);
             } else {
                 break;
@@ -913,6 +914,7 @@ fn setup_focus(
     ev: &InputEvent,
     compose: &mut bool,
 ) -> view::Id {
+    env.focus_on = 0;
     let root_vid = env.view_id;
     let vid = get_focused_vid(&mut editor, &mut env, root_vid);
     dbg_println!("FOCUS on vid {}", vid);

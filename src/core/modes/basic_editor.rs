@@ -138,7 +138,8 @@ impl<'a> Mode for BasicEditorMode {
             .push(Box::new(BasicEditorTitle::new()));
 
         // set focus on text view
-        view.focus_to = Some(view.children[1]); // TODO: get focus
+        view.main_child = Some(1); // index in children
+        view.focus_to = Some(view.children[1]); // TODO:
         env.focus_changed_to = Some(view.children[1]); // TODO:
 
         // TODO: status mode + configure

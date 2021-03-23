@@ -94,7 +94,7 @@ impl Filter<'_> for VsplitModeComposeFilter {
 
     fn run(
         &mut self,
-        _view: &View,
+        view: &View,
         env: &mut LayoutEnv,
         _filter_in: &Vec<FilterIo>,
         _filter_out: &mut Vec<FilterIo>,
@@ -102,7 +102,9 @@ impl Filter<'_> for VsplitModeComposeFilter {
         // hack
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        // cpi.style.bg_color = (100, 123, 153);
+        if env.focus_vid == view.id {
+            cpi.style.bg_color = (100, 123, 153);
+        }
         cpi.cp = '│';
         cpi.displayed_cp = '│';
         cpi.metadata = true;

@@ -92,6 +92,7 @@ pub struct EditorEnv<'a> {
     //
     pub prev_vid: usize,
     pub view_id: usize,
+    pub focus_on: usize,
     pub focus_changed_to: Option<view::Id>,
 
     pub center_offset: Option<u64>,
@@ -124,6 +125,7 @@ impl<'a> EditorEnv<'a> {
             view_id: 1,  // NB
             center_offset: None,
             focus_changed_to: None,
+            focus_on: 0,
         }
     }
 }

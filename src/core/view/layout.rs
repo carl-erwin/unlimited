@@ -31,6 +31,7 @@ pub struct LayoutEnv<'a> {
     pub base_offset: u64,
     pub max_offset: u64,
     pub screen: &'a mut Screen,
+    pub focus_vid: view::Id,
 }
 
 // TODO: add ?
@@ -350,6 +351,7 @@ pub fn run_compositing_stage_direct(
         base_offset,
         max_offset,
         screen,
+        focus_vid: editor_env.focus_on,
     };
 
     // screen must be cleared by caller
