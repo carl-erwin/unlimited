@@ -207,6 +207,10 @@ impl Filter<'_> for BasicEditorTitle {
         } else {
             doc_info.push_str("  ");
         }
+        if d.is_syncing {
+            doc_info.push_str(" (sync) ");
+        }
+
         doc_info.push_str(&format!(" size {:<12}", d.size()));
 
         self.title.push_str(&doc_info);

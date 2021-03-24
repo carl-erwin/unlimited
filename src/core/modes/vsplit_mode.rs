@@ -185,6 +185,11 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
 
         let new_op = if env.diff_x < 0 {
             // TODO: find a better way to refresh global coords
+
+            if cur_size.saturating_sub(env.diff_x as usize) > max_size {
+                return;
+            }
+
             let diff = -env.diff_x;
             let gx = env.global_x.unwrap();
             if gx <= diff {
@@ -195,10 +200,13 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Re
             //
             decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, diff as usize)
         } else if env.diff_x > 0 {
+            if cur_size + env.diff_x as usize > max_size {
+                return;
+            }
+
             // TODO: find a better way to refresh global coords
             let gx = env.global_x.unwrap() + env.diff_x;
             env.global_x = Some(gx);
-
             increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, env.diff_x as usize)
         } else {
             return;

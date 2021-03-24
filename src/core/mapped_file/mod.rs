@@ -5,13 +5,10 @@
 // the leaves are linked to allow fast sequential traversal.
 //
 
-extern crate libc;
-
 use std::collections::HashSet;
 
 use std::cell::RefCell;
 
-use std::ffi::CString;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::Deref;
@@ -22,34 +19,14 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::slice;
 
+use std::fs;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::SeekFrom;
+
 use std::sync::{Arc, RwLock};
 
 const DEBUG: bool = false;
-
-use self::libc::{
-    c_int,
-    c_void,
-    close,
-    fstat,
-    mmap,
-    munmap,
-    open,
-    posix_fadvise, // posix_madvise,
-    pread,
-    size_t,
-    unlink,
-    write,
-    MAP_FAILED,
-    MAP_PRIVATE,
-    O_CREAT,
-    O_RDONLY,
-    O_RDWR,
-    O_TRUNC,
-    PROT_READ,
-    S_IFDIR,
-    S_IRUSR,
-    S_IWUSR,
-};
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,11 +38,6 @@ enum PageSource {
 
 #[derive(Debug, Clone)]
 enum Page {
-    // read only mapped region: use this if your are sure the storage is a local disk
-    // already adjusted  (base + skip) / (len - skip)
-    MappedStorage(*const u8, size_t, size_t, c_int), // base, len, skip, fd
-
-    // read only region: like mmap  but avoid SIGBUS, on network/usb storage errors
     ReadOnlyStorageCopy(*const u8, usize), // base, len
 
     // Copy on write
@@ -75,9 +47,6 @@ enum Page {
 impl Page {
     fn as_slice<'a>(&self) -> Option<&'a [u8]> {
         Some(match *self {
-            // already adjusted  (base + skip) / (len - skip)
-            Page::MappedStorage(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
-
             Page::ReadOnlyStorageCopy(base, len) => unsafe { slice::from_raw_parts(base, len) },
 
             Page::InRam(base, len, ..) => unsafe { slice::from_raw_parts(base, len) },
@@ -88,12 +57,6 @@ impl Page {
 impl Drop for Page {
     fn drop(&mut self) {
         match *self {
-            Page::MappedStorage(base, len, skip, ..) => {
-                // eprintln!("munmap {:?}", base);
-                let _base =
-                    unsafe { munmap(base.offset(-(skip as isize)) as *mut c_void, len + skip) };
-            }
-
             Page::ReadOnlyStorageCopy(base, len) => {
                 let v = unsafe { Vec::from_raw_parts(base as *mut u8, len, len) };
                 drop(v);
@@ -132,13 +95,11 @@ type NodeLocalOffset = u64;
 pub type FileHandle<'a> = Arc<RwLock<MappedFile<'a>>>;
 pub type FileIterator<'a> = MappedFileIterator<'a>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Node {
     // state ?
     used: bool,
     to_delete: bool,
-
-    fd: c_int, // TODO: Windows handle / cfg
 
     // idx: NodeIndex, // for DEBUG
     parent: Option<NodeIndex>,
@@ -162,7 +123,6 @@ impl Node {
     fn clear(&mut self) {
         self.used = false;
         self.to_delete = false;
-        self.fd = -1;
         // self.idx = 0xffff_ffff_ffff_ffff as NodeIndex;
         self.parent = None;
         self.left = None;
@@ -181,15 +141,12 @@ impl Node {
     }
 
     // use this to read data directly skipping temporary
-    pub fn do_direct_copy(&self, out: &mut [u8]) -> Option<usize> {
-        // - already mapped ? -
+    pub fn do_direct_copy(&self, fd: &Option<Arc<RwLock<File>>>, out: &mut [u8]) -> Option<usize> {
+        // in ram ? -
         if let Some(ref page) = self.cow {
             let p = page.borrow().as_slice().unwrap();
             let n = std::cmp::min(out.len(), p.len());
             assert!(n > 0);
-            //for i in 0..n {
-            //    out[i] = p[i];
-            //}
             unsafe {
                 ptr::copy(p.as_ptr(), out.as_mut_ptr(), n);
             }
@@ -201,80 +158,58 @@ impl Node {
             let p = page.borrow().as_slice().unwrap();
             let n = std::cmp::min(out.len(), p.len());
             assert!(n > 0);
-            //for i in 0..n {
-            //    out[i] = p[i];
-            //}
             unsafe {
                 ptr::copy(p.as_ptr(), out.as_mut_ptr(), n);
             }
-
             return Some(n);
         }
 
-        // - pread/mmap
+        // access storage
         if let Some(storage_offset) = self.storage_offset {
-            match std::env::var("UNLIMITED_USE_MAPPED_FILE") {
-                Err(_) => unsafe {
-                    let base = out.as_ptr();
-                    let n = std::cmp::min(out.len(), self.size as usize);
-                    assert!(n > 0);
-                    let nrd = pread(self.fd, base as *mut c_void, n, storage_offset as i64);
-                    assert!(nrd > 0);
-                    if nrd < 0 {
-                        // handle error
-                        return None;
-                    }
-                    return Some(nrd as usize);
-                },
+            let n = std::cmp::min(out.len(), self.size as usize);
+            assert!(n > 0);
 
-                Ok(_) => unsafe {
-                    let ptr = {
-                        mmap(
-                            ptr::null_mut(),
-                            (self.size + self.skip) as usize,
-                            PROT_READ,
-                            MAP_PRIVATE,
-                            self.fd,
-                            storage_offset as i64,
-                        )
-                    };
+            let mut fd = fd.as_ref().unwrap().write().unwrap();
 
-                    if ptr == MAP_FAILED {
-                        eprintln!(
-                            "mmap error : disk_offset = {}, size = {}",
-                            storage_offset, self.size
-                        );
-                        return None;
-                    }
-
-                    let n = std::cmp::min(out.len(), (self.size + self.skip) as usize);
-                    let p = ptr.offset(self.skip as isize) as *const u8;
-                    ptr::copy(p, out.as_mut_ptr(), n);
-                    return Some(n);
-                },
-            }
+            let _ = fd.seek(SeekFrom::Start(storage_offset));
+            let nrd = fd.read(&mut out[..n]).unwrap(); // remove unwrap() )?; TODO: io error
+            assert!(nrd == n);
+            return Some(nrd);
         }
 
         None
     }
 
-    fn do_read(&mut self, storage_offset: u64) -> Option<Rc<RefCell<Page>>> {
+    fn do_read(
+        &mut self,
+        fd: &Option<Arc<RwLock<File>>>,
+        storage_offset: u64,
+    ) -> Option<Rc<RefCell<Page>>> {
         let mut v = Vec::with_capacity(self.size as usize);
 
         // from Vec doc
         // Pull out the various important pieces of information about `v`
         let base = v.as_mut_ptr() as *const u8;
         let capacity = v.capacity();
-
-        let nrd = unsafe {
-            pread(
-                self.fd,
-                base as *mut c_void,
-                capacity,
-                storage_offset as i64,
-            )
+        unsafe {
+            v.set_len(capacity);
         };
-        if nrd < 0 || nrd != capacity as isize {
+
+        let _ = fd
+            .as_ref()
+            .unwrap()
+            .write()
+            .unwrap()
+            .seek(SeekFrom::Start(storage_offset));
+
+        let nrd = fd
+            .as_ref()
+            .unwrap()
+            .write()
+            .unwrap()
+            .read(&mut v[..capacity])
+            .unwrap();
+        if nrd != capacity {
             eprintln!(
                 "read error error : disk_offset = {}, size = {}",
                 storage_offset, self.size
@@ -296,43 +231,7 @@ impl Node {
         Some(page)
     }
 
-    fn do_mmap(&mut self, storage_offset: u64) -> Option<Rc<RefCell<Page>>> {
-        let ptr = unsafe {
-            mmap(
-                ptr::null_mut(),
-                (self.size + self.skip) as usize,
-                PROT_READ,
-                MAP_PRIVATE,
-                self.fd,
-                storage_offset as i64,
-            )
-        };
-
-        if ptr == MAP_FAILED {
-            eprintln!(
-                "mmap error : disk_offset = {}, size = {}",
-                storage_offset, self.size
-            );
-            return None;
-        }
-
-        // adjust base + skip
-        let base = unsafe { ptr.offset(self.skip as isize) as *const u8 };
-        let len = (self.size - self.skip) as usize;
-
-        let page = Rc::new(RefCell::new(Page::MappedStorage(
-            base, // adjusted ptr + skip
-            len,  // adjusted len - skip
-            self.skip as usize,
-            self.fd,
-        )));
-
-        self.page = Rc::downgrade(&page);
-
-        Some(page)
-    }
-
-    fn map(&mut self) -> Option<Rc<RefCell<Page>>> {
+    fn map(&mut self, fd: &Option<Arc<RwLock<File>>>) -> Option<Rc<RefCell<Page>>> {
         // ram ?
         if let Some(ref page) = self.cow {
             return Some(Rc::clone(page));
@@ -344,12 +243,7 @@ impl Node {
         }
 
         if let Some(storage_offset) = self.storage_offset {
-            // TODO: pass map policy as parameter
-            // node.map(mapPolicy.use_mapped_file)
-            match std::env::var("UNLIMITED_USE_MAPPED_FILE") {
-                Err(_) => self.do_read(storage_offset),
-                Ok(_) => self.do_mmap(storage_offset),
-            }
+            self.do_read(fd, storage_offset)
         } else {
             panic!("mapped_file internal error: invalid storage offset");
         }
@@ -393,12 +287,12 @@ impl Node {
         }
     }
 
-    fn move_to_ram(&mut self) -> Page {
+    fn move_to_ram(&mut self, fd: &Option<Arc<RwLock<File>>>) -> Page {
         // 1 - save all page iterators local offsets
 
         // 2 - map the page // will invalidate iterators base pointer
         // TODO: check
-        let page = self.map().unwrap();
+        let page = self.map(fd).unwrap();
         let slice = page.borrow().as_slice().unwrap();
 
         // 3 - allocate a vector big enough to hold page data
@@ -473,7 +367,7 @@ impl IndexMut<usize> for FreeListAllocator<Node> {
 #[derive(Debug)]
 pub struct MappedFile<'a> {
     phantom: PhantomData<&'a u8>,
-    fd: c_int,
+    pub fd: Option<Arc<RwLock<File>>>,
     pub pool: FreeListAllocator<Node>,
     root_index: Option<NodeIndex>,
     page_size: usize,
@@ -484,9 +378,7 @@ pub struct MappedFile<'a> {
 }
 
 impl<'a> Drop for MappedFile<'a> {
-    fn drop(&mut self) {
-        unsafe { close(self.fd) };
-    }
+    fn drop(&mut self) {}
 }
 
 impl<'a> MappedFile<'a> {
@@ -495,32 +387,17 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn new(path: String, page_size: usize) -> Option<FileHandle<'a>> {
-        let path = CString::new(path).unwrap();
-
         // TODO: check page size % 4096 // sysconfig
 
-        let fd = unsafe { open(path.as_ptr(), O_RDONLY) };
-        if fd < 0 {
+        let fd = File::open(path.clone());
+        if fd.is_err() {
             return None;
         }
+        let fd = Some(Arc::new(RwLock::new(fd.unwrap())));
 
-        let stbuff = unsafe {
-            let mut stbuff: libc::stat = ::std::mem::zeroed();
-            if fstat(fd, &mut stbuff) != 0 {
-                panic!("cannot get file informations");
-            }
-            stbuff
-        };
+        let metadata = fs::metadata(path.clone()).unwrap();
 
-        if S_IFDIR & stbuff.st_mode != 0 {
-            return None;
-        }
-
-        let file_size = stbuff.st_size as u64;
-
-        unsafe {
-            posix_fadvise(fd, 0, 0, 2 /*POSIX_FADV_SEQUENTIAL*/);
-        }
+        let file_size = metadata.len();
 
         let mut file = MappedFile {
             phantom: PhantomData,
@@ -539,7 +416,6 @@ impl<'a> MappedFile<'a> {
         let root_node = Node {
             used: true,
             to_delete: false,
-            fd,
             //idx: 0,
             size: file_size,
             parent: None,
@@ -563,7 +439,6 @@ impl<'a> MappedFile<'a> {
         MappedFile::build_tree(
             PageSource::FromStorage,
             &mut file.pool,
-            fd,
             &mut leaves,
             Some(id),
             page_size as u64,
@@ -674,7 +549,6 @@ impl<'a> MappedFile<'a> {
     fn build_tree(
         source: PageSource,
         pool: &mut FreeListAllocator<Node>,
-        fd: i32,
         leaves: &mut Vec<NodeIndex>,
         parent: Option<NodeIndex>,
         pg_size: u64,
@@ -725,10 +599,10 @@ impl<'a> MappedFile<'a> {
 
         // create leaves : TODO: use default() ?
         // TODO: None::new(fd, parent, size, storage_offset)
+
         let left_node = Node {
             used: true,
             to_delete: false,
-            fd,
             //            idx: 0,
             size: l_sz,
             parent,
@@ -744,11 +618,9 @@ impl<'a> MappedFile<'a> {
         };
         let (l, _) = pool.allocate(left_node, &MappedFile::assert_node_is_unused);
 
-        // TODO: None::new(fd, parent, size, storage_offset)
         let right_node = Node {
             used: true,
             to_delete: false,
-            fd,
             //          idx: 0,
             size: r_sz,
             parent,
@@ -767,21 +639,12 @@ impl<'a> MappedFile<'a> {
 
         // build children
         // left
-        MappedFile::build_tree(
-            source.clone(),
-            pool,
-            fd,
-            leaves,
-            Some(l),
-            pg_size,
-            l_sz,
-            b_off,
-        );
+        MappedFile::build_tree(source.clone(), pool, leaves, Some(l), pg_size, l_sz, b_off);
+
         // right
         MappedFile::build_tree(
             source.clone(),
             pool,
-            fd,
             leaves,
             Some(r),
             pg_size,
@@ -890,7 +753,7 @@ impl<'a> MappedFile<'a> {
         let file = file_.write().unwrap();
 
         let page = file.pool[node_idx as usize].page.upgrade().unwrap();
-        let slice = page.borrow_mut().as_slice().unwrap();
+        let slice = page.borrow().as_slice().unwrap();
 
         MappedFileIterator::Real(IteratorInstance {
             file: Arc::clone(file_),
@@ -906,6 +769,12 @@ impl<'a> MappedFile<'a> {
     pub fn iter_from(file_: &FileHandle<'a>, offset: u64) -> FileIterator<'a> {
         let mut file = file_.write().unwrap();
 
+        let fd = if let Some(fd) = &file.fd {
+            Some(Arc::clone(fd))
+        } else {
+            None
+        };
+
         let pair = if file.size() == 0 {
             (None, 0, 0)
         } else {
@@ -914,8 +783,8 @@ impl<'a> MappedFile<'a> {
 
         match pair {
             (Some(node_idx), node_size, local_offset) => {
-                let page = file.pool[node_idx as usize].map().unwrap();
-                let slice = page.borrow_mut().as_slice().unwrap();
+                let page = file.pool[node_idx as usize].map(&fd).unwrap();
+                let slice = page.borrow().as_slice().unwrap();
 
                 MappedFileIterator::Real(IteratorInstance {
                     file: Arc::clone(file_),
@@ -947,11 +816,9 @@ impl<'a> MappedFile<'a> {
                 if max_read == 0 {
                     break;
                 }
-
                 unsafe {
                     ptr::copy(&it.base[off], vec.as_mut_ptr().add(nr_read), max_read);
                 }
-
                 nr_to_read -= max_read;
                 nr_read += max_read;
 
@@ -1040,7 +907,6 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => 0,
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
-                    Page::MappedStorage(..) => 0,
                     Page::ReadOnlyStorageCopy(..) => 0,
 
                     Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
@@ -1054,10 +920,6 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => panic!("trying to write on end iterator"),
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
-                    Page::MappedStorage(..) => {
-                        panic!("trying to write on read only memory");
-                    }
-
                     Page::ReadOnlyStorageCopy(..) => {
                         panic!("trying to write on read only memory");
                     }
@@ -1097,13 +959,18 @@ impl<'a> MappedFile<'a> {
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
             MappedFileIterator::End(ref rcfile) => {
                 let mut file = rcfile.as_ref().write().unwrap();
+                let fd = if let Some(fd) = &file.fd {
+                    Some(Arc::clone(fd))
+                } else {
+                    None
+                };
 
                 MappedFile::print_all_used_nodes(&file, "BEFORE INSERT - @ eof");
 
                 let file_size = file.size();
                 if file_size > 0 {
                     let (idx, node_size, _) = file.find_node_by_offset(file_size - 1);
-                    let page = file.pool[idx.unwrap()].map();
+                    let page = file.pool[idx.unwrap()].map(&fd);
                     (idx, node_size, node_size, page)
                 } else {
                     (None, 0, 0, None)
@@ -1186,7 +1053,6 @@ impl<'a> MappedFile<'a> {
             (None, None, None)
         };
 
-        let fd = file.fd;
         let room = file.sub_page_reserve;
         let sub_page_size = file.sub_page_size;
 
@@ -1207,7 +1073,6 @@ impl<'a> MappedFile<'a> {
         let subroot_node = Node {
             used: true,
             to_delete: false,
-            fd,
             //            idx: 0,
             size: new_size as u64,
             parent: gparent_idx,
@@ -1239,7 +1104,6 @@ impl<'a> MappedFile<'a> {
         MappedFile::build_tree(
             PageSource::FromRam,
             &mut file.pool,
-            fd,
             &mut leaves,
             Some(subroot_idx),
             new_page_size as u64,
@@ -1442,7 +1306,13 @@ impl<'a> MappedFile<'a> {
 
             // copy on write
             if file.pool[idx].cow.is_none() {
-                let page = file.pool[idx].move_to_ram();
+                let fd = if let Some(fd) = &file.fd {
+                    Some(Arc::clone(fd))
+                } else {
+                    None
+                };
+
+                let page = file.pool[idx].move_to_ram(&fd);
                 let rc = Rc::new(RefCell::new(page));
                 file.pool[idx].page = Rc::downgrade(&rc);
                 file.pool[idx].cow = Some(rc);
@@ -1464,10 +1334,6 @@ impl<'a> MappedFile<'a> {
             }
 
             match *file.pool[idx].cow.as_ref().unwrap().borrow_mut() {
-                Page::MappedStorage(..) => {
-                    panic!("trying to write on read only memory");
-                }
-
                 Page::ReadOnlyStorageCopy(..) => {
                     panic!("trying to write on read only memory");
                 }
@@ -1955,8 +1821,8 @@ impl<'a> MappedFile<'a> {
         }
     }
 
-    pub fn patch_storage_offset_and_file_descriptor(file: &mut MappedFile, new_fd: c_int) {
-        let old_fd = file.fd;
+    pub fn patch_storage_offset_and_file_descriptor(file: &mut MappedFile, new_fd: File) {
+        let new_fd = Some(Arc::new(RwLock::new(new_fd)));
 
         let mut count: u64 = 0;
         let mut offset = 0;
@@ -1967,25 +1833,8 @@ impl<'a> MappedFile<'a> {
 
             // node on storage ?
             if file.pool[idx].cow.is_none() {
-                match std::env::var("UNLIMITED_USE_MAPPED_FILE") {
-                    Ok(_) => {
-                        // MappedStorage -> align mmap base offset
-
-                        // We do not need to adjust the node's size
-                        // because we always do : mmap @(n.storage_offset), len(n.size + skip)
-                        // and store PTR(ptr + skip), SZ(len - skip), OFF(skip)
-
-                        let align_offset = 4096 * (offset / 4096);
-                        let skip = offset % 4096;
-                        file.pool[idx].storage_offset = Some(align_offset);
-                        file.pool[idx].skip = skip;
-                    }
-
-                    _ => {
-                        // ReadOnlyStorageCopy
-                        file.pool[idx].storage_offset = Some(offset);
-                    }
-                }
+                // ReadOnlyStorageCopy
+                file.pool[idx].storage_offset = Some(offset);
             } else {
                 assert_eq!(file.pool[idx].storage_offset, None); // TODO: check
                                                                  //file.pool[idx].skip = 0;
@@ -2005,32 +1854,26 @@ impl<'a> MappedFile<'a> {
             offset += node_size;
             n = file.pool[idx].next;
 
-            if file.pool[idx].fd >= 0 && file.pool[idx].fd != old_fd {
-                panic!(
-                    "file.pool[idx].fd {} != old_fd {}",
-                    file.pool[idx].fd, old_fd
-                );
-            }
-
-            file.pool[idx].fd = new_fd;
             count += 1;
         }
-        file.fd = new_fd;
 
-        //
-        unsafe {
-            close(old_fd);
-        }
+        file.fd = new_fd;
+        dbg_println!("SYNC: file.fd = {:?}", file.fd);
     }
 
     // TODO: add fix page offset function
     pub fn sync_to_storage(file: &mut MappedFile, tmp_file_name: &str) -> ::std::io::Result<()> {
-        let path = CString::new(tmp_file_name).unwrap();
-        unsafe { unlink(path.as_ptr()) };
-        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
-        if fd < 0 {
+        let fd = File::open(tmp_file_name);
+        if fd.is_err() {
             return Ok(());
         }
+        let mut fd = fd.unwrap();
+
+        let orig_fd = if let Some(fd) = &file.fd {
+            Some(Arc::clone(fd))
+        } else {
+            None
+        };
 
         let mut offset = 0;
         let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
@@ -2039,12 +1882,13 @@ impl<'a> MappedFile<'a> {
 
             let node_size = file.pool[idx].size;
             // map
-            let page = file.pool[idx].map().unwrap();
+
+            let page = file.pool[idx].map(&orig_fd).unwrap();
             let slice = page.borrow().as_slice().unwrap();
 
             // copy
-            let nw = unsafe { write(fd, slice.as_ptr() as *mut c_void, slice.len()) };
-            if nw != slice.len() as isize {
+            let nw = fd.write(slice).unwrap();
+            if nw != slice.len() {
                 panic!("write error");
             }
 
@@ -2081,7 +1925,7 @@ impl<'a> MappedFileIterator<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IteratorInstance<'a> {
     file: FileHandle<'a>,
     file_size: u64,
@@ -2112,6 +1956,7 @@ impl<'a> Iterator for MappedFileIterator<'a> {
             MappedFileIterator::Real(ref mut it) => {
                 if it.local_offset == it.page_size {
                     let mut file = it.file.write().unwrap();
+                    let fd = file.fd.as_ref().unwrap().clone();
 
                     let next_node_idx = {
                         let node = &mut file.pool[it.node_idx as usize];
@@ -2126,8 +1971,8 @@ impl<'a> Iterator for MappedFileIterator<'a> {
 
                     let next_node = &mut file.pool[next_node_idx as usize];
 
-                    let page = next_node.map().unwrap();
-                    let slice = page.borrow_mut().as_slice().unwrap();
+                    let page = next_node.map(&Some(fd)).unwrap();
+                    let slice = page.borrow().as_slice().unwrap();
 
                     it.node_idx = next_node_idx;
                     it.page_size = next_node.size;
@@ -2162,7 +2007,6 @@ mod tests {
         use super::*;
         use std::rc::Weak;
 
-        let fd = -1;
         let mut pool = FreeListAllocator::new();
         let file_size = 1024 * 1024 * 1024 * 1024 * 8; // x Tib
         let page_size = 4096 * 256 * 4; // 4 Mib
@@ -2170,7 +2014,6 @@ mod tests {
         let root_node = Node {
             used: true,
             to_delete: false,
-            fd,
             size: file_size,
             parent: None,
             left: None,
@@ -2190,7 +2033,6 @@ mod tests {
         MappedFile::build_tree(
             PageSource::FromRam,
             &mut pool,
-            fd,
             &mut leaves,
             Some(id),
             page_size as u64,

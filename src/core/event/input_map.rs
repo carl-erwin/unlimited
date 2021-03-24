@@ -691,7 +691,13 @@ mod tests {
             let mut next_node: Option<Rc<InputEventRule>> = None;
 
             for ev in &iev {
-                let action = eval_input_event(&ev, &map, true, &mut current_node, &mut next_node);
+                let action = eval_input_event(
+                    &ev,
+                    &map,
+                    DefaultActionMode::RunDefaultAction,
+                    &mut current_node,
+                    &mut next_node,
+                );
                 if let Some(_action) = action {
                     //dbg_println!("found action {}", action);
                 } else {

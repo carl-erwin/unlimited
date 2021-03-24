@@ -3,6 +3,9 @@
 use std::sync::Arc;
 use std::sync::RwLock;
 
+use std::fs::File;
+use std::io::prelude::*;
+
 //
 use crate::core::editor::user_is_active;
 
@@ -442,38 +445,39 @@ impl<'a> Document<'a> {
 use std::ffi::CString;
 
 extern crate libc;
+
+#[cfg(target_family = "unix")]
 use self::libc::{c_void, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC, S_IRUSR, S_IWUSR};
+
+#[cfg(target_family = "windows")]
+use self::libc::{c_void, open, unlink, write, O_CREAT, O_RDWR, O_TRUNC};
 
 // TODO:
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     // read/copy
-    let fd = {
+    let mut fd = {
         let doc = doc.read().unwrap();
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move to global config
 
-        let path = CString::new(tmp_file_name).unwrap();
+        let path = CString::new(tmp_file_name.clone()).unwrap();
         unsafe { unlink(path.as_ptr()) };
-        let fd = unsafe { open(path.as_ptr(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR) };
-        if fd < 0 {
-            // LOG CANNOT SAVE XXX
+
+        let fd = File::create(tmp_file_name);
+        if fd.is_err() {
             dbg_println!("cannot save {}", doc.file_name());
             return;
         }
-        fd
+        fd.unwrap()
     };
 
-    let mut idx = None;
-    {
+    dbg_println!("SYNC: fd = {:?}", fd);
+
+    let mut idx = {
         let doc = doc.read().unwrap();
-        idx = {
-            let file = doc.buffer.data.read().unwrap();
-            let (node_index, _, _) = file.find_node_by_offset(0);
-            if node_index.is_none() {
-                return;
-            };
-            node_index
-        };
-    }
+        let file = doc.buffer.data.read().unwrap();
+        let (node_index, _, _) = file.find_node_by_offset(0);
+        node_index
+    };
 
     while idx != None {
         // do not hold the doc.lock more
@@ -487,8 +491,10 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
                 data.set_len(data.capacity());
             };
 
-            if let Some(n) = node.do_direct_copy(&mut data) {
-                let nw = unsafe { write(fd, data.as_ptr() as *mut c_void, n) };
+            let orig_fd = { Some(file.fd.as_ref().unwrap().clone()) };
+
+            if let Some(n) = node.do_direct_copy(&orig_fd, &mut data) {
+                let nw = fd.write(&data).unwrap();
                 if nw < 0 {
                     dbg_println!("cannot save {}", doc.file_name());
                     panic!("");
@@ -528,12 +534,15 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
         let _ = ::std::fs::rename(&tmp_file_name, &doc.file_name());
 
+        // reopen file
+        let new_fd = File::open(&doc.file_name()).unwrap();
+
         // TODO: handle skip with ReadOnly
         let mapped_file = doc.buffer.data.clone();
         let mut mapped_file = mapped_file.write().unwrap();
         crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
             &mut mapped_file,
-            fd,
+            new_fd,
         );
 
         // TODO: check result, handle io results properly
@@ -563,9 +572,9 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     let mut total_byte_count: [u64; 256] = [0; 256];
 
+    let mut data = vec![];
     while idx != None {
         let mut byte_count: [u64; 256] = [0; 256];
-        let mut data = vec![];
 
         // read node bytes
         {
@@ -581,10 +590,12 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
             data.reserve(node.size as usize);
             unsafe {
-                data.set_len(data.capacity());
+                data.set_len(node.size as usize);
             };
 
-            if let Some(_n) = node.do_direct_copy(&mut data) {
+            let orig_fd = { Some(file.fd.as_ref().unwrap().clone()) };
+
+            if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
                 dbg_println!(
                     "build index doc('{}') node {}",
                     doc.file_name(),
@@ -598,8 +609,9 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
         // count node bytes (no lock)
         for b in data.iter() {
-            byte_count[*b as usize] += 1;
-            total_byte_count[*b as usize] += 1;
+            let byte_idx = *b as usize;
+            byte_count[byte_idx] += 1;
+            total_byte_count[byte_idx] += 1;
         }
 
         if user_is_active() == true {
@@ -639,7 +651,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.unwrap().write().unwrap();
+        let mut doc = doc.as_ref().unwrap().write().unwrap();
 
         const STR_LEN: usize = 1000;
 
@@ -700,7 +712,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.unwrap().write().unwrap();
+        let mut doc = doc.as_ref().unwrap().write().unwrap();
 
         const NB_STR: usize = 10000;
 

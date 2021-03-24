@@ -137,7 +137,7 @@ pub fn application_quit(
 
 pub fn application_quit_abort_setup(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RefCell<View<'static>>>,
 ) {
     let status_vid = view::get_status_view(&editor, view);
@@ -187,7 +187,7 @@ pub fn application_quit_abort_yes(
 
 pub fn application_quit_abort_no(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RefCell<View<'static>>>,
 ) {
     {
