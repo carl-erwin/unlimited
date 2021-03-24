@@ -47,8 +47,7 @@ impl<'a> Buffer<'a> {
         // TODO: check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
-        let page_size = 4096 * 256 * 2;
-        let file = match MappedFile::new(file_name.to_owned(), page_size) {
+        let file = match MappedFile::new(file_name.to_owned()) {
             Some(file) => file,
             None => {
                 // TODO: return Result

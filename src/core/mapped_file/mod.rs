@@ -195,28 +195,17 @@ impl Node {
             v.set_len(capacity);
         };
 
-        let _ = fd
-            .as_ref()
-            .unwrap()
-            .write()
-            .unwrap()
-            .seek(SeekFrom::Start(storage_offset));
+        let mut fd = fd.as_ref().unwrap().write().unwrap();
 
-        let nrd = fd
-            .as_ref()
-            .unwrap()
-            .write()
-            .unwrap()
-            .read(&mut v[..capacity])
-            .unwrap();
+        let _ = fd.seek(SeekFrom::Start(storage_offset));
+
+        let nrd = fd.read(&mut v[..capacity]).unwrap();
         if nrd != capacity {
             eprintln!(
                 "read error error : disk_offset = {}, size = {}",
                 storage_offset, self.size
             );
             panic!("read error");
-            // TODO:
-            // return None;
         }
 
         // 5 - build "new" page
@@ -386,7 +375,7 @@ impl<'a> MappedFile<'a> {
         assert_eq!(n.used, false);
     }
 
-    pub fn new(path: String, page_size: usize) -> Option<FileHandle<'a>> {
+    pub fn new(path: String) -> Option<FileHandle<'a>> {
         // TODO: check page size % 4096 // sysconfig
 
         let fd = File::open(path.clone());
@@ -399,14 +388,26 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
+        // TODO: find good sizes
+        let sub_page_size = 1024 * 1024 * 2;
+        let page_size = if file_size > (1024 * 1024 * 1024 * 1024) {
+            1024 * 1024 * 128
+        } else if file_size > (512 * 1024 * 1024 * 1024) {
+            1024 * 1024 * 64
+        } else if file_size > (512 * 1024 * 1024) {
+            1024 * 1024 * 32
+        } else {
+            1024 * 1024 * 2
+        };
+
         let mut file = MappedFile {
             phantom: PhantomData,
             fd,
             pool: FreeListAllocator::new(),
             root_index: None,
             page_size,
-            sub_page_size: 4096 * 256 * 2, // 2 mib
-            sub_page_reserve: 2 * 1024,    // 2 kib
+            sub_page_size,
+            sub_page_reserve: 2 * 1024, // 2 kib
         };
 
         if file_size == 0 {
@@ -2115,7 +2116,7 @@ mod tests {
         drop(slc);
 
         eprintln!("-- mapping the test file");
-        let file = match MappedFile::new(filename, page_size) {
+        let file = match MappedFile::new(filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2137,14 +2138,12 @@ mod tests {
         use std::fs;
         use std::fs::File;
 
-        let page_size = 4096 * 256;
-
         let filename = "/tmp/playground_insert_test".to_owned();
         let _ = fs::remove_file("/tmp/playground_insert_test");
         File::create(&filename).unwrap();
 
         eprintln!("-- mapping the test file");
-        let file = match MappedFile::new(filename, page_size) {
+        let file = match MappedFile::new(filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2168,11 +2167,9 @@ mod tests {
     fn test_1b_insert() {
         use super::*;
 
-        let page_size = 4096;
-
         use std::fs;
         use std::fs::File;
-        use std::io::prelude::*;
+        //        use std::io::prelude::*;
 
         let filename = "/tmp/playground_insert_test".to_owned();
         {
@@ -2199,7 +2196,7 @@ mod tests {
         }
 
         eprintln!("-- mapping the test file");
-        let file = match MappedFile::new(filename, page_size) {
+        let file = match MappedFile::new(filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
