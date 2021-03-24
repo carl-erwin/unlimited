@@ -699,6 +699,40 @@ impl Screen {
     }
 }
 
+pub fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_line_mut(l) {
+            for c in 0..line.nb_cells {
+                if let Some(cpi) = line.get_mut_cpi(c) {
+                    if on_cpi(c, l, cpi) == false {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn screen_apply_all<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_line_mut(l) {
+            for c in 0..line.width() {
+                if let Some(cpi) = line.get_mut_cpi(c) {
+                    if on_cpi(c, l, cpi) == false {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn _print_clipped_line(screen: &mut Screen, color: (u8, u8, u8), s: &str) {
     let mut push_count = 0;
     for c in s.chars().take(screen.width()) {

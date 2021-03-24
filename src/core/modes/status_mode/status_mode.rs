@@ -14,6 +14,9 @@ use crate::core::modes::text_mode::TextCodecFilter;
 use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::modes::text_mode::WordWrapFilter;
 use crate::core::view::View;
+
+use crate::core::screen::screen_apply_all;
+
 use crate::dbg_println;
 
 use crate::core::view::layout::Filter;
@@ -25,6 +28,17 @@ use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
 
 pub struct StatusModeContext {}
+
+pub struct StatusMode {}
+
+impl StatusMode {
+    pub fn new() -> Self {
+        dbg_println!("StatusMode");
+        StatusMode {}
+    }
+
+    pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
+}
 
 impl<'a> Mode for StatusMode {
     fn name(&self) -> &'static str {
@@ -92,18 +106,46 @@ impl<'a> Mode for StatusMode {
         view.compose_filters
             .borrow_mut()
             .push(Box::new(screen_filter));
+
+        view.compose_filters
+            .borrow_mut()
+            .push(Box::new(StatusModeCompose::new()));
     }
 }
 
-pub struct StatusMode {
+pub struct StatusModeCompose {
     // add common filed
 }
 
-impl StatusMode {
+impl StatusModeCompose {
     pub fn new() -> Self {
         dbg_println!("StatusMode");
-        StatusMode {}
+        StatusModeCompose {}
     }
 
     pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
+}
+
+impl Filter<'_> for StatusModeCompose {
+    fn name(&self) -> &'static str {
+        &"StatusModeCompose"
+    }
+
+    fn setup(&mut self, _env: &mut LayoutEnv, _view: &View) {}
+
+    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
+        if env.screen.push_count() <= 1 {
+            // eof
+            return;
+        }
+
+        // default
+        screen_apply_all(&mut env.screen, |_, _, cpi| {
+            //cpi.style.color = (255, 255, 255);
+            cpi.style.color = (0, 0, 0);
+            cpi.style.bg_color = (0, 170, 255);
+            cpi.style.bg_color = TextStyle::default_color();
+            true
+        });
+    }
 }

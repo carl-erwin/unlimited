@@ -10,6 +10,8 @@ use crate::core::view::View;
 
 use super::TextModeContext;
 
+use crate::core::screen::screen_apply;
+
 pub struct DrawMarks {}
 
 impl DrawMarks {
@@ -122,24 +124,6 @@ fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
             for cell in &mut l.cells {
                 if !cell.cpi.style.is_selected {
                     cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
-                }
-            }
-        }
-    }
-}
-
-// move to screen module , rename walk/map ?
-fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
-    screen: &mut Screen,
-    mut on_cpi: F,
-) {
-    for l in 0..screen.height() {
-        if let Some(line) = screen.get_line_mut(l) {
-            for c in 0..line.nb_cells {
-                if let Some(cpi) = line.get_mut_cpi(c) {
-                    if on_cpi(c, l, cpi) == false {
-                        return;
-                    }
                 }
             }
         }
