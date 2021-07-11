@@ -1080,9 +1080,9 @@ pub fn redo(mut editor: &mut Editor, mut env: &mut EditorEnv, view: &Rc<RefCell<
 
     tm.prev_action = ActionType::Redo;
     /*
-     TODO: add this function pointer attr
-     if ActionType::Modification -> save marks before exec, etc ...
-     */
+    TODO: add this function pointer attr
+    if ActionType::Modification -> save marks before exec, etc ...
+    */
 }
 
 /// Remove the current utf8 encoded code point.<br/>
@@ -3392,6 +3392,29 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         return;
     }
 
+    // dumb
+    {
+        let mut m = Mark::new(view.start_offset);
+
+    // rewind
+    {
+        let doc = view.document().unwrap();
+        let doc = doc.read().unwrap();
+        let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        for _ in 0..nb_lines {
+            m.move_backward(&doc, codec);
+            m.move_to_start_of_line(&doc, codec);
+        }
+
+        dbg_println!("DUMB: Fixed start of line offset = {}", m.offset);
+
+        view.start_offset = m.offset;
+        return;
+    }
+}
+
     ////
     let width = view.screen.read().unwrap().width();
     let height = view.screen.read().unwrap().height() + nb_lines;
@@ -3402,7 +3425,7 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
     // go to N previous physical lines ... here N is height
     // rewind width*height chars
     let mut m = Mark::new(view.start_offset);
-    let diff = (nb_lines * width * 4) as u64; // if ascci only 4 -> 1
+    let diff = (nb_lines * width / 2) as u64; // if ascci only 4 -> 1
     dbg_println!(
         "diff = nb_lines({}) * width({}) * 4 = {}",
         nb_lines,

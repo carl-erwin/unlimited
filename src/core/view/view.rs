@@ -491,8 +491,10 @@ pub fn compute_view_layout(
     dbg_println!("DIMENSION {:?}", dimension);
 
     let last_offset = {
-        let mut screen = v.screen.write().unwrap();
-        screen.clear();
+        // the screen is unlikely in ui thread
+        // let mut screen = v.screen.write().unwrap();
+        // screen.clear();
+        let mut screen = Screen::with_dimension(dimension);
         run_compositing_stage_direct(
             editor,
             env,
@@ -502,7 +504,10 @@ pub fn compute_view_layout(
             &mut screen,
             LayoutPass::ContentAndScreenOverlay,
         );
-        screen.last_offset
+        let off = screen.last_offset;
+        v.screen = Arc::new(RwLock::new(Box::new(screen)));
+
+        off
     };
     if let Some(last_offset) = last_offset {
         v.end_offset = last_offset;
