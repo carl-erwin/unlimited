@@ -3338,10 +3338,13 @@ pub fn get_lines_offsets(
     )
 }
 
-// MOVE TO TEXT MODE
-/* TODO: use nb_lines
+/*
+ TODO: use nb_lines
  to compute previous screen height
  new_h = screen.wheight + (nb_lines * screen.width * max_codec_encode_size)
+
+ build screen in reverse order by taking
+
 */
 pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_lines: usize) {
     if view.start_offset == 0 || nb_lines == 0 {
@@ -3354,7 +3357,7 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         view.start_offset
     );
 
-    // TODO: find abetter way to pas mode data around, macro ?
+    // TODO: find a better way to pas mode data around, macro ?
 
     // TODO: DUMB version
     // NEW: first try to check nb_lines in the same area
@@ -3363,41 +3366,9 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
     // if we find '\n' or \r we stop
     // and take the next char offset -> view.start_offset
 
-    let start_offset = view.start_offset;
-
-    if nb_lines == 1 {
-        let doc = view.document.clone();
-        let doc = doc.unwrap();
-        let doc = doc.read().unwrap();
-
-        let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
-        let codec = tm.text_codec.as_ref();
-
-        let mut tmp = Mark::new(start_offset);
-        for _ in 0..nb_lines {
-            if tmp.offset == 0 {
-                break;
-            }
-            tmp.offset -= 1;
-            tmp.move_to_start_of_line(&doc, codec);
-        }
-
-        assert!(tmp.offset != view.start_offset);
-
-        view.start_offset = tmp.offset;
-
-        // TODO: render screen here
-        // if not aligned full rebuild etc...
-        // diff tmp stat > s.width s.height
-        return;
-    }
-
-    // dumb
-    {
+    // dumb version:
+    if true {
         let mut m = Mark::new(view.start_offset);
-
-    // rewind
-    {
         let doc = view.document().unwrap();
         let doc = doc.read().unwrap();
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -3413,7 +3384,8 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
         view.start_offset = m.offset;
         return;
     }
-}
+
+    let start_offset = view.start_offset;
 
     ////
     let width = view.screen.read().unwrap().width();
