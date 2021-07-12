@@ -36,7 +36,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub static DBG_PRINTLN_FLAG: AtomicUsize = AtomicUsize::new(1);
+pub static DBG_PRINTLN_FLAG: AtomicUsize = AtomicUsize::new(0);
 
 pub fn enable_dbg_println() {
     DBG_PRINTLN_FLAG.store(1, Ordering::Relaxed);

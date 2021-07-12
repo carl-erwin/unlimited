@@ -482,11 +482,11 @@ fn run_content_filters(
 
     let mut total_time = 0;
     for (idx, f) in filters.iter_mut().enumerate() {
-        eprintln!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
+        dbg_println!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
         total_time += time_spent[idx];
     }
 
-    eprintln!(
+    dbg_println!(
         "total time spent in content filter pipeline: {} µs, loop_count {}\r",
         total_time, loop_count
     );
@@ -527,11 +527,11 @@ fn run_screen_overlay_filters(
 
     let mut total_time = 0;
     for (idx, f) in filters.iter_mut().enumerate() {
-        eprintln!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
+        dbg_println!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
         total_time += time_spent[idx];
     }
 
-    eprintln!(
+    dbg_println!(
         "total time spent in screen overlay pipeline: µs {}\r",
         total_time
     );

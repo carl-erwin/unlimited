@@ -75,6 +75,12 @@ fn parse_command_line() -> Config {
         .about("unlimited is an experimental editor")
         .args_from_usage("--ui, --ui=[termion|crossterm] 'select user interface frontend'")
         .arg(
+            Arg::with_name("DEBUG")
+                .short("d")
+                .long("--debug")
+                .help("enable debug logs oon stderr (use redirection to file)"), // TODO: istty ?
+        )
+        .arg(
             Arg::with_name("FILES")
                 .help("list of the files to open")
                 .required(false)
@@ -94,6 +100,10 @@ fn parse_command_line() -> Config {
             .unwrap()
             .map(|x| x.to_owned())
             .collect();
+    }
+
+    if matches.is_present("DEBUG") {
+        core::enable_dbg_println();
     }
 
     Config {

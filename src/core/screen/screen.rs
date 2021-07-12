@@ -707,7 +707,7 @@ impl Screen {
             }
         }
 
-        eprintln!("SELF {:?}", self);
+        dbg_println!("SELF {:?}", self);
 
         panic!(
             "cannot file offset {} between {} {}",

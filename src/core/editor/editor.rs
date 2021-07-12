@@ -1082,14 +1082,14 @@ fn process_input_events(
     let end = Instant::now();
 
     for (idx, f) in env.time_spent.iter().enumerate() {
-        eprintln!(
+        dbg_println!(
             "time spent in {:?} : {:4?} µs\r",
             index_to_stage(idx),
             env.time_spent[idx]
         );
     }
 
-    eprintln!(
+    dbg_println!(
         "input event : total process time {} µs\r",
         (end - start).as_micros()
     );
