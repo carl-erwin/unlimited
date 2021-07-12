@@ -3378,11 +3378,19 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
 
     // dumb version:
     if true {
+        let width = view.screen.read().unwrap().width();
+        let height = view.screen.read().unwrap().height();
+        let diff = (width * height * 2) as u64;
+
         let mut m = Mark::new(view.start_offset);
         let doc = view.document().unwrap();
-        let doc = doc.read().unwrap();
+        let mut doc = doc.write().unwrap();
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
         let codec = tm.text_codec.as_ref();
+
+        let min = m.offset.saturating_sub(diff);
+        let max = m.offset.saturating_add(diff);
+        doc.set_cache(min, max);
 
         for _ in 0..nb_lines {
             m.move_backward(&doc, codec);
