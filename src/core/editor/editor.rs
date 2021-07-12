@@ -1051,9 +1051,7 @@ fn run_input_stage(
         // Stage::Restart ?
     }
 
-    return Stage::Input;
-
-    // POST
+    // POST ?
     let id = env.view_id;
     run_stage(Post, Stage::Input, &mut editor, &mut env, id);
 

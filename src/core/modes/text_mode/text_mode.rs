@@ -437,7 +437,7 @@ pub fn run_text_mode_actions_vec(
     view: &Rc<RefCell<View>>,
     actions: &Vec<Action>,
 ) {
-    let mut update_read_cache = false;
+    let mut update_read_cache = !false;
 
     for a in actions.iter() {
         match a {
@@ -553,6 +553,10 @@ pub fn run_text_mode_actions_vec(
         }
     }
 
+    // TODO: add offscreen support
+    // marks ranges
+    // screen scrolling * key freq
+    // if main mark offscreen ignore cache ?
     if update_read_cache {
         let v = &mut view.borrow_mut();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -566,22 +570,22 @@ pub fn run_text_mode_actions_vec(
             let doc = v.document().unwrap();
             let mut doc = doc.write().unwrap();
 
+            let (s, e) = doc.get_cache_range();
+
             // screen cache
             {
                 let screen = v.screen.read().unwrap();
                 let w = screen.width();
                 let h = screen.height();
-                let max_char = (w * h * 4 * 256) as u64; // 4 = tm.codec_max_encode_size();
-                                                         //                let _max_char = max_char * 4; // nb previous screen ?
+                let nb_screens = 256;
+                let codec_max_encode_size = 4;
+                let max_char = (w * h * nb_screens * codec_max_encode_size) as u64;
 
-                if screen.contains_offset(min) {
-                    min = screen.first_offset.unwrap_or(min);
-                }
+                min = screen.first_offset.unwrap_or(min);
                 min = min.saturating_sub(max_char);
                 max = min.saturating_add(max_char); // no eof checks
             }
 
-            let (s, e) = doc.get_cache_range();
             if s <= min && e >= max {
                 /* cache is up to date */
             } else {
@@ -609,6 +613,12 @@ fn run_text_mode_actions(
     stage: editor::Stage,
 ) {
     dbg_println!("run_text_mode_actions stage {:?} pos {:?},", stage, pos);
+
+    {
+        let mut v = view.borrow_mut();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        tm.pre_compose_action.push(Action::UpdateReadCache);
+    }
 
     let actions: Vec<Action> = {
         match (stage, pos) {
