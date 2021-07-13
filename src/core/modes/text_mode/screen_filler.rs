@@ -54,8 +54,6 @@ impl ContentFilter<'_> for ScreenFilter {
             return;
         }
 
-        eprintln!("----------------------------------");
-
         // start offset
         let base_offset = filter_in[0].offset;
 

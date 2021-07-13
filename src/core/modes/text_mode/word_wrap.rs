@@ -118,21 +118,28 @@ impl ContentFilter<'_> for WordWrapFilter {
 
                 // line is full ?
                 if self.column_count > self.max_column {
+                    if self.display_wrap {
                     dbg_println!("line is full");
+                    }
 
                     // blank ?
                     if c == ' ' || c == '\n' {
+                        if self.display_wrap {
                         dbg_println!("last char is blank, ignore wrapping");
+                        }
                         self.column_count = 0;
                         filter_out.append(&mut self.accum);
                         self.column_count = 0;
                         continue;
                     }
 
+                    if self.display_wrap {
                     dbg_println!("last char is NOT blank");
-
+                    }
                     if self.accum.len() > self.max_column as usize {
+                        if self.display_wrap {
                         dbg_println!("accum.len() > max_column");
+                        }
 
                         // middle of a word
                         let mut blank_idx = 0; // option ?
@@ -146,7 +153,9 @@ impl ContentFilter<'_> for WordWrapFilter {
                             {
                                 if *real_cp == ' ' as u32 {
                                     blank_idx = (self.accum.len() - idx) - 1;
+                                    if self.display_wrap {
                                     dbg_println!("found wrap blank @ idx {}", blank_idx);
+                                    }
                                     blank_offset = accum_io.offset;
                                     break;
                                 }
@@ -176,29 +185,27 @@ impl ContentFilter<'_> for WordWrapFilter {
                             let mut line: Vec<FilterIo> =
                                 self.accum.drain(0..blank_idx + 1).collect();
                             line.push(fnl);
+                            if self.display_wrap {
                             dbg_println!("line.len() {}", line.len());
+                            }
 
                             filter_out.append(&mut line);
                             self.column_count = self.accum.len() as u64 % self.max_column;
+                            if self.display_wrap {
                             dbg_println!("after wrap , new column count {}", self.column_count);
+                            }
 
                             continue;
                         } else {
-                            dbg_println!("NOP");
                             let mut line: Vec<FilterIo> =
                                 self.accum.drain(0..(self.max_column) as usize).collect();
-
-                            dbg_println!("line.len() {}", line.len());
                             filter_out.append(&mut line);
-
-                            dbg_println!("accum.len() {}", self.accum.len());
 
                             if self.display_wrap {
                                 self.accum.pop();
                                 self.accum.push(set_first_column_color(&io));
                             }
                             self.column_count = 1;
-                            dbg_println!("new column count {}", self.column_count);
                         }
                     } else {
                         dbg_println!("accum.len() <= max_column");
