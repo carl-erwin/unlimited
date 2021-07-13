@@ -488,7 +488,8 @@ fn run_content_filters(
 
     dbg_println!(
         "total time spent in content filter pipeline: {} µs, loop_count {}\r",
-        total_time, loop_count
+        total_time,
+        loop_count
     );
 }
 

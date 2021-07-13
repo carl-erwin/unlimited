@@ -1697,7 +1697,26 @@ pub fn move_on_screen_mark_to_next_line(
 
     dbg_println!("update mark : offset => {} -> {}", old_offset, m.offset);
 
+    /*
+     TODO:
+     how current data model does not support virtual characters.
+     ie: if a filter fills the screen with meta info (not document's real data)
+     The offset mechanism is broken
+     if a filter expands a cp on multiple lines
+
+     To fix this the "injected" metadata span must be stored eleswhere.
+     (internal, doc_id, offset, size)
+     and use a portal like mechanism
+
+    */
     if old_offset == m.offset {
+        // same offset detected: bug to fix in line wrapping
+        // a line cannot start with a wrap
+        // when line wrapping is enabled
+        let cpi = screen.get_cpinfo(0, new_y + 1).unwrap();
+        m.offset = cpi.offset.unwrap();
+        return (true, Some((old_offset, m.offset)), None);
+
         return (!true, Some((old_offset, m.offset)), None);
     }
 
@@ -3377,7 +3396,7 @@ pub fn scroll_view_up(view: &mut View, editor: &Editor, env: &EditorEnv, nb_line
     // and take the next char offset -> view.start_offset
 
     // dumb version:
-    if true {
+    if nb_lines == 1 {
         let width = view.screen.read().unwrap().width();
         let height = view.screen.read().unwrap().height();
         let diff = (width * height * 2) as u64;

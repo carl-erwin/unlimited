@@ -1037,10 +1037,11 @@ fn run_input_stage(
     for ev in flat_events.iter() {
         let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         run_stages(Stage::Input, &mut editor, &mut env, id);
-        if env.skip_compositing == false {
+        // if env.skip_compositing == false
+        {
             run_stages(Stage::Compositing, &mut editor, &mut env, id);
         }
-        flush_ui_event(editor, env, &ui_tx);
+        // flush_ui_event(editor, env, &ui_tx);
         //run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
     }
 
