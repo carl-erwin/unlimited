@@ -164,7 +164,8 @@ impl Line {
         if self.nb_cells < self.width() && !self.read_only {
             let unicode_width = UnicodeWidthChar::width(cpi.cp).unwrap_or(1);
 
-            if self.nb_cells + unicode_width >= self.width() {
+            // width overflow ?
+            if self.nb_cells + unicode_width > self.width() {
                 // TODO: signal no space available
                 self.read_only = true;
                 // NOTE(ceg) full flag ?
