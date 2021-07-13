@@ -332,16 +332,19 @@ impl Screen {
         let unicode_width = UnicodeWidthChar::width(cpi.cp).unwrap_or(1);
         if unicode_width > self.line[self.clip.y + self.current_line_index].available() {
             self.line[self.clip.y + self.current_line_index].read_only = true; // api ?
-            self.current_line_index += 1; // go to next line
+            self.current_line_index += 1; // go to next line ?
+
+            if self.current_line_index == self.height() {
+                return (false, self.current_line_index);
+            }
         }
 
         if self.line[self.clip.y + self.current_line_index].read_only {
             // was marked
             self.current_line_index += 1; // go to next line
-        }
-
-        if self.current_line_index == self.height() {
-            return (false, self.current_line_index);
+            if self.current_line_index == self.height() {
+                return (false, self.current_line_index);
+            }
         }
 
         if self.push_count > 0 {

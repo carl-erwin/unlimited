@@ -95,14 +95,15 @@ impl ContentFilter<'_> for RawDataFilter {
             if rd < self.read_size {
                 env.quit = true;
 
-                (*filter_out).push(FilterIo {
-                    metadata: true,
-                    style: TextStyle::new(),
-                    offset: Some(self.pos + rd as u64),
-                    size: 0,
-                    data: FilterData::EndOfStream,
-                });
-
+                if true {
+                    (*filter_out).push(FilterIo {
+                        metadata: true,
+                        style: TextStyle::new(),
+                        offset: Some(self.pos + rd as u64),
+                        size: 0,
+                        data: FilterData::EndOfStream,
+                    });
+                }
                 dbg_println!("EOF @ offset {}", self.pos + rd as u64);
             }
 

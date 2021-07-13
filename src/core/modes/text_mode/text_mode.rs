@@ -245,10 +245,10 @@ impl<'a> Mode for TextMode {
         //
         let use_utf8_codec = true;
 
-        let use_highlight_keywords = true;
-        let use_highlight_selection = true; // mandatory
-        let use_tabulation_exp = true;
-        let use_char_map = true; // very slow
+        let use_highlight_keywords = !true;
+        let use_highlight_selection = !true; // mandatory
+        let use_tabulation_exp = !true;
+        let use_char_map = !true; // very slow
         let use_word_wrap = true;
 
         let use_draw_marks = true; // mandatory

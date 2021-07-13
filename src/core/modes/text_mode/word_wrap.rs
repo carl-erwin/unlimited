@@ -28,6 +28,26 @@ impl WordWrapFilter {
     }
 }
 
+fn set_first_column_color(io: &FilterIo) -> FilterIo {
+    // flush new line
+    let mut new_io = FilterIo {
+        // general info
+        metadata: false,
+        style: TextStyle::new(),
+        offset: io.offset,
+        size: 1, // io.size,
+        data: io.data.clone(),
+    };
+
+    {
+        new_io.style.is_blinking = true;
+        new_io.style.is_selected = true;
+        new_io.style.bg_color = (0, 0, 255);
+    }
+
+    new_io
+}
+
 impl ContentFilter<'_> for WordWrapFilter {
     fn name(&self) -> &'static str {
         &"WordWrapFilter"
@@ -78,10 +98,15 @@ impl ContentFilter<'_> for WordWrapFilter {
                 self.column_count += 1; // TODO: char width here ?
 
                 let c = u32_to_char(*real_cp);
-                self.accum.push(io.clone());
+
+                if self.column_count == 1 {
+                    self.accum.push(set_first_column_color(&io));
+                } else {
+                    self.accum.push(io.clone());
+                }
 
                 eprintln!(
-                    "column_count/max {}/{} , c {}, real_cp {}, accum.len() {}",
+                    "column_count/max {}/{} , cp '{}', real_cp {}, accum.len() {}",
                     self.column_count,
                     self.max_column,
                     c,
@@ -104,9 +129,8 @@ impl ContentFilter<'_> for WordWrapFilter {
 
                     eprintln!("last char is NOT blank");
 
-                    if self.accum.len() <= self.max_column as usize {
-
-                        eprintln!("accum.len() < max_column");
+                    if self.accum.len() > self.max_column as usize {
+                        eprintln!("accum.len() > max_column");
 
                         // middle of a word
                         let mut blank_idx = 0; // option ?
@@ -120,6 +144,7 @@ impl ContentFilter<'_> for WordWrapFilter {
                             {
                                 if *real_cp == ' ' as u32 {
                                     blank_idx = (self.accum.len() - idx) - 1;
+                                    eprintln!("found wrap blank @ idx {}", blank_idx);
                                     blank_offset = accum_io.offset;
                                     break;
                                 }
@@ -127,6 +152,7 @@ impl ContentFilter<'_> for WordWrapFilter {
                         }
 
                         if blank_offset.is_some() && blank_idx + 1 != self.max_column as usize {
+                            // fake new line
                             let mut fnl = FilterIo {
                                 // general info
                                 metadata: true,
@@ -148,23 +174,36 @@ impl ContentFilter<'_> for WordWrapFilter {
                             let mut line: Vec<FilterIo> =
                                 self.accum.drain(0..blank_idx + 1).collect();
                             line.push(fnl);
+                            eprintln!("line.len() {}", line.len());
+
                             filter_out.append(&mut line);
-                            self.column_count = self.accum.len() as u64 % ( self.max_column - 1);
-                            eprintln!("new column count {}", self.column_count);
+                            self.column_count = self.accum.len() as u64 % self.max_column;
+                            eprintln!("after wrap , new column count {}", self.column_count);
+
                             continue;
                         } else {
                             eprintln!("NOP");
-                            self.column_count = self.accum.len() as u64 % ( self.max_column - 1 );
+                            let mut line: Vec<FilterIo> = self
+                                .accum
+                                .drain(0..(self.max_column) as usize)
+                                .collect();
+
+                            eprintln!("line.len() {}", line.len());
+                            filter_out.append(&mut line);
+
+                            eprintln!("accum.len() {}", self.accum.len());
+
+                            self.accum.pop();
+                            self.accum.push(set_first_column_color(&io));
+                            self.column_count = 1;
                             eprintln!("new column count {}", self.column_count);
-
                         }
-
-
                     } else {
-                        eprintln!("accum.len() >= max_column");
+                        eprintln!("accum.len() <= max_column");
 
                         self.column_count = self.accum.len() as u64 % self.max_column;
                         eprintln!("new column count {}", self.column_count);
+                        panic!("");
                     }
 
                     continue;
@@ -193,7 +232,7 @@ impl ContentFilter<'_> for WordWrapFilter {
                         {
                             new_io.style.is_blinking = true;
                             new_io.style.is_selected = true;
-                            new_io.style.bg_color = (255, 255, 0);
+                            new_io.style.bg_color = (0, 255, 0);
                         }
                         self.accum.push(new_io);
                     }
