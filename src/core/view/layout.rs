@@ -340,11 +340,11 @@ fn compose_children(
                 };
 
                 child_v.end_offset = last_offset.unwrap_or(0);
-                child_v.watcher.clone()
+                child_v.subscribers.clone()
             };
 
             //
-            // NB: notify watchers just after composition
+            // NB: notify subscriberss just after composition
             // use View::compose_priority to order notifications
             //
             // NOTE(ceg): currently we do not have event filters

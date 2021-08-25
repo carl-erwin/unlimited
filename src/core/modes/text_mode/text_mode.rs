@@ -76,6 +76,7 @@
 
 use std::any::Any;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::RwLock;
 
 use std::collections::HashMap;
@@ -96,6 +97,9 @@ use super::mark::Mark;
 use crate::core::codec::text::utf8;
 use crate::core::codec::text::SyncDirection; // TODO: remove
 use crate::core::codec::text::TextCodec;
+
+use crate::core::document::BufferOperation;
+use crate::core::document::BufferOperationType;
 
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
@@ -912,6 +916,7 @@ pub fn insert_codepoint_array(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View>>,
 ) {
+    // InputEvent -> Vec<char>
     let array = {
         let v = view.read().unwrap();
 
@@ -926,7 +931,7 @@ pub fn insert_codepoint_array(
                         shift: false,
                     },
                 key: Key::UnicodeArray(ref v),
-            } => v.clone(), // should move Rc<> ?
+            } => v.clone(), // should move to Rc<> ?
 
             InputEvent::KeyPress {
                 key: Key::Unicode(c),
@@ -941,6 +946,7 @@ pub fn insert_codepoint_array(
             }
 
             _ => {
+                // unhandled event type
                 return;
             }
         }
@@ -949,10 +955,10 @@ pub fn insert_codepoint_array(
     // doc read only ?
     {
         let v = view.read().unwrap();
-        let doc = v.document.clone();
-        let doc = doc.unwrap();
+        let doc = v.document.as_ref().unwrap();
         let doc = doc.read().unwrap();
         if doc.is_syncing {
+            // TODO(ceg): send/display notification
             return;
         }
     }
@@ -966,7 +972,7 @@ pub fn insert_codepoint_array(
         tm.prev_action == ActionType::MarksMove
     };
 
-    // TODO: fin a way to remove this
+    // TODO: find a way to remove this
     if save_marks {
         run_text_mode_actions_vec(
             &mut editor,
@@ -1005,6 +1011,11 @@ pub fn insert_codepoint_array(
 
             let mut grow: u64 = 0;
 
+            let mut insert_ops = vec![];
+
+            // build operations vector
+            // while updating marks
+
             for m in tm.marks.iter_mut() {
                 if m.offset < view_start {
                     view_growth += utf8.len() as u64;
@@ -1012,16 +1023,31 @@ pub fn insert_codepoint_array(
 
                 m.offset += grow;
                 doc.insert(m.offset, utf8.len(), &utf8);
+
+                // track insert operation
+                insert_ops.push(BufferOperation {
+                    op_type: BufferOperationType::Insert,
+                    data: Some(Arc::new(utf8.clone())),
+                    offset: m.offset,
+                });
+
                 m.offset += utf8.len() as u64;
 
                 offset = m.offset; // TODO: remove this merge
 
                 grow += utf8.len() as u64;
             }
+
+            // notify doc subscriberss of insert ops
+            // cannot do this in doc.callback ?
+            // and notify all users the current view should not touch the marks ?
+            // struct DocumentId(u64)
+            // struct DocumentClientId(u64)
+            // view.doc_client_id = doc.add_client_cb(cb);
+            // where cb = fn(DocumentId, DocumentClientId, [ops])
+            // doc.notify_operations(view.doc_client_id, &insert_ops);
         }
         v.start_offset += view_growth;
-
-        dbg_println!("view_growth = {}", view_growth);
 
         // mark off_screen ?
         let screen = v.screen.read().unwrap();

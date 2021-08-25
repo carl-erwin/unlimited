@@ -10,8 +10,7 @@ use crate::core::EditorEnv;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 
-use crate::core::view::register_view_watchee;
-use crate::core::view::register_view_watcher;
+use crate::core::view::register_view_subscriber;
 
 use crate::core::view::View;
 use crate::core::view::ViewEventDestination;
@@ -131,16 +130,8 @@ impl<'a> Mode for SimpleViewMode {
 
         eprintln!("simple-view: children: {:?}", v.children);
 
-        register_view_watcher(editor, env, vscrollbar_mode.clone(), src, dst);
-
-        let src = ViewEventSource {
-            id: v.children[scroll_bar_idx],
-        };
-        let dst = ViewEventDestination {
-            id: v.children[text_view_idx],
-        };
-
-        register_view_watchee(editor, env, vscrollbar_mode.clone(), src, dst);
+        // view events -> scrollbar
+        register_view_subscriber(editor, env, vscrollbar_mode.clone(), src, dst);
     }
 }
 

@@ -326,13 +326,12 @@ pub struct View<'a> {
     pub filter_in: Rc<RefCell<Vec<FilterIo>>>,
     pub filter_out: Rc<RefCell<Vec<FilterIo>>>,
 
-    pub watcher: Vec<(Rc<Box<dyn Mode>>, ViewEventSource, ViewEventDestination)>,
-    pub watchee: Vec<(Rc<Box<dyn Mode>>, ViewEventSource, ViewEventDestination)>,
+    pub subscribers: Vec<(Rc<Box<dyn Mode>>, ViewEventSource, ViewEventDestination)>,
 }
 
 /// Use this function if the mode needs to watch a given view
 ///
-pub fn register_view_watcher(
+pub fn register_view_subscriber(
     editor: &mut Editor<'static>,
     _env: &mut EditorEnv<'static>,
     mode: Rc<Box<dyn Mode>>,
@@ -343,27 +342,10 @@ pub fn register_view_watcher(
     let src = editor.view_map.get(&src.id)?;
     let _dst = editor.view_map.get(&dst.id)?;
 
-    src.write().unwrap().watcher.push(ctx);
+    src.write().unwrap().subscribers.push(ctx);
 
     // ie: will call mode->on_view_event(editor, env, src, dst, event);
 
-    Some(())
-}
-
-/// Use this function if the mode needs to watch a given view
-///
-pub fn register_view_watchee(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
-    mode: Rc<Box<dyn Mode>>,
-    src: ViewEventSource,
-    dst: ViewEventDestination,
-) -> Option<()> {
-    let ctx = (mode, src, dst);
-    let src = editor.view_map.get(&src.id)?;
-    let _dst = editor.view_map.get(&dst.id)?;
-
-    src.write().unwrap().watchee.push(ctx);
     Some(())
 }
 
@@ -429,8 +411,7 @@ impl<'a> View<'a> {
             filter_out: Rc::new(RefCell::new(vec![])),
 
             //
-            watcher: vec![],
-            watchee: vec![],
+            subscribers: vec![], // list of other views to notify when the current view changes
         };
 
         // setup modes/input map/etc..

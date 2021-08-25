@@ -41,7 +41,7 @@ pub struct VscrollbarMode {
     // add common fields
 }
 pub struct VscrollbarModeContext {
-    pub linked_vid: view::Id,
+    pub target_vid: view::Id,
 
     pub percent: f64,
     pub percent_end: f64,
@@ -65,7 +65,7 @@ impl<'a> Mode for VscrollbarMode {
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc vscrollbar-mode ctx");
         let ctx = VscrollbarModeContext {
-            linked_vid: 0,
+            target_vid: 0,
             percent: 0.0,
             percent_end: 0.0,
             scroll_start: 0,
@@ -107,6 +107,8 @@ impl<'a> Mode for VscrollbarMode {
         let mut dst = editor.view_map.get(&dst.id).unwrap().write().unwrap();
 
         let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+
+        mode_ctx.target_vid = src.id;
 
         let doc = src.document.as_ref().unwrap();
         let doc = doc.read().unwrap();
@@ -203,20 +205,20 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
         },
 
         Some(InputEvent::PointerMotion(PointerEvent { x: _, y, mods: _ })) => {
-            if v.watchee.is_empty() {
-                return;
-            }
-
-            {
+            let target_vid = {
                 let mode_ctx = v.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
                 if !mode_ctx.selected {
                     return;
                 }
-            }
+
+                if mode_ctx.target_vid == 0 {
+                    return;
+                }
+                mode_ctx.target_vid
+            };
 
             let dim = v.screen.read().unwrap().dimension();
-            let dst = { v.watchee[0].2 };
-            let mut dst = editor.view_map.get(&dst.id).unwrap().write().unwrap();
+            let mut dst = editor.view_map.get(&target_vid).unwrap().write().unwrap();
 
             let doc_size = {
                 let doc = dst.document.as_ref().unwrap();
@@ -243,12 +245,16 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
             eprintln!("SCROLLBAR percent: {}", percent);
 
             // set target's offset
-            // the scroolbar dimension are recomputed in on_view_event
+            // the scrollbar dimension are recomputed in on_view_event
             let offset = (doc_size as f64 * percent) as u64;
             dst.start_offset = offset;
 
             // TODO: push action
-            // center + scrolldown (h / 2)
+            // center + scroll-down (h / 2)
+
+            // TODO: update scrollbar.subscription()
+            // view.on_event(ViewEvent { ChangeOffset{ offset } });
+            // view.on_request(src, dsc, ViewEvent { ChangeOffset{ offset } });
         }
 
         _ => {

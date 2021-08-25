@@ -82,6 +82,7 @@ impl DocumentBuilder {
             changed: false,
             is_syncing: false,
             last_tag_time: std::time::Instant::now(),
+            subscribers: vec![],
         };
 
         Some(Arc::new(RwLock::new(doc)))
@@ -155,6 +156,26 @@ impl DocumentReadCache {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct DocumentEventSource {
+    pub id: Id,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DocumentEventDestination {
+    pub id: Id,
+}
+
+pub enum DocumentEvent {
+    Add,
+    Open,
+    Close,
+    Remove,
+    Change { op: BufferOperation },
+}
+
+type DocumentEventCb = fn(DocumentEventDestination, DocumentEvent);
+
 #[derive(Debug)]
 pub struct Document<'a> {
     pub id: Id,
@@ -167,6 +188,12 @@ pub struct Document<'a> {
     pub is_syncing: bool,
     pub abort_indexing: bool,
     pub last_tag_time: std::time::Instant,
+
+    pub subscribers: Vec<(
+        DocumentEventSource,
+        DocumentEventDestination,
+        DocumentEventCb,
+    )>,
 }
 
 // NB: doc MUST be wrapped in Arc<RwLock<XXX>>
@@ -414,6 +441,13 @@ impl<'a> Document<'a> {
 
     pub fn find(&self, offset: u64, data: &Vec<u8>) -> Option<u64> {
         self.buffer.find(offset, &data)
+    }
+
+    // TODO(ceg): return an array of offsets ?
+    pub fn apply_operations(&mut self, ops: &[BufferOperation]) {
+        for op in ops {
+            self.apply_log_operation(op);
+        }
     }
 
     fn apply_log_operation(&mut self, op: &BufferOperation) -> Option<u64> {
@@ -780,7 +814,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             node.byte_count = byte_count;
             node.indexed = true;
 
-            // TODO: notify watcher
+            // TODO: notify subscribers
             /*
             doc.register_node_event_cb(cb);
 
