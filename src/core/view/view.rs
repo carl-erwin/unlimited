@@ -407,6 +407,8 @@ impl<'a> View<'a> {
             compose_screen_overlay_filters: Rc::new(RefCell::new(vec![])),
 
             compose_priority: 0, //  greater first
+
+            // here ?
             filter_in: Rc::new(RefCell::new(vec![])),
             filter_out: Rc::new(RefCell::new(vec![])),
 
@@ -417,6 +419,7 @@ impl<'a> View<'a> {
         // setup modes/input map/etc..
         for mode_name in modes.iter() {
             if mode_name.len() == 0 {
+                // TODO(ceg): log error
                 continue;
             }
 
@@ -428,7 +431,7 @@ impl<'a> View<'a> {
                 Rc::clone(mode.unwrap())
             };
 
-            // move to mode.configure()
+            // TODO(ceg): move to mode.configure()
             // merge all actions
             // move to mode
             let action_map = mode.build_action_map();
@@ -441,7 +444,6 @@ impl<'a> View<'a> {
             {
                 let ctx = mode.alloc_ctx();
                 v.set_mode_ctx(mode.name(), ctx);
-
                 dbg_println!("mode[{}] configure VID {}", mode.name(), v.id);
                 mode.configure_view(editor, env, &mut v);
             }
@@ -451,8 +453,7 @@ impl<'a> View<'a> {
     }
 
     pub fn dimension(&self) -> (usize, usize) {
-        let screen = self.screen.read().unwrap();
-        (screen.width(), screen.height())
+        self.screen.read().unwrap().dimension()
     }
 
     pub fn set_mode_ctx(&mut self, name: &str, ctx: Box<dyn Any>) -> bool {
@@ -567,9 +568,7 @@ pub fn compute_view_layout(
         let v = view.read().unwrap();
         let doc = v.document()?;
         let max_offset = { doc.read().unwrap().size() as u64 };
-
         let dimension = v.screen.read().unwrap().dimension();
-        dbg_println!("DIMENSION {:?}", dimension);
         (dimension, max_offset)
     };
 
@@ -578,10 +577,10 @@ pub fn compute_view_layout(
             let v = view.read().unwrap();
             v.start_offset
         };
-        // the screen is unlikely in ui thread
-        // let mut screen = v.screen.write().unwrap();
-        // screen.clear();
+
+        // TODO(ceg): screen cache/allocator
         let mut screen = Screen::with_dimension(dimension);
+
         run_compositing_stage_direct(
             editor,
             env,
@@ -591,6 +590,7 @@ pub fn compute_view_layout(
             &mut screen,
             LayoutPass::ContentAndScreenOverlay,
         );
+
         screen
     };
 
