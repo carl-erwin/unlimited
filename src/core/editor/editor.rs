@@ -113,7 +113,7 @@ fn stage_pos_to_index(pos: StagePosition) -> usize {
 }
 
 // Option<StagePosition> ?
-fn index_to_stage_pos(index: usize) -> StagePosition {
+fn _index_to_stage_pos(index: usize) -> StagePosition {
     match index {
         0 => StagePosition::Pre,
         1 => StagePosition::In,
