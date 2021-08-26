@@ -114,8 +114,8 @@ impl FindMode {
     }
 }
 
-// TODO: env.focus_stack.push(view.id)
-// TODO: env.set_focus_to.push(status.id)
+// TODO(ceg): env.focus_stack.push(view.id)
+// TODO(ceg): env.set_focus_to.push(status.id)
 // Mode "find"
 pub fn find_start(
     editor: &mut Editor<'static>,
@@ -148,11 +148,11 @@ pub fn find_start(
             let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
             let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
             input_map_stack.push(input_map);
-            // TODO: add lock flag
+            // TODO(ceg): add lock flag
             // to not exec lower input level
         }
     } else {
-        // TODO: log missing status mode
+        // TODO(ceg): log missing status mode
     }
 }
 
@@ -169,7 +169,7 @@ pub fn find_stop(
         // env.focus_locked_on = None;
     }
 
-    // reset status view : TODO: view::reset_status_view(&editor, view);
+    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
     let status_vid = view::get_status_view(&editor, &env, view);
     if let Some(status_vid) = status_vid {
         let status_view = editor.view_map.get(&status_vid).unwrap();
@@ -353,7 +353,7 @@ pub fn display_find_string(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     //
-    // reset status view : TODO: view::reset_status_view(&editor, view);
+    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
     let status_vid = view::get_status_view(&editor, &env, view);
 
     if let Some(status_vid) = status_vid {

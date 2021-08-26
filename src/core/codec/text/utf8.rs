@@ -134,9 +134,9 @@ pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
     0
 }
 
-// TODO: rename sync_backward
-// TODO: change this with temporary (cp, offset, size) until from_offset
-// TODO: rename in sync(BACKWARD, offset) -> offset
+// TODO(ceg): rename sync_backward
+// TODO(ceg): change this with temporary (cp, offset, size) until from_offset
+// TODO(ceg): rename in sync(BACKWARD, offset) -> offset
 // get_previous
 fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
     assert!(data.len() >= from_offset as usize);
@@ -188,7 +188,7 @@ fn get_previous_codepoint_start(data: &[u8], from_offset: u64) -> u64 {
 }
 
 pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
-    let mut v = vec![]; // TODO: move to array
+    let mut v = vec![]; // TODO(ceg): move to array
     let mut ctx = Utf8DecodeContext::new();
     ctx.from_offset = from_offset;
     ctx.current_offset = from_offset;
@@ -208,7 +208,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     (v[0].0, from_offset, v[0].2)
 }
 
-// TODO: pass codec in env
+// TODO(ceg): pass codec in env
 struct Utf8DecodeContext {
     current_offset: u64,
     from_offset: u64,
@@ -377,7 +377,7 @@ impl TextCodec for Utf8Codec {
         is_codepoint_start(byte)
     }
 
-    // TODO: return Result<u64, need more|invalid offset|...>
+    // TODO(ceg): return Result<u64, need more|invalid offset|...>
     fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64> {
         let data_offset = data_offset as usize;
 
@@ -516,7 +516,7 @@ fn test_backward_decode() {
         start_offset, data[start_offset as usize] as u32
     );
 
-    // TODO: transform all return code into Error
+    // TODO(ceg): transform all return code into Error
     // for example start_offset can be greater than data.len()
     // we could return something like Error(invalid offset)
     let off = get_previous_codepoint_start(&data, start_offset as u64);

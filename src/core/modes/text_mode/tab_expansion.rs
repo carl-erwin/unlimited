@@ -50,7 +50,7 @@ impl ContentFilter<'_> for TabFilter {
                 match codepoint {
                     '\t' => {
                         self.prev_cp = '\t';
-                        // TODO: setup
+                        // TODO(ceg): setup
                         let tab_size = 8;
                         let padding = tab_size - (self.column_count % tab_size);
 

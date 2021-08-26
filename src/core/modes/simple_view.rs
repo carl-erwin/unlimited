@@ -108,13 +108,13 @@ impl<'a> Mode for SimpleViewMode {
 
         v.is_group_leader = true; // allow generic split code
 
-        // TODO: set focus
+        // TODO(ceg): set focus
         // set focus on text view
         let text_view_idx = 0;
         let scroll_bar_idx = 1;
         v.main_child = Some(text_view_idx); // index in children
-        v.focus_to = Some(v.children[text_view_idx]); // TODO:
-        env.focus_changed_to = Some(v.children[text_view_idx]); // TODO:
+        v.focus_to = Some(v.children[text_view_idx]); // TODO(ceg):
+        env.focus_changed_to = Some(v.children[text_view_idx]); // TODO(ceg):
 
         // register siblings view
         // text <--> scrollbar

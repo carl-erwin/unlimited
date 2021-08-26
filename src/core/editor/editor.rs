@@ -38,7 +38,7 @@ use crate::core::view::LayoutDirection;
 
 use crate::core::view::View;
 
-/* TODO:
+/* TODO(ceg):
 
  InputStageActionMap is kept in EditorEnv
  Have a map per view
@@ -46,7 +46,7 @@ use crate::core::view::View;
  It will allow per mode actions instanciate for each view
  transform into STACK of map ?
 
- TODO:
+ TODO(ceg):
    check file metadata on every operations -> file changed ... reload ?
 
    add Timers -> for Blinking marks
@@ -233,7 +233,7 @@ impl<'a> Editor<'a> {
 
 //////////////////////////////////////////////
 
-// TODO: handle conflicting bindings
+// TODO(ceg): handle conflicting bindings
 pub fn register_input_stage_action(
     map: &mut InputStageActionMap,
     s: &str,
@@ -442,7 +442,7 @@ fn process_single_input_event<'a>(
         let mut in_node = v.input_ctx.current_node.clone();
         dbg_println!("last node = {:?}", in_node);
 
-        // TODO: function
+        // TODO(ceg): function
         let trigger_pos = v.input_ctx.trigger.len() - 1;
         let trigger_pos_max = v.input_ctx.trigger.len();
 
@@ -561,7 +561,7 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     //    dbg_println!("FLUSH: pending render events = {}\r", p_rdr);
 
     // % last render time
-    // TODO: receive FPS from ui in Event ?
+    // TODO(ceg): receive FPS from ui in Event ?
     if (p_rdr <= 60) || p_input <= 60 {
         // hit
         let view = editor.view_map.get(&env.view_id).unwrap().clone();
@@ -614,7 +614,7 @@ pub fn set_focus_on_view(
     env: &mut EditorEnv<'static>,
     view: &mut View<'static>,
 ) {
-    // TODO: propagate focus up to root
+    // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
     //    assert!(view.children.is_empty());
@@ -900,7 +900,7 @@ fn run_stage(
 
     match stage {
         Stage::Input => {
-            // TODO: run_stage_input
+            // TODO(ceg): run_stage_input
             match pos {
                 StagePosition::Pre => {
                     env.process_input_start = Instant::now();
@@ -1018,7 +1018,7 @@ fn setup_focus_and_event(
     };
 
     let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
-    // - - TODO: if button press only: env.focus_on = Option<vid> ? -
+    // - - TODO(ceg): if button press only: env.focus_on = Option<vid> ? -
     set_focus_on_vid(&mut editor, &mut env, vid);
 
     env.current_input_event = ev;

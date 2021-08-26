@@ -1,5 +1,5 @@
 /*
-  TODO: split in function kind
+  TODO(ceg): split in function kind
 
   movements:
     up/down/forward/backward
@@ -95,7 +95,7 @@ use crate::core::screen::Screen;
 use super::mark::Mark;
 
 use crate::core::codec::text::utf8;
-use crate::core::codec::text::SyncDirection; // TODO: remove
+use crate::core::codec::text::SyncDirection; // TODO(ceg): remove
 use crate::core::codec::text::TextCodec;
 
 use crate::core::document::BufferOperation;
@@ -326,7 +326,7 @@ impl<'a> Mode for TextMode {
 
         // Config input map
         dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
-        // TODO: user define
+        // TODO(ceg): user define
         // let input_map = mode.build_input_map(); TODO
         {
             let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
@@ -335,7 +335,7 @@ impl<'a> Mode for TextMode {
         }
 
         /*
-        TODO: --set-key key1=val1,key2,..,key(n)
+        TODO(ceg): --set-key key1=val1,key2,..,key(n)
             no-highlight-keyword
             no-highlight-selection
             no-tab
@@ -348,7 +348,7 @@ impl<'a> Mode for TextMode {
         //
         let use_utf8_codec = true;
 
-        let use_highlight_keywords = true; // TODO: transform in overlay filter
+        let use_highlight_keywords = true; // TODO(ceg): transform in overlay filter
         let use_highlight_selection = true; // mandatory
         let use_tabulation_exp = true;
         // TODO(ceg) filter '\r'
@@ -539,7 +539,7 @@ impl TextMode {
             ("text-mode:button-press", button_press),
             ("text-mode:button-release", button_release),
             ("text-mode:pointer-motion", pointer_motion),
-            // TODO: usage not well defined
+            // TODO(ceg): usage not well defined
             ("editor:cancel", editor_cancel),
         ];
 
@@ -668,7 +668,7 @@ pub fn run_text_mode_actions_vec(
         }
     }
 
-    // TODO: add offscreen support
+    // TODO(ceg): add offscreen support
     // marks ranges
     // screen scrolling * key freq
     // if main mark offscreen ignore cache ?
@@ -677,8 +677,8 @@ pub fn run_text_mode_actions_vec(
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.mark_index = tm.marks.len().saturating_sub(1);
 
-        // TODO: Action::UpdateReadCache(s) vs multiple views
-        // TODO: adjust with v.star_offset ..
+        // TODO(ceg): Action::UpdateReadCache(s) vs multiple views
+        // TODO(ceg): adjust with v.star_offset ..
         if tm.marks.len() > 0 {
             let mut min = tm.marks[0].offset;
             let mut max = tm.marks[tm.marks.len() - 1].offset;
@@ -723,7 +723,7 @@ pub fn run_text_mode_actions_vec(
                 //max = std::cmp::max(max, screen_end);
 
                 // cap size ... < 2m ?
-                // TODO: add read cache for mark updates have multiple caches
+                // TODO(ceg): add read cache for mark updates have multiple caches
             }
 
             if s <= min && e >= max {
@@ -736,7 +736,7 @@ pub fn run_text_mode_actions_vec(
                     "UPDATE READ CACHE SIZE = {} Mib",
                     (max - min) / (1024 * 1024)
                 );
-                doc.set_cache(min, max); // TODO: optimize read with discard cache + append
+                doc.set_cache(min, max); // TODO(ceg): optimize read with discard cache + append
 
                 let (s, e) = doc.get_cache_range();
                 dbg_println!("UPDATE READ CACHE  MIN={}, MAX={}, diff={}", s, e, e - s);
@@ -770,7 +770,7 @@ fn run_text_mode_actions(
 
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-                // TODO: add selection in buffer log ?
+                // TODO(ceg): add selection in buffer log ?
                 // ex: cut-line
                 // undo must restore marks before cut
                 tm.prev_buffer_log_revision = doc.buffer_log.data.len();
@@ -841,7 +841,7 @@ fn run_text_mode_actions(
     run_text_mode_actions_vec(&mut editor, &mut env, &view, &actions);
 
     // CEG: is this true after undo redo with multiple cursors ?
-    // TODO: cut/paste
+    // TODO(ceg): cut/paste
     if !true {
         let v = view.read().unwrap();
         let doc = v.document().unwrap();
@@ -892,7 +892,7 @@ pub fn editor_cancel(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<
 }
 
 pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    // TODO: 3 is from mode configuration
+    // TODO(ceg): 3 is from mode configuration
     // env["default-scroll-size"] -> int
     let v = &mut view.write().unwrap();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -901,7 +901,7 @@ pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<Vi
 }
 
 pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    // TODO: 3 is from mode configuration
+    // TODO(ceg): 3 is from mode configuration
     // env["default-scroll-size"] -> int
     let v = &mut view.write().unwrap();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -909,7 +909,7 @@ pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<
     tm.pre_compose_action.push(Action::ScrollDown { n: 3 });
 }
 
-// TODO: rename into handle_input_events
+// TODO(ceg): rename into handle_input_events
 /// Insert an single element/array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(
     mut editor: &mut Editor<'static>,
@@ -972,7 +972,7 @@ pub fn insert_codepoint_array(
         tm.prev_action == ActionType::MarksMove
     };
 
-    // TODO: find a way to remove this
+    // TODO(ceg): find a way to remove this
     if save_marks {
         run_text_mode_actions_vec(
             &mut editor,
@@ -1033,7 +1033,7 @@ pub fn insert_codepoint_array(
 
                 m.offset += utf8.len() as u64;
 
-                offset = m.offset; // TODO: remove this merge
+                offset = m.offset; // TODO(ceg): remove this merge
 
                 grow += utf8.len() as u64;
             }
@@ -1171,7 +1171,7 @@ pub fn undo(
         tm.prev_action == ActionType::DocumentModification
     };
 
-    // TODO: fin a way to remove this
+    // TODO(ceg): fin a way to remove this
     if save_marks {
         run_text_mode_actions_vec(
             &mut editor,
@@ -1256,7 +1256,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
 
     tm.prev_action = ActionType::Redo;
     /*
-    TODO: add this function pointer attr
+    TODO(ceg): add this function pointer attr
     if ActionType::Modification -> save marks before exec, etc ...
     */
 }
@@ -1317,7 +1317,7 @@ pub fn remove_codepoint(
 }
 
 /// Skip blanks (if any) and remove until end of the word.
-/// TODO: handle ',' | ';' | '(' | ')' | '{' | '}'
+/// TODO(ceg): handle ',' | ';' | '(' | ')' | '{' | '}'
 pub fn remove_until_end_of_word(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
@@ -1405,7 +1405,7 @@ pub fn remove_until_end_of_word(
                                                          // if doc changes cancel selection ?
 }
 
-// TODO: maintain main mark Option<(x,y)>
+// TODO(ceg): maintain main mark Option<(x,y)>
 pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write().unwrap();
 
@@ -1491,11 +1491,11 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
             dbg_println!("before forward : m.offset = {}", before);
 
             // mark move off_screen ? scroll down 1 line
-            m.move_forward(&doc, codec); // TODO: check error
+            m.move_forward(&doc, codec); // TODO(ceg): check error
 
             dbg_println!("after forward : m.offset = {}", m.offset);
 
-            // TODO: end_offset is not set properly at startup
+            // TODO(ceg): end_offset is not set properly at startup
             // main mark + on screen ?
             if before > 0
                 && idx == midx
@@ -1512,8 +1512,8 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
         tm.marks.len()
     };
 
-    // TODO:  tm.pre_compose_action.push(Action::SelectLastMark);
-    tm.mark_index = nr_marks.saturating_sub(1); // TODO: dedup ?
+    // TODO(ceg):  tm.pre_compose_action.push(Action::SelectLastMark);
+    tm.mark_index = nr_marks.saturating_sub(1); // TODO(ceg): dedup ?
 
     //      move this check at post render to reschedule render ?
     //      if v.center_on_mark_move {
@@ -1710,7 +1710,7 @@ fn move_on_screen_mark_to_previous_line(
     let screen = screen.read().unwrap();
     let mut m = &mut marks[midx];
 
-    // TODO: if v.is_mark_on_screen(m) -> (bool, x, y) + (prev/new offset)?
+    // TODO(ceg): if v.is_mark_on_screen(m) -> (bool, x, y) + (prev/new offset)?
     match screen.find_cpi_by_offset(m.offset) {
         // off_screen
         (None, _, _) => {
@@ -1726,9 +1726,9 @@ fn move_on_screen_mark_to_previous_line(
         (Some(_), x, y) if y > 0 => {
             dbg_println!("MARK on screen @ ({},{})", x, y);
 
-            // TODO: refactor code to support screen cell metadata
+            // TODO(ceg): refactor code to support screen cell metadata
             let new_y = y - 1; // select previous line
-            let l = screen.get_used_line(new_y).unwrap(); // TODO:  get_line_last_used_cpi()
+            let l = screen.get_used_line(new_y).unwrap(); // TODO(ceg):  get_line_last_used_cpi()
             dbg_println!("MARK  line {} : len {} ", new_y, l.len());
             // previous line is filled ?
             if l.len() > 0 {
@@ -1777,7 +1777,7 @@ fn move_mark_to_previous_line(
         return;
     }
 
-    // TODO:
+    // TODO(ceg):
     // offset = move_off_screen_mark_to_previous_line(&editor, &env, &v, midx, &mut marks);
 
     dbg_println!(
@@ -1812,7 +1812,7 @@ fn move_mark_to_previous_line(
         //let end_offset = std::cmp::min(end_offset, doc_size);
         //let end_offset = m_offset + width as u64 * 4;
 
-        // TODO: return last screen, ie screen that contains
+        // TODO(ceg): return last screen, ie screen that contains
         //  the last offset
         // and then use screen_find_offset
         // to compute correct column
@@ -1865,7 +1865,7 @@ fn move_mark_to_previous_line(
             v.start_offset = line_start_off;
         }
 
-        // TODO: we can avoid a redraw if the last screen in get_lines_offsets_direct is sync
+        // TODO(ceg): we can avoid a redraw if the last screen in get_lines_offsets_direct is sync
         {
             marks[midx].offset = line_start_off;
         }
@@ -1882,7 +1882,7 @@ pub fn move_marks_to_previous_line(
         let mut v = view.write().unwrap();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-        // TODO: maintain env.mark_index_max ?
+        // TODO(ceg): maintain env.mark_index_max ?
         let idx_max = tm.marks.len() - 1;
         (tm.marks.clone(), idx_max)
     };
@@ -1894,7 +1894,7 @@ pub fn move_marks_to_previous_line(
             let prev_offset = marks[idx].offset;
             move_mark_to_previous_line(editor, env, view, idx, &mut marks);
 
-            // TODO: move this to pre/post render
+            // TODO(ceg): move this to pre/post render
             if idx == 0 && idx_max == 0 {
                 // tm.pre_compose_action.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
                 let new_offset = marks[idx].offset;
@@ -1928,7 +1928,7 @@ pub fn move_on_screen_mark_to_next_line(
     m: &mut Mark,
     screen: &Screen,
 ) -> (bool, Option<(u64, u64)>, Option<Action>) {
-    // TODO: add hints: check in screen range
+    // TODO(ceg): add hints: check in screen range
     if !screen.contains_offset(m.offset) {
         dbg_println!(" offset {} not found in screen", m.offset);
 
@@ -1992,7 +1992,7 @@ pub fn move_on_screen_mark_to_next_line(
     dbg_println!("update mark : offset => {} -> {}", old_offset, m.offset);
 
     /*
-     TODO:
+     TODO(ceg):
      Our current data model does not support virtual characters.
      ie: if a filter fills the screen with meta info (not document's real data)
      The offset mechanism is broken
@@ -2032,7 +2032,7 @@ pub fn move_mark_to_next_line(
     view: &Rc<RwLock<View>>,
     mark_idx: usize,
 ) -> Option<(u64, u64)> {
-    // TODO: m.on_buffer_end() ?
+    // TODO(ceg): m.on_buffer_end() ?
 
     let max_offset = {
         let v = view.read().unwrap();
@@ -2119,8 +2119,8 @@ pub fn move_mark_to_next_line(
         // get lines start, end offset
         // NB: run full layout code for one screen line ( folding etc ... )
 
-        // TODO: return Vec<Box<screen>> ? update contenet
-        // TODO: add perf view screen cache ? sorted by screens.start_offset
+        // TODO(ceg): return Vec<Box<screen>> ? update contenet
+        // TODO(ceg): add perf view screen cache ? sorted by screens.start_offset
         // with same width/heigh as v.screen
         let lines = {
             get_lines_offsets_direct(
@@ -2158,7 +2158,7 @@ pub fn move_mark_to_next_line(
 
             let codec = tm.text_codec.as_ref();
 
-            // TODO: use codec.read(doc, n=width) until e.offset is reached
+            // TODO(ceg): use codec.read(doc, n=width) until e.offset is reached
             let mut s = Mark::new(lines[index].0);
             let e = Mark::new(lines[index].1);
             let mut count = 0;
@@ -2188,9 +2188,9 @@ pub fn move_mark_to_next_line(
 
         let codec = tm.text_codec.as_ref();
 
-        // TODO: codec.skip_n(doc, 0..new_x)
+        // TODO(ceg): codec.skip_n(doc, 0..new_x)
         for _ in 0..new_x {
-            tmp_mark.move_forward(&doc, codec); // TODO: pass n as arg
+            tmp_mark.move_forward(&doc, codec); // TODO(ceg): pass n as arg
         }
 
         tmp_mark.offset = std::cmp::min(tmp_mark.offset, line_end_off);
@@ -2269,7 +2269,7 @@ fn sync_mark(view: &Rc<RwLock<View>>, m: &mut Mark) -> u64 {
 }
 
 /*
-    TODO: we use a virtual screen to compute OFFSCREEN marks
+    TODO(ceg): we use a virtual screen to compute OFFSCREEN marks
 
     We should reuse the temporary screen if possible and skip composing pass
     or better allocate a virtual screen with 1 + height + 1
@@ -2443,7 +2443,7 @@ pub fn move_marks_to_next_line(
         tm.marks.clone()
     };
 
-    // TODO: add eof in conditions
+    // TODO(ceg): add eof in conditions
     // find a way to transform while loops into iterator over screens
     // document_walk ? ...
     // ctx
@@ -2490,7 +2490,7 @@ pub fn move_marks_to_next_line(
             }
             assert_ne!(0, screen.push_count()); // at least EOF
             dbg_println!("screen.push_count() == {}", screen.push_count());
-            // TODO: pass doc &doc to avoid double borrow
+            // TODO(ceg): pass doc &doc to avoid double borrow
             // env.doc ?
             // env.view ? to avoid too many args
 
@@ -2560,7 +2560,7 @@ pub fn move_marks_to_next_line(
             for i in idx_index..idx_end {
                 dbg_println!("update marks[{} / {}]", i, idx_max);
 
-                // TODO: that use/match the returned action
+                // TODO(ceg): that use/match the returned action
                 let ret = move_on_screen_mark_to_next_line(&mut marks[i], &screen);
                 if ret.0 == false {
                     dbg_println!(
@@ -2778,7 +2778,7 @@ pub fn move_mark_to_screen_start(
     let marks = &mut tm.marks;
 
     for m in marks.iter_mut() {
-        // TODO: add main mark check
+        // TODO(ceg): add main mark check
         if m.offset < start_offset || m.offset > end_offset {
             m.offset = start_offset;
         }
@@ -2798,7 +2798,7 @@ pub fn move_mark_to_screen_end(
     let marks = &mut tm.marks;
 
     for m in marks.iter_mut() {
-        // TODO: add main mark check
+        // TODO(ceg): add main mark check
         if m.offset < start_offset || m.offset > end_offset {
             m.offset = end_offset;
         }
@@ -2821,7 +2821,7 @@ pub fn scroll_to_previous_screen(
         scroll_view_up(view, editor, env, nb);
     }
 
-    // TODO: add hints to trigger mark moves
+    // TODO(ceg): add hints to trigger mark moves
     move_mark_to_screen_end(editor, env, &view);
 }
 
@@ -2878,7 +2878,7 @@ pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &
 }
 
 /*
-    TODO: with multi marks:
+    TODO(ceg): with multi marks:
       add per mark cut/paste buffer
       and reuse it when pasting
       check behavior when the marks offset cross each other
@@ -2925,9 +2925,9 @@ pub fn cut_to_end_of_line(
     let single_mark = tm.marks.len() == 1;
 
     // this will join line with multi-marks
-    let remove_eol = false && !single_mark; // && join_lines // TODO: use option join-cut-lines
+    let remove_eol = false && !single_mark; // && join_lines // TODO(ceg): use option join-cut-lines
 
-    // TODO: compute range, check overlaps
+    // TODO(ceg): compute range, check overlaps
     // remove marks in other ranges
     // and cut
     for m in tm.marks.iter_mut().rev() {
@@ -3001,7 +3001,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
         m.offset += grow;
 
         if tm.copy_buffer.len() != marks_len {
-            // TODO: insert each tm.copy_buffer transaction + '\n'
+            // TODO(ceg): insert each tm.copy_buffer transaction + '\n'
             // grow += each tr
         } else {
             let copy = &tm.copy_buffer[midx];
@@ -3040,7 +3040,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
 }
 
 pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    // TODO: factorize macrk action
+    // TODO(ceg): factorize macrk action
     // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
     //
 
@@ -3068,7 +3068,7 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
         // main mark ?
         if idx == midx {
             if !screen.contains_offset(m.offset) {
-                // TODO: push to post action queue
+                // TODO(ceg): push to post action queue
                 // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
                 //
                 center = true;
@@ -3103,7 +3103,7 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
 
         // main mark ?
         if !screen.contains_offset(m.offset) {
-            // TODO: push to post action queue
+            // TODO(ceg): push to post action queue
             // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
             //
             sync = true;
@@ -3251,7 +3251,7 @@ pub fn copy_maybe_remove_selection(
         symmetric
     };
 
-    // TODO: always save marks and insert between transaction ?
+    // TODO(ceg): always save marks and insert between transaction ?
     /*
       we could save marks in tmp vec
       save state log size
@@ -3277,14 +3277,14 @@ pub fn copy_maybe_remove_selection(
         );
     }
 
-    // todo: sync view(new_start, adjust_size)
+    // TODO(ceg): sync view(new_start, adjust_size)
     let (copied, removed) = if symmetric {
         copy_maybe_remove_selection_symmetric(editor, env, view, copy, remove)
     } else {
         copy_maybe_remove_selection_non_symmetric(editor, env, view, copy, remove)
     };
 
-    // save marks: TODO: save marks before
+    // save marks: TODO(ceg): save marks before
     // cmp cur marks after and if changed save new marks
     {
         let v = &mut view.as_ref().clone().write().unwrap();
@@ -3294,7 +3294,7 @@ pub fn copy_maybe_remove_selection(
     copied + removed
 }
 
-// TODO: add help, + flag , copy_maybe_remove_selection()
+// TODO(ceg): add help, + flag , copy_maybe_remove_selection()
 pub fn copy_selection(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -3437,7 +3437,7 @@ pub fn button_release(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
     }
 }
 
-// TODO: add enter /leave clipped region detection
+// TODO(ceg): add enter /leave clipped region detection
 pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write().unwrap();
     let screen = v.screen.clone();
@@ -3447,10 +3447,10 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
         return;
     }
 
-    // TODO: match events
+    // TODO(ceg): match events
     match &v.input_ctx.trigger[0] {
         InputEvent::PointerMotion(PointerEvent { mods: _, x, y }) => {
-            // TODO: change screen (x,y) to i32 ? and filter in functions ?
+            // TODO(ceg): change screen (x,y) to i32 ? and filter in functions ?
 
             let vid = v.id;
             dbg_println!("VID {} pointer motion x({}) y({})", vid, x, y);
@@ -3468,7 +3468,7 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
                     // update selection point
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-                    // TODO: check focus
+                    // TODO(ceg): check focus
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
                             tm.select_point.clear();
@@ -3513,7 +3513,7 @@ pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc
     dbg_println!("select view_id {}", env.view_id);
 }
 
-// TODO: view.center_around_offset()
+// TODO(ceg): view.center_around_offset()
 pub fn center_around_mark(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -3541,7 +3541,7 @@ pub fn center_around_offset(
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
-        center_view_around_offset(view, editor, env, offset); // TODO: enum { top center bottom } ? in text-mode
+        center_view_around_offset(view, editor, env, offset); // TODO(ceg): enum { top center bottom } ? in text-mode
     }
 }
 
@@ -3585,7 +3585,7 @@ pub fn get_lines_offsets_direct(
     screen_height: usize,
 ) -> Vec<(u64, u64)> {
     let mut lines = Vec::<(u64, u64)>::new();
-    let mut tmp = Mark::new(start_offset); // TODO: rename into screen_start
+    let mut tmp = Mark::new(start_offset); // TODO(ceg): rename into screen_start
 
     // and build tmp screens until end_offset if found
     let screen_width = ::std::cmp::max(1, screen_width);
@@ -3693,7 +3693,7 @@ pub fn get_lines_offsets_direct(
 }
 
 /*
- TODO: use nb_lines
+ TODO(ceg): use nb_lines
  to compute previous screen height
  new_h = screen.weight + (nb_lines * screen.width * max_codec_encode_size)
 */

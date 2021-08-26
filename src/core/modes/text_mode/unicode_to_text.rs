@@ -55,7 +55,7 @@ impl ContentFilter<'_> for UnicodeToTextFilter {
                                 real_cp: e.cp,
                                 displayed_cp: e.cp,
                             },
-                            // TODO: add style infos ?
+                            // TODO(ceg): add style infos ?
                         };
 
                         filter_out.push(new_io);

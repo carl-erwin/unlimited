@@ -36,7 +36,7 @@ use crate::core::modes::Mode;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 pub type Id = usize;
 
-// TODO:
+// TODO(ceg):
 //
 // reorg
 // buffer
@@ -48,7 +48,7 @@ pub type Id = usize;
 // any view(doc)
 // we should be able to view a document with different views
 
-// TODO: "virtual" scene graph
+// TODO(ceg): "virtual" scene graph
 // add recursive View definition:
 // we want a split-able view, with move-able borders/origin point
 // a view is:
@@ -189,11 +189,11 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
 // process
 // post()
 
-// TODO: add ?
+// TODO(ceg): add ?
 //        doc,
 //        view
 
-// TODO:
+// TODO(ceg):
 // add struct to map view["mode(n)"] -> data
 // add struct to map doc["mode(n)"]  -> data: ex: line index
 
@@ -252,28 +252,28 @@ pub enum ViewEvent {
 //
 
 /// The **View** is a way to present a given Document.<br/>
-// TODO: find a way to have marks as plugin.<br/>
+// TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
 // TODO editor.env.current.view_id = view.id
 // can zoom ?
 //
-// TODO: add view.subscribe_to_vid
-// TODO: add view.publish_to_vid
+// TODO(ceg): add view.subscribe_to_vid
+// TODO(ceg): add view.publish_to_vid
 //
 // follow mode fills
-// TODO: add view.prev_content_vid
-// TODO: add view.next_content_vid
+// TODO(ceg): add view.prev_content_vid
+// TODO(ceg): add view.next_content_vid
 pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,
     pub is_group_leader: bool, // This flags marks a view that can be cloned when doing split views
 
     pub parent_id: Option<Id>,
-    pub focus_to: Option<Id>,       // child id TODO: redirect input ?
+    pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
     pub status_view_id: Option<Id>, // TODO(ceg): remove this ?  or per view see env.status_view_id
     /*
       any view that can display some text,
-      TODO: use special document for this
+      TODO(ceg): use special document for this
       split text-mode into
       text-display-mode: scrolling ops etc
       text-edit-mode   : marks , selection etc...
@@ -364,7 +364,7 @@ impl<'a> View<'a> {
         width: usize,
         height: usize,
         document: Option<Arc<RwLock<Document<'static>>>>,
-        modes: &Vec<String>, // TODO: add core mode fr save/quit/quit/abort/split{V,H}
+        modes: &Vec<String>, // TODO(ceg): add core mode fr save/quit/quit/abort/split{V,H}
         start_offset: u64,
     ) -> View<'static> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
@@ -502,7 +502,7 @@ impl<'a> View<'a> {
     pub fn check_invariants(&self) {
         self.screen.read().unwrap().check_invariants();
         let _max_offset = self.document().unwrap().read().unwrap().size();
-        // TODO: mode check invariants
+        // TODO(ceg): mode check invariants
     }
 } // impl View
 
@@ -542,7 +542,7 @@ pub fn run_stage(
     pos: StagePosition,
     stage: Stage,
 ) {
-    // TODO: Rc ?
+    // TODO(ceg): Rc ?
     // exec order ?, path ?
     let actions = view.read().unwrap().stage_actions.clone();
 

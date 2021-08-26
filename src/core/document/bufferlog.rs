@@ -85,7 +85,7 @@ impl BufferOperation {
 
         BufferOperation {
             op_type,
-            data: self.data.clone(), // TODO: replace data by an enum { byte:[u8;12] , vec:Arc:Vec<u8> } // Arc<> to share the data, depending on the data.size()
+            data: self.data.clone(), // TODO(ceg): replace data by an enum { byte:[u8;12] , vec:Arc:Vec<u8> } // Arc<> to share the data, depending on the data.size()
             offset: self.offset,
         }
     }

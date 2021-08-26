@@ -17,7 +17,7 @@ use crate::core::document::Document;
 use crate::core::screen::Screen;
 
 //
-// TODO: implement functions ti update the counters
+// TODO(ceg): implement functions ti update the counters
 // on send (++) / receive (--)
 // add per Event counters
 //
@@ -121,7 +121,7 @@ impl KeyModifiers {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ButtonEvent {
-    pub button: u32, // TODO:: use enum MouseButton { Left, Middle , Right } ?
+    pub button: u32, // TODO(ceg):: use enum MouseButton { Left, Middle , Right } ?
     pub x: i32,
     pub y: i32,
     pub mods: KeyModifiers,
@@ -153,7 +153,7 @@ impl PointerEvent {
     }
 }
 
-// TODO: special hash for ButtonPress/ButtonRelease that ignores (x,y)
+// TODO(ceg): special hash for ButtonPress/ButtonRelease that ignores (x,y)
 
 /// Supported input events
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]

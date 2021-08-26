@@ -19,10 +19,10 @@ Unlimited design will evolve at will. Suggestions are welcomed.
 
 - **EventMessage**<br/>
 An **EventMessage** main purpose is to encapsulate user inputs.<br/>
-TODO: add time info/ sequence / etc.<br/>
+TODO(ceg): add time info/ sequence / etc.<br/>
 
 - **Event**<br/>
-An **Event** TODO: describe event sub types.<br/>
+An **Event** TODO(ceg): describe event sub types.<br/>
 
 - **Document**<br/>
 A **Document** represents a **Buffer** PLUS it's configuration.<br/>
@@ -90,7 +90,7 @@ There are 2 kinds of selection:<br/>
 - **InputMap**<br/>
 The InputMap, will hold the input sequences the user must enter to trigger an action in the core thread.
 
-  TODO: describe json format
+  TODO(ceg): describe json format
 
 ------
 

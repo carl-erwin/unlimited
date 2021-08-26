@@ -88,7 +88,7 @@ fn build_wrap_point_io(blank_offset: Option<u64>) -> FilterIo {
     FilterIo {
         // general info
         metadata: true,
-        style: TextStyle::new(), // TODO: customize
+        style: TextStyle::new(), // TODO(ceg): customize
         offset: blank_offset,
         size: 0,
         data: FilterData::TextInfo {
@@ -120,7 +120,7 @@ impl ContentFilter<'_> for WordWrapFilter {
     }
 
     /*
-            TODO: filters dependencies: check in view's filter_array that
+            TODO(ceg): filters dependencies: check in view's filter_array that
             dep.index < cur_filter.index or (and WARN)
             we can push multiple times new instance of a filter :-)
 

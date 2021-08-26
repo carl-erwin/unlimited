@@ -251,10 +251,10 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
             let offset = (doc_size as f64 * percent) as u64;
             dst.start_offset = offset;
 
-            // TODO: push action
+            // TODO(ceg): push action
             // center + scroll-down (h / 2)
 
-            // TODO: update scrollbar.subscription()
+            // TODO(ceg): update scrollbar.subscription()
             // view.on_event(ViewEvent { ChangeOffset{ offset } });
             // view.on_request(src, dsc, ViewEvent { ChangeOffset{ offset } });
         }

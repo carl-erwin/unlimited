@@ -20,7 +20,7 @@ use crate::core::view::View;
 enum TokenType {
     Unknown,
     InvalidUnicode,
-    Blank, // ' ' | '\n' | '\t' : TODO: specific END_OF_LINE ?
+    Blank, // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
     // Num,
     Identifier,   // _a-zA-Z unicode // default ?
     ParenOpen,    // (
@@ -68,7 +68,7 @@ impl HighlightFilter {
     }
 }
 
-// TODO: monitor env.quit
+// TODO(ceg): monitor env.quit
 // to flush
 impl ContentFilter<'_> for HighlightFilter {
     fn name(&self) -> &'static str {

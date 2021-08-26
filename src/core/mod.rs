@@ -105,7 +105,7 @@ pub fn no_ui_render() -> bool {
 }
 
 /*
- TODO:
+ TODO(ceg):
 
     "core-mode" {
         scrollbar-mode
@@ -326,7 +326,7 @@ pub fn indexer(
 
 use crate::core::document::DocumentBuilder;
 
-/// TODO: replace this by load/unload doc functions
+/// TODO(ceg): replace this by load/unload doc functions
 /// the ui will open the documents on demand
 pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.read().unwrap().len() as u64;
@@ -360,7 +360,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
                 let s = WELCOME_MESSAGE.as_bytes();
 
                 // move 1st tag to ctor/doc::new() ?
-                d.tag(env.current_time, 0, vec![0]); // TODO: rm this only if the buffer log is cleared
+                d.tag(env.current_time, 0, vec![0]); // TODO(ceg): rm this only if the buffer log is cleared
 
                 d.insert(0, s.len(), s);
 

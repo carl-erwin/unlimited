@@ -522,7 +522,7 @@ impl Screen {
 
         self.first_offset = None;
         self.last_offset = None;
-        self.doc_max_offset = 0; // TODO: Option<u64>
+        self.doc_max_offset = 0; // TODO(ceg): Option<u64>
 
         self.line_offset.clear();
         self.line_index.clear();
@@ -702,6 +702,6 @@ pub fn screen_apply_all<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
     }
 }
 
-// TODO: test are broken
+// TODO(ceg): test are broken
 #[test]
 fn test_screen() {}

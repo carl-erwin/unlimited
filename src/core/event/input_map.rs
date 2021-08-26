@@ -14,7 +14,7 @@ pub enum DefaultActionMode {
     RunDefaultAction,
 }
 
-// TODO: map error to editor error
+// TODO(ceg): map error to editor error
 // unlimited::error::SyntaxError(file, line, col, str_details);
 pub fn build_input_event_map(json: &str) -> Result<InputEventMap, serde_json::error::Error> {
     let mut ctx = ParseCtx::new();
@@ -68,7 +68,7 @@ impl ParseCtx {
     fn build_map_entry(&mut self) {
         //dbg_println!("building entry for '{}'", self.action);
 
-        // TODO: user iter instead of index
+        // TODO(ceg): user iter instead of index
         fn read_sequence(
             is_default: bool,
             map: &mut InputEventMap,
@@ -78,10 +78,10 @@ impl ParseCtx {
         ) {
             if pos == sequence.len() {
                 if is_default {
-                    // TODO: check action
+                    // TODO(ceg): check action
                     let ev = InputEvent::FallbackEvent;
                     let event_hash = compute_input_event_hash(&ev);
-                    // TODO: replace
+                    // TODO(ceg): replace
                     map.remove(&event_hash);
                     map.entry(event_hash).or_insert(Rc::new(InputEventRule {
                         action: Some(action.clone()),
@@ -129,7 +129,7 @@ impl ParseCtx {
         read_sequence(self.is_default, map, &self.sequence, 0, &self.action);
 
         //
-        // TODO: self.reset();
+        // TODO(ceg): self.reset();
         self.action.clear();
         self.sequence.clear();
         self.is_default = false;
@@ -258,7 +258,7 @@ fn parse_event_entry_input_button_press(
     ctx.sequence.push(ev)
 }
 
-// TODO: refactor with  parse_event_entry_input_button_press
+// TODO(ceg): refactor with  parse_event_entry_input_button_press
 fn parse_event_entry_input_button_release(
     ctx: &mut ParseCtx,
     _name: &String,

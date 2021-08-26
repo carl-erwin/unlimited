@@ -126,7 +126,7 @@ pub fn application_quit(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    // TODO: change this
+    // TODO(ceg): change this
     // editor.changed_doc : HashSet<document::Id>
     // if editor.change_docs.len() != 0
 
@@ -173,11 +173,11 @@ pub fn application_quit_abort_setup(
             let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
             let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
             input_map_stack.push(input_map);
-            // TODO: add lock flag
+            // TODO(ceg): add lock flag
             // to not exec lower input level
         }
     } else {
-        // TODO: log missing status mode
+        // TODO(ceg): log missing status mode
     }
 }
 
@@ -202,7 +202,7 @@ pub fn application_quit_abort_no(
         // env.focus_locked_on = None;
     }
 
-    // reset status view : TODO: view::reset_status_view(&editor, view);
+    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
     let status_vid = view::get_status_view(&editor, &env, view);
     if let Some(status_vid) = status_vid {
         let status_view = editor.view_map.get(&status_vid).unwrap();
@@ -227,7 +227,7 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
             // - needed ? already syncing ? -
             let doc = doc.read().unwrap();
             if !doc.changed || doc.is_syncing {
-                // TODO: ensure all other places are checking this flag, all doc....write()
+                // TODO(ceg): ensure all other places are checking this flag, all doc....write()
                 // better, some permissions mechanism ?
                 // doc.access_permissions = r-
                 // doc.access_permissions = -w
@@ -569,7 +569,7 @@ pub fn split_view_with_direction(
         width,
         height,
         None,
-        &vec![], // TODO: add core mode fr save/quit/quit/abort/split{V,H}
+        &vec![], // TODO(ceg): add core mode fr save/quit/quit/abort/split{V,H}
         0,
     );
 
@@ -715,7 +715,7 @@ pub fn increase_layout_op(
 // quit hack ignoring other children
 pub fn decrease_layout_op(
     op: LayoutOperation,
-    // TODO: min_size: usize,
+    // TODO(ceg): min_size: usize,
     max_size: usize,
     cur_size: usize,
     diff: usize, // decrease amount
@@ -976,7 +976,7 @@ pub fn destroy_view(
 
         let mut kept_vid = None;
 
-        // TODO: get sibling ids
+        // TODO(ceg): get sibling ids
         // mark siblings for delete
         for (idx, view_id) in pv.children.iter().enumerate() {
             if idx == v_layout_index {
@@ -984,7 +984,7 @@ pub fn destroy_view(
                 destroy.push(*view_id);
             } else if idx == 1 {
                 // separator index
-                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
                 dbg_println!("prepare delete of view id {} (separator)", *view_id);
                 destroy.push(*view_id);
             } else {
@@ -997,7 +997,7 @@ pub fn destroy_view(
             // replace parent in grand-parent
             ppv.children[pv_layout_index] = kept_vid;
             pv.parent_id = Some(ppvid);
-            // update grand parent focus: // TODO: find a better way
+            // update grand parent focus: // TODO(ceg): find a better way
             ppv.focus_to = Some(kept_vid);
 
             // update link to grand-parent  (new parent)
@@ -1014,7 +1014,7 @@ pub fn destroy_view(
             env.focus_changed_to = Some(kept_vid); // post input
         }
     } else {
-        // TODO: get sibling ids
+        // TODO(ceg): get sibling ids
         // mark self+siblings for delete
         let mut kept_vid = None;
 
@@ -1024,7 +1024,7 @@ pub fn destroy_view(
                 destroy.push(*view_id);
             } else if idx == 1 {
                 // separator index
-                // TODO: add view_kind ? text/scrollbar/hsplit/vsplit etc ?
+                // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
                 dbg_println!("prepare delete of view id {} (separator)", *view_id);
                 destroy.push(*view_id);
             } else {

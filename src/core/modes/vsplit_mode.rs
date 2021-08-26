@@ -184,7 +184,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
         dbg_println!("VSPLIT env.diff_x = {}", env.diff_x);
 
         let new_op = if env.diff_x < 0 {
-            // TODO: find a better way to refresh global coords
+            // TODO(ceg): find a better way to refresh global coords
 
             if cur_size.saturating_sub(env.diff_x as usize) > max_size {
                 return;
@@ -204,7 +204,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
                 return;
             }
 
-            // TODO: find a better way to refresh global coords
+            // TODO(ceg): find a better way to refresh global coords
             let gx = env.global_x.unwrap() + env.diff_x;
             env.global_x = Some(gx);
             increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, env.diff_x as usize)
@@ -214,7 +214,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
         pv.layout_ops[lidx] = new_op;
     }
-    // TODO: refresh global coords
+    // TODO(ceg): refresh global coords
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

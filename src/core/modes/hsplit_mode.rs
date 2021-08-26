@@ -184,7 +184,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
         dbg_println!("VSPLIT env.diff_y = {}", env.diff_y);
 
         let new_op = if env.diff_y < 0 {
-            // TODO: find a better way to refresh global coords
+            // TODO(ceg): find a better way to refresh global coords
             let diff = -env.diff_y;
             let gy = env.global_y.unwrap();
             if gy <= diff {
@@ -195,7 +195,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
             //
             decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, diff as usize)
         } else if env.diff_y > 0 {
-            // TODO: find a better way to refresh global coords
+            // TODO(ceg): find a better way to refresh global coords
             let gy = env.global_y.unwrap() + env.diff_y;
             env.global_y = Some(gy);
 
@@ -206,7 +206,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
         pv.layout_ops[lidx] = new_op;
     }
-    // TODO: refresh global coords
+    // TODO(ceg): refresh global coords
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

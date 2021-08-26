@@ -28,7 +28,7 @@ pub fn main_loop(
     ui_tx: &Sender<EventMessage<'static>>,
     core_tx: &Sender<EventMessage<'static>>,
 ) {
-    // TODO: switch ui here
+    // TODO(ceg): switch ui here
     match ui_name {
         "termion" => {
             run_termion(&ui_rx, &ui_tx, &core_tx);

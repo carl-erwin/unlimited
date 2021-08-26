@@ -160,7 +160,7 @@ pub fn main_loop<'a>(
                 _ => {}
             }
         } else {
-            // TODO: handle timeout
+            // TODO(ceg): handle timeout
         }
     }
 
@@ -207,7 +207,7 @@ fn draw_screen(_last_screen: &mut Screen, screen: &mut Screen, mut stdout: &mut 
 }
 
 /*
-    TODO:
+    TODO(ceg):
     1 : be explicit
     2 : create editor internal result type Result<>
     3 : use idomatic    func()? style

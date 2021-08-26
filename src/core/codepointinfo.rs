@@ -63,18 +63,18 @@ impl TextStyle {
 pub struct CodepointInfo {
     pub used: bool,
 
-    pub metadata: bool, // offset cannot be used, TODO: use enum to tag Eof, Normal
+    pub metadata: bool, // offset cannot be used, TODO(ceg): use enum to tag Eof, Normal
 
     // pub is_eof ?
     pub cp: char,            // the real codepoint
     pub displayed_cp: char,  // the displayed codepoint
-    pub offset: Option<u64>, // TODO: Option<(u64, usize)>, back end size (codec)
-    pub size: usize,         // TODO: Option<(u64, usize)>, back end size (codec)
+    pub offset: Option<u64>, // TODO(ceg): Option<(u64, usize)>, back end size (codec)
+    pub size: usize,         // TODO(ceg): Option<(u64, usize)>, back end size (codec)
 
     pub skip_render: bool,
 
-    // TODO: add n/m fragments ie tabs ?
-    // TODO: add real_size ? in bytes
+    // TODO(ceg): add n/m fragments ie tabs ?
+    // TODO(ceg): add real_size ? in bytes
     pub style: TextStyle,
 }
 

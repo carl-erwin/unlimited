@@ -104,7 +104,7 @@ impl ContentFilter<'_> for TextCodecFilter {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: pass codec in env
+// TODO(ceg): pass codec in env
 pub struct Utf8FilterCtx {
     cp_size: usize,
     state: u32,
@@ -147,7 +147,7 @@ fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
     }
 }
 
-// TODO: remove Option<>
+// TODO(ceg): remove Option<>
 // always ?
 #[inline(always)]
 fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, val: u8) {
@@ -352,7 +352,7 @@ pub fn filter_utf8_bytearray(
 
     let mut ctx = ctx;
 
-    // TODO: move accum between state structs
+    // TODO(ceg): move accum between state structs
     if true {
         for val in vec {
             filter_utf8_byte(&mut ctx, *val);
@@ -379,7 +379,7 @@ pub fn filter_utf8_bytearray(
         data: FilterData::UnicodeArray {
             vec: ctx.out.clone(),
         },
-        // TODO: add style infos ?
+        // TODO(ceg): add style infos ?
     };
 
     filter_out.push(new_io);
@@ -442,7 +442,7 @@ impl ContentFilter<'_> for Utf8Filter {
                         });
                     }
 
-                    // TODO: flush remaining bytes
+                    // TODO(ceg): flush remaining bytes
                     filter_out.push(d.clone());
                 }
 

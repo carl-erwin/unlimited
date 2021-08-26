@@ -29,9 +29,9 @@ pub enum EncodeResult {
     Value { bytes: [u8; 4], size: usize },
 }
 
-// TODO: add new type : editor:: type Offset = u64;
+// TODO(ceg): add new type : editor:: type Offset = u64;
 
-// TODO: add incremental decoder, state in impl
+// TODO(ceg): add incremental decoder, state in impl
 // fn decode_byte(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<(char, Offset, usize)>
 //
 
@@ -47,7 +47,7 @@ pub trait TextCodec {
 
     fn is_sync(&self, byte: u8) -> bool;
 
-    // TODO: return Result<u64, need more|invalid offset|...>
+    // TODO(ceg): return Result<u64, need more|invalid offset|...>
     fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64>;
 }
 

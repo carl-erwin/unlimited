@@ -20,7 +20,7 @@ pub enum OpenMode {
 pub struct Buffer<'a> {
     pub id: Id,
     /// the name of the file where the data will be synced
-    pub file_name: String, // TODO: Option<String>
+    pub file_name: String, // TODO(ceg): Option<String>
     /// the current size of the buffer
     pub size: usize,
     /// the number of changes (since last save TODO)
@@ -40,8 +40,8 @@ impl<'a> Buffer<'a> {
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successful open operation
     pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer<'a>> {
-        // TODO: check permission
-        // TODO: check file's type => ignore directory (for now)
+        // TODO(ceg): check permission
+        // TODO(ceg): check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
         if file_name.is_empty() {
@@ -51,7 +51,7 @@ impl<'a> Buffer<'a> {
         let file = match MappedFile::new(file_name.to_owned()) {
             Some(file) => file,
             None => {
-                // TODO: return Result
+                // TODO(ceg): return Result
                 // dbg_println!("cannot map file '{}'", file_name);
                 return None;
             }
@@ -80,8 +80,6 @@ impl<'a> Buffer<'a> {
         };
 
         let size = file.as_ref().read().unwrap().size() as usize;
-
-        dbg_println!("CEG allocate EMPTY file name");
 
         Some(Buffer {
             id: 0,
@@ -126,13 +124,13 @@ impl<'a> Buffer<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, mut data: &mut Vec<u8>) -> usize {
-        // TODO: let nr_bytes = data.capacity();
+        // TODO(ceg): let nr_bytes = data.capacity();
         let mut it = MappedFile::iter_from(&self.data, offset);
         MappedFile::read(&mut it, nr_bytes, &mut data)
     }
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
-    /// return the number of written bytes (TODO: use io::Result)
+    /// return the number of written bytes (TODO(ceg): use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
         let mut it = MappedFile::iter_from(&self.data, offset);
         let nb = MappedFile::insert(&mut it, &data);
@@ -144,7 +142,7 @@ impl<'a> Buffer<'a> {
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
-    /// if removed_data is provided will call self.read(offset, nr_bytes, data)
+    /// if removed_data is provided, will call self.read(offset, nr_bytes, data)
     /// before remove the bytes
     pub fn remove(
         &mut self,

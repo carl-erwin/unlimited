@@ -39,7 +39,7 @@ pub struct LayoutEnv<'a> {
     pub focus_vid: view::Id,
 }
 
-// TODO: add ?
+// TODO(ceg): add ?
 //        doc,
 //        view
 //
@@ -128,7 +128,7 @@ pub struct FilterIo {
     pub size: usize, // count(data) ?
     //
     pub data: FilterData,
-    // TODO: add style infos ?
+    // TODO(ceg): add style infos ?
 }
 
 impl FilterIo {
@@ -262,7 +262,7 @@ fn compose_children(
         }
     }
 
-    // TODO: sort based on depth/priority
+    // TODO(ceg): sort based on depth/priority
     compose_idx.sort_by(|idxa, idxb| {
         let vida = view.children[idxa.0];
         let vidb = view.children[idxb.0];
@@ -311,7 +311,7 @@ fn compose_children(
             assert!(w > 0);
             assert!(h > 0);
 
-            // TODO: resize instead of replace
+            // TODO(ceg): resize instead of replace
             let mut child_screen = Screen::new(w, h);
             run_compositing_stage_direct(
                 editor,

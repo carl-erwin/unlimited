@@ -72,7 +72,7 @@ impl<'a> Mode for BasicEditorMode {
                     size: 1 + 0, /* nano-like */
                 },
                 doc.clone(),
-                vec![], // TODO: title-mode
+                vec![], // TODO(ceg): title-mode
             ),
             (
                 LayoutOperation::RemainMinus { minus: 2 },
@@ -116,12 +116,12 @@ impl<'a> Mode for BasicEditorMode {
             v.write().unwrap().destroyable = false;
         }
 
-        // TODO: put some kind of label on
+        // TODO(ceg): put some kind of label on
         // like view.label = 'text-view'
         // like view.label = 'status-line'
         // view.children_by_label<String, (vid, index)>
 
-        // set focus on text view : TODO: title mode + configure
+        // set focus on text view : TODO(ceg): title mode + configure
         let title_vid = view.children[0];
         let v = editor.view_map.get(&title_vid).unwrap();
         v.write()
@@ -132,10 +132,10 @@ impl<'a> Mode for BasicEditorMode {
 
         // set focus on text view
         view.main_child = Some(1); // index in children
-        view.focus_to = Some(view.children[1]); // TODO:
-        env.focus_changed_to = Some(view.children[1]); // TODO:
+        view.focus_to = Some(view.children[1]); // TODO(ceg):
+        env.focus_changed_to = Some(view.children[1]); // TODO(ceg):
 
-        // TODO: status mode + configure
+        // TODO(ceg): status mode + configure
         // setup status view
         let status_vid = view.children[view.children.len() - 1];
         // set status_vid

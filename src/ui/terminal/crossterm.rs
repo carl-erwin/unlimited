@@ -54,7 +54,7 @@ use crate::core::codepointinfo::TextStyle;
 use crate::ui::UiState;
 
 fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
-    // TODO: generate_test from logs grep | awk >>
+    // TODO(ceg): generate_test from logs grep | awk >>
     //    let v = autotest_0001();
     //    send_input_events(&v, &tx);
 
@@ -119,7 +119,7 @@ pub fn main_loop(
 
     execute!(
         stdout,
-        EnableMouseCapture, // TODO: add option for mouse capture --(en|dis)able-mouse
+        EnableMouseCapture, // TODO(ceg): add option for mouse capture --(en|dis)able-mouse
         Hide,
         SetAttribute(Attribute::Reset),
         SetBackgroundColor(bg_color),
@@ -264,7 +264,7 @@ pub fn main_loop(
 }
 
 /*
-    TODO:
+    TODO(ceg):
     1 : be explicit
     2 : create editor internal result type Result<>
     3 : use idiomatic    func()? style
@@ -289,7 +289,7 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
         queue!(stdout, MoveTo(0, li as u16))?;
         //            queue!(stdout, Clear(ClearType::CurrentLine))?; //  key : crossterm.dumb_render.clear_line_before_render=true ?
 
-        // TODO: fill len.len()..screen.width()
+        // TODO(ceg): fill len.len()..screen.width()
         let line = screen.get_line(li).unwrap();
 
         for c in 0..line.len() {
@@ -366,7 +366,7 @@ fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
 }
 
 /*
-   TODO:
+   TODO(ceg):
      if width || height change -> clear redraw all
 */
 fn draw_screen(
@@ -486,7 +486,7 @@ fn draw_screen(
             )?;
 
             // draw character
-            // TODO: assert ! \r \n \t , etc.
+            // TODO(ceg): assert ! \r \n \t , etc.
             match cpi.displayed_cp {
                 '\n' | '\r' | '\t' => panic!("invalid char on screen"),
                 _ => {}
@@ -709,8 +709,8 @@ fn translate_crossterm_event(
             }
 
             ::crossterm::event::MouseEventKind::Drag(_button) => {
-                // TODO: no Drag event in the editor yet ?
-                // TODO: filter dragged button
+                // TODO(ceg): no Drag event in the editor yet ?
+                // TODO(ceg): filter dragged button
 
                 // return InputEvent::NoInputEvent;
 
@@ -736,7 +736,7 @@ fn translate_crossterm_event(
 
         ::crossterm::event::Event::Resize(width, height) => {
             // println!("New size {}x{}", width, height)
-            // TODO: not really an input
+            // TODO(ceg): not really an input
             *pending_resize = true;
             return InputEvent::RefreshUi {
                 width: width as usize,

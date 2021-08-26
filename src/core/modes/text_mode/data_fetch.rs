@@ -81,11 +81,11 @@ impl ContentFilter<'_> for RawDataFilter {
         // There is no input HERE
         // we convert the document data into  buffer FilterIo
 
-        // we read screen.width() bytes // TODO: width * codec_max_encode_size() for now
+        // we read screen.width() bytes // TODO(ceg): width * codec_max_encode_size() for now
         let doc = view.document.clone();
         if let Some(ref doc) = doc {
             // 1st pass raw_data_filter
-            let mut raw_data = vec![]; // TODO: write directly to next filter input
+            let mut raw_data = vec![]; // TODO(ceg): write directly to next filter input
 
             // disable this block to test until eof
             if bench_to_eof() == false {
@@ -186,7 +186,7 @@ impl ContentFilter<'_> for RawDataFilter {
             self.pos += rd as u64;
             self.read_count += rd;
 
-            // TODO: cache doc size ?
+            // TODO(ceg): cache doc size ?
             if self.pos == doc.read().unwrap().size() as u64 {
                 env.quit = true;
 
@@ -205,7 +205,7 @@ impl ContentFilter<'_> for RawDataFilter {
             }
 
             if bench_to_eof() == false {
-                // TODO: in setup : self.read_to_eof = bench_to_eof()
+                // TODO(ceg): in setup : self.read_to_eof = bench_to_eof()
                 if self.pos >= self.max_pos {
                     env.quit = true;
                     if self.debug {
@@ -222,7 +222,7 @@ impl ContentFilter<'_> for RawDataFilter {
             }
 
             // increase read size at every call
-            // TODO: find better default size
+            // TODO(ceg): find better default size
             if self.read_size < self.read_max {
                 self.read_size += env.screen.width();
                 //dbg_println!("updated read size  {} ", self.read_size);

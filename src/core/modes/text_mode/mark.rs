@@ -13,14 +13,14 @@ pub struct Mark {
 }
 
 fn is_blank(cp: char) -> bool {
-    // TODO: put definition of word in array of char and use any(is_word_vec)
+    // TODO(ceg): put definition of word in array of char and use any(is_word_vec)
     match cp {
         ' ' /*| '\r'*/ | '\n' | '\t' => true,
         _ => false,
     }
 }
 
-// TODO: codec...
+// TODO(ceg): codec...
 pub fn read_char_forward(
     doc: &Document,
     from_offset: u64,
@@ -32,7 +32,7 @@ pub fn read_char_forward(
     }
 
     let mut data = Vec::with_capacity(4);
-    let sz = doc.read(from_offset, data.capacity(), &mut data); // TODO: decode up to capacity ?
+    let sz = doc.read(from_offset, data.capacity(), &mut data); // TODO(ceg): decode up to capacity ?
 
     if DEBUG {
         dbg_println!(
@@ -46,7 +46,7 @@ pub fn read_char_forward(
     codec.decode(SyncDirection::Forward, &data, 0)
 }
 
-// TODO: codec..., remove temporary vec -> slice
+// TODO(ceg): codec..., remove temporary vec -> slice
 pub fn read_char_backward(
     doc: &Document,
     from_offset: u64,
@@ -88,7 +88,7 @@ pub fn read_char_backward(
     (ret.0, from_offset - ret.2 as u64, ret.2)
 }
 
-// TODO: codec...
+// TODO(ceg): codec...
 pub fn read_char(
     _direction: SyncDirection,
     codec: &dyn TextCodec,
@@ -136,7 +136,7 @@ pub fn decode_until_offset_or_char(
     let mut rd_cache = doc.build_cache(prev_offset, prev_offset + cache_size);
 
     loop {
-        // TODO: avoid this, use single read before loop
+        // TODO(ceg): avoid this, use single read before loop
         // and pass &buff[pos..pos+4] for decode
         // pos += size
         let mut data = Vec::with_capacity(4);
@@ -192,7 +192,7 @@ pub fn decode_until_end_of_line_or_offset(
 }
 
 impl Mark {
-    /* TODO: add TextCodec trait
+    /* TODO(ceg): add TextCodec trait
 
      Codec {
         encode(Writer: , offset, bytes: vec<u8>)
@@ -228,7 +228,7 @@ impl Mark {
 
     pub fn move_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset < doc.size() as u64 {
-            // TODO: if '\r\n' must move + 1 in codec
+            // TODO(ceg): if '\r\n' must move + 1 in codec
             let (_, _, size) = read_char_forward(&doc, self.offset, codec);
             self.offset += size as u64;
         }
@@ -236,7 +236,7 @@ impl Mark {
         self
     }
 
-    // TODO: check multi-byte utf8 sequence
+    // TODO(ceg): check multi-byte utf8 sequence
     pub fn move_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let (c, offset, size) = read_char_backward(&doc, self.offset, codec);
         dbg_println!(
@@ -330,7 +330,7 @@ impl Mark {
     }
 
     pub fn at_end_of_buffer(&self, doc: &Document) -> bool {
-        // TODO: end_of_buffer().or_return()
+        // TODO(ceg): end_of_buffer().or_return()
         self.offset == doc.size() as u64
     }
 
@@ -450,7 +450,7 @@ fn test_marks() {
     use crate::core::document::buffer::OpenMode;
     use crate::core::document::DocumentBuilder;
 
-    // TODO: move to utf8 tests
+    // TODO(ceg): move to utf8 tests
     // add more tests move etc
 
     println!("\n**************** test marks *****************");

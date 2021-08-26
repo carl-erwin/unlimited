@@ -75,7 +75,7 @@ impl DocumentBuilder {
             id: 0,
             name: self.document_name.clone(),
             buffer,
-            cache: DocumentReadCache::new(), // TODO: have a per view cache or move to View
+            cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
             use_buffer_log: true,
             abort_indexing: false,
@@ -245,7 +245,7 @@ impl<'a> Document<'a> {
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
-    /// return XXX on error (TODO: use ioresult)
+    /// return XXX on error (TODO(ceg): use ioresult)
     pub fn size(&self) -> usize {
         self.buffer.size
     }
@@ -266,7 +266,7 @@ impl<'a> Document<'a> {
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
-    /// return XXX on error (TODO: use ioresult)
+    /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         let doc_rev = self.nr_changes();
 
@@ -295,7 +295,7 @@ impl<'a> Document<'a> {
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
-    /// return XXX on error (TODO: use ioresult)
+    /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read_cached(
         &self,
         offset: u64,
@@ -377,16 +377,16 @@ impl<'a> Document<'a> {
             BufferOperationType::Tag {
                 ref marks_offsets, ..
             } => {
-                Some(marks_offsets.clone()) // TODO: Arc<Vec<u64>>
+                Some(marks_offsets.clone()) // TODO(ceg): Arc<Vec<u64>>
             }
             _ => None,
         }
     }
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
-    /// return the number of written bytes (TODO: use io::Result)
+    /// return the number of written bytes (TODO(ceg): use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
-        // TODO: update cache if possible
+        // TODO(ceg): update cache if possible
         self.set_cache(0, 0); // invalidate cache,
 
         // log insert op
@@ -417,7 +417,7 @@ impl<'a> Document<'a> {
         nr_bytes: usize,
         removed_data: Option<&mut Vec<u8>>,
     ) -> usize {
-        // TODO: update cache if possible
+        // TODO(ceg): update cache if possible
         self.set_cache(0, 0); // invalidate cache,
 
         let mut rm_data = Vec::with_capacity(nr_bytes);
@@ -458,7 +458,7 @@ impl<'a> Document<'a> {
             BufferOperationType::Insert => {
                 let sz = self.buffer.size();
 
-                // TODO: check i/o errors
+                // TODO(ceg): check i/o errors
                 let added = if let Some(data) = &op.data {
                     self.buffer.insert(op.offset, data.len(), &data);
                     self.changed = true;
@@ -474,7 +474,7 @@ impl<'a> Document<'a> {
             BufferOperationType::Remove => {
                 let sz = self.buffer.size();
 
-                // TODO: check i/o errors
+                // TODO(ceg): check i/o errors
                 let _removed = if let Some(data) = &op.data {
                     let rm = self.buffer.remove(op.offset, data.len(), None);
                     self.changed = true;
@@ -622,18 +622,18 @@ extern crate libc;
 
 use self::libc::unlink;
 
-// TODO:
+// TODO(ceg):
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     // read/copy
     let mut fd = {
         let doc = doc.read().unwrap();
 
         if doc.file_name().is_empty() {
-            // TODO: save as pop up/notification
+            // TODO(ceg): save as pop up/notification
             return;
         }
 
-        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move to global config
+        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move to global config
 
         let path = CString::new(tmp_file_name.clone()).unwrap();
         unsafe { unlink(path.as_ptr()) };
@@ -668,7 +668,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
             };
 
             if file.fd.is_none() {
-                // TODO: save as pop up
+                // TODO(ceg): save as pop up
                 break;
             }
 
@@ -704,12 +704,12 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
         let perms = metadata.permissions();
 
-        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO: move '.update' to global config
+        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move '.update' to global config
 
         {
-            // TODO: large file warning in save ? disable backup ?
+            // TODO(ceg): large file warning in save ? disable backup ?
             let _tmp_backup_name = format!("{}{}", doc.file_name(), "~");
-            // TODO: move '~' to global config
+            // TODO(ceg): move '~' to global config
             // let _ = ::std::fs::rename(&doc.file_name(), &tmp_backup_name);
         }
 
@@ -718,7 +718,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         // reopen file
         let new_fd = File::open(&doc.file_name()).unwrap();
 
-        // TODO: handle skip with ReadOnly
+        // TODO(ceg): handle skip with ReadOnly
         let mapped_file = doc.buffer.data.clone();
         let mut mapped_file = mapped_file.write().unwrap();
         crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
@@ -726,7 +726,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
             new_fd,
         );
 
-        // TODO: check result, handle io results properly
+        // TODO(ceg): check result, handle io results properly
         // set buffer status to : permission denied etc
         let _ = ::std::fs::set_permissions(&doc.file_name(), perms);
 
@@ -735,6 +735,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     }
 }
 
+// TODO(ceg): split code to provide index_single_node(nid)
 pub fn build_index(doc: &Arc<RwLock<Document>>) {
     let mut idx = {
         let doc = doc.read().unwrap();
@@ -788,7 +789,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                     data.len(),
                 );
             } else {
-                // TODO: return error
+                // TODO(ceg): return error
                 panic!("direct copy failed");
             }
         }
@@ -814,7 +815,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             node.byte_count = byte_count;
             node.indexed = true;
 
-            // TODO: notify subscribers
+            // TODO(ceg): notify subscribers
             /*
             doc.register_node_event_cb(cb);
 
@@ -851,7 +852,6 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     let t1 = std::time::Instant::now();
     dbg_println!("index time {:?} ms", (t1 - t0).as_millis());
-
     dbg_println!("Number of lines {}", total_byte_count[b'\n' as usize]);
 }
 

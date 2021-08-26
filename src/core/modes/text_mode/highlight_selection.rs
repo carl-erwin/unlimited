@@ -17,7 +17,7 @@ pub struct HighlightSelectionFilter {
     skip_filter: bool,
 }
 
-// TODO: move highlight filter to text mode
+// TODO(ceg): move highlight filter to text mode
 // must share selection point or
 // declare var 'selection-point' : value  -> language level ...
 // enum { type, value }
@@ -37,7 +37,7 @@ impl HighlightSelectionFilter {
     }
 }
 
-// TODO: monitor env.quit
+// TODO(ceg): monitor env.quit
 // to flush
 impl ContentFilter<'_> for HighlightSelectionFilter {
     fn name(&self) -> &'static str {
@@ -48,7 +48,7 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
         let v = view.read().unwrap();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
-        // TODO: compute selection ranges build vec[(min, max)] + index in selection ranges
+        // TODO(ceg): compute selection ranges build vec[(min, max)] + index in selection ranges
         let min = tm.marks[tm.mark_index].offset;
         let max = if tm.select_point.len() == 1 {
             tm.select_point[0].offset

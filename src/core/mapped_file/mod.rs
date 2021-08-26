@@ -186,7 +186,7 @@ impl Node {
                 {
                     let mut fd = fd.as_ref().unwrap().write().unwrap();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
-                    let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO: io error
+                    let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
                     assert!(nrd == chunk_size);
                     //dbg_println!("direct copy chunk_size {} , pos({}) / size({})", chunk_size, pos, n);
                 }
@@ -300,7 +300,7 @@ impl Node {
         // 1 - save all page iterators local offsets
 
         // 2 - map the page // will invalidate iterators base pointer
-        // TODO: check
+        // TODO(ceg): check
         let page = self.map(fd).unwrap();
         let slice = page.borrow().as_slice().unwrap();
 
@@ -410,7 +410,7 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn new(path: String) -> Option<FileHandle<'a>> {
-        // TODO: check page size % 4096 // sysconfig
+        // TODO(ceg): check page size % 4096 // sysconfig
 
         let fd = File::open(path.clone());
         if fd.is_err() {
@@ -422,7 +422,7 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
-        // TODO: find good sizes
+        // TODO(ceg): find good sizes
         let sub_page_size = 1024 * 1024 * 2;
         let page_size = if file_size > (1024 * 1024 * 1024 * 1024) {
             1024 * 1024 * 32
@@ -485,7 +485,7 @@ impl<'a> MappedFile<'a> {
             MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, Some(idx));
             prev_idx = Some(idx);
 
-            // TODO: add hints to map all nodes
+            // TODO(ceg): add hints to map all nodes
             /*
             if file_size <= page_size as u64 {
                 let p = file.pool[idx as usize].move_to_ram();
@@ -634,8 +634,8 @@ impl<'a> MappedFile<'a> {
         let l_sz = sz;
         let r_sz = node_size - l_sz;
 
-        // create leaves : TODO: use default() ?
-        // TODO: None::new(fd, parent, size, storage_offset)
+        // create leaves : TODO(ceg): use default() ?
+        // TODO(ceg): None::new(fd, parent, size, storage_offset)
 
         let left_node = Node {
             used: true,
@@ -702,7 +702,7 @@ impl<'a> MappedFile<'a> {
         }
     }
 
-    // TODO: non recursive version
+    // TODO(ceg): non recursive version
     fn find_sub_node_by_offset(
         &self,
         n: NodeIndex,
@@ -743,7 +743,7 @@ impl<'a> MappedFile<'a> {
         }
     }
 
-    // TODO: use idiomatic map/iter
+    // TODO(ceg): use idiomatic map/iter
     pub fn for_each_node(&self, cb: impl Fn(&Node) -> bool) {
         let (node_index, _, _) = self.find_node_by_offset(0);
         if node_index.is_none() {
@@ -973,7 +973,7 @@ impl<'a> MappedFile<'a> {
 
         let mut cur_offset = from_offset;
 
-        // TODO: rd.len() >= data.len()
+        // TODO(ceg): rd.len() >= data.len()
         let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
 
         loop {
@@ -1080,7 +1080,7 @@ impl<'a> MappedFile<'a> {
     // 4 - copy the data
     // 5 - replace the parent node
     // 6 - update hierachy
-    // 7 - TODO: update iterator internal using find + local_offset on the allocated subtree
+    // 7 - TODO(ceg): update iterator internal using find + local_offset on the allocated subtree
     pub fn insert(it_: &mut FileIterator<'a>, data: &[u8]) -> usize {
         let data_len = data.len() as u64;
         if data_len == 0 {
@@ -1190,7 +1190,7 @@ impl<'a> MappedFile<'a> {
 
         let new_size: usize = (node_size as usize) + data.len();
 
-        // TODO: provide user apis to tweak allocations
+        // TODO(ceg): provide user apis to tweak allocations
         let sub_page_min_size = sub_page_size as usize;
         //let new_page_size = ::std::cmp::min(new_size / sub_page_min_size, sub_page_min_size);
         //let new_page_size = ::std::cmp::max(new_page_size, sub_page_min_size);
@@ -1316,7 +1316,7 @@ impl<'a> MappedFile<'a> {
 
         assert_eq!(remain, 0);
 
-        // TODO: check reparenting
+        // TODO(ceg): check reparenting
         // swap subroot_idx and node_idx
         if let Some(node_to_split) = node_to_split {
             // MappedFile::exchage_nodes(gparent, node_to_split);
@@ -1379,7 +1379,7 @@ impl<'a> MappedFile<'a> {
 
         MappedFile::print_all_used_nodes(&file, "AFTER INSERT");
 
-        // TODO:
+        // TODO(ceg):
         // refresh iterator or next will crash
         //        it.file_size += size as u64;
         //        it_offset = base + it.local_offset;
@@ -1399,8 +1399,8 @@ impl<'a> MappedFile<'a> {
     // 1 - get iterator's node info
     // 2 - remove the data, update hierachy
     // 3 - rebalance the tree, starting at node_index
-    // 4 - TODO: update iterator internal using find + local_offset on the modified subtree
-    // TODO: split nodes before remove
+    // 4 - TODO(ceg): update iterator internal using find + local_offset on the modified subtree
+    // TODO(ceg): split nodes before remove
     pub fn remove(it_: &mut FileIterator<'a>, nr: usize) -> usize {
         if nr == 0 {
             return 0;
@@ -1603,7 +1603,7 @@ impl<'a> MappedFile<'a> {
         if let Some(gp_idx) = pool[p_idx].parent {
             let relation = MappedFile::get_parent_relation(&pool, gp_idx, p_idx);
 
-            // TODO: helper func
+            // TODO(ceg): helper func
             pool[p_idx].parent = None;
             if relation == NodeRelation::Left {
                 pool[gp_idx].left = Some(child_idx);
@@ -1616,7 +1616,7 @@ impl<'a> MappedFile<'a> {
         }
     }
 
-    // TODO: avoid this , really slow
+    // TODO(ceg): avoid this , really slow
     // rebalance
     // this function shrinks the tree by deleting parent nodes with one child
     fn get_best_child(
@@ -1972,7 +1972,7 @@ impl<'a> MappedFile<'a> {
                 // ReadOnlyStorageCopy
                 file.pool[idx].storage_offset = Some(offset);
             } else {
-                assert_eq!(file.pool[idx].storage_offset, None); // TODO: check
+                assert_eq!(file.pool[idx].storage_offset, None); // TODO(ceg): check
             }
 
             if false {
@@ -1995,7 +1995,7 @@ impl<'a> MappedFile<'a> {
         dbg_println!("SYNC: file.fd = {:?}", file.fd);
     }
 
-    // TODO: add fix page offset function
+    // TODO(ceg): add fix page offset function
     pub fn sync_to_storage(file: &mut MappedFile, tmp_file_name: &str) -> ::std::io::Result<()> {
         let fd = File::open(tmp_file_name);
         if fd.is_err() {
@@ -2046,7 +2046,7 @@ pub enum MappedFileIterator<'a> {
 impl<'a> MappedFileIterator<'a> {
     fn get_mut_ref(&mut self) -> Option<&mut IteratorInstance<'a>> {
         match *self {
-            MappedFileIterator::End(..) => None, // TODO: return sentinel ?
+            MappedFileIterator::End(..) => None, // TODO(ceg): return sentinel ?
             MappedFileIterator::Real(ref mut it) => Some(it),
         }
     }
@@ -2060,7 +2060,7 @@ impl<'a> MappedFileIterator<'a> {
 
     pub fn get_offset(&self) -> Option<u64> {
         match *self {
-            MappedFileIterator::End(..) => None, // TODO: return sentinel ?
+            MappedFileIterator::End(..) => None, // TODO(ceg): return sentinel ?
             MappedFileIterator::Real(ref it) => {
                 let mut pos = it.local_offset;
                 let mut idx = it.node_idx;
@@ -2264,7 +2264,7 @@ mod tests {
     fn test_remove() {
         use super::*;
 
-        // TODO: loop over nb_page [2->256]
+        // TODO(ceg): loop over nb_page [2->256]
         let nb_page = 2;
         let page_size = 4096;
         let file_size = page_size * nb_page;
@@ -2394,7 +2394,7 @@ mod tests {
             {
                 let mut it = MappedFile::iter_from(&file, i + i * 4096);
                 dbg_println!("--  sub insert 1");
-                // TODO: change interface to consume iterator on insert to show that it is invalid
+                // TODO(ceg): change interface to consume iterator on insert to show that it is invalid
                 MappedFile::insert(&mut it, &['\n' as u8]);
             }
         }

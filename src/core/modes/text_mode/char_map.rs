@@ -16,7 +16,7 @@ use crate::core::codec::text::u32_to_char;
 use crate::core::codepointinfo::TextStyle;
 
 pub struct CharMapFilter {
-    char_map: Option<HashMap<char, String>>, // TODO: add CharMap type
+    char_map: Option<HashMap<char, String>>, // TODO(ceg): add CharMap type
     color_map: Option<HashMap<char, (u8, u8, u8)>>,
 }
 
@@ -40,7 +40,7 @@ impl ContentFilter<'_> for CharMapFilter {
         let char_map = tm.char_map.clone();
         let color_map = tm.color_map.clone();
 
-        // TODO: reload only on view change ? ref ?
+        // TODO(ceg): reload only on view change ? ref ?
         self.char_map = char_map;
         self.color_map = color_map;
     }

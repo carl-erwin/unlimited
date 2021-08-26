@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 
 use crate::core::view;
 
-// ADD view env ? TODO: refresh env after input_processing
-//TODO: define workflow
+// ADD view env ? TODO(ceg): refresh env after input_processing
+//TODO(ceg): define workflow
 //  pre_input | input | post_input | pre_eval | eval | pos_eval |  pre_render | render | post_render
 //  each stage MUST have special signature
 // the modes register themselves at any stage

@@ -78,7 +78,7 @@ fn parse_command_line() -> Config {
             Arg::with_name("DEBUG")
                 .short("d")
                 .long("--debug")
-                .help("enable debug logs on stderr (use redirection to file)"), // TODO: istty ?
+                .help("enable debug logs on stderr (use redirection to file)"), // TODO(ceg): istty ?
         )
         .arg(
             Arg::with_name("NO_READ_CACHE")

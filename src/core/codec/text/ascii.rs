@@ -115,7 +115,7 @@ impl TextCodec for AsciiCodec {
         true
     }
 
-    // TODO: return Result<u64, need more|invalid offset|...>
+    // TODO(ceg): return Result<u64, need more|invalid offset|...>
     fn sync(&self, direction: SyncDirection, data: &[u8], data_offset: u64) -> Option<u64> {
         let data_offset = data_offset as usize;
 
