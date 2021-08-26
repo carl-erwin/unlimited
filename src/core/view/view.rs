@@ -536,7 +536,7 @@ pub fn get_status_view(
 
 ///
 pub fn run_stage(
-    mut editor: &mut Editor<'static>,
+    editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     pos: StagePosition,
