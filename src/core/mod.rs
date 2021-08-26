@@ -389,17 +389,6 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
         }
     }
 
-    // index this document
-    if true {
-        let msg = EventMessage {
-            seq: 0,
-            event: Event::IndexTask {
-                document_map: Arc::clone(&editor.document_map),
-            },
-        };
-        editor.indexer_tx.send(msg).unwrap_or(());
-    }
-
     let modes = match std::env::var("SINGLE_VIEW") {
         Ok(_) => vec!["simple-view".to_owned()],
         _ => vec!["basic-editor".to_owned()],
@@ -424,6 +413,18 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
         // top level views
         editor.root_views.push(view.id);
         editor.view_map.insert(view.id, Rc::new(RwLock::new(view)));
+    }
+
+    // index documents
+    // TODO(ceg): send one event per doc
+    if true {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::IndexTask {
+                document_map: Arc::clone(&editor.document_map),
+            },
+        };
+        editor.indexer_tx.send(msg).unwrap_or(());
     }
 }
 

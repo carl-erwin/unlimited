@@ -1,3 +1,5 @@
+use std::fmt;
+
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -166,17 +168,20 @@ pub struct DocumentEventDestination {
     pub id: Id,
 }
 
+#[derive(Debug, Clone)]
 pub enum DocumentEvent {
     Add,
     Open,
     Close,
     Remove,
     Change { op: BufferOperation },
+    NodeAdded { node_idx: usize },
+    NodeRemoved { node_idx: usize },
+    NodeIndexed { node_idx: usize },
 }
 
-type DocumentEventCb = fn(DocumentEventDestination, DocumentEvent);
+pub type DocumentEventCb = fn(Id, DocumentEventSource, DocumentEventDestination, &DocumentEvent);
 
-#[derive(Debug)]
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
@@ -189,11 +194,16 @@ pub struct Document<'a> {
     pub abort_indexing: bool,
     pub last_tag_time: std::time::Instant,
 
-    pub subscribers: Vec<(
-        DocumentEventSource,
-        DocumentEventDestination,
-        DocumentEventCb,
-    )>,
+    pub subscribers: Vec<(DocumentEventCb, Id, DocumentEventDestination)>,
+}
+
+impl<'a> fmt::Debug for Document<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Document {}")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .finish()
+    }
 }
 
 // NB: doc MUST be wrapped in Arc<RwLock<XXX>>
@@ -260,6 +270,27 @@ impl<'a> Document<'a> {
 
     pub fn readahead(&mut self, start: u64, end: u64) {
         self.cache = self.build_cache(start, end)
+    }
+
+    pub fn notify(&self, src: DocumentEventSource, evt: &DocumentEvent) {
+        dbg_println!("notify {:?}, nb subscribers {}", evt, self.subscribers.len());
+        for (idx, s) in self.subscribers.iter().enumerate() {
+            if s.2.id  == src.id {
+                continue;
+            }
+            s.0(self.id, src, s.2, evt);
+        }
+    }
+
+    pub fn register_subscriber(&mut self, cb: DocumentEventCb) -> DocumentEventDestination {
+        // TODO:
+        let len = 1 + self.subscribers.len();
+        let dst = DocumentEventDestination { id: len as u64 };
+
+        let ctx = (cb, self.id, dst);
+        self.subscribers.push(ctx);
+
+        dst
     }
 
     // read ahead
@@ -814,6 +845,12 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             let mut node = &mut file.pool[idx.unwrap()];
             node.byte_count = byte_count;
             node.indexed = true;
+
+            let evt = DocumentEvent::NodeIndexed {
+                node_idx: idx.unwrap(),
+            };
+
+            doc.notify(DocumentEventSource { id: 0 }, &evt);
 
             // TODO(ceg): notify subscribers
             /*

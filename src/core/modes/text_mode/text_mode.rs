@@ -98,8 +98,13 @@ use crate::core::codec::text::utf8;
 use crate::core::codec::text::SyncDirection; // TODO(ceg): remove
 use crate::core::codec::text::TextCodec;
 
+use crate::core::document;
 use crate::core::document::BufferOperation;
 use crate::core::document::BufferOperationType;
+
+use crate::core::document::DocumentEvent;
+use crate::core::document::DocumentEventDestination;
+use crate::core::document::DocumentEventSource;
 
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
@@ -199,6 +204,17 @@ pub struct TextModeContext {
     pub post_compose_action: Vec<Action>,
 
     pub prev_action: ActionType,
+
+    pub doc_subscription: DocumentEventDestination,
+}
+
+fn text_mode_on_doc_event(
+    id: document::Id,
+    src: DocumentEventSource,
+    dst: DocumentEventDestination,
+    evt: &DocumentEvent,
+) {
+    dbg_println!("text_mode_on_doc_event doc_id {:?} src {:?} dst {:?} evt {:?}", id, src, dst, evt);
 }
 
 impl<'a> Mode for TextMode {
@@ -298,6 +314,7 @@ impl<'a> Mode for TextMode {
             pre_compose_action: vec![],
             post_compose_action: vec![],
             prev_action: ActionType::MarksMove,
+            doc_subscription: DocumentEventDestination { id: 0 },
         };
 
         Box::new(ctx)
@@ -313,7 +330,17 @@ impl<'a> Mode for TextMode {
 
         view.compose_priority = 256;
 
+        let doc = { view.document.as_ref().unwrap().clone() };
+
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        tm.doc_subscription = doc
+            .write()
+            .unwrap()
+            .register_subscriber(text_mode_on_doc_event);
+
+            dbg_println!("CEG subscription {:?}", tm.doc_subscription );
+
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
