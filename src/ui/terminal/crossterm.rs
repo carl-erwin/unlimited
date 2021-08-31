@@ -174,7 +174,7 @@ pub fn main_loop(
                     if (start - fps_t0).as_millis() >= 1000 {
                         let screen = screen.read().unwrap();
 
-                        eprintln!(
+                        dbg_println!(
                             "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
                             start.duration_since(startup).as_millis(),
                             screen.first_offset,
@@ -233,7 +233,7 @@ pub fn main_loop(
 
                     let p_rdr = crate::core::event::pending_render_event_count();
                     /*
-                        eprintln!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
+                        dbg_println!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
                         (end - start).as_micros(),
                         fps,
                         p_input,

@@ -272,15 +272,15 @@ fn compose_children(
 
         let pa = va.read().unwrap().compose_priority;
         let pb = vb.read().unwrap().compose_priority;
-        eprintln!("pa vid {} priority: {:?}", vida, pa);
-        eprintln!("pb vid {} priority: {:?}", vidb, pb);
-        eprintln!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
+        dbg_println!("pa vid {} priority: {:?}", vida, pa);
+        dbg_println!("pb vid {} priority: {:?}", vidb, pb);
+        dbg_println!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
 
         pb.cmp(&pa)
     });
     //
 
-    eprintln!("COMPOSE sub VIDs indexes {:?}, ", compose_idx);
+    dbg_println!("COMPOSE sub VIDs indexes {:?}, ", compose_idx);
 
     for info in &compose_idx {
         let idx = info.0;
@@ -290,7 +290,7 @@ fn compose_children(
             continue;
         }
 
-        eprintln!("COMPOSE VID index {:?}, ", idx);
+        dbg_println!("COMPOSE VID index {:?}, ", idx);
 
         let vid = view.children[idx];
 
@@ -398,7 +398,7 @@ pub fn run_compositing_stage_direct(
     }
 
     {
-        eprintln!("COMPOSE VID {:?}, ", view.read().unwrap().id);
+        dbg_println!("COMPOSE VID {:?}, ", view.read().unwrap().id);
     }
 
     // Draw Leaf View

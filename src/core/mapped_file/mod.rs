@@ -157,7 +157,7 @@ impl Node {
         }
 
         // already mapped ?
-        if let Some(page) = self.page.upgrade() {
+        if let Some(ref page) = self.page.upgrade() {
             let p = page.borrow().as_slice().unwrap();
             let n = std::cmp::min(out.len(), p.len());
             assert!(n > 0);
@@ -172,23 +172,15 @@ impl Node {
             let n = std::cmp::min(out.len(), self.size as usize);
             assert!(n > 0);
 
-            // read by chunks of 4kib -> better user experience with slow storage access
-
-            // not atomic ...
-            {
-                // let mut fd = fd.as_ref().unwrap().write().unwrap();
-                // let _ = fd.seek(SeekFrom::Start(storage_offset));
-            }
-
             let mut pos = 0;
             while pos < n {
                 let chunk_size = std::cmp::min(n - pos, 1024 * 16);
+                // not atomic
                 {
                     let mut fd = fd.as_ref().unwrap().write().unwrap();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
                     assert!(nrd == chunk_size);
-                    //dbg_println!("direct copy chunk_size {} , pos({}) / size({})", chunk_size, pos, n);
                 }
                 pos += chunk_size;
             }
@@ -331,13 +323,13 @@ impl<T> FreeListAllocator<T> {
         }
     }
 
-    fn allocate(&mut self, n: T, check_previous: &dyn Fn(&mut T)) -> (NodeIndex, &mut T) {
+    fn allocate(&mut self, n: T, check_slot: &dyn Fn(&mut T)) -> (NodeIndex, &mut T) {
         if !self.free_indexes.is_empty() {
             let i = self.free_indexes.pop().unwrap();
             if DEBUG {
                 dbg_println!("node allocator reuse slot {}", i);
             }
-            check_previous(&mut self.slot[i]);
+            check_slot(&mut self.slot[i]);
             self.slot[i] = n;
             (i as NodeIndex, &mut self.slot[i])
         } else {
@@ -380,9 +372,9 @@ pub struct MappedFile<'a> {
     pub pool: FreeListAllocator<Node>,
     root_index: Option<NodeIndex>,
     page_size: usize,
-    /// size of new allocated blocks when splitting old ones (default 2 mib)
+    /// size of new allocated blocks when splitting old ones
     pub sub_page_size: usize,
-    /// reserve storage on new allocated blocks (default 2 kib)
+    /// reserve storage on new allocated blocks
     pub sub_page_reserve: usize,
 }
 
@@ -403,7 +395,7 @@ impl<'a> MappedFile<'a> {
             root_index: None,
             page_size: 2 * 1024 * 1024,
             sub_page_size: 4096,
-            sub_page_reserve: 2 * 1024, // 2 kib
+            sub_page_reserve: 2 * 1024,
         };
 
         Some(Arc::new(RwLock::new(file)))
@@ -441,13 +433,14 @@ impl<'a> MappedFile<'a> {
             root_index: None,
             page_size,
             sub_page_size,
-            sub_page_reserve: 2 * 1024, // 2 kib
+            sub_page_reserve: 2 * 1024,
         };
 
         if file_size == 0 {
             return Some(Arc::new(RwLock::new(file)));
         }
 
+        // TODO(ceg): Node::new()
         let root_node = Node {
             used: true,
             to_delete: false,
@@ -515,13 +508,13 @@ impl<'a> MappedFile<'a> {
         prev_idx: Option<NodeIndex>,
         next_idx: Option<NodeIndex>,
     ) {
-        if let Some(p_idx) = prev_idx {
-            pool[p_idx as usize].next = next_idx;
+        if let Some(prev_idx) = prev_idx {
+            pool[prev_idx].next = next_idx;
             // dbg_println!("link_next : prev({:?})  -> next({:?})", prev_idx, next_idx);
         }
 
-        if let Some(n_idx) = next_idx {
-            pool[n_idx as usize].prev = prev_idx;
+        if let Some(next_idx) = next_idx {
+            pool[next_idx].prev = prev_idx;
             // dbg_println!("link_prev : prev({:?})  <- next({:?})", prev_idx, next_idx);
         }
     }
@@ -635,8 +628,7 @@ impl<'a> MappedFile<'a> {
         let r_sz = node_size - l_sz;
 
         // create leaves : TODO(ceg): use default() ?
-        // TODO(ceg): None::new(fd, parent, size, storage_offset)
-
+        // TODO(ceg): Node::new(fd, parent, size, storage_offset)
         let left_node = Node {
             used: true,
             to_delete: false,
@@ -674,20 +666,13 @@ impl<'a> MappedFile<'a> {
 
         // build children
         // left
-        MappedFile::build_tree(source.clone(), pool, leaves, Some(l), pg_size, l_sz, b_off);
-
+        let l_base = b_off;
+        MappedFile::build_tree(source.clone(), pool, leaves, Some(l), pg_size, l_sz, l_base);
         // right
-        MappedFile::build_tree(
-            source.clone(),
-            pool,
-            leaves,
-            Some(r),
-            pg_size,
-            r_sz,
-            b_off + l_sz,
-        );
+        let r_base = b_off + l_sz;
+        MappedFile::build_tree(source.clone(), pool, leaves, Some(r), pg_size, r_sz, r_base);
 
-        // link to parent
+        // update parent's links
         if let Some(idx) = parent {
             let idx = idx as usize;
             pool[idx].left = Some(l);
@@ -843,7 +828,7 @@ impl<'a> MappedFile<'a> {
         let mut nr_to_read = nr_to_read;
 
         while nr_to_read > 0 {
-            if let Some(ref mut it) = from.get_mut_ref() {
+            if let Some(it) = from.get_mut_ref() {
                 let off = it.local_offset as usize;
                 let max_read = ::std::cmp::min(it.page_size as usize - off, nr_to_read);
                 if max_read == 0 {
@@ -881,7 +866,7 @@ impl<'a> MappedFile<'a> {
         let mut nr_to_read = nr_to_read;
 
         while nr_to_read > 0 {
-            if let Some(ref mut it) = it_.get_mut_ref() {
+            if let Some(it) = it_.get_mut_ref() {
                 let off = it.local_offset as usize;
 
                 let max_read = ::std::cmp::min(it.page_size as usize - off, nr_to_read);
@@ -1771,15 +1756,6 @@ impl<'a> MappedFile<'a> {
         assert_eq!(visited.contains(&idx), false);
         visited.insert(idx);
 
-        // no children ? -> leaf
-        let is_leaf = pool.slot[idx].left.is_none() && pool.slot[idx].right.is_none();
-
-        // some children ? -> intermediate node
-        let is_intermediate_node = pool.slot[idx].left.is_some() || pool.slot[idx].right.is_some();
-
-        // an intermediate node cannot be a leaf
-        assert!(is_leaf != is_intermediate_node);
-
         // check parent / children idx
         if let Some(l) = pool.slot[idx].left {
             if DEBUG {
@@ -1954,6 +1930,7 @@ impl<'a> MappedFile<'a> {
             } else {
                 panic!("invalid tree, broken next link");
             }
+            //TODO(ceg): check prev
         }
     }
 
@@ -1995,7 +1972,6 @@ impl<'a> MappedFile<'a> {
         dbg_println!("SYNC: file.fd = {:?}", file.fd);
     }
 
-    // TODO(ceg): add fix page offset function
     pub fn sync_to_storage(file: &mut MappedFile, tmp_file_name: &str) -> ::std::io::Result<()> {
         let fd = File::open(tmp_file_name);
         if fd.is_err() {
@@ -2015,13 +1991,13 @@ impl<'a> MappedFile<'a> {
             let idx = n.unwrap();
 
             let node_size = file.pool[idx].size;
-            // map
 
+            // map
             let page = file.pool[idx].map(&orig_fd).unwrap();
             let slice = page.borrow().as_slice().unwrap();
 
             // copy
-            let nw = fd.write(slice).unwrap();
+            let nw = fd.write(slice).unwrap(); //TODO(ceg): handle result
             if nw != slice.len() {
                 panic!("write error");
             }

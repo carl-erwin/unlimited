@@ -355,7 +355,7 @@ impl Screen {
                 cpi.displayed_cp = '.';
             }
         } else {
-            // eprintln!("unicode_width for cp {} = {}", cpi.cp as u32, unicode_width);
+            // dbg_println!("unicode_width for cp {} = {}", cpi.cp as u32, unicode_width);
             // do not allow invisible char
             if cpi.cp == cpi.displayed_cp {
                 match cpi.cp {

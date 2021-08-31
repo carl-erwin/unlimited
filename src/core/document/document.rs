@@ -273,9 +273,13 @@ impl<'a> Document<'a> {
     }
 
     pub fn notify(&self, src: DocumentEventSource, evt: &DocumentEvent) {
-        dbg_println!("notify {:?}, nb subscribers {}", evt, self.subscribers.len());
+        dbg_println!(
+            "notify {:?}, nb subscribers {}",
+            evt,
+            self.subscribers.len()
+        );
         for (idx, s) in self.subscribers.iter().enumerate() {
-            if s.2.id  == src.id {
+            if s.2.id == src.id {
                 continue;
             }
             s.0(self.id, src, s.2, evt);

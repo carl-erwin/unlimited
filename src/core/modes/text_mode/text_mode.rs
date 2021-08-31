@@ -214,7 +214,13 @@ fn text_mode_on_doc_event(
     dst: DocumentEventDestination,
     evt: &DocumentEvent,
 ) {
-    dbg_println!("text_mode_on_doc_event doc_id {:?} src {:?} dst {:?} evt {:?}", id, src, dst, evt);
+    dbg_println!(
+        "text_mode_on_doc_event doc_id {:?} src {:?} dst {:?} evt {:?}",
+        id,
+        src,
+        dst,
+        evt
+    );
 }
 
 impl<'a> Mode for TextMode {
@@ -339,8 +345,7 @@ impl<'a> Mode for TextMode {
             .unwrap()
             .register_subscriber(text_mode_on_doc_event);
 
-            dbg_println!("CEG subscription {:?}", tm.doc_subscription );
-
+        dbg_println!("CEG subscription {:?}", tm.doc_subscription);
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();

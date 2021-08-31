@@ -128,7 +128,7 @@ impl<'a> Mode for SimpleViewMode {
             id: v.children[scroll_bar_idx],
         };
 
-        eprintln!("simple-view: children: {:?}", v.children);
+        dbg_println!("simple-view: children: {:?}", v.children);
 
         // view events -> scrollbar
         register_view_subscriber(editor, env, vscrollbar_mode.clone(), src, dst);

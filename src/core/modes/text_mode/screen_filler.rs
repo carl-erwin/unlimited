@@ -121,14 +121,14 @@ impl ContentFilter<'_> for ScreenFilter {
         }
 
         /*
-                eprintln!(
+                dbg_println!(
                     "screen.push_available({}) + screen.push_count({}) == screen.push_capacity({})",
                     env.screen.push_available(),
                     env.screen.push_count(),
                     env.screen.push_capacity()
                 );
 
-                eprintln!(
+                dbg_println!(
                     "ScreenFilter :  env.screen.push_available(); {}",
                     env.screen.push_available()
                 );

@@ -131,8 +131,8 @@ impl<'a> Mode for VscrollbarMode {
         };
         mode_ctx.scroll_end = std::cmp::min(dim.1, mode_ctx.scroll_end);
 
-        eprintln!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
-        eprintln!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
+        dbg_println!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
+        dbg_println!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
     }
 }
 
@@ -242,9 +242,9 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                 1.0
             };
 
-            eprintln!("SCROLLBAR H: {}", dim.1);
-            eprintln!("SCROLLBAR Y: {}", y);
-            eprintln!("SCROLLBAR percent: {}", percent);
+            dbg_println!("SCROLLBAR H: {}", dim.1);
+            dbg_println!("SCROLLBAR Y: {}", y);
+            dbg_println!("SCROLLBAR percent: {}", percent);
 
             // set target's offset
             // the scrollbar dimension are recomputed in on_view_event
@@ -308,9 +308,9 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
             }
         }
 
-        eprintln!("SCROLLBAR height {}", env.screen.height());
-        eprintln!("SCROLLBAR start {}", mode_ctx.scroll_start);
-        eprintln!("SCROLLBAR end {}", mode_ctx.scroll_end);
+        dbg_println!("SCROLLBAR height {}", env.screen.height());
+        dbg_println!("SCROLLBAR start {}", mode_ctx.scroll_start);
+        dbg_println!("SCROLLBAR end {}", mode_ctx.scroll_end);
 
         for i in mode_ctx.scroll_start..mode_ctx.scroll_end {
             if let Some(cpi) = env.screen.get_cpinfo_mut(0, i) {
