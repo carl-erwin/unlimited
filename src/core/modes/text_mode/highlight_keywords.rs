@@ -211,8 +211,8 @@ impl ContentFilter<'_> for HighlightFilter {
                         | "i64" | "i128" | "f32" | "f64" => (0, 128, 128),
 
                         // C preprocessor
-                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#define"
-                        | "#pragma" => (255, 0, 0),
+                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
+                        | "#define" | "#pragma" => (255, 0, 0),
 
                         // C keywords
                         "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
@@ -231,7 +231,7 @@ impl ContentFilter<'_> for HighlightFilter {
                         "//" => (255, 255, 255),
 
                         // C++ keywords
-                        "class" | "template" | "namespace" => (0, 128, 128),
+                        "bool" | "class" | "template" | "namespace" => (0, 128, 128),
 
                         "\"" | "\"\"" | "'" | "''" => (247, 104, 38),
 
