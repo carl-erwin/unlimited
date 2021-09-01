@@ -52,7 +52,7 @@ use crate::core::view::View;
 
    add Timers -> for Blinking marks
 
-   parse argument to extract line,colinfo,offset {
+   parse argument to extract line,column or offset {
     file@1246
     file:10
     file:10,5

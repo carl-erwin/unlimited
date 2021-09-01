@@ -55,7 +55,7 @@ use crate::core::view;
 // input  core::DataType
 // each process receive an input with
 // src/dest
-// the destination can be diferrent from the input generator
+// the destination can be different from the input generator
 // multiplex
 
 // env.repeat_action_n , api to set repeat

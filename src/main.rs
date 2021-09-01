@@ -34,7 +34,6 @@ fn main() {
     let (ui_tx, ui_rx) = channel();
     let (core_tx, core_rx) = channel();
     // create core thread
-
     let core_th = start_core_thread(config, core_tx.clone(), core_rx, ui_tx.clone());
 
     // run the ui loop in the main thread
@@ -60,7 +59,7 @@ fn start_core_thread(
     }))
 }
 
-fn check_env_flags() {
+fn _check_env_flags() {
     match std::env::var("UNLIMITED_CHECK_SCREEN_INVARIANTS") {
         Err(_) => return,
         _ => crate::core::screen::enable_screen_checks(),
@@ -78,7 +77,7 @@ fn parse_command_line() -> Config {
             Arg::with_name("DEBUG")
                 .short("d")
                 .long("--debug")
-                .help("enable debug logs on stderr (use redirection to file)"), // TODO(ceg): istty ?
+                .help("enable debug logs on stderr (use redirection to file)"), // TODO(ceg): isatty ?
         )
         .arg(
             Arg::with_name("NO_READ_CACHE")
@@ -155,14 +154,4 @@ fn parse_command_line() -> Config {
         files_list,
         ui_frontend,
     }
-}
-
-#[test]
-fn test_codec_encode() {
-    let expect_cp: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
-    let mut mut_cp: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-
-    let n = encode(0x20ac as u32, &mut mut_cp);
-    assert_eq!(n, 3);
-    assert_eq!(mut_cp, expect_cp);
 }
