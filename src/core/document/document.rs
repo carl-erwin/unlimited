@@ -650,14 +650,9 @@ impl<'a> Document<'a> {
 }
 
 // helper
+use std::path::Path;
 
-use std::ffi::CString;
-
-extern crate libc;
-
-use self::libc::unlink;
-
-// TODO(ceg):
+// TODO(ceg): handle errors
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     // read/copy
     let mut fd = {
@@ -670,10 +665,11 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move to global config
 
-        let path = CString::new(tmp_file_name.clone()).unwrap();
-        unsafe { unlink(path.as_ptr()) };
+        let path = Path::new(&tmp_file_name);
+        if let Result::Err(_) = std::fs::remove_file(path) {
+        }
 
-        let fd = File::create(tmp_file_name);
+        let fd = File::create(path);
         if fd.is_err() {
             dbg_println!("cannot save {}", doc.file_name());
             return;
