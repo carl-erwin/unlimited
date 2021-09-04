@@ -204,7 +204,8 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
             }
         },
 
-        Some(InputEvent::PointerMotion(PointerEvent { x: _, y, mods: _ })) => {
+        Some(InputEvent::PointerMotion(PointerEvent { x, y, mods: _ })) => {
+            dbg_println!("VSCROLLBAR CLIPPING x {} y {}", x, y);
             let target_vid = {
                 let mode_ctx = v.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
                 if !mode_ctx.selected {
@@ -226,7 +227,8 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                 std::cmp::max(1, doc.size()) // avoid div by zero
             };
 
-            let y = *y as usize;
+            let y = std::cmp::max(0, *y) as usize; //  coordinates can be negative
+
             let y = if y < dim.1.saturating_sub(1) {
                 y
             } else {

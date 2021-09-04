@@ -649,7 +649,10 @@ fn clip_locked_coordinates_xy(
 ) -> view::Id {
     let id = env.focus_locked_on.unwrap();
 
-    dbg_println!("CLIPPING LOCKED ----------------------------------BEGIN");
+    dbg_println!(
+        "CLIPPING LOCKED VID {} ----------------------------------BEGIN",
+        id
+    );
 
     dbg_println!(
         "CLIPPING LOCKED ---------------------------------- X({}) Y({})",
@@ -664,6 +667,11 @@ fn clip_locked_coordinates_xy(
 
     env.diff_x = *x - env.global_x.unwrap();
     env.diff_y = *y - env.global_y.unwrap();
+
+    // update local coordinates
+    // it is up to the mode to ignore negative values
+    *x = env.local_x.unwrap() + env.diff_x;
+    *y = env.local_y.unwrap() + env.diff_y;
 
     dbg_println!(
         "CLIPPING LOCKED ---------------------------------- DIFF X({}) Y({})",
@@ -766,6 +774,9 @@ fn clip_coordinates_xy(
                         dbg_println!("CLIPPING         updated clipping coords ({},{})", *x, *y);
                         dbg_println!("CLIPPING         select vid {}", child_v.id);
 
+                        env.local_x = Some(*x);
+                        env.local_y = Some(*y);
+
                         id = child_v.id;
                         break 'inner;
                     } else {
@@ -788,6 +799,8 @@ fn clip_coordinates_and_get_vid(
     vid: view::Id,
 ) -> (view::Id, InputEvent) {
     let mut ev = ev.clone();
+    dbg_println!("CLIPPING ev in: {:?}", ev);
+
     let vid = match &mut ev {
         InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
             clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
@@ -806,6 +819,8 @@ fn clip_coordinates_and_get_vid(
         }
         _ => vid,
     };
+
+    dbg_println!("CLIPPING ev out: {:?}", ev);
 
     (vid, ev)
 }

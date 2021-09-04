@@ -85,6 +85,9 @@ pub struct EditorEnv<'a> {
     pub height: usize,
     pub global_x: Option<i32>,
     pub global_y: Option<i32>,
+    pub local_x: Option<i32>,
+    pub local_y: Option<i32>,
+
     pub diff_x: i32,
     pub diff_y: i32,
 
@@ -128,8 +131,11 @@ impl<'a> EditorEnv<'a> {
             process_input_end: Instant::now(),
             width: 0,
             height: 0,
+            // event coordinates
             global_x: None,
             global_y: None,
+            local_x: None,
+            local_y: None,
             diff_x: 0,
             diff_y: 0,
             //max
