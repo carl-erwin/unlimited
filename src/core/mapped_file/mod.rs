@@ -1142,6 +1142,8 @@ impl<'a> MappedFile<'a> {
 
             MappedFile::print_all_used_nodes(&file, "AFTER INSERT INLINE");
 
+            // node_event.push(NodeChanged { index: node_to_split } );
+
             return data_len as usize;
         }
 
@@ -1296,6 +1298,8 @@ impl<'a> MappedFile<'a> {
             // link leaves
             MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, Some(*idx));
             prev_idx = Some(*idx);
+
+            // node_event.push(NodeAdded { index: idx } );
         }
         // link last leaf
         MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, next_idx);
@@ -1710,6 +1714,8 @@ impl<'a> MappedFile<'a> {
                 assert!(pool[n].used);
                 pool[n].clear();
                 pool.release(n);
+
+                // node_event.push(NodeRemoved { index: n } );
             }
         }
 

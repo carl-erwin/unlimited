@@ -475,11 +475,11 @@ impl<'a> View<'a> {
                     Some(m) => {
                         return m;
                     }
-                    None => panic!("internal error: wrong type registered"),
+                    None => panic!("internal error: wrong type registered : mode name {}", name),
                 }
             }
 
-            None => panic!("not configured properly"),
+            None => panic!("not configured properly: mode name {}", name),
         }
     }
 

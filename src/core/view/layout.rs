@@ -464,7 +464,7 @@ fn run_content_filters(
     // is interactive rendering possible ?
 
     let view = view.read();
-    layout_env.quit = false;
+    layout_env.quit = filters.is_empty();
     while layout_env.quit == false {
         loop_count += 1;
 
@@ -472,7 +472,7 @@ fn run_content_filters(
             // always clear filter output
             filter_out.clear();
 
-            if false {
+            if !true {
                 dbg_println!(
                     "run {:32} : filter_in.len() {})\r",
                     f.name(),

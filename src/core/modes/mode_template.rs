@@ -12,10 +12,15 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::layout::ContentFilter;
+use crate::core::view::layout::ScreenOverlayFilter;
+
 use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 
 use crate::core::view::View;
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
 
 pub struct TemplateMode {
     // add common fields
@@ -50,6 +55,16 @@ impl<'a> Mode for TemplateMode {
         view.compose_content_filters
             .borrow_mut()
             .push(Box::new(TemplateComposeFilter::new()));
+    }
+
+    fn on_view_event(
+        &self,
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
+        _src: ViewEventSource,
+        _dst: ViewEventDestination,
+        _event: &ViewEvent,
+    ) {
     }
 }
 
@@ -100,4 +115,12 @@ impl ContentFilter<'_> for TemplateComposeFilter {
     }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+}
+
+impl ScreenOverlayFilter<'_> for TemplateMode {
+    fn name(&self) -> &'static str {
+        &"template-screen-overlay-filter"
+    }
+
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
 }

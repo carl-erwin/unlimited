@@ -334,7 +334,7 @@ impl<'a> Mode for TextMode {
     ) {
         dbg_println!("config text-mode for VID {}", view.id);
 
-        view.compose_priority = 256;
+        view.compose_priority = 256; // TODO: move to caller
 
         let doc = { view.document.as_ref().unwrap().clone() };
 
@@ -342,7 +342,7 @@ impl<'a> Mode for TextMode {
 
         tm.doc_subscription = doc.write().register_subscriber(text_mode_on_doc_event);
 
-        dbg_println!("CEG subscription {:?}", tm.doc_subscription);
+        dbg_println!("subscription {:?}", tm.doc_subscription);
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();

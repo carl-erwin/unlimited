@@ -50,26 +50,27 @@ impl<'a> Mode for SimpleViewMode {
 
         // children_layout_and_modes
         let ops_modes = vec![
-            /*
-                    // line numbers
+            // line numbers
             (
-                            LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
-                            doc.clone(),
-                            vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
-                        ),
-                    // line changed
+                LayoutOperation::Fixed { size: 12 }, // TODO(ceg): adjust size based on screen content
+                doc.clone(),
+                vec!["line-number-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
+            ),
+            /*
+                        // line changed
                         (
                             LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
                             doc.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "line-change-mode" in screen overlay pass
                         ),
-                    // fold
+                        // fold
                         (
                             LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
                             doc.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "fold-mode" in screen overlay pass
                         ),
             */
+            // text
             (
                 LayoutOperation::RemainMinus { minus: 1 },
                 doc.clone(),
@@ -79,6 +80,7 @@ impl<'a> Mode for SimpleViewMode {
                     "find-mode".to_owned(),
                 ],
             ),
+            // scrollbar
             (
                 LayoutOperation::Fixed { size: 1 },
                 doc.clone(),
@@ -110,28 +112,50 @@ impl<'a> Mode for SimpleViewMode {
 
         // TODO(ceg): set focus
         // set focus on text view
-        let text_view_idx = 0;
-        let scroll_bar_idx = 1;
+        let line_numbers_view_idx = 0;
+        let text_view_idx = ops_modes.len() - 2;
+        let scroll_bar_idx = ops_modes.len() - 1;
+
         v.main_child = Some(text_view_idx); // index in children
         v.focus_to = Some(v.children[text_view_idx]); // TODO(ceg):
         env.focus_changed_to = Some(v.children[text_view_idx]); // TODO(ceg):
 
+        dbg_println!("simple-view: children: {:?}", v.children);
         // register siblings view
         // text <--> scrollbar
 
         let vscrollbar_mode = editor.get_mode("vscrollbar-mode").unwrap().clone();
 
-        let src = ViewEventSource {
+        let text_view_src = ViewEventSource {
             id: v.children[text_view_idx],
         };
-        let dst = ViewEventDestination {
+
+        let scrollbar_dst = ViewEventDestination {
             id: v.children[scroll_bar_idx],
         };
 
-        dbg_println!("simple-view: children: {:?}", v.children);
-
         // view events -> scrollbar
-        register_view_subscriber(editor, env, vscrollbar_mode.clone(), src, dst);
+        register_view_subscriber(
+            editor,
+            env,
+            vscrollbar_mode.clone(),
+            text_view_src,
+            scrollbar_dst,
+        );
+
+        // view events -> line_number
+        let line_number_dst = ViewEventDestination {
+            id: v.children[line_numbers_view_idx],
+        };
+
+        let line_number_mode = editor.get_mode("line-number-mode").unwrap().clone();
+        register_view_subscriber(
+            editor,
+            env,
+            line_number_mode.clone(),
+            text_view_src,
+            line_number_dst,
+        );
     }
 }
 

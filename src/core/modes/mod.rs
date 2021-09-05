@@ -1,10 +1,10 @@
 use std::any::Any;
-use std::rc::Rc;
 
 pub mod basic_editor;
 pub mod core_mode;
 pub mod find_mode;
 pub mod hsplit_mode;
+pub mod line_number;
 pub mod mode_template;
 pub mod simple_view;
 pub mod status_mode;
@@ -22,6 +22,7 @@ pub use basic_editor::BasicEditorMode;
 pub use core_mode::CoreMode;
 pub use find_mode::FindMode;
 pub use hsplit_mode::HsplitMode;
+pub use line_number::LineNumberMode;
 pub use simple_view::SimpleViewMode;
 pub use status_mode::StatusMode;
 pub use text_mode::TextMode;

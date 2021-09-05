@@ -281,7 +281,7 @@ pub fn worker(
                     document::sync_to_storage(&doc);
                 }
 
-                //                Event::DeferedTask { task_uid,  editor, editor_env, doc_id, vid, action, params ? } => {
+                //                Event::OutsourcedTask { task_uid,  editor, editor_env, doc_id, vid, action, params ? } => {
                 //                    action();
                 //                }
                 _ => {
@@ -309,6 +309,7 @@ pub fn indexer(
                     break;
                 }
 
+                // TODO(ceg): split in sub-threads/async task
                 Event::IndexTask { document_map } => {
                     let map = document_map.read();
                     for (_id, doc) in map.iter() {
@@ -444,6 +445,8 @@ use crate::core::modes::VsplitMode;
 
 use crate::core::modes::VscrollbarMode;
 
+use crate::core::modes::LineNumberMode;
+
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
     editor.register_mode(Box::new(CoreMode::new()));
@@ -459,4 +462,6 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(StatusMode::new()));
 
     editor.register_mode(Box::new(FindMode::new()));
+
+    editor.register_mode(Box::new(LineNumberMode::new()));
 }
