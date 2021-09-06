@@ -52,7 +52,7 @@ impl<'a> Mode for SimpleViewMode {
         let ops_modes = vec![
             // line numbers
             (
-                LayoutOperation::Fixed { size: 12 }, // TODO(ceg): adjust size based on screen content
+                LayoutOperation::Fixed { size: 15 }, // TODO(ceg): adjust size based on screen content
                 doc.clone(),
                 vec!["line-number-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
             ),

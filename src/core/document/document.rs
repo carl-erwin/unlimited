@@ -158,29 +158,60 @@ impl DocumentReadCache {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DocumentEventSource {
     pub id: Id,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DocumentEventDestination {
     pub id: Id,
 }
 
+pub trait DocumentEventCb {
+    fn cb(
+        &mut self,
+        src: DocumentEventSource,
+        dst: Option<DocumentEventDestination>,
+        event: &DocumentEvent,
+    );
+
+    // if src == destination() skip
+    fn destination(&self) -> Option<DocumentEventDestination> {
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
-pub enum DocumentEvent {
+pub enum DocumentEvent<'a> {
     Add,
     Open,
     Close,
     Remove,
     Change { op: BufferOperation },
     NodeAdded { node_idx: usize },
-    NodeRemoved { node_idx: usize },
-    NodeIndexed { node_idx: usize },
+    NodeRemoved { node_idx: usize, data: &'a Vec<u8> },
+    NodeIndexed { node_idx: usize, data: &'a Vec<u8> },
 }
 
-pub type DocumentEventCb = fn(Id, DocumentEventSource, DocumentEventDestination, &DocumentEvent);
+fn document_event_to_string(evt: &DocumentEvent) -> String {
+    match evt {
+        DocumentEvent::Add => "Add".to_owned(),
+        DocumentEvent::Open => "Add".to_owned(),
+        DocumentEvent::Close => "Add".to_owned(),
+        DocumentEvent::Remove => "Add".to_owned(),
+        DocumentEvent::Change { .. } => "Change".to_owned(),
+        DocumentEvent::NodeAdded { node_idx } => {
+            format!("NodeAdded idx: {}", node_idx)
+        }
+        DocumentEvent::NodeRemoved { node_idx, .. } => {
+            format!("NodeAdded idx: {}", node_idx)
+        }
+        DocumentEvent::NodeIndexed { node_idx, .. } => {
+            format!("NodeAdded idx: {}", node_idx)
+        }
+    }
+}
 
 pub struct Document<'a> {
     pub id: Id,
@@ -193,8 +224,7 @@ pub struct Document<'a> {
     pub is_syncing: bool,
     pub abort_indexing: bool,
     pub last_tag_time: std::time::Instant,
-
-    pub subscribers: Vec<(DocumentEventCb, Id, DocumentEventDestination)>,
+    pub subscribers: Vec<Box<dyn DocumentEventCb>>,
 }
 
 impl<'a> fmt::Debug for Document<'a> {
@@ -272,29 +302,29 @@ impl<'a> Document<'a> {
         self.cache = self.build_cache(start, end)
     }
 
-    pub fn notify(&self, src: DocumentEventSource, evt: &DocumentEvent) {
+    pub fn notify(&mut self, src: DocumentEventSource, evt: &DocumentEvent) {
         dbg_println!(
             "notify {:?}, nb subscribers {}",
-            evt,
+            document_event_to_string(&evt),
             self.subscribers.len()
         );
-        for (idx, s) in self.subscribers.iter().enumerate() {
-            if s.2.id == src.id {
-                continue;
+        for (idx, e) in self.subscribers.iter_mut().enumerate() {
+            let dst = e.destination();
+            if let Some(dst) = dst {
+                if src.id == dst.id {
+                    continue;
+                }
             }
-            s.0(self.id, src, s.2, evt);
+
+            e.cb(src, dst, evt);
         }
     }
 
-    pub fn register_subscriber(&mut self, cb: DocumentEventCb) -> DocumentEventDestination {
-        // TODO:
+    // TODO(ceg): return cb slot / unregister slot_mask
+    pub fn register_subscriber(&mut self, cb: Box<dyn DocumentEventCb>) -> usize {
         let len = 1 + self.subscribers.len();
-        let dst = DocumentEventDestination { id: len as u64 };
-
-        let ctx = (cb, self.id, dst);
-        self.subscribers.push(ctx);
-
-        dst
+        self.subscribers.push(cb);
+        len
     }
 
     // read ahead
@@ -839,50 +869,22 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
         // update node info
         {
-            let doc = doc.read();
-            let mut file = doc.buffer.data.write();
-            let mut node = &mut file.pool[idx.unwrap()];
-            node.byte_count = byte_count;
-            node.indexed = true;
-
-            let evt = DocumentEvent::NodeIndexed {
-                node_idx: idx.unwrap(),
-            };
-
-            doc.notify(DocumentEventSource { id: 0 }, &evt);
-
-            // TODO(ceg): notify subscribers
-            /*
-            doc.register_node_event_cb(cb);
-
-            enum NodeEvent
+            let mut doc = doc.write();
             {
-             NodeAdded { idx } ),
-             NodeRemoved { idx } ),
-             NodeIndexed { idx } ),
-             NodeContentChanged { idx, Op { insert, remove }, local_offset, size }} ,
+                let mut file = doc.buffer.data.write();
+                let mut node = &mut file.pool[idx.unwrap()];
+                node.byte_count = byte_count;
+                node.indexed = true;
+                idx = node.next;
             }
 
-            doc.get_node_mut(index) ->  &mut Node;
-
-            fn node_event_cb(doc, ev: NodeEvent, &mut node);
-
-
-            }
-
-
-            doc.event_cb(NodeAdded, &mut node, idx);
-            doc.event_cb(NodeRemoved, &mut node, idx);
-            doc.event_cb(NodeIndexed, &mut node, idx);
-            doc.event_cb(
-                NodeContentChanged { Op { insert, remove }, local_offset, size }} ,
-                &mut node,
-                idx
+            doc.notify(
+                DocumentEventSource { id: 0 },
+                &DocumentEvent::NodeIndexed {
+                    node_idx: idx.unwrap(),
+                    data: &data,
+                },
             );
-            */
-
-            //
-            idx = node.next;
         }
     }
 

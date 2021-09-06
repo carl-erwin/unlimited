@@ -2,8 +2,8 @@
 // MappedFile is binary tree that provides on-demand data mapping, and keeps only the modified areas in memory.
 // the leaves are linked to allow fast sequential traversal.
 //
-
 use std::collections::HashSet;
+use std::fmt;
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -366,7 +366,6 @@ impl IndexMut<usize> for FreeListAllocator<Node> {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
 pub struct MappedFile<'a> {
     phantom: PhantomData<&'a u8>,
     pub fd: Option<RcLockFile>,
@@ -377,7 +376,45 @@ pub struct MappedFile<'a> {
     pub sub_page_size: usize,
     /// reserve storage on new allocated blocks
     pub sub_page_reserve: usize,
+
+    pub subscribers: Vec<MappedFileEventCb>,
 }
+
+impl<'a> fmt::Debug for MappedFile<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MappedFile {}")
+            .field("fd", &self.fd)
+            .field("root_index", &self.root_index)
+            .field("page_size", &self.page_size)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct NodeOperationData<'a> {
+    pub data: &'a Vec<u8>,
+    pub offset: u64,
+    pub local_offset: u64,
+}
+
+#[derive(Debug)]
+pub enum MappedFileEvent /*<'a>*/ {
+    NodeChanged {
+        node_idx: usize,
+        //        before: NodeOperationData<'a>,
+        //        after: NodeOperationData<'a>,
+    }, // ?
+    NodeAdded {
+        node_idx: usize,
+        //        data: NodeOperationData<'a>,
+    },
+    NodeRemoved {
+        node_idx: usize,
+        //        data: NodeOperationData<'a>,
+    },
+}
+
+pub type MappedFileEventCb = fn(&MappedFileEvent /*<'static>*/);
 
 impl<'a> Drop for MappedFile<'a> {
     fn drop(&mut self) {}
@@ -397,6 +434,7 @@ impl<'a> MappedFile<'a> {
             page_size: 2 * 1024 * 1024,
             sub_page_size: 4096,
             sub_page_reserve: 2 * 1024,
+            subscribers: vec![],
         };
 
         Some(Arc::new(RwLock::new(file)))
@@ -435,6 +473,7 @@ impl<'a> MappedFile<'a> {
             page_size,
             sub_page_size,
             sub_page_reserve: 2 * 1024,
+            subscribers: vec![],
         };
 
         if file_size == 0 {
@@ -685,6 +724,22 @@ impl<'a> MappedFile<'a> {
                 dbg_println!("l idx {} = {:?}", l, pool[l]);
                 dbg_println!("r idx {} = {:?}", r, pool[r]);
             }
+        }
+    }
+
+    pub fn register_subscriber(&mut self, cb: MappedFileEventCb) -> usize {
+        self.subscribers.push(cb);
+        self.subscribers.len()
+    }
+
+    pub fn notify(&self, evt: &MappedFileEvent /*<'static>*/) {
+        dbg_println!(
+            "mapped file notify , nb subscribers {}",
+            //evt,
+            self.subscribers.len()
+        );
+        for (idx, cb) in self.subscribers.iter().enumerate() {
+            cb(evt);
         }
     }
 
@@ -1142,8 +1197,10 @@ impl<'a> MappedFile<'a> {
 
             MappedFile::print_all_used_nodes(&file, "AFTER INSERT INLINE");
 
-            // node_event.push(NodeChanged { index: node_to_split } );
-
+            dbg_println!("mapped file notify NodeChanged idx: {:?}", node_to_split);
+            file.notify(&MappedFileEvent::NodeChanged {
+                node_idx: node_to_split.unwrap(),
+            });
             return data_len as usize;
         }
 
@@ -1299,7 +1356,9 @@ impl<'a> MappedFile<'a> {
             MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, Some(*idx));
             prev_idx = Some(*idx);
 
-            // node_event.push(NodeAdded { index: idx } );
+            // TODO: push events
+            dbg_println!("mapped file notify NodeAdded idx: {:?}", idx);
+            file.notify(&MappedFileEvent::NodeAdded { node_idx: *idx });
         }
         // link last leaf
         MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, next_idx);
@@ -1339,6 +1398,11 @@ impl<'a> MappedFile<'a> {
             }
             file.pool[node_to_split].clear();
             file.pool.release(node_to_split);
+
+            dbg_println!("mapped file notify NodeRemoved idx: {:?}", node_to_split);
+            file.notify(&MappedFileEvent::NodeRemoved {
+                node_idx: node_to_split,
+            });
         }
 
         // check root

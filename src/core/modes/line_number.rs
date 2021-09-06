@@ -9,12 +9,13 @@
 
     NB: This is tied to the document implementation
 
-              (root)
-            [  4 + 6 ]
-          /           \
-        [ 2 + 2 ]     [ 2 + 4 ]
+                 (root)
+                   |
+               [ 3 + 6 ]
+             /          \
+        [ 1 + 2 ]     [ 2 + 4 ]
        /        \    /        \
-    [2]        [2]  [2]       [4]
+    [1]        [2]  [2]       [4]
 
     each time a node is indexed
     the document impl must call update hierarchy with the build metadata diff
@@ -30,9 +31,6 @@
     and keep a per node doc_revision
 
     Must we re-index before remove ?
-
-
-
 */
 
 use std::any::Any;
@@ -137,8 +135,7 @@ impl<'a> Mode for LineNumberMode {
         dst: ViewEventDestination,
         _event: &ViewEvent,
     ) {
-        dbg_println!("LINENUM on_view_event src: {:?}", src);
-        dbg_println!("LINENUM on_view_event dst: {:?}", dst);
+        dbg_println!("LINENUM on_view_event src: {:?} dst: {:?}", src, dst);
 
         let src = editor.view_map.get(&src.id).unwrap().write();
         let mut dst = editor.view_map.get(&dst.id).unwrap().write();
@@ -146,7 +143,7 @@ impl<'a> Mode for LineNumberMode {
         mode_ctx.target_vid = src.id;
 
         let doc_id = src.document.as_ref().unwrap().read().id;
-        let d = DOC_METADATA_MAP.as_ref().write().get_mut(&doc_id).unwrap();
+        let d = DOC_METADATA_MAP.as_ref().write().get_mut(&doc_id); //.unwrap();
     }
 }
 
@@ -181,7 +178,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         dbg_println!("LINENUM RUN");
         env.screen.clear();
         for e in self.line_offsets.iter() {
-            let s = format!("@{:>10}", e.0);
+            let s = format!("@{:>12}", e.0);
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
