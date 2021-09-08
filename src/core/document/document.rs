@@ -1,7 +1,9 @@
 use std::fmt;
 
 use parking_lot::RwLock;
+use std::cell::RefCell;
 use std::sync::Arc;
+use std::sync::Weak;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -11,6 +13,12 @@ use crate::core::editor::user_is_active;
 
 use super::buffer::Buffer;
 use super::buffer::OpenMode;
+
+use crate::core::mapped_file::MappedFile;
+use crate::core::mapped_file::MappedFileEvent;
+use crate::core::mapped_file::UpdateHierarchyOp;
+
+use crate::core::mapped_file::NodeIndex;
 
 //
 pub use super::bufferlog::BufferLog;
@@ -27,6 +35,25 @@ pub struct DocumentBuilder {
     document_name: String,
     file_name: String,
     mode: OpenMode,
+}
+
+#[derive(Debug)]
+struct DocumentMappedFileEventHandler<'a> {
+    doc: Weak<RwLock<Document<'a>>>,
+}
+
+fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> DocumentEvent {
+    match evt {
+        MappedFileEvent::NodeChanged { node_index } => DocumentEvent::NodeChanged {
+            node_index: *node_index,
+        },
+        MappedFileEvent::NodeAdded { node_index } => DocumentEvent::NodeAdded {
+            node_index: *node_index,
+        },
+        MappedFileEvent::NodeRemoved { node_index } => DocumentEvent::NodeRemoved {
+            node_index: *node_index,
+        },
+    }
 }
 
 ///
@@ -66,28 +93,8 @@ impl DocumentBuilder {
     }
 
     ///
-    pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'a>>>> {
-        let buffer = if self.file_name.is_empty() {
-            Buffer::empty(self.mode.clone())?
-        } else {
-            Buffer::new(&self.file_name, self.mode.clone())?
-        };
-
-        let doc = Document {
-            id: 0,
-            name: self.document_name.clone(),
-            buffer,
-            cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
-            buffer_log: BufferLog::new(),
-            use_buffer_log: true,
-            abort_indexing: false,
-            changed: false,
-            is_syncing: false,
-            last_tag_time: std::time::Instant::now(),
-            subscribers: vec![],
-        };
-
-        Some(Arc::new(RwLock::new(doc)))
+    pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'static>>>> {
+        Document::new(&self.document_name, &self.file_name, self.mode.clone())
     }
 }
 
@@ -158,57 +165,39 @@ impl DocumentReadCache {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DocumentEventSource {
-    pub id: Id,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DocumentEventDestination {
-    pub id: Id,
-}
-
 pub trait DocumentEventCb {
-    fn cb(
-        &mut self,
-        src: DocumentEventSource,
-        dst: Option<DocumentEventDestination>,
-        event: &DocumentEvent,
-    );
-
-    // if src == destination() skip
-    fn destination(&self) -> Option<DocumentEventDestination> {
-        None
-    }
+    fn cb(&mut self, doc: &Document, event: &DocumentEvent);
 }
 
 #[derive(Debug, Clone)]
-pub enum DocumentEvent<'a> {
-    Add,
-    Open,
-    Close,
-    Remove,
-    Change { op: BufferOperation },
-    NodeAdded { node_idx: usize },
-    NodeRemoved { node_idx: usize, data: &'a Vec<u8> },
-    NodeIndexed { node_idx: usize, data: &'a Vec<u8> },
+pub enum DocumentEvent {
+    DocumentAdded,
+    DocumentOpened,
+    DocumentClosed,
+    DocumentRemoved,
+    NodeAdded { node_index: usize },
+    NodeChanged { node_index: usize },
+    NodeRemoved { node_index: usize },
+    NodeIndexed { node_index: usize },
 }
 
 fn document_event_to_string(evt: &DocumentEvent) -> String {
     match evt {
-        DocumentEvent::Add => "Add".to_owned(),
-        DocumentEvent::Open => "Add".to_owned(),
-        DocumentEvent::Close => "Add".to_owned(),
-        DocumentEvent::Remove => "Add".to_owned(),
-        DocumentEvent::Change { .. } => "Change".to_owned(),
-        DocumentEvent::NodeAdded { node_idx } => {
-            format!("NodeAdded idx: {}", node_idx)
+        DocumentEvent::DocumentAdded => "Added".to_owned(),
+        DocumentEvent::DocumentOpened => "Opened".to_owned(),
+        DocumentEvent::DocumentClosed => "Closed".to_owned(),
+        DocumentEvent::DocumentRemoved => "Removed".to_owned(),
+        DocumentEvent::NodeAdded { node_index } => {
+            format!("NodeAdded idx: {}", node_index)
         }
-        DocumentEvent::NodeRemoved { node_idx, .. } => {
-            format!("NodeAdded idx: {}", node_idx)
+        DocumentEvent::NodeChanged { node_index } => {
+            format!("NodeChanged idx: {}", node_index)
         }
-        DocumentEvent::NodeIndexed { node_idx, .. } => {
-            format!("NodeAdded idx: {}", node_idx)
+        DocumentEvent::NodeRemoved { node_index, .. } => {
+            format!("NodeRemoved idx: {}", node_index)
+        }
+        DocumentEvent::NodeIndexed { node_index, .. } => {
+            format!("NodeIndexed idx: {}", node_index)
         }
     }
 }
@@ -223,8 +212,9 @@ pub struct Document<'a> {
     pub changed: bool,
     pub is_syncing: bool,
     pub abort_indexing: bool,
+    pub indexed: bool,
     pub last_tag_time: std::time::Instant,
-    pub subscribers: Vec<Box<dyn DocumentEventCb>>,
+    pub subscribers: Vec<RefCell<Box<dyn DocumentEventCb>>>,
 }
 
 impl<'a> fmt::Debug for Document<'a> {
@@ -241,6 +231,39 @@ unsafe impl<'a> Send for Document<'a> {}
 unsafe impl<'a> Sync for Document<'a> {}
 
 impl<'a> Document<'a> {
+    pub fn new(
+        document_name: &String,
+        file_name: &String,
+        mode: OpenMode,
+    ) -> Option<Arc<RwLock<Document<'static>>>> {
+        let buffer = if file_name.is_empty() {
+            Buffer::empty(mode.clone())
+        } else {
+            Buffer::new(&file_name, mode.clone())
+        };
+
+        if buffer.is_none() {
+            panic!("cannot open {} {} {:?}", document_name, file_name, mode);
+        }
+
+        let doc = Document {
+            id: 0,
+            name: document_name.clone(),
+            buffer: buffer.unwrap(),
+            cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
+            buffer_log: BufferLog::new(),
+            use_buffer_log: true,
+            abort_indexing: false,
+            indexed: false,
+            changed: false,
+            is_syncing: false,
+            last_tag_time: std::time::Instant::now(),
+            subscribers: vec![],
+        };
+
+        Some(Arc::new(RwLock::new(doc)))
+    }
+
     pub fn set_cache(&mut self, start: u64, end: u64) {
         if start > end {
             panic!("start {} > end {}", start, end);
@@ -302,28 +325,56 @@ impl<'a> Document<'a> {
         self.cache = self.build_cache(start, end)
     }
 
-    pub fn notify(&mut self, src: DocumentEventSource, evt: &DocumentEvent) {
+    pub fn notify(&self, evt: &DocumentEvent) {
         dbg_println!(
             "notify {:?}, nb subscribers {}",
             document_event_to_string(&evt),
             self.subscribers.len()
         );
-        for (idx, e) in self.subscribers.iter_mut().enumerate() {
-            let dst = e.destination();
-            if let Some(dst) = dst {
-                if src.id == dst.id {
-                    continue;
-                }
+        for (idx, e) in self.subscribers.iter().enumerate() {
+            e.borrow_mut().cb(self, evt);
+        }
+    }
+
+    pub fn build_node_byte_count(&self, node_index: usize) {
+        // let node_info = doc.get_node_info(node_index);
+        let mut file = self.buffer.data.write();
+        build_node_byte_count(&mut file, Some(node_index));
+    }
+
+    pub fn remove_node_byte_count(&self, node_index: usize) {
+        // let node_info = doc.get_node_info(node_index);
+        let mut file = self.buffer.data.write();
+        remove_node_byte_count(&mut file, Some(node_index));
+    }
+
+    pub fn update_node_byte_count(&self, node_index: usize) {
+        // let node_info = doc.get_node_info(node_index);
+        let mut file = self.buffer.data.write();
+        update_node_byte_count(&mut file, Some(node_index));
+    }
+
+    pub fn show_root_node_bytes_stats(&self) {
+        // let node_info = doc.get_node_info(node_index);
+        let file = self.buffer.data.read();
+        if let Some(idx) = file.root_index() {
+            let node = &file.pool[idx];
+            if !node.indexed {
+                return;
             }
 
-            e.cb(src, dst, evt);
+            for (i, count) in node.byte_count.iter().enumerate() {
+                if i == 10 {
+                    eprintln!("ROOT NODE byte_count[{}] = {}", i, count);
+                }
+            }
         }
     }
 
     // TODO(ceg): return cb slot / unregister slot_mask
     pub fn register_subscriber(&mut self, cb: Box<dyn DocumentEventCb>) -> usize {
         let len = 1 + self.subscribers.len();
-        self.subscribers.push(cb);
+        self.subscribers.push(RefCell::new(cb));
         len
     }
 
@@ -448,6 +499,41 @@ impl<'a> Document<'a> {
         }
     }
 
+    pub fn update_hierarchy_from_events(&self, events: &Vec<MappedFileEvent>) {
+        for ev in events {
+            match ev {
+                MappedFileEvent::NodeChanged { node_index } => {
+                    self.remove_node_byte_count(*node_index);
+                    self.build_node_byte_count(*node_index);
+
+                    let mut file = self.buffer.data.write();
+
+                    // remove prev counts
+                    update_byte_index_hierarchy(
+                        &mut file,
+                        Some(*node_index),
+                        UpdateHierarchyOp::Sub,
+                    );
+
+                    // rebuild current counters
+
+                    // add new count
+                    update_byte_index_hierarchy(
+                        &mut file,
+                        Some(*node_index),
+                        UpdateHierarchyOp::Add,
+                    );
+                }
+                MappedFileEvent::NodeAdded { node_index } => {
+                    self.build_node_byte_count(*node_index);
+                }
+                MappedFileEvent::NodeRemoved { node_index } => {
+                    self.remove_node_byte_count(*node_index);
+                }
+            }
+        }
+    }
+
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO(ceg): use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
@@ -466,16 +552,32 @@ impl<'a> Document<'a> {
             );
         }
 
-        let sz = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
+        let (sz, events) = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
         if sz > 0 {
             self.changed = true;
         }
+
+        self.update_hierarchy_from_events(&events);
+
+        for ev in &events {
+            let ev = mapped_file_event_to_document_event(&ev);
+            self.notify(&ev);
+        }
+
         sz
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data)
     /// before remove the bytes
+    /*
+       TODO(ceg): we want
+       - remove the data
+       - collect each leaf node impacted
+       - update byte index from these nodes
+       - call event subscriber
+       - cleanup impacted nodes
+    */
     pub fn remove(
         &mut self,
         offset: u64,
@@ -487,7 +589,7 @@ impl<'a> Document<'a> {
 
         let mut rm_data = Vec::with_capacity(nr_bytes);
 
-        let nr_bytes_removed = self.buffer.remove(offset, nr_bytes, Some(&mut rm_data));
+        let (nr_bytes_removed, events) = self.buffer.remove(offset, nr_bytes, Some(&mut rm_data));
 
         if let Some(v) = removed_data {
             v.extend(rm_data.clone());
@@ -501,6 +603,14 @@ impl<'a> Document<'a> {
         if nr_bytes_removed > 0 {
             self.changed = true;
         }
+
+        self.update_hierarchy_from_events(&events);
+
+        for ev in &events {
+            let ev = mapped_file_event_to_document_event(&ev);
+            self.notify(&ev);
+        }
+
         nr_bytes_removed
     }
 
@@ -525,8 +635,16 @@ impl<'a> Document<'a> {
 
                 // TODO(ceg): check i/o errors
                 let added = if let Some(data) = &op.data {
-                    self.buffer.insert(op.offset, data.len(), &data);
+                    let (_, events) = self.buffer.insert(op.offset, data.len(), &data);
                     self.changed = true;
+
+                    self.update_hierarchy_from_events(&events);
+
+                    for ev in &events {
+                        let ev = mapped_file_event_to_document_event(&ev);
+                        self.notify(&ev);
+                    }
+
                     data.len() as u64
                 } else {
                     0
@@ -541,8 +659,16 @@ impl<'a> Document<'a> {
 
                 // TODO(ceg): check i/o errors
                 let _removed = if let Some(data) = &op.data {
-                    let rm = self.buffer.remove(op.offset, data.len(), None);
+                    let (rm, events) = self.buffer.remove(op.offset, data.len(), None);
                     self.changed = true;
+
+                    self.update_hierarchy_from_events(&events);
+
+                    for ev in &events {
+                        let ev = mapped_file_event_to_document_event(&ev);
+                        self.notify(&ev);
+                    }
+
                     assert_eq!(rm, data.len());
                     rm
                 } else {
@@ -746,7 +872,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
                 panic!("direct copy failed");
             }
 
-            idx = node.next;
+            idx = node.link.next;
         }
 
         // NB: experimental throttling based on user input freq/rendering
@@ -795,6 +921,117 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     }
 }
 
+fn update_byte_index_hierarchy(
+    file: &mut MappedFile,
+    idx: Option<NodeIndex>,
+    op: UpdateHierarchyOp,
+) {
+    if idx.is_none() {
+        return;
+    }
+    let idx = idx.unwrap();
+
+    // get counters
+    let node = &mut file.pool[idx];
+    let byte_count = node.byte_count.clone();
+
+    let mut p = node.link.parent;
+
+    while p.is_some() {
+        let p_idx = p.unwrap();
+
+        let p_node = &mut file.pool[p_idx];
+        for (i, count) in byte_count.iter().enumerate() {
+            match op {
+                UpdateHierarchyOp::Add => p_node.byte_count[i] += count,
+                UpdateHierarchyOp::Sub => p_node.byte_count[i] -= count,
+            }
+        }
+        p_node.indexed = true;
+
+        p = p_node.link.parent;
+    }
+}
+
+// call this on new done
+pub fn build_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
+    if idx.is_none() {
+        return;
+    }
+
+    let idx = idx.unwrap();
+
+    let node = &mut file.pool[idx];
+    let mut data = Vec::with_capacity(node.size as usize);
+    unsafe {
+        data.set_len(node.size as usize);
+    };
+
+    let orig_fd = if file.fd.is_none() {
+        None
+    } else {
+        Some(file.fd.as_ref().unwrap().clone())
+    };
+
+    if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
+        //
+    } else {
+        // TODO(ceg): return error
+        panic!("direct copy failed");
+    }
+
+    assert!(!node.indexed);
+    //    node.byte_count = [0;256];
+
+    // count node bytes (no lock)
+    for b in data.iter() {
+        let byte_idx = *b as usize;
+        if *b as char == '\n' {
+            node.byte_count[byte_idx] += 1;
+        }
+    }
+    node.indexed = true;
+
+    update_byte_index_hierarchy(&mut file, Some(idx), UpdateHierarchyOp::Add);
+}
+
+// call this on new done
+pub fn remove_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
+    if idx.is_none() {
+        return;
+    }
+
+    let idx = idx.unwrap();
+
+    let node = &mut file.pool[idx];
+    if !node.indexed {
+        return;
+    }
+
+    update_byte_index_hierarchy(&mut file, Some(idx), UpdateHierarchyOp::Sub);
+
+    let node = &mut file.pool[idx];
+    node.byte_count = [0; 256];
+    node.indexed = false;
+}
+
+// call this on new done
+pub fn update_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
+    if idx.is_none() {
+        return;
+    }
+
+    let idx = idx.unwrap();
+
+    let node = &mut file.pool[idx];
+    if !node.indexed {
+        return;
+    }
+
+    node.indexed = false;
+    update_byte_index_hierarchy(&mut file, Some(idx), UpdateHierarchyOp::Sub);
+}
+
 // TODO(ceg): split code to provide index_single_node(nid)
 pub fn build_index(doc: &Arc<RwLock<Document>>) {
     let mut idx = {
@@ -811,14 +1048,11 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     let t0 = std::time::Instant::now();
 
-    let mut total_byte_count: [u64; 256] = [0; 256];
-
     let mut data = vec![];
     while idx != None {
         // read node bytes
         {
             let doc = doc.read();
-
             if doc.abort_indexing == true {
                 break;
             }
@@ -826,7 +1060,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             let file = doc.buffer.data.read();
             let node = &file.pool[idx.unwrap()];
             if node.indexed == true {
-                idx = node.next;
+                idx = node.link.next;
                 continue;
             }
 
@@ -841,6 +1075,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                 Some(file.fd.as_ref().unwrap().clone())
             };
 
+            let t0_read = std::time::Instant::now();
             if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
                 dbg_println!(
                     "build index doc('{}') node {} size {}",
@@ -852,45 +1087,73 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                 // TODO(ceg): return error
                 panic!("direct copy failed");
             }
+            let t1_read = std::time::Instant::now();
+            dbg_println!("read node time {:?} ms", (t1_read - t0_read).as_millis());
         }
 
         // count node bytes (no lock)
         let mut byte_count: [u64; 256] = [0; 256];
         for b in data.iter() {
             let byte_idx = *b as usize;
-            byte_count[byte_idx] += 1;
-            total_byte_count[byte_idx] += 1;
+            if *b as char == '\n' {
+                byte_count[byte_idx] += 1;
+            }
         }
 
+        // yield some cpu time
         if user_is_active() == true {
             let wait = std::time::Duration::from_millis(16);
             std::thread::sleep(wait);
         }
 
-        // update node info
+        // update node info (idx)
         {
-            let mut doc = doc.write();
+            let doc = doc.read();
+            let mut file = doc.buffer.data.write();
+
+            let node_index = idx.unwrap();
+
+            // save byte counters
             {
-                let mut file = doc.buffer.data.write();
-                let mut node = &mut file.pool[idx.unwrap()];
+                let mut node = &mut file.pool[node_index];
                 node.byte_count = byte_count;
                 node.indexed = true;
-                idx = node.next;
+                idx = node.link.next;
             }
 
-            doc.notify(
-                DocumentEventSource { id: 0 },
-                &DocumentEvent::NodeIndexed {
-                    node_idx: idx.unwrap(),
-                    data: &data,
-                },
-            );
+            update_byte_index_hierarchy(&mut file, Some(node_index), UpdateHierarchyOp::Add);
+        }
+
+        // notify subscribers
+        if idx.is_some() {
+            let doc = doc.read();
+            doc.notify(&DocumentEvent::NodeIndexed {
+                node_index: idx.unwrap(),
+            });
         }
     }
 
     let t1 = std::time::Instant::now();
-    dbg_println!("index time {:?} ms", (t1 - t0).as_millis());
-    dbg_println!("Number of lines {}", total_byte_count[b'\n' as usize]);
+    eprintln!("index time {:?} ms", (t1 - t0).as_millis());
+
+    {
+        // set index status flags
+        let mut doc = doc.write();
+        if !doc.abort_indexing {
+            doc.indexed = true;
+        }
+
+        // display root node info
+        let file = doc.buffer.data.read();
+        if let Some(root_index) = file.root_index() {
+            let node = &file.pool[root_index];
+            eprintln!(
+                "{} : Number of lines {}",
+                doc.file_name(),
+                node.byte_count[b'\n' as usize]
+            );
+        }
+    }
 }
 
 #[cfg(test)]

@@ -54,7 +54,7 @@ impl<'a> Mode for StatusMode {
     }
 
     fn configure_view(
-        &self,
+        &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,

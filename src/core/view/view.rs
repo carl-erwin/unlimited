@@ -229,7 +229,9 @@ pub struct ViewEventDestination {
     pub id: Id,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum ViewEvent {
+    Subscribe,
     PostComposition,
     OffsetsChange { start_offset: u64, end_offset: u64 },
 }
@@ -326,25 +328,29 @@ pub struct View<'a> {
     pub filter_in: Rc<RefCell<Vec<FilterIo>>>,
     pub filter_out: Rc<RefCell<Vec<FilterIo>>>,
 
-    pub subscribers: Vec<(Rc<Box<dyn Mode>>, ViewEventSource, ViewEventDestination)>,
+    pub subscribers: Vec<(
+        Rc<RefCell<Box<dyn Mode>>>,
+        ViewEventSource,
+        ViewEventDestination,
+    )>,
 }
 
 /// Use this function if the mode needs to watch a given view
 ///
 pub fn register_view_subscriber(
-    editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
-    mode: Rc<Box<dyn Mode>>,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    mode: Rc<RefCell<Box<dyn Mode>>>, // TODO: use type
     src: ViewEventSource,
     dst: ViewEventDestination,
 ) -> Option<()> {
+    mode.borrow()
+        .on_view_event(&mut editor, &mut env, src, dst, &ViewEvent::Subscribe);
+
     let ctx = (mode, src, dst);
-    let src = editor.view_map.get(&src.id)?;
-    let _dst = editor.view_map.get(&dst.id)?;
+    let src_view = editor.view_map.get(&src.id)?;
 
-    src.write().subscribers.push(ctx);
-
-    // ie: will call mode->on_view_event(editor, env, src, dst, event);
+    src_view.write().subscribers.push(ctx);
 
     Some(())
 }
@@ -423,17 +429,13 @@ impl<'a> View<'a> {
                 continue;
             }
 
-            let mode = {
-                let mode = editor.get_mode(mode_name);
-                if mode.is_none() {
-                    panic!("cannot find mode {}", mode_name);
-                }
-                Rc::clone(mode.unwrap())
-            };
+            let mode = editor.get_mode(mode_name);
+            if mode.is_none() {
+                panic!("cannot find mode {}", mode_name);
+            }
+            let mut mode = mode.as_ref().unwrap().borrow_mut();
 
-            // TODO(ceg): move to mode.configure()
-            // merge all actions
-            // move to mode
+            // TODO(ceg): add doc
             let action_map = mode.build_action_map();
             for (name, fnptr) in action_map {
                 v.input_ctx.action_map.insert(name.clone(), fnptr);

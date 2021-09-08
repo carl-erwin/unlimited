@@ -29,7 +29,8 @@ pub use text_mode::TextMode;
 pub use vscrollbar_mode::VscrollbarMode;
 pub use vsplit_mode::VsplitMode;
 
-use crate::core::view;
+use crate::core::document::Document;
+
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
@@ -37,19 +38,30 @@ use crate::core::view::ViewEventSource;
 pub trait Mode {
     // Returns the mode name
     fn name(&self) -> &'static str;
-    /// This function exposes the mode's function (name, pointer)
+
+    /// This function exposes the mode's input function (name, pointer)
     fn build_action_map<'m>(&'m self) -> InputStageActionMap<'static>;
 
     fn alloc_ctx(&self) -> Box<dyn Any>;
 
+    /// This function MUST be called once per document
+    /// It is used to allocate document's mode context/metadata
+    fn configure_document(
+        &mut self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        _doc: &mut Document<'static>,
+    ) {
+    }
+
+    /// This function MUST be called once per view
+    /// It is used to allocate view's mode context
     fn configure_view(
-        &self,
+        &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         _view: &mut View<'static>,
     );
-
-    // ? fn notify() {}
 
     fn on_view_event(
         &self,

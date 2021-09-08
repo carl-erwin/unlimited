@@ -351,7 +351,7 @@ fn compose_children(
             {
                 for cb in cbs.iter() {
                     let mode = cb.0.as_ref();
-                    mode.on_view_event(
+                    mode.borrow().on_view_event(
                         &mut editor,
                         &mut editor_env,
                         cb.1,

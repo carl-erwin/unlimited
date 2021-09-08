@@ -119,7 +119,10 @@ impl ContentFilter<'_> for RawDataFilter {
                 );
             }
 
-            let rd = doc.read().read(self.pos, self.read_size, &mut raw_data);
+            //
+            let doc = doc.read();
+
+            let rd = doc.read(self.pos, self.read_size, &mut raw_data);
 
             if self.debug {
                 dbg_println!(
@@ -128,7 +131,7 @@ impl ContentFilter<'_> for RawDataFilter {
                     rd,
                     self.read_size
                 );
-                dbg_println!("DATA FETCH: BUFFER SIZE {}", doc.read().size());
+                dbg_println!("DATA FETCH: BUFFER SIZE {}", doc.size());
                 dbg_println!(
                     "DATA FETCH: POS {} + RD {}  = {}",
                     self.pos,
@@ -184,7 +187,7 @@ impl ContentFilter<'_> for RawDataFilter {
             self.read_count += rd;
 
             // TODO(ceg): cache doc size ?
-            if self.pos == doc.read().size() as u64 {
+            if self.pos == doc.size() as u64 {
                 env.quit = true;
 
                 if true {

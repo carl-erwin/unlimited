@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
+
+use std::cell::RefCell;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -164,10 +166,10 @@ pub type Id = u64;
 
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'a>>>>>>,
+    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'static>>>>>>,
     pub root_views: Vec<view::Id>,
     pub view_map: HashMap<view::Id, Rc<RwLock<View<'a>>>>,
-    pub modes: HashMap<String, Rc<Box<dyn Mode>>>,
+    pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub core_tx: Sender<EventMessage<'a>>,
     pub ui_tx: Sender<EventMessage<'a>>,
     pub worker_tx: Sender<EventMessage<'a>>,
@@ -189,7 +191,7 @@ impl<'a> Editor<'a> {
             document_map: Arc::new(RwLock::new(HashMap::new())),
             root_views: vec![],
             view_map: HashMap::new(),
-            modes: HashMap::new(),
+            modes: Rc::new(RefCell::new(HashMap::new())),
             ui_tx,
             core_tx,
             worker_tx,
@@ -225,10 +227,19 @@ impl<'a> Editor<'a> {
 
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
         let name = mode.name();
-        self.modes.insert(name.to_owned(), Rc::new(mode));
+        self.modes
+            .borrow_mut()
+            .insert(name.to_owned(), Rc::new(RefCell::new(mode)));
     }
-    pub fn get_mode<'e>(&mut self, name: &str) -> Option<&Rc<Box<dyn Mode>>> {
-        self.modes.get(&name.to_owned())
+
+    pub fn get_mode<'e>(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn Mode>>>> {
+        let h = self.modes.clone();
+        let h = h.borrow();
+        let m = h.get(&name.to_owned());
+        if m.is_none() {
+            return None;
+        }
+        Some(m.unwrap().clone())
     }
 }
 

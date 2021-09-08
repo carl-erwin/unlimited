@@ -247,10 +247,13 @@ pub fn run<'a>(
     };
 
     editor.worker_tx = worker_tx.clone();
+
     load_modes(&mut editor, &mut env);
+
     load_files(&mut editor, &mut env);
 
-    // main loop
+    create_views(&mut editor, &mut env);
+
     editor::main_loop(&mut editor, &mut env, &core_rx, &ui_tx);
 
     // wait for worker thread
@@ -362,6 +365,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
 
                 // move 1st tag to ctor/doc::new() ?
                 d.tag(env.current_time, 0, vec![0]); // TODO(ceg): rm this only if the buffer log is cleared
+                                                     //    create_views(&mut editor, &mut env);
 
                 d.insert(0, s.len(), s);
 
@@ -374,8 +378,24 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
         }
     }
 
-    dbg_println!("id {}", id);
+    // configure document
+    let modes = editor.modes.clone();
+    for (mode_name, mode) in modes.borrow().iter() {
+        // per mode document metadata
+        dbg_println!("setup mode[{}] document metadata", mode_name);
+        let mut mode = mode.borrow_mut();
+        let map = editor.document_map.clone();
+        let mut map = map.as_ref().write();
+        for (_, doc) in map.iter_mut() {
+            let mut doc = doc.write();
+            mode.configure_document(editor, env, &mut doc);
+        }
+    }
 
+    dbg_println!("id {}", id);
+}
+
+pub fn create_views(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
     let document_map = editor.document_map.clone();
     let document_map = document_map.read();
 
@@ -431,8 +451,6 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
 
 use crate::core::modes::BasicEditorMode;
 use crate::core::modes::SimpleViewMode;
-
-//use crate::core::modes::VScrollbarMode;
 
 use crate::core::modes::CoreMode;
 use crate::core::modes::FindMode;

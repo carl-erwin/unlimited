@@ -63,7 +63,7 @@ impl<'a> Mode for CoreMode {
     }
 
     fn configure_view(
-        &self,
+        &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
@@ -218,7 +218,7 @@ pub fn toggle_dgb_print(_editor: &mut Editor, _env: &mut EditorEnv, _view: &Rc<R
     crate::core::toggle_dbg_println();
 }
 
-pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn save_document(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = view.write();
 
     let doc_id = {

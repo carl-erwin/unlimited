@@ -37,6 +37,7 @@ use std::any::Any;
 
 use parking_lot::RwLock;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -49,6 +50,8 @@ use crate::core::EditorEnv;
 
 use crate::core::document;
 use crate::core::document::Document;
+use crate::core::document::DocumentEvent;
+use crate::core::document::DocumentEventCb;
 
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::layout::ScreenOverlayFilter;
@@ -63,8 +66,25 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 // document meta data map
 lazy_static! {
-    static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'static>>>>>> =
+    static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, RwLock<LineNumberDocumentMetaData>>>> =
         Arc::new(RwLock::new(HashMap::new()));
+
+        // document::Id -> (doc, LineNumberDocumentMetaData)
+}
+
+struct LineNumberDocumentMetaData {
+    cb_installed: bool,
+    root_idx: Option<usize>,
+}
+
+impl LineNumberDocumentMetaData {
+    pub fn new() -> Self {
+        dbg_println!("LineNumberDocumentMetaData");
+        LineNumberDocumentMetaData {
+            cb_installed: false,
+            root_idx: None,
+        }
+    }
 }
 
 struct LineNumberDocumentNodeMetaData {
@@ -75,7 +95,7 @@ struct LineNumberDocumentNodeMetaData {
 
 impl LineNumberDocumentNodeMetaData {
     pub fn new() -> Self {
-        dbg_println!("LineNumberMode");
+        dbg_println!("LineNumberDocumentNodeMetaData");
         LineNumberDocumentNodeMetaData {
             nl_count: 0,
             cr_count: 0,
@@ -86,12 +106,15 @@ impl LineNumberDocumentNodeMetaData {
 
 pub struct LineNumberMode {
     // add common fields
+    doc_subscription: usize,
 }
 
 impl LineNumberMode {
     pub fn new() -> Self {
         dbg_println!("LineNumberMode");
-        LineNumberMode {}
+        LineNumberMode {
+            doc_subscription: 0,
+        }
     }
 }
 
@@ -100,14 +123,17 @@ pub struct LineNumberModeContext {
     target_vid: view::Id,
 }
 
+struct LineNumberModeDocEventHandler {
+    pub count: usize,
+}
+
 impl<'a> Mode for LineNumberMode {
     fn name(&self) -> &'static str {
         &"line-number-mode"
     }
 
     fn build_action_map(&self) -> InputStageActionMap<'static> {
-        let mut map = InputStageActionMap::new();
-        map
+        InputStageActionMap::new()
     }
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
@@ -116,8 +142,34 @@ impl<'a> Mode for LineNumberMode {
         Box::new(ctx)
     }
 
+    fn configure_document(
+        &mut self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        doc: &mut Document<'static>,
+    ) {
+        // allocate document meta data
+        let doc_id = doc.id;
+
+        DOC_METADATA_MAP
+            .as_ref()
+            .write()
+            .entry(doc_id)
+            .or_insert(RwLock::new(LineNumberDocumentMetaData::new()));
+
+        let meta = DOC_METADATA_MAP.as_ref().write();
+        let meta = meta.get(&doc_id);
+        let meta = meta.as_ref().unwrap().write();
+
+        if !meta.cb_installed {
+            let cb = Box::new(LineNumberModeDocEventHandler { count: 0 });
+
+            self.doc_subscription = doc.register_subscriber(cb);
+        }
+    }
+
     fn configure_view(
-        &self,
+        &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
@@ -133,17 +185,62 @@ impl<'a> Mode for LineNumberMode {
         _env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,
-        _event: &ViewEvent,
+        event: &ViewEvent,
     ) {
-        dbg_println!("LINENUM on_view_event src: {:?} dst: {:?}", src, dst);
+        let src_view = editor.view_map.get(&src.id).unwrap().write();
+        let mut dst_view = editor.view_map.get(&dst.id).unwrap().write();
 
-        let src = editor.view_map.get(&src.id).unwrap().write();
-        let mut dst = editor.view_map.get(&dst.id).unwrap().write();
-        let mut mode_ctx = dst.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
-        mode_ctx.target_vid = src.id;
+        match event {
+            ViewEvent::Subscribe => {
+                dbg_println!(
+                    "LINENUM on_view_event src: {:?} dst: {:?}, event {:?}",
+                    src,
+                    dst,
+                    event
+                );
 
-        let doc_id = src.document.as_ref().unwrap().read().id;
-        let d = DOC_METADATA_MAP.as_ref().write().get_mut(&doc_id); //.unwrap();
+                let mut mode_ctx =
+                    dst_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+                mode_ctx.target_vid = src.id;
+            }
+            _ => {}
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DocumentEventCb for LineNumberModeDocEventHandler {
+    fn cb(&mut self, doc: &Document, event: &DocumentEvent) {
+        self.count += 1;
+
+        dbg_println!(
+            "LineNumberModeDocEventHandler ev {:?} CB count = {}",
+            event,
+            self.count
+        );
+
+        match event {
+            DocumentEvent::NodeIndexed { node_index } => {
+                dbg_println!(
+                    "TODO index node {} with target codec  {:?}",
+                    node_index,
+                    event
+                );
+            }
+
+            DocumentEvent::NodeAdded { node_index } => {}
+
+            DocumentEvent::NodeRemoved { node_index } => {}
+
+            DocumentEvent::NodeChanged { node_index } => {}
+
+            _ => {
+                eprintln!("unhandled event {:?}", event);
+            }
+        }
+
+        doc.show_root_node_bytes_stats();
     }
 }
 
@@ -175,10 +272,9 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
     }
 
     fn run(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
-        dbg_println!("LINENUM RUN");
         env.screen.clear();
         for e in self.line_offsets.iter() {
-            let s = format!("@{:>12}", e.0);
+            let s = format!("@{}", e.0);
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
@@ -188,7 +284,5 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         }
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {
-        dbg_println!("LINENUM FINISH");
-    }
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
 }

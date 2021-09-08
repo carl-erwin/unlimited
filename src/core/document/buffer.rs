@@ -1,5 +1,6 @@
 use crate::core::mapped_file::FileHandle;
 use crate::core::mapped_file::MappedFile;
+use crate::core::mapped_file::MappedFileEvent;
 
 //
 pub type Id = u64;
@@ -26,7 +27,7 @@ pub struct Buffer<'a> {
     /// the number of changes (since last save TODO)
     pub nr_changes: u64,
     mode: OpenMode,
-    pub data: FileHandle<'a>,
+    pub data: FileHandle<'a>, // TODO(ceg): enum { DirectoryHandle | file }
 }
 
 impl<'a> Buffer<'a> {
@@ -131,14 +132,20 @@ impl<'a> Buffer<'a> {
 
     /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO(ceg): use io::Result)
-    pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
+    pub fn insert(
+        &mut self,
+        offset: u64,
+        nr_bytes: usize,
+        data: &[u8],
+    ) -> (usize, Vec<MappedFileEvent>) {
         let mut it = MappedFile::iter_from(&self.data, offset);
-        let nb = MappedFile::insert(&mut it, &data);
+        let (nb, events) = MappedFile::insert(&mut it, &data);
+
         assert_eq!(nb, nr_bytes);
         self.size += nb;
         self.nr_changes += 1;
 
-        nb
+        (nb, events)
     }
 
     /// remove up to 'nr_bytes' from the buffer starting at offset
@@ -149,7 +156,7 @@ impl<'a> Buffer<'a> {
         offset: u64,
         nr_bytes: usize,
         removed_data: Option<&mut Vec<u8>>,
-    ) -> usize {
+    ) -> (usize, Vec<MappedFileEvent>) {
         let start_offset = ::std::cmp::min(offset as usize, self.size);
         let end_offset = ::std::cmp::min(start_offset + nr_bytes, self.size);
         let nr_bytes_removed = (end_offset - start_offset) as usize;
@@ -160,12 +167,12 @@ impl<'a> Buffer<'a> {
         }
 
         let mut it = MappedFile::iter_from(&self.data, start_offset as u64);
-        let nb = MappedFile::remove(&mut it, nr_bytes_removed);
+        let (nb, events) = MappedFile::remove(&mut it, nr_bytes_removed);
         assert!(nb <= nr_bytes_removed);
         self.size -= nb;
         self.nr_changes += 1;
 
-        nb
+        (nb, events)
     }
 
     pub fn find(&self, from_offset: u64, data: &Vec<u8>) -> Option<u64> {
@@ -207,7 +214,7 @@ fn test_buffer() {
     let rm_expect = vec![3, 4, 5];
 
     let mut rm = vec![];
-    let n = bb.remove(3, 3, Some(&mut rm));
+    let (n, _) = bb.remove(3, 3, Some(&mut rm));
     assert_eq!(n, 3);
     assert_eq!(rm, rm_expect);
 

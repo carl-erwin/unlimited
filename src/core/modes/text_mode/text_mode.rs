@@ -102,12 +102,6 @@ use crate::core::document;
 use crate::core::document::BufferOperation;
 use crate::core::document::BufferOperationType;
 
-use crate::core::document::Document;
-use crate::core::document::DocumentEvent;
-use crate::core::document::DocumentEventCb;
-use crate::core::document::DocumentEventDestination;
-use crate::core::document::DocumentEventSource;
-
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
 use crate::core::event::Key;
@@ -206,22 +200,6 @@ pub struct TextModeContext {
     pub post_compose_action: Vec<Action>,
 
     pub prev_action: ActionType,
-
-    pub doc_subscription: usize,
-}
-
-fn text_mode_on_doc_event(
-    id: document::Id,
-    src: DocumentEventSource,
-    dst: DocumentEventDestination,
-    evt: &DocumentEvent,
-) {
-    dbg_println!(
-        "text_mode_on_doc_event doc_id {:?} src {:?} dst {:?}",
-        id,
-        src,
-        dst,
-    );
 }
 
 impl<'a> Mode for TextMode {
@@ -321,14 +299,13 @@ impl<'a> Mode for TextMode {
             pre_compose_action: vec![],
             post_compose_action: vec![],
             prev_action: ActionType::MarksMove,
-            doc_subscription: 0,
         };
 
         Box::new(ctx)
     }
 
     fn configure_view(
-        &self,
+        &mut self,
         editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
@@ -339,30 +316,9 @@ impl<'a> Mode for TextMode {
 
         let doc_id = { view.document.as_ref().unwrap().clone().read().id };
 
-        let doc = editor.document_map.read().get(&doc_id).unwrap().clone();
+        let doc = { editor.document_map.read().get(&doc_id).unwrap().clone() };
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
-
-        struct TextModeDocEventFilter {
-            pub doc: Arc<RwLock<Document<'static>>>,
-        };
-
-        impl DocumentEventCb for TextModeDocEventFilter {
-            fn cb(
-                &mut self,
-                src: DocumentEventSource,
-                dst: Option<DocumentEventDestination>,
-                event: &DocumentEvent,
-            ) {
-                dbg_println!("TextModeDocEventFilter CB");
-            }
-        }
-
-        let cb = Box::new(TextModeDocEventFilter { doc: doc.clone() });
-
-        tm.doc_subscription = doc.write().register_subscriber(cb);
-
-        dbg_println!("subscription {:?}", tm.doc_subscription);
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();

@@ -73,7 +73,7 @@ impl Drop for Page {
 //////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-enum UpdateHierarchyOp {
+pub enum UpdateHierarchyOp {
     Add,
     Sub,
 }
@@ -88,12 +88,43 @@ enum NodeRelation {
     // Next,
 }
 
-type NodeIndex = usize;
+pub type NodeIndex = usize;
 type NodeSize = u64;
 type NodeLocalOffset = u64;
 
 pub type FileHandle<'a> = Arc<RwLock<MappedFile<'a>>>;
 pub type FileIterator<'a> = MappedFileIterator<'a>;
+
+#[derive(Debug)]
+pub struct NodeLinks {
+    pub parent: Option<NodeIndex>,
+    pub left: Option<NodeIndex>,
+    pub right: Option<NodeIndex>,
+    pub prev: Option<NodeIndex>,
+    pub next: Option<NodeIndex>,
+}
+
+impl NodeLinks {
+    pub fn new() -> Self {
+        NodeLinks {
+            parent: None,
+            left: None,
+            right: None,
+            prev: None,
+            next: None,
+        }
+    }
+
+    pub fn with_parent(parent: Option<NodeIndex>) -> Self {
+        NodeLinks {
+            parent,
+            left: None,
+            right: None,
+            prev: None,
+            next: None,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Node {
@@ -102,12 +133,7 @@ pub struct Node {
     page: Weak<RefCell<Page>>,
     cow: Option<Rc<RefCell<Page>>>,
     //
-    parent: Option<NodeIndex>,
-    left: Option<NodeIndex>,
-    right: Option<NodeIndex>,
-    prev: Option<NodeIndex>,
-    pub next: Option<NodeIndex>,
-
+    pub link: NodeLinks,
     // data
     storage_offset: Option<u64>,
     pub size: u64,
@@ -125,11 +151,7 @@ impl Node {
             page: Weak::new(),
             cow: None,
             //
-            parent: None,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::new(),
             //
             size: 0,
             storage_offset: None,
@@ -143,6 +165,66 @@ impl Node {
         *self = Self::new();
     }
 
+    // TODO: offset + size: allow to yield disk
+    // use this to read copy data directly to 'out' slice
+    // (try to copy out.len() bytes)
+    pub fn do_direct_copy_at_pos(
+        &self,
+        fd: &Option<RcLockFile>,
+        pos: usize,
+        size: usize,
+        out: &mut [u8],
+    ) -> Option<usize> {
+        // in ram ? -
+        if let Some(ref page) = self.cow {
+            let p = page.borrow().as_slice().unwrap();
+            let n = std::cmp::min(size, p.len() - pos);
+            assert!(n > 0);
+            unsafe {
+                ptr::copy(p.as_ptr().offset(pos as isize), out.as_mut_ptr(), n);
+            }
+            return Some(n);
+        }
+
+        // already mapped ?
+        if let Some(ref page) = self.page.upgrade() {
+            let p = page.borrow().as_slice().unwrap();
+            let n = std::cmp::min(size, p.len() - pos);
+            assert!(n > 0);
+            unsafe {
+                ptr::copy(p.as_ptr(), out.as_mut_ptr(), n);
+            }
+            return Some(n);
+        }
+
+        // access storage
+        if let Some(storage_offset) = self.storage_offset {
+            let n = std::cmp::min(size, self.size as usize);
+            assert!(n > 0);
+
+            let mut pos = pos;
+            while pos < n {
+                let chunk_size = std::cmp::min(n - pos, 1024 * 32);
+                // not atomic
+                {
+                    //let t0_read = std::time::Instant::now();
+                    let mut fd = fd.as_ref().unwrap().write();
+                    let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
+                    let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
+                                                                                 //let t1_read = std::time::Instant::now();
+                                                                                 //eprintln!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
+                    assert!(nrd == chunk_size);
+                }
+                pos += chunk_size;
+            }
+
+            return Some(n);
+        }
+
+        None
+    }
+
+    // TODO: offset + size: allow to yield disk
     // use this to read copy data directly to 'out' slice
     // (try to copy out.len() bytes)
     pub fn do_direct_copy(&self, fd: &Option<RcLockFile>, out: &mut [u8]) -> Option<usize> {
@@ -175,12 +257,15 @@ impl Node {
 
             let mut pos = 0;
             while pos < n {
-                let chunk_size = std::cmp::min(n - pos, 1024 * 16);
+                let chunk_size = std::cmp::min(n - pos, 1024 * 32);
                 // not atomic
                 {
+                    //let t0_read = std::time::Instant::now();
                     let mut fd = fd.as_ref().unwrap().write();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
+                                                                                 //let t1_read = std::time::Instant::now();
+                                                                                 //eprintln!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     assert!(nrd == chunk_size);
                 }
                 pos += chunk_size;
@@ -214,14 +299,14 @@ impl Node {
         let nrd = fd.read(&mut v[..capacity]).unwrap();
         if nrd != capacity {
             dbg_println!(
-                "read error error : disk_offset = {}, size = {}",
+                "MAPPED FILE: read error error : disk_offset = {}, size = {}",
                 storage_offset,
                 self.size
             );
             panic!("read error"); // if file changed on disk ...
         }
 
-        // 5 - build "new" page
+        // 5 - build "MAPPED FILE: new" page
         mem::forget(v);
 
         let ro_page = Page::ReadOnlyStorageCopy(base, capacity);
@@ -261,7 +346,7 @@ impl Node {
 
         mem::forget(v);
 
-        // 5 - build "new" page
+        // 5 - build "MAPPED FILE: new" page
         Page::InRam(
             // from a Vec<u8> raw parts
             base, len, capacity,
@@ -376,8 +461,8 @@ pub struct MappedFile<'a> {
     pub sub_page_size: usize,
     /// reserve storage on new allocated blocks
     pub sub_page_reserve: usize,
-
-    pub subscribers: Vec<MappedFileEventCb>,
+    // list of past node events, cleared on insert/remove
+    events: Vec<MappedFileEvent>,
 }
 
 impl<'a> fmt::Debug for MappedFile<'a> {
@@ -397,24 +482,22 @@ pub struct NodeOperationData<'a> {
     pub local_offset: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum MappedFileEvent /*<'a>*/ {
     NodeChanged {
-        node_idx: usize,
-        //        before: NodeOperationData<'a>,
-        //        after: NodeOperationData<'a>,
+        node_index: usize,
+        //byte_count_before: Vec<u8>,
+        //byte_count_after: Vec<u8>,
     }, // ?
     NodeAdded {
-        node_idx: usize,
+        node_index: usize,
         //        data: NodeOperationData<'a>,
     },
     NodeRemoved {
-        node_idx: usize,
+        node_index: usize,
         //        data: NodeOperationData<'a>,
     },
 }
-
-pub type MappedFileEventCb = fn(&MappedFileEvent /*<'static>*/);
 
 impl<'a> Drop for MappedFile<'a> {
     fn drop(&mut self) {}
@@ -434,7 +517,7 @@ impl<'a> MappedFile<'a> {
             page_size: 2 * 1024 * 1024,
             sub_page_size: 4096,
             sub_page_reserve: 2 * 1024,
-            subscribers: vec![],
+            events: vec![],
         };
 
         Some(Arc::new(RwLock::new(file)))
@@ -453,16 +536,16 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
-        // TODO(ceg): find good sizes
+        // TODO(ceg): find good sizes, add user configuration
         let sub_page_size = 1024 * 1024 * 2;
-        let page_size = if file_size > (1024 * 1024 * 1024 * 1024) {
-            1024 * 1024 * 32
-        } else if file_size > (512 * 1024 * 1024 * 1024) {
-            1024 * 1024 * 16
+        let page_size = if file_size > (512 * 1024 * 1024 * 1024) {
+            1024 * 1024 * 4
         } else if file_size > (512 * 1024 * 1024) {
-            1024 * 1024 * 8
-        } else {
             1024 * 1024 * 2
+        } else if file_size > (512 * 1024) {
+            1024 * 4 * 2
+        } else {
+            1024 * 4
         };
 
         let mut file = MappedFile {
@@ -473,7 +556,7 @@ impl<'a> MappedFile<'a> {
             page_size,
             sub_page_size,
             sub_page_reserve: 2 * 1024,
-            subscribers: vec![],
+            events: vec![],
         };
 
         if file_size == 0 {
@@ -485,11 +568,7 @@ impl<'a> MappedFile<'a> {
             used: true,
             to_delete: false,
             size: file_size,
-            parent: None,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::new(),
             page: Weak::new(),
             cow: None,
             storage_offset: None,
@@ -535,6 +614,31 @@ impl<'a> MappedFile<'a> {
         Some(Arc::new(RwLock::new(file)))
     }
 
+    pub fn cleanup_events(&mut self) {
+        dbg_println!("CLEANUP EVENTS {:?}", self.events);
+
+        for event in &self.events {
+            match event {
+                MappedFileEvent::NodeRemoved { node_index } => {
+                    dbg_println!("CLEANUP {:?}", event);
+                    if self.pool[*node_index].to_delete {
+                        self.pool[*node_index].clear();
+                        self.pool.release(*node_index);
+                    } else {
+                        panic!("INVALID CLEANUP {:?}", event);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        self.events.clear();
+    }
+
+    pub fn root_index(&self) -> Option<NodeIndex> {
+        self.root_index
+    }
+
     pub fn size(&self) -> u64 {
         if let Some(idx) = self.root_index {
             self.pool[idx].size as u64
@@ -549,12 +653,12 @@ impl<'a> MappedFile<'a> {
         next_idx: Option<NodeIndex>,
     ) {
         if let Some(prev_idx) = prev_idx {
-            pool[prev_idx].next = next_idx;
+            pool[prev_idx].link.next = next_idx;
             // dbg_println!("link_next : prev({:?})  -> next({:?})", prev_idx, next_idx);
         }
 
         if let Some(next_idx) = next_idx {
-            pool[next_idx].prev = prev_idx;
+            pool[next_idx].link.prev = prev_idx;
             // dbg_println!("link_prev : prev({:?})  <- next({:?})", prev_idx, next_idx);
         }
     }
@@ -566,10 +670,10 @@ impl<'a> MappedFile<'a> {
         relation: &NodeRelation,
     ) {
         if let Some(child_idx) = child_idx {
-            pool[child_idx].parent = parent_idx;
+            pool[child_idx].link.parent = parent_idx;
             if DEBUG {
                 dbg_println!(
-                    "link_parent : child({:?})  -> parent({:?})",
+                    "MAPPED FILE: link_parent : child({:?})  -> parent({:?})",
                     child_idx,
                     parent_idx
                 );
@@ -578,8 +682,8 @@ impl<'a> MappedFile<'a> {
 
         let (node_ref, name) = if let Some(parent_idx) = parent_idx {
             match relation {
-                NodeRelation::Left => (&mut pool[parent_idx].left, "left"),
-                NodeRelation::Right => (&mut pool[parent_idx].right, "right"),
+                NodeRelation::Left => (&mut pool[parent_idx].link.left, "MAPPED FILE: left"),
+                NodeRelation::Right => (&mut pool[parent_idx].link.right, "MAPPED FILE: right"),
                 _ => unimplemented!(),
             }
         } else {
@@ -590,7 +694,7 @@ impl<'a> MappedFile<'a> {
 
         if DEBUG {
             dbg_println!(
-                "link_child : parent({:?}).{} -> child({:?})",
+                "MAPPED FILE: link_child : parent({:?}).{} -> child({:?})",
                 parent_idx,
                 name,
                 child_idx
@@ -602,14 +706,14 @@ impl<'a> MappedFile<'a> {
         for (idx, n) in file.pool.slot.iter().enumerate() {
             if n.used {
                 dbg_println!(
-                    "idx({:?}), parent({:?}) left({:?}) right({:?}) prev({:?}) \
+                    "MAPPED FILE: idx({:?}), parent({:?}) left({:?}) right({:?}) prev({:?}) \
                      next({:?}) size({}) ", // on_disk_off({})",
                     idx,
-                    n.parent,
-                    n.left,
-                    n.right,
-                    n.prev,
-                    n.next,
+                    n.link.parent,
+                    n.link.left,
+                    n.link.right,
+                    n.link.prev,
+                    n.link.next,
                     n.size, // n.storage_offset
                 )
             }
@@ -631,7 +735,7 @@ impl<'a> MappedFile<'a> {
         if node_size <= pg_size {
             if DEBUG {
                 dbg_println!(
-                    "node_size <= pg_size : \
+                    "MAPPED FILE: node_size <= pg_size : \
                      leaf_node({}), pg_size({}), node_size({}), base_offset({})",
                     parent.unwrap_or(0),
                     pg_size,
@@ -673,11 +777,7 @@ impl<'a> MappedFile<'a> {
             used: true,
             to_delete: false,
             size: l_sz,
-            parent,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::with_parent(parent),
             page: Weak::new(),
             cow: None,
             storage_offset: None,
@@ -690,11 +790,7 @@ impl<'a> MappedFile<'a> {
             used: true,
             to_delete: false,
             size: r_sz,
-            parent,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::with_parent(parent),
             page: Weak::new(),
             cow: None,
             storage_offset: None,
@@ -715,8 +811,8 @@ impl<'a> MappedFile<'a> {
         // update parent's links
         if let Some(idx) = parent {
             let idx = idx as usize;
-            pool[idx].left = Some(l);
-            pool[idx].right = Some(r);
+            pool[idx].link.left = Some(l);
+            pool[idx].link.right = Some(r);
 
             if DEBUG {
                 dbg_println!("parent = {}, l = {}, r = {}", idx, l, r);
@@ -724,22 +820,6 @@ impl<'a> MappedFile<'a> {
                 dbg_println!("l idx {} = {:?}", l, pool[l]);
                 dbg_println!("r idx {} = {:?}", r, pool[r]);
             }
-        }
-    }
-
-    pub fn register_subscriber(&mut self, cb: MappedFileEventCb) -> usize {
-        self.subscribers.push(cb);
-        self.subscribers.len()
-    }
-
-    pub fn notify(&self, evt: &MappedFileEvent /*<'static>*/) {
-        dbg_println!(
-            "mapped file notify , nb subscribers {}",
-            //evt,
-            self.subscribers.len()
-        );
-        for (idx, cb) in self.subscribers.iter().enumerate() {
-            cb(evt);
         }
     }
 
@@ -756,12 +836,12 @@ impl<'a> MappedFile<'a> {
 
         assert!(node.used);
 
-        let is_leaf = node.left.is_none() && node.right.is_none();
+        let is_leaf = node.link.left.is_none() && node.link.right.is_none();
 
         if offset < node.size && is_leaf {
             (Some(n), node.size, offset)
         } else {
-            let left_size = if let Some(left) = node.left {
+            let left_size = if let Some(left) = node.link.left {
                 self.pool[left as usize].size
             } else {
                 0
@@ -774,12 +854,12 @@ impl<'a> MappedFile<'a> {
                 if DEBUG {
                     dbg_println!("go   <----");
                 }
-                self.find_sub_node_by_offset(node.left.unwrap(), offset)
+                self.find_sub_node_by_offset(node.link.left.unwrap(), offset)
             } else {
                 if DEBUG {
                     dbg_println!("go   ---->");
                 }
-                self.find_sub_node_by_offset(node.right.unwrap(), offset - left_size)
+                self.find_sub_node_by_offset(node.link.right.unwrap(), offset - left_size)
             }
         }
     }
@@ -795,10 +875,10 @@ impl<'a> MappedFile<'a> {
         loop {
             let node = &self.pool[idx];
             let ret = cb(node);
-            if !ret || node.next.is_none() {
+            if !ret || node.link.next.is_none() {
                 return;
             }
-            idx = node.next.unwrap();
+            idx = node.link.next.unwrap();
         }
     }
 
@@ -1054,7 +1134,7 @@ impl<'a> MappedFile<'a> {
             let idx = p_idx.unwrap();
             if DEBUG {
                 dbg_print!(
-                    "node({}).size {} op({:?}) {} ---> ",
+                    "MAPPED FILE: node({}).size {} op({:?}) {} ---> ",
                     idx,
                     pool[idx as usize].size,
                     op,
@@ -1071,7 +1151,7 @@ impl<'a> MappedFile<'a> {
                 dbg_println!("{}", pool[idx as usize].size);
             }
 
-            p_idx = pool[idx as usize].parent;
+            p_idx = pool[idx as usize].link.parent;
         }
     }
 
@@ -1080,9 +1160,26 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::End(..) => 0,
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
-                    Page::ReadOnlyStorageCopy(..) => 0,
+                    Page::ReadOnlyStorageCopy(..) => {
+                        if DEBUG {
+                            dbg_println!(
+                                "MAPPED FILE: Page::ReadOnlyStorageCopy: check_free_space 0"
+                            );
+                        }
 
-                    Page::InRam(_, ref mut len, capacity) => (capacity - *len) as u64,
+                        0
+                    }
+
+                    Page::InRam(_, ref mut len, capacity) => {
+                        if DEBUG {
+                            dbg_println!(
+                                "MAPPED FILE: Page::InRam: check_free_space capacity {}, len {}",
+                                capacity,
+                                len
+                            );
+                        }
+                        (capacity - *len) as u64
+                    }
                 },
             },
         }
@@ -1122,10 +1219,19 @@ impl<'a> MappedFile<'a> {
     // 5 - replace the parent node
     // 6 - update hierachy
     // 7 - TODO(ceg): update iterator internal using find + local_offset on the allocated subtree
-    pub fn insert(it_: &mut FileIterator<'a>, data: &[u8]) -> usize {
+    pub fn insert(it_: &mut FileIterator<'a>, data: &[u8]) -> (usize, Vec<MappedFileEvent>) {
+        dbg_println!("CALL CLEANUP");
+        {
+            let rcfile = it_.get_file();
+            let mut file = rcfile.as_ref().write();
+            file.cleanup_events();
+        }
+
+        let mut events = vec![];
+
         let data_len = data.len() as u64;
         if data_len == 0 {
-            return 0;
+            return (0, events);
         }
 
         // check iterator type
@@ -1138,12 +1244,15 @@ impl<'a> MappedFile<'a> {
                     None
                 };
 
-                MappedFile::print_all_used_nodes(&file, "BEFORE INSERT - @ eof");
+                MappedFile::print_all_used_nodes(&file, "MAPPED FILE: BEFORE INSERT - @ eof");
+
+                // TODO: return available SPACE HERE
 
                 let file_size = file.size();
                 if file_size > 0 {
                     let (idx, node_size, _) = file.find_node_by_offset(file_size - 1);
                     let page = file.pool[idx.unwrap()].map(&fd);
+                    dbg_println!("MAPPED FILE: use idx {:?}, node_size {}", idx, node_size);
                     (idx, node_size, node_size, page)
                 } else {
                     (None, 0, 0, None)
@@ -1162,23 +1271,31 @@ impl<'a> MappedFile<'a> {
             let rcfile = it_.get_file();
             let file = rcfile.as_ref().write();
 
-            MappedFile::print_all_used_nodes(&file, "BEFORE INSERT");
+            MappedFile::print_all_used_nodes(&file, "MAPPED FILE: BEFORE INSERT");
         }
         if DEBUG {
-            dbg_println!("node_to_split {:?} / size ({})", node_to_split, node_size);
+            dbg_println!(
+                "MAPPED FILE: node_to_split {:?} / size ({})",
+                node_to_split,
+                node_size
+            );
         }
 
         let available = MappedFile::check_free_space(it_);
         if DEBUG {
-            dbg_println!("available space = {}", available);
+            dbg_println!("MAPPED FILE: available space = {}", available);
         }
 
         /////// in place insert ?
 
         if available >= data_len {
             if DEBUG {
-                dbg_println!("available({})>= data_len({})", available, data_len);
-                dbg_println!("insert in place");
+                dbg_println!(
+                    "MAPPED FILE: available({})>= data_len({})",
+                    available,
+                    data_len
+                );
+                dbg_println!("MAPPED FILE: insert in place");
             }
 
             // insert in current node
@@ -1187,28 +1304,31 @@ impl<'a> MappedFile<'a> {
             // update parents
             let rcfile = it_.get_file();
             let mut file = rcfile.as_ref().write();
+
             MappedFile::update_hierarchy(
                 &mut file.pool,
                 node_to_split,
                 &UpdateHierarchyOp::Add,
                 data_len,
             );
-            MappedFile::check_all_nodes(&file);
+            //MappedFile::check_all_nodes(&file);
 
-            MappedFile::print_all_used_nodes(&file, "AFTER INSERT INLINE");
+            MappedFile::print_all_used_nodes(&file, "MAPPED FILE: AFTER INSERT INLINE");
 
-            dbg_println!("mapped file notify NodeChanged idx: {:?}", node_to_split);
-            file.notify(&MappedFileEvent::NodeChanged {
-                node_idx: node_to_split.unwrap(),
+            events.push(MappedFileEvent::NodeChanged {
+                node_index: node_to_split.unwrap(),
             });
-            return data_len as usize;
+
+            file.events = events.clone();
+
+            return (data_len as usize, events);
         }
 
         ////////////////////////////////////////////////
         // new subtree
 
         if DEBUG {
-            dbg_println!("allocate new subtree");
+            dbg_println!("MAPPED FILE: allocate new subtree");
         }
 
         let rcfile = it_.get_file();
@@ -1221,9 +1341,9 @@ impl<'a> MappedFile<'a> {
 
         let (prev_idx, next_idx, gparent_idx) = if let Some(idx) = node_to_split {
             (
-                file.pool[idx].prev,
-                file.pool[idx].next,
-                file.pool[idx].parent,
+                file.pool[idx].link.prev,
+                file.pool[idx].link.next,
+                file.pool[idx].link.parent,
             )
         } else {
             assert_eq!(file.size(), 0);
@@ -1243,19 +1363,15 @@ impl<'a> MappedFile<'a> {
         let new_page_size = sub_page_min_size;
 
         if DEBUG {
-            dbg_println!("new_size {}", new_size);
-            dbg_println!("new_page_size {}", new_page_size);
+            dbg_println!("MAPPED FILE: new_size {}", new_size);
+            dbg_println!("MAPPED FILE: new_page_size {}", new_page_size);
         }
 
         let subroot_node = Node {
             used: true,
             to_delete: false,
             size: new_size as u64,
-            parent: gparent_idx,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::with_parent(gparent_idx),
             page: Weak::new(),
             cow: None,
             storage_offset: None,
@@ -1269,7 +1385,7 @@ impl<'a> MappedFile<'a> {
 
         if DEBUG {
             dbg_println!(
-                "create new tree with room for {} bytes \
+                "MAPPED FILE: create new tree with room for {} bytes \
                  inserts subroot_index({}), base_offset({:?})",
                 new_size,
                 subroot_idx,
@@ -1289,9 +1405,9 @@ impl<'a> MappedFile<'a> {
         );
 
         if DEBUG {
-            dbg_println!("number of leaves = {}", leaves.len());
-            dbg_println!("node_size = {}", node_size);
-            dbg_println!("local_offset = {}", local_offset);
+            dbg_println!("MAPPED FILE: number of leaves = {}", leaves.len());
+            dbg_println!("MAPPED FILE: node_size = {}", node_size);
+            dbg_println!("MAPPED FILE: local_offset = {}", local_offset);
         }
 
         // use a flat map for data copying
@@ -1324,9 +1440,9 @@ impl<'a> MappedFile<'a> {
         let mut remain = new_size;
         for idx in &leaves {
             if DEBUG {
-                dbg_println!("copy data",);
-                dbg_println!("node_size = {}", node_size);
-                dbg_println!("local_offset = {}", local_offset);
+                dbg_println!("MAPPED FILE: copy data",);
+                dbg_println!("MAPPED FILE: node_size = {}", node_size);
+                dbg_println!("MAPPED FILE: local_offset = {}", local_offset);
             }
 
             // alloc+fill node
@@ -1334,12 +1450,17 @@ impl<'a> MappedFile<'a> {
                 let mut n = &mut file.pool[*idx];
                 let mut v = Vec::with_capacity(n.size as usize + room);
 
+                if DEBUG {
+                    dbg_println!("MAPPED FILE: v.len() = {}", v.len());
+                    dbg_println!("MAPPED FILE: v.capacity() = {}", v.capacity());
+                }
+
                 for _ in 0..n.size {
                     if let Some(b) = input_data_iter.next() {
                         v.push(*b);
                         remain -= 1;
                     } else {
-                        panic!("internal error");
+                        panic!("MAPPED FILE: internal error");
                     }
                 }
 
@@ -1356,9 +1477,8 @@ impl<'a> MappedFile<'a> {
             MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, Some(*idx));
             prev_idx = Some(*idx);
 
-            // TODO: push events
-            dbg_println!("mapped file notify NodeAdded idx: {:?}", idx);
-            file.notify(&MappedFileEvent::NodeAdded { node_idx: *idx });
+            // push events
+            events.push(MappedFileEvent::NodeAdded { node_index: *idx }); // copy data ?
         }
         // link last leaf
         MappedFile::link_prev_next_nodes(&mut file.pool, prev_idx, next_idx);
@@ -1371,37 +1491,35 @@ impl<'a> MappedFile<'a> {
             // MappedFile::exchage_nodes(gparent, node_to_split);
             if let Some(gparent_idx) = gparent_idx {
                 // update grand parent left or right // delete
-                let gparent_left = file.pool[gparent_idx].left;
-                let gparent_right = file.pool[gparent_idx].right;
+                let gparent_left = file.pool[gparent_idx].link.left;
+                let gparent_right = file.pool[gparent_idx].link.right;
 
                 if let Some(gp_left) = gparent_left {
                     if gp_left == node_to_split {
                         //                        dbg_println!("update grand parent left");
-                        file.pool[gparent_idx].left = Some(subroot_idx);
+                        file.pool[gparent_idx].link.left = Some(subroot_idx);
                     }
                 }
 
                 if let Some(gp_right) = gparent_right {
                     if gp_right == node_to_split {
                         //                        dbg_println!("update grand parent right");
-                        file.pool[gparent_idx].right = Some(subroot_idx);
+                        file.pool[gparent_idx].link.right = Some(subroot_idx);
                     }
                 }
 
                 //                dbg_println!("update subroot parent");
-                file.pool[subroot_idx].parent = Some(gparent_idx);
+                file.pool[subroot_idx].link.parent = Some(gparent_idx);
             }
 
-            // clear+delete old node
+            // mark old node for deletion
             if DEBUG {
-                dbg_println!(" clear+delete old node idx({})", node_to_split);
+                dbg_println!("MAPPED FILE: MARK NODE {} TO DELETE", node_to_split);
             }
-            file.pool[node_to_split].clear();
-            file.pool.release(node_to_split);
 
-            dbg_println!("mapped file notify NodeRemoved idx: {:?}", node_to_split);
-            file.notify(&MappedFileEvent::NodeRemoved {
-                node_idx: node_to_split,
+            file.pool[node_to_split].to_delete = true;
+            events.push(MappedFileEvent::NodeRemoved {
+                node_index: node_to_split,
             });
         }
 
@@ -1423,7 +1541,7 @@ impl<'a> MappedFile<'a> {
         }
 
         // update parent nodes size
-        let p_idx = file.pool[subroot_idx as usize].parent;
+        let p_idx = file.pool[subroot_idx as usize].link.parent;
         MappedFile::update_hierarchy(
             &mut file.pool,
             p_idx,
@@ -1431,7 +1549,7 @@ impl<'a> MappedFile<'a> {
             data.len() as u64,
         );
 
-        MappedFile::print_all_used_nodes(&file, "AFTER INSERT");
+        MappedFile::print_all_used_nodes(&file, "MAPPED FILE: AFTER INSERT");
 
         // TODO(ceg):
         // refresh iterator or next will crash
@@ -1444,34 +1562,40 @@ impl<'a> MappedFile<'a> {
         //          MappedFile::iter_from(&it.file, it_offset)
         //      };
 
-        MappedFile::check_all_nodes(&file);
+        //MappedFile::check_all_nodes(&file);
 
-        data.len()
+        file.events = events.clone();
+
+        (data.len(), events)
     }
 
     /// remove data at iterator position, and refresh the iterator
     // 1 - get iterator's node info
-    // 2 - remove the data, update hierachy
-    // 3 - rebalance the tree, starting at node_index
+    // 2 - remove the data, update hierarchy
+    // 3 - re-balance the tree, starting at node_index
     // 4 - TODO(ceg): update iterator internal using find + local_offset on the modified subtree
     // TODO(ceg): split nodes before remove
-    pub fn remove(it_: &mut FileIterator<'a>, nr: usize) -> usize {
+    pub fn remove(it_: &mut FileIterator<'a>, nr: usize) -> (usize, Vec<MappedFileEvent>) {
+        let mut events = vec![];
         if nr == 0 {
-            return 0;
+            return (0, events);
         }
 
         let mut remain = nr;
         let mut nr_removed = 0;
 
         let (mut file, start_idx, mut local_offset) = match &mut *it_ {
-            MappedFileIterator::End(..) => return 0,
+            MappedFileIterator::End(..) => return (0, events),
 
             MappedFileIterator::Real(ref it) => {
                 (it.file.as_ref().write(), it.node_idx, it.local_offset)
             }
         };
 
-        MappedFile::print_all_used_nodes(&file, "remove : BEFORE deletion");
+        dbg_println!("CALL CLEANUP");
+        file.cleanup_events();
+
+        MappedFile::print_all_used_nodes(&file, "MAPPED FILE: remove : BEFORE deletion");
 
         if DEBUG {
             dbg_println!("--- REMOVE {} bytes", nr);
@@ -1525,9 +1649,16 @@ impl<'a> MappedFile<'a> {
                 Page::InRam(base, ref mut len, capacity) => {
                     let mut v = unsafe { Vec::from_raw_parts(base as *mut u8, *len, capacity) };
                     let index = local_offset as usize;
+
+                    // Do not generate event for removed node
+                    if to_rm != v.len() {
+                        // DataRemove { idx, &v[index..index+to_rm], index , sz } )
+                        events.push(MappedFileEvent::NodeChanged { node_index: idx });
+                    }
+
                     v.drain(index..index + to_rm);
-                    *len = v.len();
-                    mem::forget(v);
+                    *len = v.len(); // update Page::InRam::len
+                    mem::forget(v); // do not drop v
                 }
             }
 
@@ -1543,44 +1674,46 @@ impl<'a> MappedFile<'a> {
                 to_rm as u64,
             );
 
-            if file.pool[idx].next.is_none() {
+            if file.pool[idx].link.next.is_none() {
                 break;
             }
-            idx = file.pool[idx].next.unwrap();
+            idx = file.pool[idx].link.next.unwrap();
         }
 
-        MappedFile::print_all_used_nodes(&file, "remove : BEFORE REBALANCE");
+        MappedFile::print_all_used_nodes(&file, "MAPPED FILE: remove : BEFORE REBALANCE");
 
-        // rebalance tree
+        // re-balance tree
         {
             if DEBUG {
                 dbg_println!(
-                    "--- tree BEFORE rebalance new_root_idx = {:?}",
+                    "MAPPED FILE: --- tree BEFORE rebalance new_root_idx = {:?}",
                     file.root_index
                 );
                 MappedFile::print_nodes(&file);
             }
 
             let mut tmp_node = file.root_index;
-            tmp_node = MappedFile::rebalance_subtree(&mut file.pool, tmp_node);
+            tmp_node = MappedFile::rebalance_subtree(&mut file.pool, tmp_node, &mut events);
             file.root_index = tmp_node;
 
             if DEBUG {
                 dbg_println!(
-                    "--- tree AFTER rebalance new_root_idx = {:?}",
+                    "MAPPED FILE: --- tree AFTER rebalance new_root_idx = {:?}",
                     file.root_index
                 );
                 MappedFile::print_nodes(&file);
             }
         }
 
-        MappedFile::print_all_used_nodes(&file, "remove : AFTER REBALANCE");
+        MappedFile::print_all_used_nodes(&file, "MAPPED FILE: remove : AFTER REBALANCE");
 
-        MappedFile::check_all_nodes(&file);
+        //MappedFile::check_all_nodes(&file);
 
-        MappedFile::print_all_used_nodes(&file, "AFTER REMOVE");
+        MappedFile::print_all_used_nodes(&file, "MAPPED FILE: AFTER REMOVE");
 
-        nr_removed
+        file.events = events.clone();
+
+        (nr_removed, events)
     }
 
     fn get_parent_relation(
@@ -1588,13 +1721,13 @@ impl<'a> MappedFile<'a> {
         parent: NodeIndex,
         child: NodeIndex,
     ) -> NodeRelation {
-        if let Some(l) = pool[parent].left {
+        if let Some(l) = pool[parent].link.left {
             if l == child {
                 return NodeRelation::Left;
             }
         }
 
-        if let Some(r) = pool[parent].right {
+        if let Some(r) = pool[parent].link.right {
             if r == child {
                 return NodeRelation::Right;
             }
@@ -1641,30 +1774,30 @@ impl<'a> MappedFile<'a> {
         if DEBUG {
             dbg_println!("reset {} left  : None", child_idx);
             dbg_println!("reset {} right : None", child_idx);
-            dbg_println!("{:?} reset parent", pool[p_idx].left);
-            dbg_println!("{:?} reset parent", pool[p_idx].right);
+            dbg_println!("{:?} reset parent", pool[p_idx].link.left);
+            dbg_println!("{:?} reset parent", pool[p_idx].link.right);
         }
 
-        pool[p_idx].left = None;
-        pool[p_idx].right = None;
+        pool[p_idx].link.left = None;
+        pool[p_idx].link.right = None;
         // }
 
-        pool[child_idx].parent = None;
+        pool[child_idx].link.parent = None;
 
         // grand parent ?
-        if let Some(gp_idx) = pool[p_idx].parent {
+        if let Some(gp_idx) = pool[p_idx].link.parent {
             let relation = MappedFile::get_parent_relation(&pool, gp_idx, p_idx);
 
             // TODO(ceg): helper func
-            pool[p_idx].parent = None;
+            pool[p_idx].link.parent = None;
             if relation == NodeRelation::Left {
-                pool[gp_idx].left = Some(child_idx);
+                pool[gp_idx].link.left = Some(child_idx);
             }
             if relation == NodeRelation::Right {
-                pool[gp_idx].right = Some(child_idx);
+                pool[gp_idx].link.right = Some(child_idx);
             }
 
-            pool[child_idx].parent = Some(gp_idx);
+            pool[child_idx].link.parent = Some(gp_idx);
         }
     }
 
@@ -1682,8 +1815,8 @@ impl<'a> MappedFile<'a> {
         let mut new_root = Some(idx);
 
         // leaf
-        let have_parent = pool[idx].parent.is_some();
-        let is_leaf = pool[idx].left.is_none() && pool[idx].right.is_none();
+        let have_parent = pool[idx].link.parent.is_some();
+        let is_leaf = pool[idx].link.left.is_none() && pool[idx].link.right.is_none();
         let is_empty_leaf = pool[idx].size == 0 && is_leaf;
 
         // empty ?
@@ -1694,18 +1827,18 @@ impl<'a> MappedFile<'a> {
 
                 // clear parent link
                 {
-                    let p_idx = pool[idx].parent.unwrap();
-                    if pool[p_idx].left == Some(idx) {
-                        pool[p_idx].left = None;
+                    let p_idx = pool[idx].link.parent.unwrap();
+                    if pool[p_idx].link.left == Some(idx) {
+                        pool[p_idx].link.left = None;
                         if DEBUG {
-                            dbg_println!("clear {:?} left", pool[idx].parent);
+                            dbg_println!("clear {:?} left", pool[idx].link.parent);
                         }
                     }
 
-                    if pool[p_idx].right == Some(idx) {
-                        pool[p_idx].right = None;
+                    if pool[p_idx].link.right == Some(idx) {
+                        pool[p_idx].link.right = None;
                         if DEBUG {
-                            dbg_println!("clear {:?} right", pool[idx].parent);
+                            dbg_println!("clear {:?} right", pool[idx].link.parent);
                         }
                     }
                 }
@@ -1716,14 +1849,14 @@ impl<'a> MappedFile<'a> {
 
         if is_empty_leaf {
             // update links
-            let prev = pool[idx].prev;
-            let next = pool[idx].next;
+            let prev = pool[idx].link.prev;
+            let next = pool[idx].link.next;
             MappedFile::link_prev_next_nodes(&mut pool, prev, next);
         }
 
         if !is_leaf {
-            let l = MappedFile::get_best_child(to_delete, pool, pool[idx].left);
-            let r = MappedFile::get_best_child(to_delete, pool, pool[idx].right);
+            let l = MappedFile::get_best_child(to_delete, pool, pool[idx].link.left);
+            let r = MappedFile::get_best_child(to_delete, pool, pool[idx].link.right);
 
             let mut have_l = false;
             let mut have_r = false;
@@ -1764,6 +1897,7 @@ impl<'a> MappedFile<'a> {
     fn rebalance_subtree(
         mut pool: &mut FreeListAllocator<Node>,
         subroot: Option<NodeIndex>,
+        events: &mut Vec<MappedFileEvent>,
     ) -> Option<NodeIndex> {
         let mut to_delete = vec![];
 
@@ -1775,11 +1909,8 @@ impl<'a> MappedFile<'a> {
         }
         for n in to_delete {
             if pool[n].to_delete {
-                assert!(pool[n].used);
-                pool[n].clear();
-                pool.release(n);
-
-                // node_event.push(NodeRemoved { index: n } );
+                dbg_println!("MARK node {} for CLEANUP", n);
+                events.push(MappedFileEvent::NodeRemoved { node_index: n });
             }
         }
 
@@ -1794,9 +1925,9 @@ impl<'a> MappedFile<'a> {
                 if n.used {
                     dbg_println!("[{}] : {:?}", i, file.pool.slot[i]);
                 } else {
-                    assert_eq!(n.parent, None);
-                    assert_eq!(n.prev, None);
-                    assert_eq!(n.next, None);
+                    assert_eq!(n.link.parent, None);
+                    assert_eq!(n.link.prev, None);
+                    assert_eq!(n.link.next, None);
                 }
             }
             dbg_println!("***********************");
@@ -1808,6 +1939,11 @@ impl<'a> MappedFile<'a> {
         idx: Option<NodeIndex>,
         pool: &FreeListAllocator<Node>,
     ) {
+        return;
+        if !DEBUG {
+            return;
+        }
+
         if idx.is_none() {
             return;
         }
@@ -1826,39 +1962,39 @@ impl<'a> MappedFile<'a> {
         visited.insert(idx);
 
         // check parent / children idx
-        if let Some(l) = pool.slot[idx].left {
+        if let Some(l) = pool.slot[idx].link.left {
             if DEBUG {
                 dbg_println!(
-                    "checking left's parent {:?} == {}.parent == {:?}",
+                    "MAPPED FILE: checking left's parent {:?} == {}.parent == {:?}",
                     Some(idx),
                     l,
-                    pool.slot[l].parent
+                    pool.slot[l].link.parent
                 );
             }
-            assert_eq!(Some(idx), pool.slot[l].parent);
+            assert_eq!(Some(idx), pool.slot[l].link.parent);
         }
 
-        if let Some(r) = pool.slot[idx].right {
+        if let Some(r) = pool.slot[idx].link.right {
             if DEBUG {
                 dbg_println!(
-                    "checking right's parent {:?} == {}.parent == {:?}",
+                    "MAPPED FILE: checking right's parent {:?} == {}.parent == {:?}",
                     Some(idx),
                     r,
-                    pool.slot[r].parent
+                    pool.slot[r].link.parent
                 );
             }
 
-            assert_eq!(Some(idx), pool.slot[r].parent);
+            assert_eq!(Some(idx), pool.slot[r].link.parent);
         }
 
         // recurse left / right
-        MappedFile::check_tree(&mut visited, pool.slot[idx].left, &pool);
-        MappedFile::check_tree(&mut visited, pool.slot[idx].right, &pool);
+        MappedFile::check_tree(&mut visited, pool.slot[idx].link.left, &pool);
+        MappedFile::check_tree(&mut visited, pool.slot[idx].link.right, &pool);
     }
 
     // This function can be very slow O(n)
     fn check_all_nodes(file: &MappedFile) {
-        if !DEBUG {
+        if DEBUG {
             return;
         }
 
@@ -1893,7 +2029,7 @@ impl<'a> MappedFile<'a> {
         if let Some(root_index) = file.root_index {
             if DEBUG {
                 dbg_println!(
-                    "file root  idx({}) : {:?} ",
+                    "MAPPED FILE: file root  idx({}) : {:?} ",
                     root_index,
                     file.pool.slot[root_index]
                 );
@@ -1904,9 +2040,12 @@ impl<'a> MappedFile<'a> {
             dbg_println!("first leaf is {}", idx);
         }
 
-        if file.pool.slot[idx].prev.is_some() {
+        if file.pool.slot[idx].link.prev.is_some() {
             if DEBUG {
-                dbg_println!("prev node is set to {:?} ????", file.pool.slot[idx].prev);
+                dbg_println!(
+                    "MAPPED FILE: prev node is set to {:?} ????",
+                    file.pool.slot[idx].link.prev
+                );
                 dbg_println!("current leaf is idx({}) : {:?} ", idx, file.pool.slot[idx]);
             }
             panic!();
@@ -1929,7 +2068,7 @@ impl<'a> MappedFile<'a> {
 
             size_checked += n.size;
 
-            if n.next.is_none() {
+            if n.link.next.is_none() {
                 break;
             }
 
@@ -1939,13 +2078,13 @@ impl<'a> MappedFile<'a> {
 
             visited.insert(idx);
 
-            idx = n.next.unwrap();
+            idx = n.link.next.unwrap();
         }
 
         if size_checked != file_size {
             if DEBUG {
                 dbg_println!(
-                    "size_checked({}) != file.size({})",
+                    "MAPPED FILE: size_checked({}) != file.size({})",
                     size_checked,
                     file.size()
                 );
@@ -1956,9 +2095,9 @@ impl<'a> MappedFile<'a> {
         for i in 0..file.pool.slot.len() {
             let n = &file.pool.slot[i];
             if !n.used {
-                assert_eq!(n.parent, None);
-                assert_eq!(n.prev, None);
-                assert_eq!(n.next, None);
+                assert_eq!(n.link.parent, None);
+                assert_eq!(n.link.prev, None);
+                assert_eq!(n.link.next, None);
             }
         }
     }
@@ -1980,7 +2119,7 @@ impl<'a> MappedFile<'a> {
             }
             if DEBUG {
                 dbg_println!(
-                    "off({}) + {} >= file.size({}) ?",
+                    "MAPPED FILE: off({}) + {} >= file.size({}) ?",
                     off,
                     file.pool[idx].size,
                     file_size
@@ -1994,7 +2133,7 @@ impl<'a> MappedFile<'a> {
                 break;
             }
 
-            if let Some(next) = file.pool[idx].next {
+            if let Some(next) = file.pool[idx].link.next {
                 idx = next;
             } else {
                 panic!("invalid tree, broken next link");
@@ -2023,7 +2162,7 @@ impl<'a> MappedFile<'a> {
 
             if false {
                 dbg_println!(
-                    "offset {}, page {}, size {} disk_offset {:?}",
+                    "MAPPED FILE: offset {}, page {}, size {} disk_offset {:?}",
                     offset,
                     count,
                     file.pool[idx].size,
@@ -2032,7 +2171,7 @@ impl<'a> MappedFile<'a> {
             }
 
             offset += node_size;
-            n = file.pool[idx].next;
+            n = file.pool[idx].link.next;
 
             count += 1;
         }
@@ -2072,7 +2211,7 @@ impl<'a> MappedFile<'a> {
             }
 
             offset += node_size;
-            n = file.pool[idx].next;
+            n = file.pool[idx].link.next;
         }
 
         MappedFile::patch_storage_offset_and_file_descriptor(file, fd);
@@ -2112,15 +2251,15 @@ impl<'a> MappedFileIterator<'a> {
                 let file = it.file.as_ref().read();
                 loop {
                     let node = &file.pool[idx];
-                    if node.parent.is_none() {
+                    if node.link.parent.is_none() {
                         break;
                     }
-                    let parent_idx = node.parent.unwrap();
+                    let parent_idx = node.link.parent.unwrap();
                     let relation = MappedFile::get_parent_relation(&file.pool, parent_idx, idx);
                     match relation {
                         NodeRelation::Right => {
                             /* add left node size*/
-                            if let Some(left_idx) = file.pool[parent_idx].left {
+                            if let Some(left_idx) = file.pool[parent_idx].link.left {
                                 pos += file.pool[left_idx].size;
                             }
                             idx = parent_idx;
@@ -2190,11 +2329,11 @@ impl<'a> Iterator for MappedFileIterator<'a> {
                         let node = &mut file.pool[it.node_idx as usize];
 
                         // end-of-file ?
-                        if node.next == None {
+                        if node.link.next == None {
                             return None;
                         }
 
-                        node.next.unwrap()
+                        node.link.next.unwrap()
                     };
 
                     let next_node = &mut file.pool[next_node_idx as usize];
@@ -2243,11 +2382,7 @@ mod tests {
             used: true,
             to_delete: false,
             size: file_size,
-            parent: None,
-            left: None,
-            right: None,
-            prev: None,
-            next: None,
+            link: NodeLinks::new(),
             page: Weak::new(),
             cow: None,
             storage_offset: None,
@@ -2348,7 +2483,7 @@ mod tests {
         };
 
         dbg_println!(
-            "-- testing remove {} @ {} from {}",
+            "MAPPED FILE: -- testing remove {} @ {} from {}",
             nr_remove,
             offset,
             file_size
@@ -2356,7 +2491,7 @@ mod tests {
         let mut it = MappedFile::iter_from(&file, offset);
         MappedFile::remove(&mut it, nr_remove);
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().unwrap().size());
+        dbg_println!("-- file.size() {}", file.as_ref().read().size());
         let _ = fs::remove_file("/tmp/playground_remove_test");
     }
 
@@ -2387,7 +2522,7 @@ mod tests {
             }
         }
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().unwrap().size());
+        dbg_println!("-- file.size() {}", file.as_ref().read().size());
         let _ = fs::remove_file("/tmp/playground_insert_test");
     }
 
@@ -2447,7 +2582,7 @@ mod tests {
         MappedFile::sync_to_storage(&mut file.as_ref().write(), &"/tmp/mapped_file.sync_test")
             .unwrap();
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().unwrap().size());
+        dbg_println!("-- file.size() {}", file.as_ref().read().size());
 
         let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
         let _ = fs::remove_file("/tmp/playground_insert_test");

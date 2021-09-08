@@ -48,7 +48,7 @@ impl<'a> Mode for BasicEditorMode {
     }
 
     fn configure_view(
-        &self,
+        &mut self,
         mut editor: &mut Editor<'static>,
         mut env: &mut EditorEnv<'static>,
         mut view: &mut View<'static>,

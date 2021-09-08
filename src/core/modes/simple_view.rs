@@ -16,6 +16,30 @@ use crate::core::view::View;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
+fn num_digit(v: usize) -> usize {
+    match v {
+        _ if v < 10 => 1,
+        _ if v < 100 => 2,
+        _ if v < 1000 => 3,
+        _ if v < 10000 => 4,
+        _ if v < 100000 => 5,
+        _ if v < 1000000 => 6,
+        _ if v < 10000000 => 7,
+        _ if v < 100000000 => 8,
+        _ if v < 1000000000 => 9,
+        _ if v < 10000000000 => 10,
+        _ if v < 100000000000 => 11,
+        _ if v < 1000000000000 => 12,
+        _ if v < 10000000000000 => 13,
+        _ if v < 100000000000000 => 14,
+        _ if v < 1000000000000000 => 15,
+        _ if v < 10000000000000000 => 16,
+        _ if v < 100000000000000000 => 17,
+        _ if v < 1000000000000000000 => 18,
+        _ if v < 10000000000000000000 => 19,
+        _ => 20,
+    }
+}
 pub struct SimpleViewMode {
     // add common fields
 }
@@ -41,18 +65,23 @@ impl<'a> Mode for SimpleViewMode {
     }
 
     fn configure_view(
-        &self,
+        &mut self,
         mut editor: &mut Editor<'static>,
         mut env: &mut EditorEnv<'static>,
         mut v: &mut View<'static>,
     ) {
         let doc = v.document();
+        let doc_sz = doc.as_ref().unwrap().read().size();
+        //let line_number_view_width = num_digit(doc_sz) + 2;
+        let line_number_view_width = 13;
 
         // children_layout_and_modes
         let ops_modes = vec![
             // line numbers
             (
-                LayoutOperation::Fixed { size: 15 }, // TODO(ceg): adjust size based on screen content
+                LayoutOperation::Fixed {
+                    size: line_number_view_width,
+                }, // TODO(ceg): adjust size based on screen content
                 doc.clone(),
                 vec!["line-number-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
             ),
@@ -124,7 +153,7 @@ impl<'a> Mode for SimpleViewMode {
         // register siblings view
         // text <--> scrollbar
 
-        let vscrollbar_mode = editor.get_mode("vscrollbar-mode").unwrap().clone();
+        let vscrollbar_mode = editor.get_mode("vscrollbar-mode").unwrap();
 
         let text_view_src = ViewEventSource {
             id: v.children[text_view_idx],
@@ -148,7 +177,7 @@ impl<'a> Mode for SimpleViewMode {
             id: v.children[line_numbers_view_idx],
         };
 
-        let line_number_mode = editor.get_mode("line-number-mode").unwrap().clone();
+        let line_number_mode = editor.get_mode("line-number-mode").unwrap();
         register_view_subscriber(
             editor,
             env,
