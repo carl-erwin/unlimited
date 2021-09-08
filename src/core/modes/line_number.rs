@@ -182,8 +182,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
-                let ret = env.screen.push(cpi);
-                dbg_println!("ret = {:?}", ret);
+                env.screen.push(cpi);
             }
             env.screen.select_next_line_index();
         }
