@@ -1674,12 +1674,6 @@ fn move_offset_to_previous_line_index(
     let screen = screen.read();
     let (width, height) = screen.dimension();
 
-    let doc = v.document().unwrap();
-    let _doc = doc.read();
-
-    let tm = v.mode_ctx::<TextModeContext>("text-mode");
-
-    let _codec = tm.text_codec.as_ref();
     let rewind = (width * height * 4) as u64;
     let start_offset = offset.saturating_sub(rewind);
 
