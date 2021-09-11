@@ -536,8 +536,8 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
         ::crossterm::event::MouseButton::Left => 0,
         ::crossterm::event::MouseButton::Right => 1,
         ::crossterm::event::MouseButton::Middle => 2,
-        // self::termion::event::MouseButton::WheelUp => 3,
-        // self::termion::event::MouseButton::WheelDown => 4,
+        // ...event::MouseButton::WheelUp => 3,
+        // ...event::MouseButton::WheelDown => 4,
     } //
 }
 

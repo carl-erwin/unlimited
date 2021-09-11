@@ -74,7 +74,7 @@ fn parse_command_line() -> Config {
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .args_from_usage("--ui, --ui=[termion|crossterm] 'select user interface frontend'")
+        .args_from_usage("--ui, --ui=[crossterm] 'select user interface frontend'")
         .arg(
             Arg::with_name("DEBUG")
                 .short("d")

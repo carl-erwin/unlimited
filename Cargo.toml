@@ -25,11 +25,6 @@ crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "fix-in
 unicode-width = "0.1.8"
 utf8parse = "0.2.0"
 
-# unix only
-[target.'cfg(unix)'.dependencies]
-termion = "*"
-
-
 [profile.release]
 #lto = true
 debug = true

@@ -15,7 +15,7 @@
 ### Removed
 
 - remove ncurses frontend
-
+- remove termion frontend
 
 ## [0.0.4] 2018-06-03
 

@@ -5,23 +5,6 @@ use std::sync::mpsc::Sender;
 
 use crate::core::event::EventMessage;
 
-#[cfg(target_family = "windows")]
-pub fn run_termion(
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
-) {
-}
-
-#[cfg(target_family = "unix")]
-pub fn run_termion(
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
-) {
-    terminal::termion::main_loop(&ui_rx, &ui_tx, &core_tx);
-}
-
 pub fn main_loop(
     ui_name: &str,
     ui_rx: &Receiver<EventMessage<'static>>,
@@ -30,10 +13,6 @@ pub fn main_loop(
 ) {
     // TODO(ceg): switch ui here
     match ui_name {
-        "termion" => {
-            run_termion(&ui_rx, &ui_tx, &core_tx);
-        }
-
         "crossterm" | _ => {
             terminal::crossterm::main_loop(&ui_rx, &ui_tx, &core_tx).ok();
         }
