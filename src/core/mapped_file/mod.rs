@@ -545,7 +545,7 @@ impl<'a> MappedFile<'a> {
         } else if file_size > (512 * 1024) {
             1024 * 4 * 2
         } else {
-            1024 * 4
+            1024 * 1024
         };
 
         let mut file = MappedFile {
@@ -2242,6 +2242,13 @@ impl<'a> MappedFileIterator<'a> {
         }
     }
 
+    pub fn get_real_iterator_ref(&self) -> Option<&IteratorInstance<'a>> {
+        match *self {
+            MappedFileIterator::End(..) => None, // TODO(ceg): return sentinel ?
+            MappedFileIterator::Real(ref it) => Some(it),
+        }
+    }
+
     pub fn get_offset(&self) -> Option<u64> {
         match *self {
             MappedFileIterator::End(..) => None, // TODO(ceg): return sentinel ?
@@ -2293,7 +2300,7 @@ pub struct IteratorInstance<'a> {
     file_size: u64,
     local_offset: u64,
     page_size: u64,
-    node_idx: NodeIndex,
+    pub node_idx: NodeIndex,
     page: Rc<RefCell<Page>>,
     base: &'a [u8],
 }

@@ -53,6 +53,9 @@ use crate::core::document::Document;
 use crate::core::document::DocumentEvent;
 use crate::core::document::DocumentEventCb;
 
+use crate::core::mapped_file::MappedFile;
+use crate::core::mapped_file::MappedFileIterator;
+
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::layout::ScreenOverlayFilter;
 
@@ -248,14 +251,160 @@ impl DocumentEventCb for LineNumberModeDocEventHandler {
 
 pub struct LineNumberOverlayFilter {
     line_offsets: Vec<(u64, u64)>,
+    line_number: Vec<(u64, (u64, Option<usize>))>, // (offset, (line_num, node_index))
 }
 
 impl LineNumberOverlayFilter {
     pub fn new() -> Self {
         LineNumberOverlayFilter {
             line_offsets: vec![],
+            line_number: vec![],
         }
     }
+}
+
+// TODO(ceg): move to document.rs
+//
+// walk through the binary tree and while looking for the node containing "offset"
+// and track byte_index count
+//                                   SZ(19)   ,       LF(9)
+//                   _________[ SZ(7+12),  LF(3+6) ]____________________
+//                  /                                                 \
+//        __[ 7=SZ(3+4), LF 3=(1+2) ]__                        _____[ 12=(5+7),  LF 6=(2+4) ]__
+//       /                             \                      /                                 \
+//  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
+//                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
+//
+//
+fn get_byte_count_at_offset(
+    doc: &Document,
+    byte_index: usize,
+    offset: u64,
+) -> (u64, Option<usize>) {
+    assert!(byte_index < 256);
+
+    let mut file = doc.buffer.data.as_ref().write();
+    let mut cur_index = file.root_index();
+    let mut total_count = 0;
+    let mut local_offset = offset;
+    while cur_index != None {
+        let idx = cur_index.unwrap();
+        let p_node = &file.pool[idx];
+
+        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
+        if is_leaf {
+            let data = document::get_node_data(&mut file, Some(idx));
+            for b in data.iter().take(local_offset as usize) {
+                if *b as usize == byte_index {
+                    total_count += 1;
+                }
+            }
+            return (total_count, cur_index);
+        }
+
+        let mut left_node_size = 0;
+        let mut left_byte_count = 0;
+
+        if let Some(left_index) = p_node.link.left {
+            let left_node = &file.pool[left_index];
+
+            if local_offset < left_node.size {
+                cur_index = Some(left_index);
+                continue;
+            }
+
+            left_byte_count = left_node.byte_count[byte_index];
+            left_node_size = left_node.size;
+        }
+
+        if let Some(right_index) = p_node.link.right {
+            total_count += left_byte_count;
+            local_offset -= left_node_size;
+            cur_index = Some(right_index);
+            continue;
+        }
+    }
+
+    (0, None)
+}
+
+// right walk
+fn _get_byte_count_at_offset_v2(
+    doc: &Document,
+    byte_index: usize,
+    offset: u64,
+) -> (u64, Option<usize>) {
+    assert!(byte_index < 256);
+
+    let mut file = doc.buffer.data.as_ref().write();
+    let mut cur_index = file.root_index();
+    if cur_index.is_none() {
+        return (0, None);
+    }
+
+    let mut total_count = file.pool[cur_index.unwrap()].byte_count[byte_index];
+
+    let mut local_offset = offset;
+
+    while cur_index != None {
+        let idx = cur_index.unwrap();
+        let p_node = &file.pool[idx];
+
+        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
+        if is_leaf {
+            // TODO(ceg): linear count count lf until local_offset is reached
+            // get node data
+            let data = document::get_node_data(&mut file, Some(idx));
+            for b in data.iter().skip(local_offset as usize) {
+                if *b as usize == byte_index {
+                    total_count -= 1;
+                }
+            }
+            return (total_count, cur_index);
+        }
+
+        let parent_total_count = file.pool[idx].byte_count[byte_index];
+
+        let mut left_byte_count = 0;
+        let mut right_byte_count = 0;
+        let mut left_node_size = 0;
+
+        #[derive(Debug, PartialEq)]
+        enum Direction {
+            Left,
+            Right,
+        }
+
+        let mut dir = Direction::Right;
+
+        if let Some(right_index) = p_node.link.right {
+            let right_node = &file.pool[right_index];
+            right_byte_count = right_node.byte_count[byte_index];
+        }
+
+        if let Some(left_index) = p_node.link.left {
+            let left_node = &file.pool[left_index];
+
+            left_byte_count = left_node.byte_count[byte_index];
+            left_node_size = left_node.size;
+
+            if local_offset < left_node.size {
+                dir = Direction::Left;
+            }
+        }
+
+        assert_eq!(parent_total_count, left_byte_count + right_byte_count);
+
+        if dir == Direction::Left {
+            total_count -= right_byte_count;
+            cur_index = p_node.link.left;
+        } else {
+            cur_index = p_node.link.right;
+            local_offset -= left_node_size;
+        }
+    }
+
+    panic!("");
 }
 
 impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
@@ -269,10 +418,64 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let target_vid = mode_ctx.target_vid;
         let src = editor.view_map.get(&target_vid).unwrap().read();
         self.line_offsets = src.screen.read().line_offset.clone();
+
+        self.line_number.clear();
+
+        let doc = src.document();
+        let doc = doc.as_ref().unwrap().read();
+        if !doc.indexed {
+            return;
+        }
+
+        // call to get_byte_count_at_offset are SLOW : compute only the first line
+        // and read the target screen to compute relative line count
+        for offset in self.line_offsets.iter().take(1) {
+            let n = get_byte_count_at_offset(&doc, '\n' as usize, offset.0);
+            self.line_number.push((offset.0, n));
+        }
+
+        let mut line_number = self.line_number[0].1 .0;
+        let screen = src.screen.as_ref().read();
+        for i in 0..screen.line_index.len() {
+            let mut offset = 0;
+            if let Some(l) = screen.get_used_line(i) {
+                for (idx, cell) in l.iter().enumerate() {
+                    if idx == 0 {
+                        offset = cell.cpi.offset.unwrap();
+                    }
+                    if cell.cpi.cp == '\n' {
+                        line_number += 1;
+                        break;
+                    }
+                }
+            }
+            self.line_number.push((offset, (line_number as u64, None)));
+        }
     }
 
     fn run(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
         env.screen.clear();
+
+        if !self.line_number.is_empty() {
+            let mut prev_line = 0;
+            for (idx, e) in self.line_number.iter().enumerate() {
+                let s = if idx > 0 && e.1 .0 == prev_line {
+                    format!("           │") // AFTER DEBUG ENABLE THIS
+                } else {
+                    format!("{: >11}│", e.1 .0 + 1)
+                };
+                prev_line = e.1 .0;
+
+                for c in s.chars() {
+                    let mut cpi = CodepointInfo::new();
+                    cpi.displayed_cp = c;
+                    env.screen.push(cpi);
+                }
+                env.screen.select_next_line_index();
+            }
+            return;
+        }
+
         for e in self.line_offsets.iter() {
             let s = format!("@{}", e.0);
             for c in s.chars() {

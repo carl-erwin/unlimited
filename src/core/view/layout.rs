@@ -344,11 +344,11 @@ fn compose_children(
             };
 
             //
-            // NB: notify subscriberss just after composition
+            // NB: notify subscribers just after composition
             // use View::compose_priority to order notifications
             //
             // NOTE(ceg): currently we do not have event filters
-            {
+            if !screen.is_off_screen {
                 for cb in cbs.iter() {
                     let mode = cb.0.as_ref();
                     mode.borrow().on_view_event(

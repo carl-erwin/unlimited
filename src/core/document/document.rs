@@ -175,6 +175,7 @@ pub enum DocumentEvent {
     DocumentOpened,
     DocumentClosed,
     DocumentRemoved,
+    DocumentFullyIndexed,
     NodeAdded { node_index: usize },
     NodeChanged { node_index: usize },
     NodeRemoved { node_index: usize },
@@ -187,6 +188,8 @@ fn document_event_to_string(evt: &DocumentEvent) -> String {
         DocumentEvent::DocumentOpened => "Opened".to_owned(),
         DocumentEvent::DocumentClosed => "Closed".to_owned(),
         DocumentEvent::DocumentRemoved => "Removed".to_owned(),
+        DocumentEvent::DocumentFullyIndexed => "FullyIndexed".to_owned(),
+
         DocumentEvent::NodeAdded { node_index } => {
             format!("NodeAdded idx: {}", node_index)
         }
@@ -205,7 +208,7 @@ fn document_event_to_string(evt: &DocumentEvent) -> String {
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
-    buffer: Buffer<'a>,
+    pub buffer: Buffer<'a>, // TODO(ceg): provide iterator apis ?
     cache: DocumentReadCache,
     pub buffer_log: BufferLog,
     pub use_buffer_log: bool,
@@ -953,6 +956,35 @@ fn update_byte_index_hierarchy(
     }
 }
 
+pub fn get_node_data(file: &mut MappedFile, idx: Option<NodeIndex>) -> Vec<u8> {
+    if idx.is_none() {
+        return vec![];
+    }
+
+    let idx = idx.unwrap();
+
+    let node = &mut file.pool[idx];
+    let mut data = Vec::with_capacity(node.size as usize);
+    unsafe {
+        data.set_len(node.size as usize);
+    };
+
+    let orig_fd = if file.fd.is_none() {
+        None
+    } else {
+        Some(file.fd.as_ref().unwrap().clone())
+    };
+
+    if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
+        //
+    } else {
+        // TODO(ceg): return error
+        panic!("direct copy failed");
+    }
+
+    data
+}
+
 // call this on new done
 pub fn build_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
     if idx.is_none() {
@@ -1039,9 +1071,6 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         {
             let file = doc.buffer.data.read();
             let (node_index, _, _) = file.find_node_by_offset(0);
-            if node_index.is_none() {
-                return;
-            };
             node_index
         }
     };
@@ -1138,20 +1167,27 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
     {
         // set index status flags
-        let mut doc = doc.write();
-        if !doc.abort_indexing {
-            doc.indexed = true;
+        {
+            let mut doc = doc.write();
+            if !doc.abort_indexing {
+                doc.indexed = true;
+            }
+
+            // display root node info
+            let file = doc.buffer.data.read();
+            if let Some(root_index) = file.root_index() {
+                let node = &file.pool[root_index];
+                eprintln!(
+                    "{} : Number of lines {}",
+                    doc.file_name(),
+                    node.byte_count[b'\n' as usize]
+                );
+            }
         }
 
-        // display root node info
-        let file = doc.buffer.data.read();
-        if let Some(root_index) = file.root_index() {
-            let node = &file.pool[root_index];
-            eprintln!(
-                "{} : Number of lines {}",
-                doc.file_name(),
-                node.byte_count[b'\n' as usize]
-            );
+        let doc = doc.read();
+        if doc.indexed {
+            doc.notify(&DocumentEvent::DocumentFullyIndexed {});
         }
     }
 }

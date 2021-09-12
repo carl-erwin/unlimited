@@ -73,7 +73,7 @@ impl<'a> Mode for SimpleViewMode {
         let doc = v.document();
         let doc_sz = doc.as_ref().unwrap().read().size();
         //let line_number_view_width = num_digit(doc_sz) + 2;
-        let line_number_view_width = 13;
+        let line_number_view_width = 12 + 1;
 
         // children_layout_and_modes
         let ops_modes = vec![
