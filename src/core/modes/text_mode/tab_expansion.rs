@@ -12,6 +12,7 @@ use crate::core::Editor;
 pub struct TabFilter {
     prev_cp: char,
     column_count: u64,
+    tab_color: (u8, u8, u8),
 }
 
 impl TabFilter {
@@ -19,6 +20,7 @@ impl TabFilter {
         TabFilter {
             prev_cp: '\u{0}',
             column_count: 0,
+            tab_color: (242, 71, 132), // purple-like
         }
     }
 }
@@ -28,15 +30,20 @@ impl ContentFilter<'_> for TabFilter {
         &"TabFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
         self.prev_cp = '\u{0}';
         self.column_count = 0;
+        if env.graphic_display {
+            self.tab_color = (242, 71, 132); // purple-like
+        } else {
+            self.tab_color = (128, 0, 128); // magenta
+        }
     }
 
     fn run(
         &mut self,
         _view: &View,
-        env: &mut LayoutEnv,
+        _env: &mut LayoutEnv,
         filter_in: &Vec<FilterIo>,
         filter_out: &mut Vec<FilterIo>,
     ) {
@@ -59,11 +66,7 @@ impl ContentFilter<'_> for TabFilter {
                         for (idx, _) in (0..padding).enumerate() {
                             // \t -> ' '
                             let mut new_io = FilterIo::replace_displayed_codepoint(io, ' ');
-                            if env.graphic_display {
-                                new_io.style.color = (242, 71, 132); // purple-like
-                            } else {
-                                new_io.style.color = (128, 0, 128); // magenta
-                            }
+                            new_io.style.color = self.tab_color;
                             new_io.size = if idx == 0 { io.size } else { 0 };
                             new_io.metadata = if idx == 0 { io.metadata } else { true };
                             filter_out.push(new_io);
