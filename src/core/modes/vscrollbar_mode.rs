@@ -1,5 +1,5 @@
+use parking_lot::RwLock;
 use std::any::Any;
-use std::sync::RwLock;
 
 use std::rc::Rc;
 
@@ -100,18 +100,18 @@ impl<'a> Mode for VscrollbarMode {
         dst: ViewEventDestination,
         _event: &ViewEvent,
     ) {
-        let src = editor.view_map.get(&src.id).unwrap().write().unwrap();
+        let src = editor.view_map.get(&src.id).unwrap().write();
 
-        let dim = src.screen.read().unwrap().dimension();
+        let dim = src.screen.read().dimension();
 
-        let mut dst = editor.view_map.get(&dst.id).unwrap().write().unwrap();
+        let mut dst = editor.view_map.get(&dst.id).unwrap().write();
 
         let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
 
         mode_ctx.target_vid = src.id;
 
         let doc = src.document.as_ref().unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         let doc_size = doc.size();
 
         let off = src.start_offset as f64 / doc_size as f64;
@@ -152,7 +152,7 @@ impl VscrollbarMode {
 // TODO?: mode:on_pointer_drag(btn, x,y)
 
 pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     let evt = v.input_ctx.trigger.last();
     match evt {
@@ -218,12 +218,12 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                 mode_ctx.target_vid
             };
 
-            let dim = v.screen.read().unwrap().dimension();
-            let mut dst = editor.view_map.get(&target_vid).unwrap().write().unwrap();
+            let dim = v.screen.read().dimension();
+            let mut dst = editor.view_map.get(&target_vid).unwrap().write();
 
             let doc_size = {
                 let doc = dst.document.as_ref().unwrap();
-                let doc = doc.read().unwrap();
+                let doc = doc.read();
                 std::cmp::max(1, doc.size()) // avoid div by zero
             };
 

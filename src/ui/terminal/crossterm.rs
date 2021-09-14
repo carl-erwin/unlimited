@@ -25,10 +25,10 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use parking_lot::RwLock;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 //
 //
@@ -172,7 +172,7 @@ pub fn main_loop(
                     let p_input = crate::core::event::pending_input_event_count();
 
                     if (start - fps_t0).as_millis() >= 1000 {
-                        let screen = screen.read().unwrap();
+                        let screen = screen.read();
 
                         dbg_println!(
                             "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
@@ -218,8 +218,8 @@ pub fn main_loop(
                         fps += 1;
 
                         {
-                            let mut screen = screen.write().unwrap();
-                            let mut last_screen = last_screen.write().unwrap();
+                            let mut screen = screen.write();
+                            let mut last_screen = last_screen.write();
                             draw_view(&mut last_screen, &mut screen, &mut stdout);
                         }
                         last_screen = screen;

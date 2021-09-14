@@ -156,3 +156,13 @@ fn parse_command_line() -> Config {
         ui_frontend,
     }
 }
+
+#[test]
+fn test_codec_encode() {
+    let expect_cp: [u8; 4] = [0xe2, 0x82, 0xac, 0x00];
+    let mut mut_cp: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
+
+    let n = encode(0x20ac as u32, &mut mut_cp);
+    assert_eq!(n, 3);
+    assert_eq!(mut_cp, expect_cp);
+}

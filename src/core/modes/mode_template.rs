@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use std::rc::Rc;
 
@@ -69,9 +69,9 @@ pub fn template_input_action_fn1(
     _env: &mut EditorEnv,
     view: &Rc<RwLock<View>>,
 ) {
-    let v = view.read().unwrap();
+    let v = view.read();
     let doc = v.document().unwrap();
-    let _doc = doc.read().unwrap();
+    let _doc = doc.read();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

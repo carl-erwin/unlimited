@@ -1,7 +1,7 @@
 use std::fmt;
 
+use parking_lot::RwLock;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -656,7 +656,7 @@ use std::path::Path;
 pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     // read/copy
     let mut fd = {
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
 
         if doc.file_name().is_empty() {
             // TODO(ceg): save as pop up/notification
@@ -666,8 +666,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move to global config
 
         let path = Path::new(&tmp_file_name);
-        if let Result::Err(_) = std::fs::remove_file(path) {
-        }
+        if let Result::Err(_) = std::fs::remove_file(path) {}
 
         let fd = File::create(path);
         if fd.is_err() {
@@ -680,8 +679,8 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     dbg_println!("SYNC: fd = {:?}", fd);
 
     let mut idx = {
-        let doc = doc.read().unwrap();
-        let file = doc.buffer.data.read().unwrap();
+        let doc = doc.read();
+        let file = doc.buffer.data.read();
         let (node_index, _, _) = file.find_node_by_offset(0);
         node_index
     };
@@ -689,8 +688,8 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
     while idx != None {
         // do not hold the doc.lock more
         {
-            let doc = doc.read().unwrap();
-            let file = doc.buffer.data.read().unwrap();
+            let doc = doc.read();
+            let file = doc.buffer.data.read();
             let node = &file.pool[idx.unwrap()];
 
             let mut data = Vec::with_capacity(node.size as usize);
@@ -730,7 +729,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
     // update
     {
-        let mut doc = doc.write().unwrap();
+        let mut doc = doc.write();
 
         let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
         let perms = metadata.permissions();
@@ -751,7 +750,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
         // TODO(ceg): handle skip with ReadOnly
         let mapped_file = doc.buffer.data.clone();
-        let mut mapped_file = mapped_file.write().unwrap();
+        let mut mapped_file = mapped_file.write();
         crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
             &mut mapped_file,
             new_fd,
@@ -769,9 +768,9 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 // TODO(ceg): split code to provide index_single_node(nid)
 pub fn build_index(doc: &Arc<RwLock<Document>>) {
     let mut idx = {
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         {
-            let file = doc.buffer.data.read().unwrap();
+            let file = doc.buffer.data.read();
             let (node_index, _, _) = file.find_node_by_offset(0);
             if node_index.is_none() {
                 return;
@@ -788,13 +787,13 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
     while idx != None {
         // read node bytes
         {
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
 
             if doc.abort_indexing == true {
                 break;
             }
 
-            let file = doc.buffer.data.read().unwrap();
+            let file = doc.buffer.data.read();
             let node = &file.pool[idx.unwrap()];
             if node.indexed == true {
                 idx = node.next;
@@ -840,8 +839,8 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
         // update node info
         {
-            let doc = doc.read().unwrap();
-            let mut file = doc.buffer.data.write().unwrap();
+            let doc = doc.read();
+            let mut file = doc.buffer.data.write();
             let mut node = &mut file.pool[idx.unwrap()];
             node.byte_count = byte_count;
             node.indexed = true;
@@ -907,7 +906,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write().unwrap();
+        let mut doc = doc.as_ref().unwrap().write();
 
         const STR_LEN: usize = 1000;
 
@@ -967,7 +966,7 @@ mod tests {
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write().unwrap();
+        let mut doc = doc.as_ref().unwrap().write();
 
         const NB_STR: usize = 10000;
 

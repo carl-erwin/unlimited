@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use std::rc::Rc;
 
@@ -127,8 +127,8 @@ pub fn find_start(
     if let Some(svid) = status_vid {
         let status_view = editor.view_map.get(&svid).unwrap();
         //
-        let doc = status_view.read().unwrap().document().unwrap();
-        let mut doc = doc.write().unwrap();
+        let doc = status_view.read().document().unwrap();
+        let mut doc = doc.write();
         // clear doc
         let sz = doc.size();
         doc.remove(0, sz, None);
@@ -139,7 +139,7 @@ pub fn find_start(
 
         // push new input map for y/n
         {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             // lock focus on v
             // env.focus_locked_on = Some(v.id);
 
@@ -162,7 +162,7 @@ pub fn find_stop(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let v = view.write().unwrap();
+        let v = view.write();
         let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
         input_map_stack.pop();
         // unlock focus
@@ -173,14 +173,14 @@ pub fn find_stop(
     let status_vid = view::get_status_view(&editor, &env, view);
     if let Some(status_vid) = status_vid {
         let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().unwrap().document().unwrap();
-        let mut doc = doc.write().unwrap();
+        let doc = status_view.read().document().unwrap();
+        let mut doc = doc.write();
         // clear buffer
         let sz = doc.size();
         doc.remove(0, sz, None);
 
         {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
 
             // fm.reset();
@@ -201,7 +201,7 @@ pub fn find_add_char(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let mut array = {
-        let v = view.read().unwrap();
+        let v = view.read();
 
         assert!(v.input_ctx.trigger.len() > 0);
         let idx = v.input_ctx.trigger.len() - 1;
@@ -235,7 +235,7 @@ pub fn find_add_char(
     };
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
         fm.find_str.append(&mut array);
     }
@@ -251,7 +251,7 @@ pub fn find_del_char(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
         fm.find_str.pop();
         let offset = fm.match_start;
@@ -275,7 +275,7 @@ pub fn find_next(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let find_str = {
             let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.find_str.clone()
@@ -322,7 +322,7 @@ pub fn find_next(
             dbg_println!("FIND start @ offset = {:?}", offset);
 
             let doc = v.document().unwrap();
-            let doc = doc.write().unwrap();
+            let doc = doc.write();
             let offset = doc.find(offset, &encoded_str);
             dbg_println!("FIND offset = {:?}", offset);
             if let Some(offset) = offset {
@@ -357,12 +357,12 @@ pub fn display_find_string(
     let status_vid = view::get_status_view(&editor, &env, view);
 
     if let Some(status_vid) = status_vid {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
 
         let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().unwrap().document().unwrap();
-        let mut doc = doc.write().unwrap();
+        let doc = status_view.read().document().unwrap();
+        let mut doc = doc.write();
 
         // clear buffer. doc.erase_all();
         let sz = doc.size();

@@ -4,8 +4,8 @@ use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::View;
 use crate::core::Editor;
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::codepointinfo::TextStyle;
 

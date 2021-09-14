@@ -1,6 +1,6 @@
 use crate::core::Editor;
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::view::layout::ContentFilter;
 use crate::core::view::layout::FilterData;
@@ -35,7 +35,7 @@ impl ContentFilter<'_> for CharMapFilter {
     }
 
     fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         let char_map = tm.char_map.clone();
         let color_map = tm.color_map.clone();

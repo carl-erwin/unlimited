@@ -57,7 +57,7 @@ impl<'a> Buffer<'a> {
             }
         };
 
-        let size = file.as_ref().read().unwrap().size() as usize;
+        let size = file.as_ref().read().size() as usize;
 
         // println!("'{}' opened size '{}'", file_name, size);
 
@@ -79,7 +79,7 @@ impl<'a> Buffer<'a> {
             }
         };
 
-        let size = file.as_ref().read().unwrap().size() as usize;
+        let size = file.as_ref().read().size() as usize;
 
         Some(Buffer {
             id: 0,

@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -130,8 +130,8 @@ pub fn application_quit(
     // editor.changed_doc : HashSet<document::Id>
     // if editor.change_docs.len() != 0
 
-    let doc = { view.read().unwrap().document().unwrap() };
-    let doc = doc.read().unwrap();
+    let doc = { view.read().document().unwrap() };
+    let doc = doc.read();
     if !doc.changed {
         env.quit = true;
     } else {
@@ -152,8 +152,8 @@ pub fn application_quit_abort_setup(
     if let Some(svid) = status_vid {
         let status_view = editor.view_map.get(&svid).unwrap();
         //
-        let doc = status_view.read().unwrap().document().unwrap();
-        let mut doc = doc.write().unwrap();
+        let doc = status_view.read().document().unwrap();
+        let mut doc = doc.write();
         // clear doc
         let sz = doc.size();
         doc.remove(0, sz, None);
@@ -164,7 +164,7 @@ pub fn application_quit_abort_setup(
 
         // push new input map for y/n
         {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             // lock focus on v
             // env.focus_locked_on = Some(v.id);
 
@@ -195,7 +195,7 @@ pub fn application_quit_abort_no(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let v = view.write().unwrap();
+        let v = view.write();
         let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
         input_map_stack.pop();
         // unlock focus
@@ -206,8 +206,8 @@ pub fn application_quit_abort_no(
     let status_vid = view::get_status_view(&editor, &env, view);
     if let Some(status_vid) = status_vid {
         let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().unwrap().document().unwrap();
-        let mut doc = doc.write().unwrap();
+        let doc = status_view.read().document().unwrap();
+        let mut doc = doc.write();
         // clear buffer
         let sz = doc.size();
         doc.remove(0, sz, None);
@@ -219,13 +219,13 @@ pub fn toggle_dgb_print(_editor: &mut Editor, _env: &mut EditorEnv, _view: &Rc<R
 }
 
 pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = view.write().unwrap();
+    let v = view.write();
 
     let doc_id = {
         let doc = v.document().unwrap();
         {
             // - needed ? already syncing ? -
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
             if !doc.changed || doc.is_syncing {
                 // TODO(ceg): ensure all other places are checking this flag, all doc....write()
                 // better, some permissions mechanism ?
@@ -238,7 +238,7 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
 
         // - set sync flag -
         {
-            let mut doc = doc.write().unwrap();
+            let mut doc = doc.write();
             let doc_id = doc.id;
             doc.is_syncing = true;
             doc_id
@@ -253,7 +253,7 @@ pub fn save_document(editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
     // doing this let us avoid the use manual lifetime annotations ('static)
     // and errors like "data from `view` flows into `editor`"
     let document_map = editor.document_map.clone();
-    let document_map = document_map.read().unwrap();
+    let document_map = document_map.read();
 
     if let Some(doc) = document_map.get(&doc_id) {
         let msg = EventMessage {
@@ -360,7 +360,7 @@ pub fn layout_view_ids_with_direction(
     view_ids: &Vec<view::Id>,
 ) {
     let parent = editor.view_map.get(&parent_id).unwrap();
-    let mut parent = parent.write().unwrap();
+    let mut parent = parent.write();
 
     parent.layout_direction = dir;
     let sizes = if dir == LayoutDirection::Vertical {
@@ -390,7 +390,7 @@ pub fn layout_view_ids_with_direction(
         };
 
         let view = editor.view_map.get(&view_ids[idx]).unwrap();
-        let mut view = view.write().unwrap();
+        let mut view = view.write();
 
         view.x = x;
         view.y = y;
@@ -428,11 +428,11 @@ fn find_first_splitable_parent(
     _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) -> Option<view::Id> {
-    let mut start_id = { view.read().unwrap().id };
+    let mut start_id = { view.read().id };
 
     loop {
         let view = editor.view_map.get(&start_id)?;
-        let v = view.read().unwrap();
+        let v = view.read();
         if v.is_group_leader {
             return Some(v.id);
         }
@@ -516,12 +516,12 @@ pub fn split_view_with_direction(
     let view = view.unwrap().clone();
 
     let (v_id, parent_id, x, y, width, height, doc, original_modes, layout_index) = {
-        let v = view.read().unwrap();
+        let v = view.read();
 
         dbg_println!("SPLITTING {:?} VID {}", dir, v.id);
 
         let (width, height) = {
-            let screen = v.screen.read().unwrap();
+            let screen = v.screen.read();
             (screen.width(), screen.height())
         };
 
@@ -529,14 +529,14 @@ pub fn split_view_with_direction(
         // get screen
 
         let document_map = editor.document_map.clone();
-        let document_map = document_map.read().unwrap();
+        let document_map = document_map.read();
 
         let doc = {
             if v.document.is_none() {
                 None
             } else {
                 let doc_id = v.document().unwrap();
-                let doc_id = doc_id.read().unwrap().id;
+                let doc_id = doc_id.read().id;
                 if let Some(_doc) = document_map.get(&doc_id) {
                     let doc = document_map.get(&doc_id).unwrap().clone();
                     Some(Arc::clone(&doc))
@@ -588,7 +588,7 @@ pub fn split_view_with_direction(
 
     if let Some(parent_id) = parent_id {
         if let Some(gp) = editor.view_map.get(&parent_id) {
-            let mut gp = gp.write().unwrap();
+            let mut gp = gp.write();
             if let Some(layout_index) = layout_index {
                 gp.children[layout_index] = p2_id;
             }
@@ -773,14 +773,14 @@ pub fn increase_left(
     _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let v = view.write().unwrap();
+    let v = view.write();
     if v.parent_id.is_none() {
         return;
     }
 
     let pvid = v.parent_id.unwrap();
     let pv = editor.view_map.get(&pvid).unwrap();
-    let mut pv = pv.write().unwrap();
+    let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
     dbg_println!("lidx = {}", lidx);
@@ -789,7 +789,7 @@ pub fn increase_left(
     }
     let lidx = lidx - 2; // take left sibling
 
-    let max_size = pv.screen.read().unwrap().width();
+    let max_size = pv.screen.read().width();
     let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, max_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
@@ -799,14 +799,14 @@ pub fn decrease_left(
     _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let v = view.write().unwrap();
+    let v = view.write();
     if v.parent_id.is_none() {
         return;
     }
 
     let pvid = v.parent_id.unwrap();
     let pv = editor.view_map.get(&pvid).unwrap();
-    let mut pv = pv.write().unwrap();
+    let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
     dbg_println!("lidx = {}", lidx);
@@ -815,8 +815,8 @@ pub fn decrease_left(
     }
     let lidx = lidx - 2; // take previous sibling
 
-    let max_size = pv.screen.read().unwrap().width();
-    let cur_size = v.screen.read().unwrap().width();
+    let max_size = pv.screen.read().width();
+    let cur_size = v.screen.read().width();
     let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
@@ -826,14 +826,14 @@ pub fn increase_right(
     _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let v = view.write().unwrap();
+    let v = view.write();
     if v.parent_id.is_none() {
         return;
     }
 
     let pvid = v.parent_id.unwrap();
     let pv = editor.view_map.get(&pvid).unwrap();
-    let mut pv = pv.write().unwrap();
+    let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
     dbg_println!("lidx = {}", lidx);
@@ -841,8 +841,8 @@ pub fn increase_right(
         return;
     }
 
-    let max_size = pv.screen.read().unwrap().width();
-    let cur_size = v.screen.read().unwrap().width();
+    let max_size = pv.screen.read().width();
+    let cur_size = v.screen.read().width();
     let new_op = increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
@@ -852,14 +852,14 @@ pub fn decrease_right(
     _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let v = view.write().unwrap();
+    let v = view.write();
     if v.parent_id.is_none() {
         return;
     }
 
     let pvid = v.parent_id.unwrap();
     let pv = editor.view_map.get(&pvid).unwrap();
-    let mut pv = pv.write().unwrap();
+    let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
     dbg_println!("lidx = {}", lidx);
@@ -867,8 +867,8 @@ pub fn decrease_right(
         return;
     }
 
-    let max_size = pv.screen.read().unwrap().width();
-    let cur_size = v.screen.read().unwrap().width();
+    let max_size = pv.screen.read().width();
+    let cur_size = v.screen.read().width();
     let new_op = decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, 1);
     pv.layout_ops[lidx] = new_op;
 }
@@ -931,7 +931,7 @@ pub fn destroy_view(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // current view/id
-    let v = view.write().unwrap();
+    let v = view.write();
 
     if v.destroyable == false {
         return;
@@ -959,7 +959,7 @@ pub fn destroy_view(
     // get parent view/id
     let pvid = *v.parent_id.as_ref().unwrap();
     let pv = editor.view_map.get(&pvid).unwrap().clone();
-    let mut pv = pv.write().unwrap();
+    let mut pv = pv.write();
 
     if pv.children.len() != 3 {
         dbg_println!(" pv.children.len({}) != 3", pv.children.len());
@@ -970,7 +970,7 @@ pub fn destroy_view(
     if let Some(ppvid) = pv.parent_id {
         // get grand parent view/id
         let ppv = editor.view_map.get(&ppvid).unwrap().clone();
-        let mut ppv = ppv.write().unwrap();
+        let mut ppv = ppv.write();
 
         let pv_layout_index = pv.layout_index.unwrap();
 
@@ -1002,7 +1002,7 @@ pub fn destroy_view(
 
             // update link to grand-parent  (new parent)
             let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
-            let mut kept_v = kept_v.write().unwrap();
+            let mut kept_v = kept_v.write();
             kept_v.parent_id = Some(ppvid);
             kept_v.layout_index = Some(pv_layout_index);
 
@@ -1049,7 +1049,7 @@ pub fn destroy_view(
             }
 
             let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
-            let mut kept_v = kept_v.write().unwrap();
+            let mut kept_v = kept_v.write();
             kept_v.parent_id = None;
             kept_v.layout_index = None;
 

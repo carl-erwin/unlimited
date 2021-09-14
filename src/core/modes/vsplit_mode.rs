@@ -1,5 +1,5 @@
+use parking_lot::RwLock;
 use std::any::Any;
-use std::sync::RwLock;
 
 use std::rc::Rc;
 
@@ -93,7 +93,7 @@ impl VsplitMode {
 // TODO?: mode:on_pointer_drag(btn, x,y)
 
 pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     let evt = v.input_ctx.trigger.last();
     match evt {
@@ -163,17 +163,17 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
     if let Some(pvid) = v.parent_id {
         let pv = editor.view_map.get(&pvid).unwrap();
-        let mut pv = pv.write().unwrap();
+        let mut pv = pv.write();
 
         let lidx = v.layout_index.unwrap() - 1; // text-view
         dbg_println!("VSPLIT SCREEN WIDTH  = {}", env.width);
 
-        let max_size = pv.screen.read().unwrap().width();
+        let max_size = pv.screen.read().width();
 
         let sibling_vid = pv.children[lidx];
         let sbv = editor.view_map.get(&sibling_vid).unwrap();
-        let sbv = sbv.read().unwrap();
-        let cur_size = sbv.screen.read().unwrap().width();
+        let sbv = sbv.read();
+        let cur_size = sbv.screen.read().width();
 
         dbg_println!(
             "VSPLIT LIDX to resize = {}, sibling_vid {}",

@@ -1,6 +1,6 @@
+use parking_lot::RwLock;
 use std::any::Any;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use super::Mode;
 
@@ -113,7 +113,7 @@ impl<'a> Mode for BasicEditorMode {
         for i in 0..view.children.len() {
             let vid = view.children[i];
             let v = editor.view_map.get(&vid).unwrap();
-            v.write().unwrap().destroyable = false;
+            v.write().destroyable = false;
         }
 
         // TODO(ceg): put some kind of label on
@@ -125,7 +125,6 @@ impl<'a> Mode for BasicEditorMode {
         let title_vid = view.children[0];
         let v = editor.view_map.get(&title_vid).unwrap();
         v.write()
-            .unwrap()
             .compose_content_filters
             .borrow_mut()
             .push(Box::new(BasicEditorTitle::new()));
@@ -186,9 +185,9 @@ impl ContentFilter<'_> for BasicEditorTitle {
         self.title = format!("unlimitED {} ", VERSION);
         w = w.saturating_sub(self.title.len());
 
-        let view = view.read().unwrap();
+        let view = view.read();
         let d = view.document().unwrap();
-        let d = d.read().unwrap();
+        let d = d.read();
         let mut doc_info = format!("{}", d.name);
         let dlen = doc_info.len();
         if w > dlen {
@@ -213,10 +212,10 @@ impl ContentFilter<'_> for BasicEditorTitle {
 
             if let Some(parent) = view.parent_id {
                 if let Some(parent) = editor.view_map.get(&parent) {
-                    let parent = &parent.read().unwrap();
+                    let parent = &parent.read();
                     if let Some(focus) = parent.focus_to {
                         if let Some(v) = editor.view_map.get(&focus) {
-                            let v = &v.read().unwrap();
+                            let v = &v.read();
                             view_start_offset = v.start_offset;
                             view_end_offset = v.end_offset;
 

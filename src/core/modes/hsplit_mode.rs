@@ -1,7 +1,7 @@
 use std::any::Any;
 
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use super::Mode;
 
@@ -93,7 +93,7 @@ impl HsplitMode {
 // TODO?: mode:on_pointer_drag(btn, x,y)
 
 pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     let evt = v.input_ctx.trigger.last();
     match evt {
@@ -163,17 +163,17 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
     if let Some(pvid) = v.parent_id {
         let pv = editor.view_map.get(&pvid).unwrap();
-        let mut pv = pv.write().unwrap();
+        let mut pv = pv.write();
 
         let lidx = v.layout_index.unwrap() - 1; // text-view
         dbg_println!("HSPLIT SCREEN HEIGHT  = {}", env.height);
 
-        let max_size = pv.screen.read().unwrap().height();
+        let max_size = pv.screen.read().height();
 
         let sibling_vid = pv.children[lidx];
         let sbv = editor.view_map.get(&sibling_vid).unwrap();
-        let sbv = sbv.read().unwrap();
-        let cur_size = sbv.screen.read().unwrap().height();
+        let sbv = sbv.read();
+        let cur_size = sbv.screen.read().height();
 
         dbg_println!(
             "VSPLIT LIDX to resize = {}, sibling_vid {}",

@@ -6,10 +6,10 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use parking_lot::RwLock;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 extern crate libc;
 
@@ -138,8 +138,8 @@ pub fn main_loop<'a>(
 
                     if draw {
                         {
-                            let mut screen = screen.write().unwrap();
-                            let mut last_screen = last_screen.write().unwrap();
+                            let mut screen = screen.write();
+                            let mut last_screen = last_screen.write();
                             draw_view(&mut last_screen, &mut screen, &mut stdout);
                         }
                         last_screen = screen;

@@ -1,7 +1,7 @@
 /* DO NOT SPLIT THIS FILE YET: the filter apis are not stable enough */
 
+use parking_lot::RwLock;
 use std::char;
-use std::sync::RwLock;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -60,7 +60,7 @@ pub trait ContentFilter<'a> {
         input: &Vec<FilterIo>,
         output: &mut Vec<FilterIo>,
     ) -> () {
-        let mut view = view.read().unwrap();
+        let mut view = view.read();
         self.run(&mut view, &mut env, input, output);
     }
 
@@ -87,7 +87,7 @@ pub trait ScreenOverlayFilter<'a> {
     }
 
     fn run_managed(&mut self, view: &Rc<RwLock<View>>, mut env: &mut LayoutEnv) -> () {
-        let mut view = view.read().unwrap();
+        let mut view = view.read();
         self.run(&mut view, &mut env);
     }
 
@@ -189,7 +189,7 @@ pub fn run_compositing_stage(
         pass_mask,
     );
 
-    let mut view = view.write().unwrap();
+    let mut view = view.write();
     if let Some(offset) = screen.last_offset {
         view.end_offset = offset;
     }
@@ -204,7 +204,7 @@ fn compose_children(
     screen: &mut Screen,
     pass_mask: LayoutPass,
 ) -> bool {
-    let view = view.read().unwrap();
+    let view = view.read();
     if view.children.len() == 0 {
         return false;
     }
@@ -241,7 +241,7 @@ fn compose_children(
     let mut x = 0;
     let mut y = 0;
     for (idx, vid) in view.children.iter().enumerate() {
-        let mut child_v = editor.view_map.get(vid).unwrap().write().unwrap();
+        let mut child_v = editor.view_map.get(vid).unwrap().write();
         let (w, h) = if layout_dir_is_vertical {
             (width, sizes[idx])
         } else {
@@ -270,8 +270,8 @@ fn compose_children(
         let va = Rc::clone(editor.view_map.get(&vida).unwrap());
         let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
 
-        let pa = va.read().unwrap().compose_priority;
-        let pb = vb.read().unwrap().compose_priority;
+        let pa = va.read().compose_priority;
+        let pb = vb.read().compose_priority;
         dbg_println!("pa vid {} priority: {:?}", vida, pa);
         dbg_println!("pb vid {} priority: {:?}", vidb, pb);
         dbg_println!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
@@ -298,7 +298,7 @@ fn compose_children(
         let child_rc = child_rc.unwrap().clone();
 
         let start_offset = {
-            let child_v = child_rc.write().unwrap();
+            let child_v = child_rc.write();
             child_v.start_offset
         };
         {
@@ -324,16 +324,16 @@ fn compose_children(
             );
 
             {
-                let mut child_v = child_rc.write().unwrap();
+                let mut child_v = child_rc.write();
                 child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
             }
         }
 
         {
             let cbs = {
-                let mut child_v = child_rc.write().unwrap();
+                let mut child_v = child_rc.write();
                 let last_offset = {
-                    let child_screen = child_v.screen.as_ref().read().unwrap();
+                    let child_screen = child_v.screen.as_ref().read();
                     // composition: copy child to (parent's) output screen
                     screen.copy_screen_at_xy(&child_screen, x, y);
                     child_screen.last_offset
@@ -398,7 +398,7 @@ pub fn run_compositing_stage_direct(
     }
 
     {
-        dbg_println!("COMPOSE VID {:?}, ", view.read().unwrap().id);
+        dbg_println!("COMPOSE VID {:?}, ", view.read().id);
     }
 
     // Draw Leaf View
@@ -437,7 +437,7 @@ fn run_content_filters(
 ) {
     // setup
     let (filters, filter_in, filter_out) = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let filter_in = v.filter_in.clone();
         let filter_out = v.filter_out.clone();
         let filters = v.compose_content_filters.clone();
@@ -463,7 +463,7 @@ fn run_content_filters(
 
     // is interactive rendering possible ?
 
-    let view = view.read().unwrap();
+    let view = view.read();
     layout_env.quit = false;
     while layout_env.quit == false {
         loop_count += 1;
@@ -549,7 +549,7 @@ fn run_screen_overlay_filters(
 ) {
     // setup
     let filters = {
-        let v = view.read().unwrap();
+        let v = view.read();
         v.compose_screen_overlay_filters.clone()
     };
     for f in filters.borrow_mut().iter_mut() {
@@ -566,7 +566,7 @@ fn run_screen_overlay_filters(
 
     // is interactive rendering possible ?
 
-    let view = view.read().unwrap();
+    let view = view.read();
 
     for (idx, f) in filters.iter_mut().enumerate() {
         let t0 = std::time::Instant::now();

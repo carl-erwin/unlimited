@@ -5,7 +5,8 @@ use std::rc::Rc;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::sync::RwLock;
+
+use parking_lot::RwLock;
 
 use std::time::Instant;
 
@@ -204,7 +205,7 @@ impl<'a> Editor<'a> {
         let b = builder.finalize();
 
         let document_map = self.document_map.clone();
-        let mut document_map = document_map.write().unwrap();
+        let mut document_map = document_map.write();
 
         if let Some(b) = b {
             let id = document_map.len() as u64;
@@ -248,11 +249,11 @@ pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
     let view = editor.view_map.get(&env.view_id);
     let view = view.unwrap();
     let view = view.as_ref();
-    let mut view = view.write().unwrap();
+    let mut view = view.write();
 
     // resize ?
     {
-        let screen = view.screen.read().unwrap();
+        let screen = view.screen.read();
         if env.width == screen.width() && env.height == screen.height() {
             return;
         }
@@ -287,7 +288,7 @@ pub fn send_draw_event(
     ui_tx: &Sender<EventMessage>,
     view: &Rc<RwLock<View>>,
 ) {
-    let view = view.read().unwrap();
+    let view = view.read();
 
     let new_screen = Arc::clone(&view.screen);
 
@@ -395,7 +396,7 @@ fn process_single_input_event<'a>(
 ) -> bool {
     let mut view = &editor.view_map.get(&view_id).unwrap().clone();
     {
-        let v = view.read().unwrap();
+        let v = view.read();
         dbg_println!("DISPATCH EVENT TO VID {}", view_id);
         assert_eq!(v.id, view_id);
     }
@@ -408,7 +409,7 @@ fn process_single_input_event<'a>(
 
     // record input sequence
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         dbg_println!("eval input event input ev = {:?}", ev);
         dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
         v.input_ctx.trigger.push((*ev).clone());
@@ -418,7 +419,7 @@ fn process_single_input_event<'a>(
     // action_name = check_input_map_stack(editor, env, v);
     // {
     let action_name = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
 
         let stack_pos = if let Some(stack_pos) = v.input_ctx.stack_pos {
             // current map
@@ -507,7 +508,7 @@ fn process_single_input_event<'a>(
     };
 
     if action_name.is_none() {
-        let v = view.read().unwrap();
+        let v = view.read();
         if v.input_ctx.current_node.is_some() {
             dbg_println!(" no action found , but sequence started -> return false");
         } else {
@@ -519,7 +520,7 @@ fn process_single_input_event<'a>(
 
     // exec_input_action()
     let action = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
 
         let action_name = action_name.unwrap();
         dbg_println!("found action : [{}]", action_name);
@@ -543,7 +544,7 @@ fn process_single_input_event<'a>(
     dbg_println!("time to run action {} µs", (end - start).as_micros());
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         v.input_ctx.trigger.clear();
         v.input_ctx.current_node = None;
         v.input_ctx.stack_pos = None;
@@ -583,7 +584,7 @@ fn get_focused_vid(
 
     let view = view.unwrap().clone();
 
-    let v = view.read().unwrap();
+    let v = view.read();
     if v.children.len() == 0 {
         return vid;
     }
@@ -605,7 +606,7 @@ pub fn set_focus_on_vid(
         return;
     }
     let view = Rc::clone(view.unwrap());
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     set_focus_on_view(&mut editor, &mut env, &mut v);
 }
 
@@ -624,7 +625,7 @@ pub fn set_focus_on_view(
         if let Some(pid) = parent_id {
             dbg_println!("set_focus update parent_id {}", pid);
             if let Some(pview) = editor.view_map.get(&pid) {
-                let mut pview = pview.write().unwrap();
+                let mut pview = pview.write();
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
                 env.focus_on = vid; // Option ?
@@ -714,7 +715,7 @@ fn clip_coordinates_xy(
     loop {
         'inner: loop {
             if let Some(v) = editor.view_map.get(&id) {
-                let v = v.read().unwrap();
+                let v = v.read();
 
                 if v.children.len() == 0 {
                     dbg_println!("CLIPPING        no more children");
@@ -723,8 +724,8 @@ fn clip_coordinates_xy(
                 }
 
                 for child in v.children.iter() {
-                    let child_v = editor.view_map.get(&child).unwrap().write().unwrap();
-                    let screen = child_v.screen.read().unwrap();
+                    let child_v = editor.view_map.get(&child).unwrap().write();
+                    let screen = child_v.screen.read();
 
                     dbg_println!(
                     "CLIPPING dump child vid {} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
@@ -744,8 +745,8 @@ fn clip_coordinates_xy(
 
                 let mut last_id = 0;
                 for (idx, child) in v.children.iter().enumerate() {
-                    let child_v = editor.view_map.get(&child).unwrap().write().unwrap();
-                    let screen = child_v.screen.read().unwrap();
+                    let child_v = editor.view_map.get(&child).unwrap().write();
+                    let screen = child_v.screen.read();
 
                     last_id = child_v.id;
 
@@ -930,7 +931,7 @@ fn run_stage(
                         {
                             // NB: resize previous view's screen to lower memory usage
                             if let Some(view) = editor.view_map.get(&env.prev_vid) {
-                                view.write().unwrap().screen.write().unwrap().resize(1, 1);
+                                view.write().screen.write().resize(1, 1);
                             }
 
                             // prepare next view input
@@ -1154,8 +1155,8 @@ pub fn main_loop(
 
     // stop indexer
     {
-        for (_id, d) in editor.document_map.as_ref().read().unwrap().iter() {
-            d.as_ref().write().unwrap().abort_indexing = true;
+        for (_id, d) in editor.document_map.as_ref().read().iter() {
+            d.as_ref().write().abort_indexing = true;
         }
     }
 

@@ -5,9 +5,9 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::thread;
 
+use parking_lot::RwLock;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 #[macro_use]
 pub(crate) mod macros;
@@ -310,7 +310,7 @@ pub fn indexer(
                 }
 
                 Event::IndexTask { document_map } => {
-                    let map = document_map.read().unwrap();
+                    let map = document_map.read();
                     for (_id, doc) in map.iter() {
                         document::build_index(doc);
                     }
@@ -329,7 +329,7 @@ use crate::core::document::DocumentBuilder;
 /// TODO(ceg): replace this by load/unload doc functions
 /// the ui will open the documents on demand
 pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
-    let mut id = editor.document_map.read().unwrap().len() as u64;
+    let mut id = editor.document_map.read().len() as u64;
 
     for f in &editor.config.files_list {
         let b = DocumentBuilder::new()
@@ -339,14 +339,14 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
             .finalize();
 
         if let Some(b) = b {
-            b.as_ref().write().unwrap().id = id;
-            editor.document_map.write().unwrap().insert(id, b);
+            b.as_ref().write().id = id; // TODO(ceg): improve doc id generation
+            editor.document_map.write().insert(id, b);
             id += 1;
         }
     }
 
     // default buffer ?
-    let map_is_empty = editor.document_map.read().unwrap().is_empty();
+    let map_is_empty = editor.document_map.read().is_empty();
     if map_is_empty {
         // edit.get_untitled_count() -> 1
 
@@ -356,7 +356,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
             .finalize();
         if let Some(b) = b {
             {
-                let mut d = b.write().unwrap();
+                let mut d = b.write();
                 let s = WELCOME_MESSAGE.as_bytes();
 
                 // move 1st tag to ctor/doc::new() ?
@@ -368,7 +368,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
                 d.buffer_log_reset();
                 d.changed = false;
             }
-            editor.document_map.write().unwrap().insert(id, b);
+            editor.document_map.write().insert(id, b);
             id += 1;
         }
     }
@@ -376,7 +376,7 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
     dbg_println!("id {}", id);
 
     let document_map = editor.document_map.clone();
-    let document_map = document_map.read().unwrap();
+    let document_map = document_map.read();
 
     // create default views
     // sort by arg pos first

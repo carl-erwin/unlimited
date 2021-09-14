@@ -1,5 +1,5 @@
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::view::layout::ContentFilter;
 use crate::core::view::layout::FilterData;
@@ -112,7 +112,7 @@ impl ContentFilter<'_> for WordWrapFilter {
         // TODO(ceg): ask env.screen.cp_width(cp) -> nb_cells
         // or embed cp_width in FilterIo meta ?
 
-        let v = view.read().unwrap();
+        let v = view.read();
         if v.check_mode_ctx::<TextModeContext>("text-mode") {
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
             self.display_wrap = tm.display_word_wrap;

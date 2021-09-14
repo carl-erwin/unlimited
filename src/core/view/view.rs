@@ -1,11 +1,11 @@
 use core::panic;
 //
+use parking_lot::RwLock;
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Instant;
 
 use crate::core::document::Document;
@@ -342,7 +342,7 @@ pub fn register_view_subscriber(
     let src = editor.view_map.get(&src.id)?;
     let _dst = editor.view_map.get(&dst.id)?;
 
-    src.write().unwrap().subscribers.push(ctx);
+    src.write().subscribers.push(ctx);
 
     // ie: will call mode->on_view_event(editor, env, src, dst, event);
 
@@ -453,7 +453,7 @@ impl<'a> View<'a> {
     }
 
     pub fn dimension(&self) -> (usize, usize) {
-        self.screen.read().unwrap().dimension()
+        self.screen.read().dimension()
     }
 
     pub fn set_mode_ctx(&mut self, name: &str, ctx: Box<dyn Any>) -> bool {
@@ -500,8 +500,8 @@ impl<'a> View<'a> {
     }
 
     pub fn check_invariants(&self) {
-        self.screen.read().unwrap().check_invariants();
-        let _max_offset = self.document().unwrap().read().unwrap().size();
+        self.screen.read().check_invariants();
+        let _max_offset = self.document().unwrap().read().size();
         // TODO(ceg): mode check invariants
     }
 } // impl View
@@ -516,7 +516,7 @@ pub fn get_status_view(
         return env.status_view_id;
     }
 
-    let view = view.read().unwrap();
+    let view = view.read();
 
     if view.status_view_id.is_some() {
         return view.status_view_id;
@@ -525,7 +525,7 @@ pub fn get_status_view(
     let v = view;
     while let Some(pvid) = v.parent_id {
         let pv = editor.view_map.get(&pvid).unwrap();
-        let pv = pv.read().unwrap();
+        let pv = pv.read();
         if pv.status_view_id.is_some() {
             return pv.status_view_id;
         }
@@ -544,7 +544,7 @@ pub fn run_stage(
 ) {
     // TODO(ceg): Rc ?
     // exec order ?, path ?
-    let actions = view.read().unwrap().stage_actions.clone();
+    let actions = view.read().stage_actions.clone();
 
     // disable for composition ?
     for a in actions {
@@ -565,16 +565,16 @@ pub fn compute_view_layout(
     view: &Rc<RwLock<View>>,
 ) -> Option<()> {
     let (dimension, max_offset) = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let doc = v.document()?;
-        let max_offset = { doc.read().unwrap().size() as u64 };
-        let dimension = v.screen.read().unwrap().dimension();
+        let max_offset = { doc.read().size() as u64 };
+        let dimension = v.screen.read().dimension();
         (dimension, max_offset)
     };
 
     let screen = {
         let start_offset = {
-            let v = view.read().unwrap();
+            let v = view.read();
             v.start_offset
         };
 
@@ -595,7 +595,7 @@ pub fn compute_view_layout(
     };
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         if let Some(last_offset) = screen.last_offset {
             v.end_offset = last_offset;
         }

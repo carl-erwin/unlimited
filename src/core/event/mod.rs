@@ -1,6 +1,7 @@
 // module export
 pub mod input_map;
 
+use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -8,7 +9,6 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Instant;
 use std::vec::Vec;
 

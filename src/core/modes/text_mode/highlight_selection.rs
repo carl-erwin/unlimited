@@ -2,8 +2,8 @@ use crate::core::view::layout::ContentFilter;
 use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::Editor;
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::codepointinfo::TextStyle;
 
@@ -45,7 +45,7 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
     }
 
     fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         // TODO(ceg): compute selection ranges build vec[(min, max)] + index in selection ranges

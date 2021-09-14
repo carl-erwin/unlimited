@@ -74,10 +74,10 @@
 
 */
 
+use parking_lot::RwLock;
 use std::any::Any;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -340,10 +340,7 @@ impl<'a> Mode for TextMode {
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
 
-        tm.doc_subscription = doc
-            .write()
-            .unwrap()
-            .register_subscriber(text_mode_on_doc_event);
+        tm.doc_subscription = doc.write().register_subscriber(text_mode_on_doc_event);
 
         dbg_println!("CEG subscription {:?}", tm.doc_subscription);
 
@@ -353,7 +350,6 @@ impl<'a> Mode for TextMode {
             .as_ref()
             .unwrap()
             .write()
-            .unwrap()
             .tag(Instant::now(), 0, marks_offsets);
 
         // Config input map
@@ -604,14 +600,14 @@ pub fn run_text_mode_actions_vec(
             }
             Action::CenterAroundMainMarkIfOffScreen => {
                 let center = {
-                    let v = &mut view.write().unwrap();
+                    let v = &mut view.write();
 
                     let tm = v.mode_ctx::<TextModeContext>("text-mode");
                     let mid = tm.mark_index;
                     let marks = &tm.marks;
                     if marks.len() > 0 {
                         let offset = marks[mid].offset;
-                        let screen = v.screen.read().unwrap();
+                        let screen = v.screen.read();
                         !screen.contains_offset(offset)
                     } else {
                         false
@@ -635,7 +631,7 @@ pub fn run_text_mode_actions_vec(
             Action::MoveMarkToPreviousLine { idx: _usize } => {}
 
             Action::ResetMarks => {
-                let v = &mut view.write().unwrap();
+                let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 let offset = tm.marks[tm.mark_index].offset;
 
@@ -645,7 +641,7 @@ pub fn run_text_mode_actions_vec(
             }
 
             Action::CheckMarks => {
-                let v = &mut view.write().unwrap();
+                let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.marks.dedup();
                 tm.mark_index = tm.marks.len().saturating_sub(1);
@@ -658,7 +654,7 @@ pub fn run_text_mode_actions_vec(
             }
 
             Action::DedupAndSaveMarks => {
-                let v = &mut view.write().unwrap();
+                let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 //
@@ -668,7 +664,7 @@ pub fn run_text_mode_actions_vec(
 
                 //
                 let doc = v.document().unwrap();
-                let mut doc = doc.write().unwrap();
+                let mut doc = doc.write();
                 let max_offset = doc.size() as u64;
                 doc.tag(env.current_time, max_offset, marks_offsets);
 
@@ -676,7 +672,7 @@ pub fn run_text_mode_actions_vec(
             }
 
             Action::SaveMarks => {
-                let v = &mut view.write().unwrap();
+                let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 //
@@ -685,7 +681,7 @@ pub fn run_text_mode_actions_vec(
 
                 //
                 let doc = v.document().unwrap();
-                let mut doc = doc.write().unwrap();
+                let mut doc = doc.write();
                 let max_offset = doc.size() as u64;
                 doc.tag(env.current_time, max_offset, marks_offsets);
 
@@ -693,7 +689,7 @@ pub fn run_text_mode_actions_vec(
             }
 
             Action::CancelSelection => {
-                let v = &mut view.write().unwrap();
+                let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.select_point.clear();
             }
@@ -705,7 +701,7 @@ pub fn run_text_mode_actions_vec(
     // screen scrolling * key freq
     // if main mark offscreen ignore cache ?
     if update_read_cache {
-        let v = &mut view.write().unwrap();
+        let v = &mut view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.mark_index = tm.marks.len().saturating_sub(1);
 
@@ -718,13 +714,13 @@ pub fn run_text_mode_actions_vec(
             dbg_println!("max (mark) = {}", max);
 
             let doc = v.document().unwrap();
-            let mut doc = doc.write().unwrap();
+            let mut doc = doc.write();
 
             let (s, e) = doc.get_cache_range();
 
             // screen cache
             {
-                let screen = v.screen.read().unwrap();
+                let screen = v.screen.read();
                 let w = screen.width();
                 let h = screen.height();
                 let nb_screens = 1;
@@ -787,7 +783,7 @@ fn run_text_mode_actions(
     dbg_println!("run_text_mode_actions stage {:?} pos {:?},", stage, pos);
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.pre_compose_action.push(Action::UpdateReadCache);
     }
@@ -795,10 +791,10 @@ fn run_text_mode_actions(
     let actions: Vec<Action> = {
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
-                let mut v = view.write().unwrap();
+                let mut v = view.write();
                 let doc = v.document.clone();
                 let doc = doc.unwrap();
-                let doc = doc.read().unwrap();
+                let doc = doc.read();
 
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -815,11 +811,11 @@ fn run_text_mode_actions(
             }
 
             (editor::Stage::Input, editor::StagePosition::Post) => {
-                let mut v = view.write().unwrap();
+                let mut v = view.write();
                 let doc = v.document.clone();
 
                 if let Some(doc) = doc {
-                    let doc = doc.read().unwrap();
+                    let doc = doc.read();
                     let max_offset = doc.size() as u64;
 
                     // refresh view offset after user input
@@ -851,14 +847,14 @@ fn run_text_mode_actions(
 
             (editor::Stage::Compositing, editor::StagePosition::Pre) => {
                 // clear
-                let mut v = view.write().unwrap();
+                let mut v = view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.pre_compose_action.drain(..).collect()
             }
 
             (editor::Stage::Compositing, editor::StagePosition::Post) => {
                 // clear
-                let mut v = view.write().unwrap();
+                let mut v = view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.pre_compose_action.drain(..).collect()
             }
@@ -875,9 +871,9 @@ fn run_text_mode_actions(
     // CEG: is this true after undo redo with multiple cursors ?
     // TODO(ceg): cut/paste
     if !true {
-        let v = view.read().unwrap();
+        let v = view.read();
         let doc = v.document().unwrap();
-        let max_offset = doc.read().unwrap().size() as u64;
+        let max_offset = doc.read().size() as u64;
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         let marks = &tm.marks;
         for m in marks.iter() {
@@ -897,7 +893,7 @@ fn run_text_mode_actions(
 // text mode functions
 
 pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let offset = tm.marks[tm.mark_index].offset;
@@ -911,7 +907,7 @@ pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
 
 // text mode functions
 pub fn cancel_selection(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     tm.select_point.clear();
@@ -926,7 +922,7 @@ pub fn editor_cancel(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<
 pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     // TODO(ceg): 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     tm.pre_compose_action.push(Action::ScrollUp { n: 3 });
@@ -935,7 +931,7 @@ pub fn scroll_up(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<Vi
 pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     // TODO(ceg): 3 is from mode configuration
     // env["default-scroll-size"] -> int
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     tm.pre_compose_action.push(Action::ScrollDown { n: 3 });
@@ -950,7 +946,7 @@ pub fn insert_codepoint_array(
 ) {
     // InputEvent -> Vec<char>
     let array = {
-        let v = view.read().unwrap();
+        let v = view.read();
 
         assert!(v.input_ctx.trigger.len() > 0);
         let idx = v.input_ctx.trigger.len() - 1;
@@ -986,9 +982,9 @@ pub fn insert_codepoint_array(
 
     // doc read only ?
     {
-        let v = view.read().unwrap();
+        let v = view.read();
         let doc = v.document.as_ref().unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         if doc.is_syncing {
             // TODO(ceg): send/display notification
             return;
@@ -998,7 +994,7 @@ pub fn insert_codepoint_array(
     // check previous action:
     // if previous action was mark(s) move -> save current marks before modifying the buffer
     let save_marks = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         tm.prev_action == ActionType::MarksMove
@@ -1018,14 +1014,14 @@ pub fn insert_codepoint_array(
     copy_maybe_remove_selection(editor, env, view, false, true);
 
     let center = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let view_start = v.start_offset;
         let mut view_growth = 0;
         let mut offset: u64 = 0;
         {
             let mut doc = v.document.clone();
             let doc = doc.as_mut().unwrap();
-            let mut doc = doc.write().unwrap();
+            let mut doc = doc.write();
 
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.prev_action = ActionType::DocumentModification;
@@ -1082,12 +1078,12 @@ pub fn insert_codepoint_array(
         v.start_offset += view_growth;
 
         // mark off_screen ?
-        let screen = v.screen.read().unwrap();
+        let screen = v.screen.read();
         screen.contains_offset(offset) == false || array.len() > screen.width() * screen.height()
     };
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         if center {
@@ -1106,7 +1102,7 @@ pub fn remove_previous_codepoint(
 ) {
     // check previous action: if previous action was a mark move -> tag new positions
     let save_marks = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         tm.prev_action == ActionType::MarksMove
@@ -1126,13 +1122,13 @@ pub fn remove_previous_codepoint(
     }
 
     let mut scroll_down = 0;
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let start_offset = v.start_offset;
 
     {
         let doc = v.document.clone();
         let doc = doc.clone().unwrap();
-        let mut doc = doc.write().unwrap();
+        let mut doc = doc.write();
         if doc.size() == 0 {
             return;
         }
@@ -1197,7 +1193,7 @@ pub fn undo(
     // check previous action:
     // if previous action was mark(s) move -> save current marks before modifying the buffer
     let save_marks = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         tm.prev_action == ActionType::DocumentModification
@@ -1213,11 +1209,11 @@ pub fn undo(
         );
     }
 
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
@@ -1246,11 +1242,11 @@ pub fn undo(
 
 /// Redo the previous write operation and sync the screen around the main mark.<br/>
 pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
@@ -1303,14 +1299,14 @@ pub fn remove_codepoint(
         return;
     }
 
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let view_start = v.start_offset;
     let mut view_shrink: u64 = 0;
 
     {
         let mut doc = v.document.clone();
         let doc = doc.as_mut().unwrap();
-        let mut doc = doc.write().unwrap();
+        let mut doc = doc.write();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1356,11 +1352,11 @@ pub fn remove_until_end_of_word(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1439,12 +1435,12 @@ pub fn remove_until_end_of_word(
 
 // TODO(ceg): maintain main mark Option<(x,y)>
 pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let start_offset = v.start_offset;
 
     let doc = v.document().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1489,15 +1485,15 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let mut scroll_down = 0;
 
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
-    let screen_has_eof = v.screen.read().unwrap().has_eof();
+    let screen_has_eof = v.screen.read().has_eof();
     let end_offset = v.end_offset;
 
     //
     let doc = v.document.clone();
     let doc = doc.unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     dbg_println!("doc.size() {}", doc.size());
 
@@ -1570,12 +1566,12 @@ pub fn move_marks_to_start_of_line(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let doc = v.document().unwrap();
-    let doc = doc.read().unwrap();
+    let doc = doc.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -1604,12 +1600,12 @@ pub fn move_marks_to_end_of_line(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let doc = v.document().unwrap();
-    let doc = doc.read().unwrap();
+    let doc = doc.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1653,13 +1649,13 @@ fn move_offset_to_previous_line_index(
 ) -> u64 {
     let t0 = Instant::now();
 
-    let v = view.read().unwrap();
+    let v = view.read();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
     let (width, height) = screen.dimension();
 
     let doc = v.document().unwrap();
-    let _doc = doc.read().unwrap();
+    let _doc = doc.read();
 
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -1739,7 +1735,7 @@ fn move_on_screen_mark_to_previous_line(
     let mut mark_moved = false;
 
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
     let mut m = &mut marks[midx];
 
     // TODO(ceg): if v.is_mark_on_screen(m) -> (bool, x, y) + (prev/new offset)?
@@ -1802,7 +1798,7 @@ fn move_mark_to_previous_line(
 ) {
     // first try on screen mark move (except first line)
     let (m_offset, mark_moved) = {
-        let v = view.read().unwrap();
+        let v = view.read();
         move_on_screen_mark_to_previous_line(&editor, &env, &v, midx, &mut marks)
     };
     if mark_moved {
@@ -1818,14 +1814,14 @@ fn move_mark_to_previous_line(
     );
     {
         let (start_offset, end_offset, width, height) = {
-            let v = view.read().unwrap();
+            let v = view.read();
             let screen = v.screen.clone();
-            let screen = screen.read().unwrap();
+            let screen = screen.read();
             let (width, height) = screen.dimension();
 
             let doc = v.document.clone();
             let doc = doc.unwrap();
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
             let _doc_size = doc.size() as u64;
 
             // rewind at least "1 full" screen
@@ -1893,7 +1889,7 @@ fn move_mark_to_previous_line(
         // or a specific flag is passed like screen-follow-mark
         //if !screen.contains_offset(m_offset) {
         {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             v.start_offset = line_start_off;
         }
 
@@ -1911,7 +1907,7 @@ pub fn move_marks_to_previous_line(
     view: &Rc<RwLock<View>>,
 ) {
     let (mut marks, idx_max) = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         // TODO(ceg): maintain env.mark_index_max ?
@@ -1940,7 +1936,7 @@ pub fn move_marks_to_previous_line(
 
     {
         // copy back
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks = marks;
@@ -2067,8 +2063,8 @@ pub fn move_mark_to_next_line(
     // TODO(ceg): m.on_buffer_end() ?
 
     let max_offset = {
-        let v = view.read().unwrap();
-        v.document().unwrap().read().unwrap().size() as u64
+        let v = view.read();
+        v.document().unwrap().read().size() as u64
     };
 
     // off_screen ?
@@ -2077,7 +2073,7 @@ pub fn move_mark_to_next_line(
 
     {
         let (screen, mut m) = {
-            let v = view.read().unwrap();
+            let v = view.read();
             let screen = v.screen.clone();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
@@ -2094,10 +2090,10 @@ pub fn move_mark_to_next_line(
 
         dbg_println!("TRYING TO MOVE TO NEXT LINE MARK offset {}", m.offset);
 
-        let screen = screen.read().unwrap();
+        let screen = screen.read();
         let (ok, offsets, action) = move_on_screen_mark_to_next_line(&mut m, &screen);
         {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
             tm.marks[mark_idx] = m;
@@ -2122,16 +2118,16 @@ pub fn move_mark_to_next_line(
 
         // mark is off_screen
         let (screen_width, screen_height) = {
-            let view = view.write().unwrap();
-            let screen = view.screen.read().unwrap();
+            let view = view.write();
+            let screen = view.screen.read();
             (screen.width(), screen.height())
         };
 
         // get start_of_line(m.offset) -> u64
         let start_offset = {
-            let v = &view.read().unwrap();
+            let v = &view.read();
             let doc = v.document().unwrap();
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
@@ -2182,9 +2178,9 @@ pub fn move_mark_to_next_line(
 
         // compute column
         let new_x = {
-            let v = &view.read().unwrap();
+            let v = &view.read();
             let doc = v.document().unwrap();
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -2212,9 +2208,9 @@ pub fn move_mark_to_next_line(
 
         let mut tmp_mark = Mark::new(line_start_off);
 
-        let v = &view.read().unwrap();
+        let v = &view.read();
         let doc = v.document().unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
 
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
@@ -2230,7 +2226,7 @@ pub fn move_mark_to_next_line(
     }
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks[mark_idx].offset = m_offset;
     }
@@ -2243,9 +2239,9 @@ pub fn move_mark_to_next_line(
 // allocate and sets screen.first_offset
 fn allocate_temporary_screen_and_start_offset(view: &Rc<RwLock<View>>) -> (Screen, u64) {
     let (width, height, first_offset) = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let screen = v.screen.clone();
-        let screen = screen.read().unwrap();
+        let screen = screen.read();
         let first_offset = screen.first_offset.unwrap();
 
         let width = screen.width();
@@ -2263,7 +2259,7 @@ fn allocate_temporary_screen_and_start_offset(view: &Rc<RwLock<View>>) -> (Scree
 
 // min offset, max index
 fn get_marks_min_offset_and_max_idx(view: &Rc<RwLock<View>>) -> (u64, usize) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let idx_max = tm.marks.len();
@@ -2279,10 +2275,10 @@ fn get_marks_min_offset_and_max_idx(view: &Rc<RwLock<View>>) -> (u64, usize) {
 }
 
 fn sync_mark(view: &Rc<RwLock<View>>, m: &mut Mark) -> u64 {
-    let v = view.read().unwrap();
+    let v = view.read();
     let doc = v.document.clone();
     let doc = doc.unwrap();
-    let doc = doc.read().unwrap();
+    let doc = doc.read();
 
     // ctx
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
@@ -2316,13 +2312,13 @@ pub fn move_marks_to_next_line(
     // check main mark, TODO(cef) proper function ?
     loop {
         let screen = {
-            let v = view.read().unwrap();
+            let v = view.read();
             v.screen.clone()
         };
-        let mut screen = screen.as_ref().write().unwrap();
+        let mut screen = screen.as_ref().write();
 
         let mut mark = {
-            let mut v = view.write().unwrap();
+            let mut v = view.write();
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
             // 1 mark ?
@@ -2392,7 +2388,7 @@ pub fn move_marks_to_next_line(
 
             // NB: update view after scroll
             {
-                let mut v = view.write().unwrap();
+                let mut v = view.write();
                 v.start_offset = new_start;
                 if let Some(last_offset) = screen.last_offset {
                     v.end_offset = last_offset; // DO NOT REMOVE
@@ -2428,7 +2424,7 @@ pub fn move_marks_to_next_line(
             // build screen overlay
             {
                 {
-                    let mut v = view.write().unwrap();
+                    let mut v = view.write();
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                     tm.marks[0] = mark; // save update
                     dbg_println!("main mark updated (fast path) {:?}", tm.marks[0]);
@@ -2470,7 +2466,7 @@ pub fn move_marks_to_next_line(
 
     // copy all marks
     let mut marks = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.marks.clone()
     };
@@ -2482,7 +2478,7 @@ pub fn move_marks_to_next_line(
 
     // update all marks
     {
-        let _v = view.read().unwrap();
+        let _v = view.read();
         let mut idx_index = 0;
         while idx_index < idx_max {
             dbg_println!(" idx_index {} < idx_max {}", idx_index, idx_max);
@@ -2614,9 +2610,9 @@ pub fn move_marks_to_next_line(
 
     // check main mark
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let screen = v.screen.clone();
-        let screen = screen.as_ref().read().unwrap();
+        let screen = screen.as_ref().read();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -2655,7 +2651,7 @@ pub fn clone_and_move_mark_to_previous_line(
     view: &Rc<RwLock<View>>,
 ) {
     let (mut marks, prev_off) = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         (tm.marks.clone(), tm.marks[0].offset)
     };
@@ -2670,9 +2666,9 @@ pub fn clone_and_move_mark_to_previous_line(
         }
     }
 
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     tm.marks = marks;
@@ -2713,7 +2709,7 @@ pub fn clone_and_move_mark_to_next_line(
 ) {
     // refresh mark index
     let mark_len = {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         let mark_len = {
@@ -2742,13 +2738,13 @@ pub fn clone_and_move_mark_to_next_line(
 
     dbg_println!(" clone move down: offsets {:?}", offsets);
 
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     // no move ?
     if offsets.0 == offsets.1 {
         let was_on_screen = {
             let screen = v.screen.clone();
-            let screen = screen.read().unwrap();
+            let screen = screen.read();
             screen.contains_offset(offsets.0)
         };
 
@@ -2771,7 +2767,7 @@ pub fn clone_and_move_mark_to_next_line(
     // update view.mark_index
 
     let (was_on_screen, is_on_screen) = {
-        let screen = v.screen.read().unwrap();
+        let screen = v.screen.read();
         let was_on_screen = screen.contains_offset(offsets.0);
         let is_on_screen = screen.contains_offset(offsets.1);
         dbg_println!(
@@ -2803,7 +2799,7 @@ pub fn move_mark_to_screen_start(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -2823,7 +2819,7 @@ pub fn move_mark_to_screen_end(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let (start_offset, end_offset) = (v.start_offset, v.end_offset);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -2845,8 +2841,8 @@ pub fn scroll_to_previous_screen(
 ) {
     {
         let nb = {
-            let v = view.read().unwrap();
-            let screen = v.screen.read().unwrap();
+            let v = view.read();
+            let screen = v.screen.read();
             let height = screen.height();
             ::std::cmp::max(height - 1, 1)
         };
@@ -2863,7 +2859,7 @@ pub fn move_mark_to_start_of_file(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     v.start_offset = 0;
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -2880,16 +2876,16 @@ pub fn move_mark_to_end_of_file(
 
     view: &Rc<RwLock<View>>,
 ) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
 
     let offset = {
         let doc = v.document().unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         doc.size() as u64
     };
     v.start_offset = offset;
 
-    let n = v.screen.read().unwrap().height() / 2;
+    let n = v.screen.read().height() / 2;
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     tm.mark_index = 0;
@@ -2902,8 +2898,8 @@ pub fn move_mark_to_end_of_file(
 }
 
 pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
-    let n = ::std::cmp::max(v.screen.read().unwrap().height() - 1, 1);
+    let mut v = view.write();
+    let n = ::std::cmp::max(v.screen.read().height() - 1, 1);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     tm.pre_compose_action.push(Action::ScrollDown { n });
@@ -2923,10 +2919,10 @@ pub fn cut_to_end_of_line(
 ) {
     // doc read only ?
     {
-        let v = view.read().unwrap();
+        let v = view.read();
         let doc = v.document.clone();
         let doc = doc.unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         if doc.is_syncing {
             return;
         }
@@ -2941,11 +2937,11 @@ pub fn cut_to_end_of_line(
         &vec![Action::DedupAndSaveMarks],
     );
 
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -3000,13 +2996,13 @@ pub fn cut_to_end_of_line(
 }
 
 pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     // doc read only ?
     {
         let doc = v.document.clone();
         let doc = doc.unwrap();
-        let doc = doc.read().unwrap();
+        let doc = doc.read();
         if doc.is_syncing {
             return;
         }
@@ -3014,7 +3010,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
 
     let mut doc = v.document.clone();
     let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -3062,7 +3058,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
     tm.pre_compose_action.push(Action::CancelSelection);
 
     // // mark off_screen ?
-    // let screen = v.screen.read().unwrap();
+    // let screen = v.screen.read();
     // screen.contains_offset(offset) == false || array.len() > screen.width() * screen.height()
     // };
     //
@@ -3078,13 +3074,13 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 
     let mut center = false;
 
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let doc = v.document.clone();
     let doc = doc.unwrap();
-    let doc = doc.read().unwrap();
+    let doc = doc.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -3117,13 +3113,13 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let mut sync = false;
 
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let doc = v.document.clone();
     let doc = doc.unwrap();
-    let doc = doc.read().unwrap();
+    let doc = doc.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -3162,7 +3158,7 @@ pub fn set_selection_points_at_marks(
     let sync = false;
 
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let vid = v.id;
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -3178,7 +3174,7 @@ pub fn set_selection_points_at_marks(
     if sync
     /* always center ? */
     {
-        let mut v = view.write().unwrap();
+        let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         tm.pre_compose_action.push(Action::CenterAroundMainMark);
     }
@@ -3192,12 +3188,12 @@ pub fn copy_maybe_remove_selection_symmetric(
     copy: bool,
     remove: bool,
 ) -> (usize, usize) {
-    let v = &mut view.as_ref().clone().write().unwrap();
+    let v = &mut view.as_ref().clone().write();
 
     // doc
     let doc = v.document.clone();
     let doc = doc.clone().unwrap();
-    let mut doc = doc.write().unwrap();
+    let mut doc = doc.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -3276,7 +3272,7 @@ pub fn copy_maybe_remove_selection(
     remove: bool,
 ) -> usize {
     let symmetric = {
-        let v = &mut view.as_ref().clone().write().unwrap();
+        let v = &mut view.as_ref().clone().write();
         let _start_offset = v.start_offset;
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         let symmetric = tm.marks.len() == tm.select_point.len();
@@ -3319,7 +3315,7 @@ pub fn copy_maybe_remove_selection(
     // save marks: TODO(ceg): save marks before
     // cmp cur marks after and if changed save new marks
     {
-        let v = &mut view.as_ref().clone().write().unwrap();
+        let v = &mut view.as_ref().clone().write();
         let _tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     }
 
@@ -3344,7 +3340,7 @@ pub fn cut_selection(
 }
 
 pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let (button, x, y) = match v.input_ctx.trigger[0] {
         InputEvent::ButtonPress(ref button_event) => match button_event {
@@ -3384,7 +3380,7 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
     }
 
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     let (w, h) = screen.dimension();
 
@@ -3433,11 +3429,11 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
         }
     }
 
-    // s // to internal view.write().unwrap().state.s
+    // s // to internal view.write().state.s
 }
 
 pub fn button_release(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
 
     let (button, _x, _y) = match v.input_ctx.trigger[0] {
         InputEvent::ButtonRelease(ref button_event) => match button_event {
@@ -3471,9 +3467,9 @@ pub fn button_release(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
 
 // TODO(ceg): add enter /leave clipped region detection
 pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write().unwrap();
+    let v = &mut view.write();
     let screen = v.screen.clone();
-    let screen = screen.read().unwrap();
+    let screen = screen.read();
 
     if !v.check_mode_ctx::<TextModeContext>("text-mode") {
         return;
@@ -3552,7 +3548,7 @@ pub fn center_around_mark(
     view: &Rc<RwLock<View>>,
 ) {
     let offset = {
-        let v = view.read().unwrap();
+        let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         tm.marks[tm.mark_index].offset
     };
@@ -3567,9 +3563,9 @@ pub fn center_around_offset(
 ) {
     if let Some(center_offset) = env.center_offset {
         let offset = {
-            let v = view.read().unwrap();
+            let v = view.read();
             let doc = v.document().unwrap();
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
             ::std::cmp::min(doc.size() as u64, center_offset)
         };
 
@@ -3578,7 +3574,7 @@ pub fn center_around_offset(
 }
 
 pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     let s = if let Some(s) = tm.char_map.as_mut().unwrap().get(&'\n') {
@@ -3597,7 +3593,7 @@ pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 }
 
 pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write().unwrap();
+    let mut v = view.write();
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     tm.display_word_wrap = !tm.display_word_wrap;
@@ -3736,7 +3732,7 @@ pub fn scroll_view_up(
     nb_lines: usize,
 ) {
     let off = {
-        let v = view.read().unwrap();
+        let v = view.read();
         if v.start_offset == 0 || nb_lines == 0 {
             return;
         }
@@ -3750,7 +3746,7 @@ pub fn scroll_view_up(
         let start_offset = v.start_offset;
         move_offset_to_previous_line_index(editor, env, &view, start_offset, nb_lines)
     };
-    view.write().unwrap().start_offset = off;
+    view.write().start_offset = off;
 }
 
 pub fn scroll_view_down(
@@ -3761,7 +3757,7 @@ pub fn scroll_view_down(
 ) {
     let mut view_start_offset = None;
     {
-        let v = view.read().unwrap();
+        let v = view.read();
 
         dbg_println!("SCROLL DOWN VID = {}", v.id);
 
@@ -3772,24 +3768,24 @@ pub fn scroll_view_down(
 
         let max_offset = {
             let doc = v.document().unwrap();
-            let doc = doc.read().unwrap();
+            let doc = doc.read();
             doc.size() as u64
         };
 
         // avoid useless scroll
-        if v.screen.read().unwrap().has_eof() {
+        if v.screen.read().has_eof() {
             dbg_println!("SCROLLDOWN {} : view has EOF", nb_lines);
             return;
         }
 
-        let h = v.screen.read().unwrap().height();
-        if nb_lines >= v.screen.read().unwrap().height() {
+        let h = v.screen.read().height();
+        if nb_lines >= v.screen.read().height() {
             dbg_println!("SCROLLDOWN {} > view.H {}:  TRY OFFSCREEN", nb_lines, h);
 
             // slower : call layout builder to build  nb_lines - screen.height()
             let off = scroll_down_view_off_screen(&view, editor, env, max_offset, nb_lines);
             {
-                view.write().unwrap().start_offset = off;
+                view.write().start_offset = off;
             }
 
             return;
@@ -3799,7 +3795,7 @@ pub fn scroll_view_down(
 
         for idx in 0..=(h - nb_lines) {
             // just read the current screen
-            if let Some(l) = v.screen.write().unwrap().get_line(nb_lines + idx) {
+            if let Some(l) = v.screen.write().get_line(nb_lines + idx) {
                 let cpi = &l[0].cpi;
                 // set first offset of screen.line[nb_lines] as next screen start
                 if let Some(offset) = cpi.offset {
@@ -3813,7 +3809,7 @@ pub fn scroll_view_down(
     }
 
     if let Some(offset) = view_start_offset {
-        view.write().unwrap().start_offset = offset;
+        view.write().start_offset = offset;
     }
 }
 
@@ -3826,9 +3822,9 @@ fn scroll_down_view_off_screen(
 ) -> u64 {
     // will be slower than just reading the current screen
 
-    let v = view.read().unwrap();
-    let screen_width = v.screen.read().unwrap().width();
-    let screen_height = v.screen.read().unwrap().height() + 32;
+    let v = view.read();
+    let screen_width = v.screen.read().width();
+    let screen_height = v.screen.read().height() + 32;
 
     let start_offset = v.start_offset;
     let end_offset = ::std::cmp::min(
@@ -3867,8 +3863,8 @@ pub fn center_view_around_offset(
 ) {
     // TODO use env.center_offset
     {
-        view.write().unwrap().start_offset = offset;
+        view.write().start_offset = offset;
     }
-    let h = view.read().unwrap().screen.read().unwrap().height() / 2;
+    let h = view.read().screen.read().height() / 2;
     scroll_view_up(view, editor, env, h);
 }

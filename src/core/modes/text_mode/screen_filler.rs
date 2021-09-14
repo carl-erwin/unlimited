@@ -7,8 +7,8 @@ use crate::core::view::layout::FilterIo;
 use crate::core::view::layout::LayoutEnv;
 use crate::core::view::View;
 use crate::core::Editor;
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
@@ -62,7 +62,7 @@ impl<'a> ScreenFilter {
                 let msg = EventMessage::new(
                     0, // get_next_seq(&mut seq), TODO
                     crate::core::event::Event::DrawEvent {
-                        screen: std::sync::Arc::new(std::sync::RwLock::new(Box::new(new_screen))),
+                        screen: std::sync::Arc::new(RwLock::new(Box::new(new_screen))),
                         time: std::time::Instant::now(),
                     },
                 );

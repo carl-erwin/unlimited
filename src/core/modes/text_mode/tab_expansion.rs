@@ -1,5 +1,5 @@
+use parking_lot::RwLock;
 use std::rc::Rc;
-use std::sync::RwLock;
 
 use crate::core::codec::text::u32_to_char;
 use crate::core::view::layout::ContentFilter;

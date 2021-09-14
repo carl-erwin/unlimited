@@ -21,7 +21,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 const DEBUG: bool = false;
 
@@ -177,7 +178,7 @@ impl Node {
                 let chunk_size = std::cmp::min(n - pos, 1024 * 16);
                 // not atomic
                 {
-                    let mut fd = fd.as_ref().unwrap().write().unwrap();
+                    let mut fd = fd.as_ref().unwrap().write();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
                     assert!(nrd == chunk_size);
@@ -206,7 +207,7 @@ impl Node {
             v.set_len(capacity);
         };
 
-        let mut fd = fd.as_ref().unwrap().write().unwrap();
+        let mut fd = fd.as_ref().unwrap().write();
 
         let _ = fd.seek(SeekFrom::Start(storage_offset));
 
@@ -768,7 +769,7 @@ impl<'a> MappedFile<'a> {
     // creates an iterator over an arbitrary node index
     // always start @ local_offset 0
     pub fn iter_from_node_index(file_: &FileHandle<'a>, node_idx: NodeIndex) -> FileIterator<'a> {
-        let file = file_.write().unwrap();
+        let file = file_.write();
 
         let page = file.pool[node_idx as usize].page.upgrade().unwrap();
         let slice = page.borrow().as_slice().unwrap();
@@ -785,7 +786,7 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn iter_from(file_: &FileHandle<'a>, offset: u64) -> FileIterator<'a> {
-        let mut file = file_.write().unwrap();
+        let mut file = file_.write();
 
         let fd = if let Some(fd) = &file.fd {
             Some(Arc::clone(fd))
@@ -1075,7 +1076,7 @@ impl<'a> MappedFile<'a> {
         // check iterator type
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
             MappedFileIterator::End(ref rcfile) => {
-                let mut file = rcfile.as_ref().write().unwrap();
+                let mut file = rcfile.as_ref().write();
                 let fd = if let Some(fd) = &file.fd {
                     Some(Arc::clone(fd))
                 } else {
@@ -1104,7 +1105,7 @@ impl<'a> MappedFile<'a> {
 
         if DEBUG {
             let rcfile = it_.get_file();
-            let file = rcfile.as_ref().write().unwrap();
+            let file = rcfile.as_ref().write();
 
             MappedFile::print_all_used_nodes(&file, "BEFORE INSERT");
         }
@@ -1130,7 +1131,7 @@ impl<'a> MappedFile<'a> {
 
             // update parents
             let rcfile = it_.get_file();
-            let mut file = rcfile.as_ref().write().unwrap();
+            let mut file = rcfile.as_ref().write();
             MappedFile::update_hierarchy(
                 &mut file.pool,
                 node_to_split,
@@ -1152,7 +1153,7 @@ impl<'a> MappedFile<'a> {
         }
 
         let rcfile = it_.get_file();
-        let mut file = rcfile.as_ref().write().unwrap();
+        let mut file = rcfile.as_ref().write();
 
         let base_offset = match node_to_split {
             Some(idx) => file.pool[idx as usize].storage_offset.unwrap_or(0),
@@ -1397,11 +1398,9 @@ impl<'a> MappedFile<'a> {
         let (mut file, start_idx, mut local_offset) = match &mut *it_ {
             MappedFileIterator::End(..) => return 0,
 
-            MappedFileIterator::Real(ref it) => (
-                it.file.as_ref().write().unwrap(),
-                it.node_idx,
-                it.local_offset,
-            ),
+            MappedFileIterator::Real(ref it) => {
+                (it.file.as_ref().write(), it.node_idx, it.local_offset)
+            }
         };
 
         MappedFile::print_all_used_nodes(&file, "remove : BEFORE deletion");
@@ -2040,7 +2039,7 @@ impl<'a> MappedFileIterator<'a> {
             MappedFileIterator::Real(ref it) => {
                 let mut pos = it.local_offset;
                 let mut idx = it.node_idx;
-                let file = it.file.as_ref().read().unwrap();
+                let file = it.file.as_ref().read();
                 loop {
                     let node = &file.pool[idx];
                     if node.parent.is_none() {
@@ -2109,7 +2108,7 @@ impl<'a> Iterator for MappedFileIterator<'a> {
 
             MappedFileIterator::Real(ref mut it) => {
                 if it.local_offset == it.page_size {
-                    let mut file = it.file.write().unwrap();
+                    let mut file = it.file.write();
 
                     let fd = if file.fd.is_none() {
                         None
@@ -2307,8 +2306,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().write().unwrap().sub_page_size = 1024 * 128;
-        file.as_ref().write().unwrap().sub_page_reserve = 1024 * 4;
+        file.as_ref().write().sub_page_size = 1024 * 128;
+        file.as_ref().write().sub_page_reserve = 1024 * 4;
 
         for i in 0..1_000_000 {
             {
@@ -2360,8 +2359,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().write().unwrap().sub_page_size = 4096;
-        file.as_ref().write().unwrap().sub_page_reserve = 10;
+        file.as_ref().write().sub_page_size = 4096;
+        file.as_ref().write().sub_page_reserve = 10;
 
         for i in 0..5 {
             dbg_println!("-- insert loop {}", i);
@@ -2375,11 +2374,8 @@ mod tests {
             }
         }
 
-        MappedFile::sync_to_storage(
-            &mut file.as_ref().write().unwrap(),
-            &"/tmp/mapped_file.sync_test",
-        )
-        .unwrap();
+        MappedFile::sync_to_storage(&mut file.as_ref().write(), &"/tmp/mapped_file.sync_test")
+            .unwrap();
 
         dbg_println!("-- file.size() {}", file.as_ref().read().unwrap().size());
 
