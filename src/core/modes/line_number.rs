@@ -443,7 +443,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     if idx == 0 {
                         offset = cell.cpi.offset.unwrap();
                     }
-                    if cell.cpi.cp == '\n' {
+                    if cell.cpi.metadata == false && cell.cpi.cp == '\n' {
                         line_number += 1;
                         break;
                     }
