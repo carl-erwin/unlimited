@@ -212,7 +212,7 @@ impl Node {
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
                                                                                  //let t1_read = std::time::Instant::now();
-                                                                                 //eprintln!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
+                                                                                 //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     assert!(nrd == chunk_size);
                 }
                 pos += chunk_size;
@@ -265,7 +265,7 @@ impl Node {
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
                                                                                  //let t1_read = std::time::Instant::now();
-                                                                                 //eprintln!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
+                                                                                 //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     assert!(nrd == chunk_size);
                 }
                 pos += chunk_size;

@@ -239,7 +239,7 @@ impl DocumentEventCb for LineNumberModeDocEventHandler {
             DocumentEvent::NodeChanged { node_index } => {}
 
             _ => {
-                eprintln!("unhandled event {:?}", event);
+                dbg_println!("unhandled event {:?}", event);
             }
         }
 

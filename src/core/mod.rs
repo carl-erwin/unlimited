@@ -303,7 +303,7 @@ pub fn indexer(
         return;
     }
 
-    eprintln!("[starting worker thread (indexer)]");
+    dbg_println!("[starting worker thread (indexer)]");
     loop {
         if let Ok(evt) = worker_rx.recv() {
             match evt.event {
@@ -314,7 +314,7 @@ pub fn indexer(
 
                 // TODO(ceg): split in sub-threads/async task
                 Event::IndexTask { document_map } => {
-                    eprintln!("[receive index task ]");
+                    dbg_println!("[receive index task ]");
 
                     let map = document_map.read();
                     for (_id, doc) in map.iter() {

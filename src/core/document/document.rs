@@ -368,7 +368,7 @@ impl<'a> Document<'a> {
 
             for (i, count) in node.byte_count.iter().enumerate() {
                 if i == 10 {
-                    eprintln!("ROOT NODE byte_count[{}] = {}", i, count);
+                    dbg_println!("ROOT NODE byte_count[{}] = {}", i, count);
                 }
             }
         }
@@ -1163,7 +1163,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
     }
 
     let t1 = std::time::Instant::now();
-    eprintln!("index time {:?} ms", (t1 - t0).as_millis());
+    dbg_println!("index time {:?} ms", (t1 - t0).as_millis());
 
     {
         // set index status flags
@@ -1177,7 +1177,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             let file = doc.buffer.data.read();
             if let Some(root_index) = file.root_index() {
                 let node = &file.pool[root_index];
-                eprintln!(
+                dbg_println!(
                     "{} : Number of lines {}",
                     doc.file_name(),
                     node.byte_count[b'\n' as usize]

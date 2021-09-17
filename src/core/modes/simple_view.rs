@@ -71,7 +71,7 @@ impl<'a> Mode for SimpleViewMode {
         mut v: &mut View<'static>,
     ) {
         let doc = v.document();
-//        let doc_sz = doc.as_ref().unwrap().read().size();
+        //        let doc_sz = doc.as_ref().unwrap().read().size();
         let line_number_view_width = 13 + 2;
 
         // children_layout_and_modes
