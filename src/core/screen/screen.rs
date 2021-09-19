@@ -462,11 +462,7 @@ impl Screen {
             }
         }
 
-        // self.buffer[self.push_count].cpi = cpi;
-        unsafe {
-            let mut cell = self.buffer.get_unchecked_mut(self.push_count);
-            cell.cpi = cpi;
-        }
+        self.buffer[self.push_count].cpi = cpi;
 
         for i in 1..unicode_width {
             self.buffer[self.push_count + i].cpi = cpi;
