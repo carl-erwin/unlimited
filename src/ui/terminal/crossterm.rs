@@ -743,6 +743,11 @@ fn translate_crossterm_event(
                 height: height as usize,
             };
         }
+
+        ::crossterm::event::Event::Terminate => {
+            // TODO(ceg): not really an input
+            return InputEvent::NoInputEvent;
+        }
     }
 
     // return InputEvent::NoInputEvent;

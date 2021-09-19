@@ -21,7 +21,7 @@ clap = "2.33.*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 #crossterm = { git = "https://github.com/crossterm-rs/crossterm" , branch = "0.20" }
-crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "fix-input-flush-fcntl" }
+crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "sigterm-handler" }
 unicode-width = "0.1.8"
 utf8parse = "0.2.0"
 
