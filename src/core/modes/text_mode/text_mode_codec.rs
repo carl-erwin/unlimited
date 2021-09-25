@@ -403,7 +403,13 @@ impl ContentFilter<'_> for Utf8Filter {
         &"Utf8Filter"
     }
 
-    fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        _env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         self.ctx = Utf8FilterCtx::new();
     }
 

@@ -44,7 +44,13 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
         &"HighlightSelectionFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        env: &mut LayoutEnv,
+        view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 

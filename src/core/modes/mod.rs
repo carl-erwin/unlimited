@@ -70,6 +70,7 @@ pub trait Mode {
         _src: ViewEventSource,
         _dst: ViewEventDestination,
         _event: &ViewEvent,
+        _parent: Option<&mut View<'static>>,
     ) {
     }
 }

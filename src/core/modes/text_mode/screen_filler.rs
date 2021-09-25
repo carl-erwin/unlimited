@@ -98,7 +98,13 @@ impl ContentFilter<'_> for ScreenFilter {
         &"ScreenFilter"
     }
 
-    fn setup(&mut self, editor: &Editor<'static>, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        editor: &Editor<'static>,
+        _env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         self.first_offset = None;
         self.last_offset = None;
 

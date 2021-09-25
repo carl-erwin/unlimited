@@ -24,7 +24,13 @@ impl ContentFilter<'_> for UnicodeToTextFilter {
         &"UnicodeToTextFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         self.cur_offset = env.base_offset;
     }
 

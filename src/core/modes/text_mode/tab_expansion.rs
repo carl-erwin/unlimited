@@ -30,7 +30,13 @@ impl ContentFilter<'_> for TabFilter {
         &"TabFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         self.prev_cp = '\u{0}';
         self.column_count = 0;
         if env.graphic_display {

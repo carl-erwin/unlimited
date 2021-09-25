@@ -232,6 +232,7 @@ pub struct ViewEventDestination {
 #[derive(Debug, Clone, Copy)]
 pub enum ViewEvent {
     Subscribe,
+    PreComposition,
     PostComposition,
     OffsetsChange { start_offset: u64, end_offset: u64 },
 }
@@ -345,7 +346,7 @@ pub fn register_view_subscriber(
     dst: ViewEventDestination,
 ) -> Option<()> {
     mode.borrow()
-        .on_view_event(&mut editor, &mut env, src, dst, &ViewEvent::Subscribe);
+        .on_view_event(&mut editor, &mut env, src, dst, &ViewEvent::Subscribe, None);
 
     let ctx = (mode, src, dst);
     let src_view = editor.view_map.get(&src.id)?;
@@ -564,7 +565,7 @@ pub fn run_stage(
 pub fn compute_view_layout(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) -> Option<()> {
     let (dimension, max_offset) = {
         let v = view.read();

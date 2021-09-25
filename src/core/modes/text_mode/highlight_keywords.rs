@@ -75,7 +75,13 @@ impl ContentFilter<'_> for HighlightFilter {
         &"HighlightFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         self.token_io = Vec::new();
         self.token_type = TokenType::Unknown;
         self.utf8_token = Vec::new();

@@ -60,6 +60,7 @@ use crate::core::view::layout::LayoutEnv;
 use crate::core::view::layout::ScreenOverlayFilter;
 
 use crate::core::view;
+use crate::core::view::LayoutOperation;
 use crate::core::view::View;
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
@@ -67,6 +68,32 @@ use crate::core::view::ViewEventSource;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+
+fn num_digit(v: usize) -> usize {
+    match v {
+        _ if v < 10 => 1,
+        _ if v < 100 => 2,
+        _ if v < 1000 => 3,
+        _ if v < 10000 => 4,
+        _ if v < 100000 => 5,
+        _ if v < 1000000 => 6,
+        _ if v < 10000000 => 7,
+        _ if v < 100000000 => 8,
+        _ if v < 1000000000 => 9,
+        _ if v < 10000000000 => 10,
+        _ if v < 100000000000 => 11,
+        _ if v < 1000000000000 => 12,
+        _ if v < 10000000000000 => 13,
+        _ if v < 100000000000000 => 14,
+        _ if v < 1000000000000000 => 15,
+        _ if v < 10000000000000000 => 16,
+        _ if v < 100000000000000000 => 17,
+        _ if v < 1000000000000000000 => 18,
+        _ if v < 10000000000000000000 => 19,
+        _ => 20,
+    }
+}
+
 // document meta data map
 lazy_static! {
     static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, RwLock<LineNumberDocumentMetaData>>>> =
@@ -189,6 +216,7 @@ impl<'a> Mode for LineNumberMode {
         src: ViewEventSource,
         dst: ViewEventDestination,
         event: &ViewEvent,
+        parent: Option<&mut View<'static>>,
     ) {
         let src_view = editor.view_map.get(&src.id).unwrap().write();
         let mut dst_view = editor.view_map.get(&dst.id).unwrap().write();
@@ -206,6 +234,32 @@ impl<'a> Mode for LineNumberMode {
                     dst_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
                 mode_ctx.target_vid = src.id;
             }
+
+            ViewEvent::PreComposition => {
+                // TODO(ceg): resize line-number view
+                let doc = src_view.document();
+                let doc = doc.as_ref().unwrap().read();
+                let max_offset = doc.size() as u64 + 1;
+                let width = if !doc.indexed {
+                    // '@offset '
+                    1 + num_digit(max_offset as usize) + 1
+                } else {
+                    let ret = get_byte_count_at_offset(&doc, '\n' as usize, max_offset);
+                    let n = num_digit(ret.0 as usize + 1); // nb line = line count + 1
+                    // 'xxxx '
+                    n + 1
+                };
+
+                if let Some(p_view) = parent {
+                    p_view.layout_ops[dst_view.layout_index.unwrap()] =
+                        LayoutOperation::Fixed { size: width };
+                } else {
+                    panic!("");
+                }
+
+                // TODO store width
+            }
+
             _ => {}
         }
     }
@@ -276,6 +330,7 @@ impl LineNumberOverlayFilter {
 //                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
 //
 //
+// return (line_count, offset's node_index)
 fn get_byte_count_at_offset(
     doc: &Document,
     byte_index: usize,
@@ -328,91 +383,18 @@ fn get_byte_count_at_offset(
     (0, None)
 }
 
-// right walk
-fn _get_byte_count_at_offset_v2(
-    doc: &Document,
-    byte_index: usize,
-    offset: u64,
-) -> (u64, Option<usize>) {
-    assert!(byte_index < 256);
-
-    let mut file = doc.buffer.data.as_ref().write();
-    let mut cur_index = file.root_index();
-    if cur_index.is_none() {
-        return (0, None);
-    }
-
-    let mut total_count = file.pool[cur_index.unwrap()].byte_count[byte_index];
-
-    let mut local_offset = offset;
-
-    while cur_index != None {
-        let idx = cur_index.unwrap();
-        let p_node = &file.pool[idx];
-
-        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
-        if is_leaf {
-            // TODO(ceg): linear count count lf until local_offset is reached
-            // get node data
-            let data = document::get_node_data(&mut file, Some(idx));
-            for b in data.iter().skip(local_offset as usize) {
-                if *b as usize == byte_index {
-                    total_count -= 1;
-                }
-            }
-            return (total_count, cur_index);
-        }
-
-        let parent_total_count = file.pool[idx].byte_count[byte_index];
-
-        let mut left_byte_count = 0;
-        let mut right_byte_count = 0;
-        let mut left_node_size = 0;
-
-        #[derive(Debug, PartialEq)]
-        enum Direction {
-            Left,
-            Right,
-        }
-
-        let mut dir = Direction::Right;
-
-        if let Some(right_index) = p_node.link.right {
-            let right_node = &file.pool[right_index];
-            right_byte_count = right_node.byte_count[byte_index];
-        }
-
-        if let Some(left_index) = p_node.link.left {
-            let left_node = &file.pool[left_index];
-
-            left_byte_count = left_node.byte_count[byte_index];
-            left_node_size = left_node.size;
-
-            if local_offset < left_node.size {
-                dir = Direction::Left;
-            }
-        }
-
-        assert_eq!(parent_total_count, left_byte_count + right_byte_count);
-
-        if dir == Direction::Left {
-            total_count -= right_byte_count;
-            cur_index = p_node.link.left;
-        } else {
-            cur_index = p_node.link.right;
-            local_offset -= left_node_size;
-        }
-    }
-
-    panic!("");
-}
-
 impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
     fn name(&self) -> &'static str {
         &"LineNumberOverlay"
     }
 
-    fn setup(&mut self, editor: &Editor, _env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        editor: &Editor,
+        _env: &mut LayoutEnv,
+        view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         let view = view.read();
         let mode_ctx = view.mode_ctx::<LineNumberModeContext>("line-number-mode");
         let target_vid = mode_ctx.target_vid;
@@ -460,9 +442,11 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             let mut prev_line = 0;
             for (idx, e) in self.line_number.iter().enumerate() {
                 let s = if idx > 0 && e.1 .0 == prev_line {
-                    format!("             ") // AFTER DEBUG ENABLE THIS
+                    // clear line
+                    format!("") // AFTER DEBUG ENABLE THIS
                 } else {
-                    format!("{: >13}", e.1 .0 + 1)
+                    //format!("{: >13}", e.1.0 + 1)
+                    format!("{}", e.1 .0 + 1)
                 };
                 prev_line = e.1 .0;
 

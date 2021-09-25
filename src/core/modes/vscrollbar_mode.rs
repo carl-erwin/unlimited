@@ -99,6 +99,7 @@ impl<'a> Mode for VscrollbarMode {
         src: ViewEventSource,
         dst: ViewEventDestination,
         _event: &ViewEvent,
+        _parent: Option<&mut View<'static>>,
     ) {
         let src = editor.view_map.get(&src.id).unwrap().write();
 

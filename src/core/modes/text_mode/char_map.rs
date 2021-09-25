@@ -34,7 +34,13 @@ impl ContentFilter<'_> for CharMapFilter {
         &"CharMapFilter"
     }
 
-    fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        _env: &mut LayoutEnv,
+        view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         let char_map = tm.char_map.clone();

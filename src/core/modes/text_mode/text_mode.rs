@@ -556,7 +556,7 @@ impl TextMode {
 pub fn run_text_mode_actions_vec(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     actions: &Vec<Action>,
 ) {
     let mut update_read_cache = true;
@@ -918,7 +918,7 @@ pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<
 pub fn insert_codepoint_array(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // InputEvent -> Vec<char>
     let array = {
@@ -1073,8 +1073,7 @@ pub fn insert_codepoint_array(
 pub fn remove_previous_codepoint(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // check previous action: if previous action was a mark move -> tag new positions
     let save_marks = {
@@ -1164,7 +1163,7 @@ pub fn remove_previous_codepoint(
 pub fn undo(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // check previous action:
     // if previous action was mark(s) move -> save current marks before modifying the buffer
@@ -1269,7 +1268,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
 pub fn remove_codepoint(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     if copy_maybe_remove_selection(editor, env, view, false, true) > 0 {
         return;
@@ -1619,19 +1618,22 @@ pub fn move_marks_to_end_of_line(
 fn move_offset_to_previous_line_index(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     offset: u64,
     line_index: usize,
 ) -> u64 {
     let t0 = Instant::now();
 
-    let v = view.read();
-    let screen = v.screen.clone();
-    let screen = screen.read();
-    let (width, height) = screen.dimension();
-
-    let rewind = (width * height * 4) as u64;
-    let start_offset = offset.saturating_sub(rewind);
+    // NOTE(ceg): this pattern begs for sub function: get_start_offset and dimension
+    let (start_offset, width, height) = {
+        let v = view.read();
+        let screen = v.screen.clone();
+        let screen = screen.read();
+        let (width, height) = screen.dimension();
+        let rewind = (width * height * 4) as u64;
+        let start_offset = offset.saturating_sub(rewind);
+        (start_offset, width, height)
+    };
 
     // TODO(ceg): codec.sync_forward(off) -> off (start_offset)
     // if we are in the middle of a utf8 sequence we move max 4 bytes until a starting point is reached
@@ -1761,8 +1763,7 @@ fn move_on_screen_mark_to_previous_line(
 fn move_mark_to_previous_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     midx: usize,
     mut marks: &mut Vec<Mark>,
 ) {
@@ -1874,7 +1875,7 @@ pub fn move_marks_to_previous_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
 
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     let (mut marks, idx_max) = {
         let mut v = view.write();
@@ -2027,7 +2028,7 @@ pub fn move_on_screen_mark_to_next_line(
 pub fn move_mark_to_next_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     mark_idx: usize,
 ) -> Option<(u64, u64)> {
     // TODO(ceg): m.on_buffer_end() ?
@@ -2276,7 +2277,7 @@ fn sync_mark(view: &Rc<RwLock<View>>, m: &mut Mark) -> u64 {
 pub fn move_marks_to_next_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // fast mode: 1 mark, on screen
     // check main mark, TODO(cef) proper function ?
@@ -2448,7 +2449,6 @@ pub fn move_marks_to_next_line(
 
     // update all marks
     {
-        let _v = view.read();
         let mut idx_index = 0;
         while idx_index < idx_max {
             dbg_println!(" idx_index {} < idx_max {}", idx_index, idx_max);
@@ -2617,8 +2617,7 @@ pub fn move_marks_to_next_line(
 pub fn clone_and_move_mark_to_previous_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     let (mut marks, prev_off) = {
         let v = view.read();
@@ -2675,7 +2674,7 @@ pub fn clone_and_move_mark_to_next_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
 
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // refresh mark index
     let mark_len = {
@@ -2806,8 +2805,7 @@ pub fn move_mark_to_screen_end(
 pub fn scroll_to_previous_screen(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     {
         let nb = {
@@ -2885,7 +2883,7 @@ pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &
 pub fn cut_to_end_of_line(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     // doc read only ?
     {
@@ -3236,8 +3234,7 @@ pub fn copy_maybe_remove_selection_non_symmetric(
 pub fn copy_maybe_remove_selection(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     copy: bool,
     remove: bool,
 ) -> usize {
@@ -3296,7 +3293,7 @@ pub fn copy_maybe_remove_selection(
 pub fn copy_selection(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     copy_maybe_remove_selection(editor, env, view, true, false);
 }
@@ -3304,7 +3301,7 @@ pub fn copy_selection(
 pub fn cut_selection(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     copy_maybe_remove_selection(editor, env, view, true, true);
 }
@@ -3515,7 +3512,7 @@ pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc
 pub fn center_around_mark(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     let offset = {
         let v = view.read();
@@ -3529,7 +3526,7 @@ pub fn center_around_mark(
 pub fn center_around_offset(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
 ) {
     if let Some(center_offset) = env.center_offset {
         let offset = {
@@ -3574,7 +3571,7 @@ pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
 /// using the run_compositing_stage function until end_offset is reached.<br/>
 /// It is up to the caller to synchronize the starting point
 pub fn get_lines_offsets_direct(
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     start_offset: u64,
@@ -3696,31 +3693,32 @@ pub fn get_lines_offsets_direct(
  new_h = screen.weight + (nb_lines * screen.width * max_codec_encode_size)
 */
 pub fn scroll_view_up(
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     nb_lines: usize,
 ) {
     let off = {
-        let v = view.read();
-        if v.start_offset == 0 || nb_lines == 0 {
-            return;
-        }
+        let start_offset = {
+            let v = view.read();
+            if v.start_offset == 0 || nb_lines == 0 {
+                return;
+            }
 
-        dbg_println!(
-            "SCROLL VIEW UP N={} START OFFSET {}",
-            nb_lines,
+            dbg_println!(
+                "SCROLL VIEW UP N={} START OFFSET {}",
+                nb_lines,
+                v.start_offset
+            );
             v.start_offset
-        );
-
-        let start_offset = v.start_offset;
+        };
         move_offset_to_previous_line_index(editor, env, &view, start_offset, nb_lines)
     };
     view.write().start_offset = off;
 }
 
 pub fn scroll_view_down(
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     nb_lines: usize,
@@ -3784,7 +3782,7 @@ pub fn scroll_view_down(
 }
 
 fn scroll_down_view_off_screen(
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     max_offset: u64,
@@ -3826,7 +3824,7 @@ fn scroll_down_view_off_screen(
 }
 
 pub fn center_view_around_offset(
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     offset: u64,

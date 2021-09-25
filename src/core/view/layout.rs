@@ -49,7 +49,13 @@ pub struct LayoutEnv<'a> {
 pub trait ContentFilter<'a> {
     fn name(&self) -> &'static str;
 
-    fn setup(&mut self, _editor: &Editor<'static>, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor<'static>,
+        _env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         /* default implementation is empty*/
     }
 
@@ -82,7 +88,13 @@ pub trait ContentFilter<'a> {
 pub trait ScreenOverlayFilter<'a> {
     fn name(&self) -> &'static str;
 
-    fn setup(&mut self, _editor: &Editor, _env: &mut LayoutEnv, _view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        _editor: &Editor,
+        _env: &mut LayoutEnv,
+        _view: &Rc<RwLock<View>>,
+        _parent_view: Option<&View<'static>>,
+    ) {
         /* default implementation is empty*/
     }
 
@@ -173,7 +185,7 @@ impl FilterIo {
 pub fn run_compositing_stage(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
     screen: &mut Screen,
@@ -198,13 +210,13 @@ pub fn run_compositing_stage(
 fn compose_children(
     mut editor: &mut Editor<'static>,
     mut editor_env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     _base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,   // default view.doc.size()   end  -> Option<u64>
     screen: &mut Screen,
     pass_mask: LayoutPass,
 ) -> bool {
-    let view = view.read();
+    let mut view = view.write();
     if view.children.len() == 0 {
         return false;
     }
@@ -217,6 +229,38 @@ fn compose_children(
     let (width, height) = (screen.width(), screen.height());
     if width == 0 || height == 0 {
         return false;
+    }
+
+    // TODO(ceg): add pass here to let the children resize themselves
+    // ex: line view width depends on target view number of line
+    // add: flag to allow resize ?
+    // View::self_resize_allowed: bool
+    let children_idx = view.children.clone();
+    for (_idx, vid) in children_idx.iter().enumerate() {
+        let child_rc = Rc::clone(editor.view_map.get(&vid).unwrap());
+        let child_rc = child_rc.clone();
+        let cbs = {
+            let child_v = child_rc.read();
+            child_v.subscribers.clone()
+        };
+
+        //
+        // NB: notify subscribers just before composition
+        // use View::compose_priority to order notifications
+        // NOTE(ceg): currently we do not have event filters
+        if !screen.is_off_screen {
+            for cb in cbs.iter() {
+                let mode = cb.0.as_ref();
+                mode.borrow().on_view_event(
+                    &mut editor,
+                    &mut editor_env,
+                    cb.1,
+                    cb.2,
+                    &ViewEvent::PreComposition,
+                    Some(&mut view),
+                );
+            }
+        }
     }
 
     // cache size ?
@@ -240,7 +284,8 @@ fn compose_children(
     // 2 - compose based on sibling dependencies/priority
     let mut x = 0;
     let mut y = 0;
-    for (idx, vid) in view.children.iter().enumerate() {
+    let children_idx = view.children.clone();
+    for (idx, vid) in children_idx.iter().enumerate() {
         let mut child_v = editor.view_map.get(vid).unwrap().write();
         let (w, h) = if layout_dir_is_vertical {
             (width, sizes[idx])
@@ -357,6 +402,7 @@ fn compose_children(
                         cb.1,
                         cb.2,
                         &ViewEvent::PostComposition,
+                        None,
                     );
                 }
             }
@@ -372,7 +418,7 @@ fn compose_children(
 pub fn run_compositing_stage_direct(
     mut editor: &mut Editor<'static>,
     mut editor_env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View>>,
+    view: &Rc<RwLock<View<'static>>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
     mut screen: &mut Screen,
@@ -421,19 +467,20 @@ pub fn run_compositing_stage_direct(
     let mut time_spent: Vec<u128> = vec![];
 
     if pass_mask == LayoutPass::Content || pass_mask == LayoutPass::ContentAndScreenOverlay {
-        run_content_filters(&editor, &mut time_spent, &view, &mut layout_env);
+        run_content_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
     }
 
     if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ContentAndScreenOverlay {
-        run_screen_overlay_filters(&editor, &mut time_spent, &view, &mut layout_env);
+        run_screen_overlay_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
     }
 }
 
 fn run_content_filters(
     editor: &Editor<'static>,
+    mut layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,
-    mut layout_env: &mut LayoutEnv,
+    parent_view: Option<&View<'static>>,
 ) {
     // setup
     let (filters, filter_in, filter_out) = {
@@ -445,7 +492,7 @@ fn run_content_filters(
     };
     for f in filters.borrow_mut().iter_mut() {
         //dbg_println!("setup {}", f.name());
-        f.setup(&editor, &mut layout_env, &view);
+        f.setup(&editor, &mut layout_env, &view, parent_view);
     }
 
     let mut filters = filters.borrow_mut();
@@ -543,9 +590,10 @@ fn run_content_filters(
 
 fn run_screen_overlay_filters(
     editor: &Editor<'static>,
+    mut layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,
-    mut layout_env: &mut LayoutEnv,
+    parent_view: Option<&View<'static>>,
 ) {
     // setup
     let filters = {
@@ -554,7 +602,7 @@ fn run_screen_overlay_filters(
     };
     for f in filters.borrow_mut().iter_mut() {
         //dbg_println!("setup {}", f.name());
-        f.setup(&editor, &mut layout_env, &view);
+        f.setup(&editor, &mut layout_env, &view, parent_view);
     }
 
     let mut filters = filters.borrow_mut();

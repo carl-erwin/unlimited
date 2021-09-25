@@ -177,7 +177,13 @@ impl ContentFilter<'_> for BasicEditorTitle {
         &"editor-title"
     }
 
-    fn setup(&mut self, editor: &Editor, env: &mut LayoutEnv, view: &Rc<RwLock<View>>) {
+    fn setup(
+        &mut self,
+        editor: &Editor,
+        env: &mut LayoutEnv,
+        view: &Rc<RwLock<View>>,
+        parent_view: Option<&View<'static>>,
+    ) {
         self.width = env.screen.width();
         self.height = env.screen.height();
 
@@ -210,17 +216,14 @@ impl ContentFilter<'_> for BasicEditorTitle {
             let mut view_start_offset = 0;
             let mut view_end_offset = 0;
 
-            if let Some(parent) = view.parent_id {
-                if let Some(parent) = editor.view_map.get(&parent) {
-                    let parent = &parent.read();
-                    if let Some(focus) = parent.focus_to {
-                        if let Some(v) = editor.view_map.get(&focus) {
-                            let v = &v.read();
-                            view_start_offset = v.start_offset;
-                            view_end_offset = v.end_offset;
+            if let Some(parent) = parent_view {
+                if let Some(focus) = parent.focus_to {
+                    if let Some(v) = editor.view_map.get(&focus) {
+                        let v = &v.read();
+                        view_start_offset = v.start_offset;
+                        view_end_offset = v.end_offset;
 
-                            have_offset = true;
-                        }
+                        have_offset = true;
                     }
                 }
             }
