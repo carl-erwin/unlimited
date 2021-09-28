@@ -246,6 +246,7 @@ impl<'a> Mode for LineNumberMode {
                 } else {
                     let ret = get_byte_count_at_offset(&doc, '\n' as usize, max_offset);
                     let n = num_digit(ret.0 as usize + 1); // nb line = line count + 1
+
                     // 'xxxx '
                     n + 1
                 };
@@ -438,6 +439,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
     fn run(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
         env.screen.clear();
 
+        let w = env.screen.width();
         if !self.line_number.is_empty() {
             let mut prev_line = 0;
             for (idx, e) in self.line_number.iter().enumerate() {
@@ -445,10 +447,14 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     // clear line
                     format!("") // AFTER DEBUG ENABLE THIS
                 } else {
-                    //format!("{: >13}", e.1.0 + 1)
                     format!("{}", e.1 .0 + 1)
                 };
                 prev_line = e.1 .0;
+
+                let padding = w - s.len() - 1;
+                for _ in 0..padding {
+                    env.screen.push(CodepointInfo::new());
+                }
 
                 for c in s.chars() {
                     let mut cpi = CodepointInfo::new();
