@@ -244,7 +244,7 @@ impl<'a> Mode for LineNumberMode {
                     // '@offset '
                     1 + num_digit(max_offset as usize) + 1
                 } else {
-                    let ret = get_byte_count_at_offset(&doc, '\n' as usize, max_offset);
+                    let ret = get_document_byte_count_at_offset(&doc, '\n' as usize, max_offset);
                     let n = num_digit(ret.0 as usize + 1); // nb line = line count + 1
 
                     // 'xxxx '
@@ -332,7 +332,7 @@ impl LineNumberOverlayFilter {
 //
 //
 // return (line_count, offset's node_index)
-fn get_byte_count_at_offset(
+fn get_document_byte_count_at_offset(
     doc: &Document,
     byte_index: usize,
     offset: u64,
@@ -410,10 +410,10 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
-        // call to get_byte_count_at_offset are SLOW : compute only the first line
+        // call to get_document_byte_count_at_offset are SLOW : compute only the first line
         // and read the target screen to compute relative line count
         for offset in self.line_offsets.iter().take(1) {
-            let n = get_byte_count_at_offset(&doc, '\n' as usize, offset.0);
+            let n = get_document_byte_count_at_offset(&doc, '\n' as usize, offset.0);
             self.line_number.push((offset.0, n));
         }
 
