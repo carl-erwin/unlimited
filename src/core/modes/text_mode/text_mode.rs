@@ -1466,56 +1466,51 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     let end_offset = v.end_offset;
 
     //
-    let doc = v.document.clone();
-    let doc = doc.unwrap();
+    let doc = v.document().unwrap();
     let mut doc = doc.write();
 
     dbg_println!("doc.size() {}", doc.size());
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-    let codec = tm.text_codec.as_ref();
-
-    let midx = tm.mark_index;
-
-    // update read cache
     let nr_marks = tm.marks.len();
-    if !nr_marks == 0 {
+    if nr_marks == 0 {
         return;
     }
+
+    // update read cache
+    let midx = tm.mark_index;
     let min = tm.marks[0].offset;
     let max = tm.marks[nr_marks - 1].offset;
-
     doc.set_cache(min, max);
 
-    let nr_marks = {
-        for (idx, m) in tm.marks.iter_mut().enumerate() {
-            let before = m.offset;
-            dbg_println!("before forward : m.offset = {}", before);
+    //
+    let prev_main_mark = tm.marks[midx];
 
-            // mark move off_screen ? scroll down 1 line
-            m.move_forward(&doc, codec); // TODO(ceg): check error
+    /* TODO(ceg): check error */
+    let codec = tm.text_codec.as_ref();
+    for m in tm.marks.iter_mut() {
+        m.move_forward(&doc, codec);
+    }
 
-            dbg_println!("after forward : m.offset = {}", m.offset);
-
-            // TODO(ceg): end_offset is not set properly at startup
-            // main mark + on screen ?
-            if before > 0
-                && idx == midx
-                && m.offset != before
-                && m.offset > end_offset
-                && !screen_has_eof
-            {
-                dbg_println!("m.offset {} > v.end_offset {}", m.offset, end_offset);
-                scroll_down = 1;
-            }
-        }
-
-        // update main mark index
-        tm.marks.len()
-    };
+    // mark move off_screen ? scroll down 1 line
+    // TODO(ceg): end_offset is not set properly at startup
+    // main mark + on screen ?
+    let main_mark = tm.marks[midx];
+    if prev_main_mark.offset > 0
+        && main_mark.offset != prev_main_mark.offset
+        && main_mark.offset > end_offset
+        && !screen_has_eof
+    {
+        dbg_println!(
+            "main_mark.offset {} > v.end_offset {}",
+            main_mark.offset,
+            end_offset
+        );
+        scroll_down = 1;
+    }
 
     // TODO(ceg):  tm.pre_compose_action.push(Action::SelectLastMark);
+    let nr_marks = tm.marks.len();
     tm.mark_index = nr_marks.saturating_sub(1); // TODO(ceg): dedup ?
 
     //      move this check at post render to reschedule render ?
@@ -1524,7 +1519,7 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     //      }
 
     if scroll_down > 0 {
-        dbg_println!("schedule scrolldown n = {}", scroll_down);
+        dbg_println!("schedule scroll down n = {}", scroll_down);
 
         tm.pre_compose_action
             .push(Action::ScrollDown { n: scroll_down });

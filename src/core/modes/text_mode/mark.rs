@@ -7,7 +7,7 @@ use crate::core::codec::text::TextCodec;
 const DEBUG: bool = false;
 
 //
-#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Mark {
     pub offset: u64,
 }
