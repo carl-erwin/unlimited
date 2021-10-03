@@ -11,3 +11,4 @@ perf*
 *.files
 *.includes
 *.creator.user
+.vscode
