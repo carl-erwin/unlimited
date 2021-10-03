@@ -682,22 +682,6 @@ pub fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
     }
 }
 
-pub fn screen_apply_all<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
-    screen: &mut Screen,
-    mut on_cpi: F,
-) {
-    for l in 0..screen.height() {
-        if let Some(line) = screen.get_line_mut(l) {
-            for (c, cell) in line.iter_mut().enumerate() {
-                let cpi = &mut cell.cpi;
-                if on_cpi(c, l, cpi) == false {
-                    return;
-                }
-            }
-        }
-    }
-}
-
 // TODO(ceg): test are broken
 #[test]
 fn test_screen() {}

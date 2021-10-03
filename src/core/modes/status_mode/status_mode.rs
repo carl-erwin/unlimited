@@ -14,7 +14,7 @@ use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::modes::text_mode::WordWrapFilter;
 use crate::core::view::View;
 
-use crate::core::screen::screen_apply_all;
+use crate::core::screen::screen_apply;
 
 use crate::dbg_println;
 
@@ -141,7 +141,7 @@ impl ContentFilter<'_> for StatusModeCompose {
         }
 
         // default
-        screen_apply_all(&mut env.screen, |_, _, cpi| {
+        screen_apply(&mut env.screen, |_, _, cpi| {
             //cpi.style.color = (255, 255, 255);
             cpi.style.color = (0, 0, 0);
             cpi.style.bg_color = (113, 114, 123);
