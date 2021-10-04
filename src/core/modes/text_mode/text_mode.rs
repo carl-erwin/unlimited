@@ -34,7 +34,7 @@
 
     instant search/find: search-as-you-type  case(in)sensitive
     form search/find:   fill-form-and-search
-
+    reverse
 
     ////
 
@@ -98,7 +98,6 @@ use crate::core::codec::text::utf8;
 use crate::core::codec::text::SyncDirection; // TODO(ceg): remove
 use crate::core::codec::text::TextCodec;
 
-use crate::core::document;
 use crate::core::document::BufferOperation;
 use crate::core::document::BufferOperationType;
 
@@ -1477,7 +1476,7 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
         return;
     }
 
-    // update read cache
+    // set read cache between first and last mark (TODO: remove this, move cache updates to doc.read() + with size)
     let midx = tm.mark_index;
     let min = tm.marks[0].offset;
     let max = tm.marks[nr_marks - 1].offset;
@@ -3567,8 +3566,8 @@ pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
 /// It is up to the caller to synchronize the starting point
 pub fn get_lines_offsets_direct(
     view: &Rc<RwLock<View<'static>>>,
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     start_offset: u64,
     end_offset: u64,
     screen_width: usize,
@@ -3656,23 +3655,12 @@ pub fn get_lines_offsets_direct(
 
         // eof reached ?
         if screen.has_eof() {
-            //            dbg_println!("add virtual EOF");
             return lines;
         }
 
         if screen.push_count == 0 {
-            //            dbg_println!("screen.push_count == 0");
             return lines;
         }
-        /*
-                dbg_println!(
-                    "screen first/last = {:?}/{:?}",
-                    screen.first_offset,
-                    screen.last_offset
-                );
-
-                dbg_println!("screen.current_line_index == {}", screen.current_line_index);
-        */
 
         // the next screen start is the offset past le last line last offset
         let l = screen.get_last_used_line().unwrap();
@@ -3824,10 +3812,7 @@ pub fn center_view_around_offset(
     env: &mut EditorEnv<'static>,
     offset: u64,
 ) {
-    // TODO use env.center_offset
-    {
-        view.write().start_offset = offset;
-    }
+    view.write().start_offset = offset;
     let h = view.read().screen.read().height() / 2;
     scroll_view_up(view, editor, env, h);
 }
