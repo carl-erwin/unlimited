@@ -11,22 +11,23 @@ use std::io::prelude::*;
 //
 use crate::core::editor::user_is_active;
 
-use super::buffer::Buffer;
-use super::buffer::OpenMode;
-
 use crate::core::mapped_file::MappedFile;
 use crate::core::mapped_file::MappedFileEvent;
 use crate::core::mapped_file::UpdateHierarchyOp;
 
 use crate::core::mapped_file::NodeIndex;
 
-//
-pub use super::bufferlog::BufferLog;
-pub use super::bufferlog::BufferOperation;
-pub use super::bufferlog::BufferOperationType;
+use super::buffer::Buffer;
+use super::buffer::OpenMode;
+
+use super::bufferlog::BufferLog;
+use super::bufferlog::BufferOperation;
+use super::bufferlog::BufferOperationType;
 
 //
-pub type Id = u64; // TODO change to usize
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id(pub usize);
 
 ///
 #[derive(Debug)]
@@ -250,7 +251,7 @@ impl<'a> Document<'a> {
         }
 
         let doc = Document {
-            id: 0,
+            id: Id(0),
             name: document_name.clone(),
             buffer: buffer.unwrap(),
             cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View

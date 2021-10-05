@@ -335,7 +335,7 @@ use crate::core::document::DocumentBuilder;
 /// TODO(ceg): replace this by load/unload doc functions
 /// the ui will open the documents on demand
 pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
-    let mut id = editor.document_map.read().len() as u64;
+    let mut id = editor.document_map.read().len();
 
     for f in &editor.config.files_list {
         let b = DocumentBuilder::new()
@@ -345,8 +345,9 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
             .finalize();
 
         if let Some(b) = b {
-            b.as_ref().write().id = id; // TODO(ceg): improve doc id generation
-            editor.document_map.write().insert(id, b);
+            let doc_id = document::Id(id);
+            b.as_ref().write().id = doc_id; // TODO(ceg): improve doc id generation
+            editor.document_map.write().insert(doc_id, b);
             id += 1;
         }
     }
@@ -375,7 +376,8 @@ pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'sta
                 d.buffer_log_reset();
                 d.changed = false;
             }
-            editor.document_map.write().insert(id, b);
+            let doc_id = document::Id(id);
+            editor.document_map.write().insert(doc_id, b);
             id += 1;
         }
     }

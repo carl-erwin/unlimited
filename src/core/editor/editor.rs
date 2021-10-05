@@ -161,9 +161,6 @@ use crate::core::document;
 use crate::core::document::Document;
 use crate::core::document::DocumentBuilder;
 
-//
-pub type Id = u64;
-
 pub struct Editor<'a> {
     pub config: Config,
     pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'static>>>>>>,
@@ -210,8 +207,8 @@ impl<'a> Editor<'a> {
         let mut document_map = document_map.write();
 
         if let Some(b) = b {
-            let id = document_map.len() as u64;
-            document_map.insert(id, b);
+            let id = document_map.len();
+            document_map.insert(document::Id(id), b);
         }
 
         let mut builder = DocumentBuilder::new();
@@ -220,8 +217,8 @@ impl<'a> Editor<'a> {
         let b = builder.finalize();
 
         if let Some(b) = b {
-            let id = document_map.len() as u64;
-            document_map.insert(id, b);
+            let id = document_map.len();
+            document_map.insert(document::Id(id), b);
         }
     }
 
