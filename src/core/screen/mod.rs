@@ -1,3 +1,3 @@
-pub mod screen;
+mod screen;
 
 pub use self::screen::*;

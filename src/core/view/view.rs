@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::core::document::Document;
 
@@ -18,13 +17,14 @@ use crate::core::editor::StagePosition;
 
 use crate::core::screen::Screen;
 
-use crate::core::view::layout::run_compositing_stage_direct;
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutPass;
+use super::ContentFilter;
+use super::FilterIo;
+use super::LayoutPass;
+use super::ScreenOverlayFilter;
+
+use crate::core::view::run_compositing_stage_direct;
 
 use std::collections::HashMap;
-
-use super::layout;
 
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::InputEvent;
@@ -34,7 +34,8 @@ use crate::core::event::InputEventRule;
 use crate::core::modes::Mode;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-pub type Id = usize;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id(pub usize);
 
 // TODO(ceg):
 //
@@ -321,8 +322,8 @@ pub struct View<'a> {
     pub stage_actions: Vec<(String, StageFunction)>,
 
     //
-    pub compose_content_filters: Rc<RefCell<Vec<Box<dyn layout::ContentFilter<'a>>>>>,
-    pub compose_screen_overlay_filters: Rc<RefCell<Vec<Box<dyn layout::ScreenOverlayFilter<'a>>>>>,
+    pub compose_content_filters: Rc<RefCell<Vec<Box<dyn ContentFilter<'a>>>>>,
+    pub compose_screen_overlay_filters: Rc<RefCell<Vec<Box<dyn ScreenOverlayFilter<'a>>>>>,
     pub compose_priority: usize,
 
     // can be moved to layout engine
@@ -386,7 +387,7 @@ impl<'a> View<'a> {
             is_group_leader: false,
             focus_to: None,
             status_view_id: None,
-            id,
+            id: Id(id),
             document,
             screen,
             //
@@ -447,7 +448,7 @@ impl<'a> View<'a> {
             {
                 let ctx = mode.alloc_ctx();
                 v.set_mode_ctx(mode.name(), ctx);
-                dbg_println!("mode[{}] configure VID {}", mode.name(), v.id);
+                dbg_println!("mode[{}] configure  {:?}", mode.name(), v.id);
                 mode.configure_view(editor, env, &mut v);
             }
         }

@@ -11,11 +11,11 @@ use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::view::layout::ContentFilter;
-use crate::core::view::layout::ScreenOverlayFilter;
+use crate::core::view::ContentFilter;
+use crate::core::view::ScreenOverlayFilter;
 
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::FilterIo;
+use crate::core::view::LayoutEnv;
 
 use crate::core::view::View;
 use crate::core::view::ViewEvent;

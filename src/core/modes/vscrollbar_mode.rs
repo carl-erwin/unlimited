@@ -14,9 +14,9 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view;
-use crate::core::view::layout::ContentFilter;
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::ContentFilter;
+use crate::core::view::FilterIo;
+use crate::core::view::LayoutEnv;
 
 use crate::core::view::View;
 
@@ -65,7 +65,7 @@ impl<'a> Mode for VscrollbarMode {
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc vscrollbar-mode ctx");
         let ctx = VscrollbarModeContext {
-            target_vid: 0,
+            target_vid: view::Id(0),
             percent: 0.0,
             percent_end: 0.0,
             scroll_start: 0,
@@ -213,7 +213,7 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                     return;
                 }
 
-                if mode_ctx.target_vid == 0 {
+                if mode_ctx.target_vid == view::Id(0) {
                     return;
                 }
                 mode_ctx.target_vid

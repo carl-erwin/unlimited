@@ -1,6 +1,6 @@
-use crate::core::view::layout::ScreenOverlayFilter;
+use crate::core::view::ScreenOverlayFilter;
 
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::LayoutEnv;
 
 use super::mark::Mark;
 use crate::core::codepointinfo::TextStyle;

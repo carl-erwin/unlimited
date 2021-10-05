@@ -108,8 +108,8 @@ use crate::core::event::KeyModifiers;
 use crate::core::event::PointerEvent;
 
 //
-use crate::core::view::layout::run_compositing_stage_direct;
-use crate::core::view::layout::LayoutPass;
+use crate::core::view::run_compositing_stage_direct;
+use crate::core::view::LayoutPass;
 
 use crate::core::editor;
 
@@ -311,7 +311,7 @@ impl<'a> Mode for TextMode {
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        dbg_println!("config text-mode for VID {}", view.id);
+        dbg_println!("config text-mode for  {:?}", view.id);
 
         view.compose_priority = 256; // TODO: move to caller
 
@@ -1598,7 +1598,7 @@ pub fn set_selection_points_at_marks(
         // update selection point
         tm.select_point.clear();
         for m in tm.marks.iter() {
-            dbg_println!("VID {} set point @ offset {}", vid, m.offset);
+            dbg_println!("{:?} set point @ offset {}", vid, m.offset);
             tm.select_point.push(m.clone());
         }
     }
@@ -1817,14 +1817,7 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
 
     let (x, y) = (x as usize, y as usize);
 
-    dbg_println!(
-        "VID {} : CLICK @ x({}) Y({})  W({}) H({})",
-        v.id,
-        x,
-        y,
-        w,
-        h
-    );
+    dbg_println!("{:?} : CLICK @ x({}) Y({})  W({}) H({})", v.id, x, y, w, h);
     // move cursor to (x,y)
 
     // check from right to left until some codepoint is found
@@ -1849,7 +1842,7 @@ pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
             });
 
             dbg_println!(
-                "VID {} : CLICK @ x({}) Y({}) set main mark at offset : {:?}",
+                "{:?} : CLICK @ x({}) Y({}) set main mark at offset : {:?}",
                 v.id,
                 i,
                 y,
@@ -1912,7 +1905,7 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
             // TODO(ceg): change screen (x,y) to i32 ? and filter in functions ?
 
             let vid = v.id;
-            dbg_println!("VID {} pointer motion x({}) y({})", vid, x, y);
+            dbg_println!("{:?} pointer motion x({}) y({})", vid, x, y);
 
             let x = std::cmp::max(0, *x) as usize;
             let y = std::cmp::max(0, *y) as usize;
@@ -1943,7 +1936,7 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
                     }
 
                     dbg_println!(
-                        "VID {} @{:?} : pointer motion x({}) y({}) | select offset({:?})",
+                        "{:?} @{:?} : pointer motion x({}) y({}) | select offset({:?})",
                         vid,
                         Instant::now(),
                         x,
@@ -1963,13 +1956,13 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
 pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
     env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
     env.view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select view_id {}", env.view_id);
+    dbg_println!("select {:?}", env.view_id);
 }
 
 pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
     env.root_view_index = env.root_view_index.saturating_sub(1);
     env.view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select view_id {}", env.view_id);
+    dbg_println!("select {:?}", env.view_id);
 }
 
 // TODO(ceg): view.center_around_offset()
@@ -2180,7 +2173,7 @@ pub fn scroll_view_down(
     {
         let v = view.read();
 
-        dbg_println!("SCROLL DOWN VID = {}", v.id);
+        dbg_println!("SCROLL DOWN VID = {:?}", v.id);
 
         // nothing to do :-( ?
         if nb_lines == 0 {

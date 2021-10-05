@@ -13,9 +13,9 @@ use crate::core::event::input_map::build_input_event_map;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::view::layout::ContentFilter;
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::ContentFilter;
+use crate::core::view::FilterIo;
+use crate::core::view::LayoutEnv;
 
 use crate::core::view::View;
 
@@ -176,7 +176,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
         let cur_size = sbv.screen.read().width();
 
         dbg_println!(
-            "VSPLIT LIDX to resize = {}, sibling_vid {}",
+            "VSPLIT LIDX to resize = {}, sibling_ {:?}",
             lidx,
             sibling_vid
         );

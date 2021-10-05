@@ -1,6 +1,5 @@
-pub mod layout;
-pub mod view;
+mod layout;
+mod view;
 
-pub use view::*;
-
-pub use view::View;
+pub use self::layout::*;
+pub use self::view::*;

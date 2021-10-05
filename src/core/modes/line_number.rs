@@ -37,7 +37,6 @@ use std::any::Any;
 
 use parking_lot::RwLock;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -53,11 +52,8 @@ use crate::core::document::Document;
 use crate::core::document::DocumentEvent;
 use crate::core::document::DocumentEventCb;
 
-use crate::core::mapped_file::MappedFile;
-use crate::core::mapped_file::MappedFileIterator;
-
-use crate::core::view::layout::LayoutEnv;
-use crate::core::view::layout::ScreenOverlayFilter;
+use crate::core::view::LayoutEnv;
+use crate::core::view::ScreenOverlayFilter;
 
 use crate::core::view;
 use crate::core::view::LayoutOperation;
@@ -168,7 +164,9 @@ impl<'a> Mode for LineNumberMode {
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc line-number-mode ctx");
-        let ctx = LineNumberModeContext { target_vid: 0 };
+        let ctx = LineNumberModeContext {
+            target_vid: view::Id(0),
+        };
         Box::new(ctx)
     }
 

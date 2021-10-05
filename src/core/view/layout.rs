@@ -221,7 +221,7 @@ fn compose_children(
         return false;
     }
 
-    dbg_println!("COMPOSE CHILDREN OF VID {}", view.id);
+    dbg_println!("COMPOSE CHILDREN OF  {:?}", view.id);
 
     // split direction
     let layout_dir_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
@@ -271,7 +271,7 @@ fn compose_children(
     };
 
     dbg_println!(
-        "ITER over VID {}, CHILDREN {:?}, size {:?}",
+        "ITER over  {:?}, CHILDREN {:?}, size {:?}",
         view.id,
         view.children,
         sizes
@@ -317,8 +317,8 @@ fn compose_children(
 
         let pa = va.read().compose_priority;
         let pb = vb.read().compose_priority;
-        dbg_println!("pa vid {} priority: {:?}", vida, pa);
-        dbg_println!("pb vid {} priority: {:?}", vidb, pb);
+        dbg_println!("pa vid {:?} priority: {:?}", vida, pa);
+        dbg_println!("pb vid {:?} priority: {:?}", vidb, pb);
         dbg_println!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
 
         pb.cmp(&pa)

@@ -6,11 +6,11 @@ use parking_lot::RwLock;
 use std::rc::Rc;
 
 use crate::core::codec::text::utf8;
-use crate::core::view::layout::ContentFilter;
-use crate::core::view::layout::FilterData;
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
-use crate::core::view::layout::Unicode;
+use crate::core::view::ContentFilter;
+use crate::core::view::FilterData;
+use crate::core::view::FilterIo;
+use crate::core::view::LayoutEnv;
+use crate::core::view::Unicode;
 use crate::core::view::View;
 use crate::core::Editor;
 

@@ -168,7 +168,7 @@ pub fn application_quit_abort_setup(
             // lock focus on v
             // env.focus_locked_on = Some(v.id);
 
-            dbg_println!("configure quit-abort VID {}", v.id);
+            dbg_println!("configure quit-abort  {:?}", v.id);
             v.input_ctx.stack_pos = None;
             let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
             let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
@@ -518,7 +518,7 @@ pub fn split_view_with_direction(
     let (v_id, parent_id, x, y, width, height, doc, original_modes, layout_index) = {
         let v = view.read();
 
-        dbg_println!("SPLITTING {:?} VID {}", dir, v.id);
+        dbg_println!("SPLITTING {:?}  {:?}", dir, v.id);
 
         let (width, height) = {
             let screen = v.screen.read();
@@ -980,15 +980,15 @@ pub fn destroy_view(
         // mark siblings for delete
         for (idx, view_id) in pv.children.iter().enumerate() {
             if idx == v_layout_index {
-                dbg_println!("prepare delete of view id {}", *view_id);
+                dbg_println!("prepare delete of {:?}", *view_id);
                 destroy.push(*view_id);
             } else if idx == 1 {
                 // separator index
                 // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
-                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                dbg_println!("prepare delete of {:?} (separator)", *view_id);
                 destroy.push(*view_id);
             } else {
-                dbg_println!("keep view id {}", *view_id);
+                dbg_println!("keep {:?}", *view_id);
                 kept_vid = Some(*view_id);
             }
         }
@@ -1008,8 +1008,8 @@ pub fn destroy_view(
 
             kept_v.destroyable = pv.destroyable; // NB: take parent policy
 
-            dbg_println!("prepare delete of view id {} (parent)", pvid);
-            dbg_println!("set focus to view id {}", kept_vid);
+            dbg_println!("prepare delete of {:?} (parent)", pvid);
+            dbg_println!("set focus to {:?}", kept_vid);
             destroy.push(pvid);
             env.focus_changed_to = Some(kept_vid); // post input
         }
@@ -1020,22 +1020,22 @@ pub fn destroy_view(
 
         for (idx, view_id) in pv.children.iter().enumerate() {
             if idx == v_layout_index {
-                dbg_println!("prepare delete of view id {}", *view_id);
+                dbg_println!("prepare delete of view id {:?}", *view_id);
                 destroy.push(*view_id);
             } else if idx == 1 {
                 // separator index
                 // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
-                dbg_println!("prepare delete of view id {} (separator)", *view_id);
+                dbg_println!("prepare delete of view id {:?} (separator)", *view_id);
                 destroy.push(*view_id);
             } else {
-                dbg_println!("keep view id {}", *view_id);
+                dbg_println!("keep view id {:?}", *view_id);
                 kept_vid = Some(*view_id);
             }
         }
 
         if let Some(kept_vid) = kept_vid {
             dbg_println!("root view update");
-            dbg_println!("delete {}", pvid);
+            dbg_println!("delete {:?}", pvid);
             destroy.push(pvid);
 
             for i in 0..editor.root_views.len() {

@@ -10,8 +10,8 @@ use crate::core::editor::EditorEnv;
 use crate::core::screen::Screen;
 use crate::core::view::View;
 
-use crate::core::view::layout::run_compositing_stage_direct;
-use crate::core::view::layout::LayoutPass;
+use crate::core::view::run_compositing_stage_direct;
+use crate::core::view::LayoutPass;
 
 // Helpers
 

@@ -12,11 +12,11 @@ use crate::core::modes::core_mode::split_with_direction;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::view::layout::ContentFilter;
+use crate::core::view::ContentFilter;
 
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::FilterIo;
 use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutEnv;
 use crate::core::view::LayoutOperation;
 
 use crate::core::view::View;

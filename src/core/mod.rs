@@ -431,7 +431,7 @@ pub fn create_views(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'s
             &modes,
             0,
         );
-        dbg_println!("create view id {}", view.id);
+        dbg_println!("create {:?}", view.id);
 
         // top level views
         editor.root_views.push(view.id);

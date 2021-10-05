@@ -18,11 +18,9 @@ use crate::core::screen::screen_apply;
 
 use crate::dbg_println;
 
-use crate::core::view::layout::ContentFilter;
+use crate::core::view::ContentFilter;
 
-use crate::core::view::layout::LayoutEnv;
-
-use crate::core::codepointinfo::TextStyle;
+use crate::core::view::LayoutEnv;
 
 pub struct StatusModeContext {}
 

@@ -95,9 +95,9 @@ pub struct EditorEnv<'a> {
     pub root_view_index: usize,
 
     //
-    pub prev_vid: usize,
-    pub view_id: usize,
-    pub focus_on: usize,
+    pub prev_vid: view::Id,
+    pub view_id: view::Id,
+    pub focus_on: view::Id,
     pub focus_changed_to: Option<view::Id>,
     pub focus_locked_on: Option<view::Id>,
     pub status_view_id: Option<view::Id>,
@@ -140,12 +140,12 @@ impl<'a> EditorEnv<'a> {
             diff_y: 0,
             //max
             root_view_index: 0,
-            prev_vid: 1, // NB
-            view_id: 1,  // NB
+            prev_vid: view::Id(1), // NB
+            view_id: view::Id(1),  // NB
             center_offset: None,
             skip_compositing: false,
             focus_changed_to: None,
-            focus_on: 0,
+            focus_on: view::Id(0),
             focus_locked_on: None,
             status_view_id: None,
             time_spent: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],

@@ -69,7 +69,7 @@ impl<'a> Mode for FindMode {
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        dbg_println!("configure find VID {}", view.id);
+        dbg_println!("configure find  {:?}", view.id);
 
         // setup input map for core actions
         let input_map = build_input_event_map(FIND_TRIGGER_MAP).unwrap();
@@ -143,7 +143,7 @@ pub fn find_start(
             // lock focus on v
             // env.focus_locked_on = Some(v.id);
 
-            dbg_println!("configure find VID {}", v.id);
+            dbg_println!("configure find  {:?}", v.id);
             v.input_ctx.stack_pos = None;
             let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
             let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();

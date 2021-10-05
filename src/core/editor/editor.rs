@@ -34,8 +34,8 @@ use crate::core::modes::Mode;
 
 use crate::core::screen::Screen;
 use crate::core::view;
-use crate::core::view::layout::FilterIo;
-use crate::core::view::layout::LayoutEnv;
+use crate::core::view::FilterIo;
+use crate::core::view::LayoutEnv;
 
 use crate::core::view::LayoutDirection;
 
@@ -255,7 +255,7 @@ pub fn register_input_stage_action(
 }
 
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
-    dbg_println!("checking view dimension {}", env.view_id);
+    dbg_println!("checking view dimension {:?}", env.view_id);
 
     let view = editor.view_map.get(&env.view_id);
     let view = view.unwrap();
@@ -408,7 +408,7 @@ fn process_single_input_event<'a>(
     let mut view = &editor.view_map.get(&view_id).unwrap().clone();
     {
         let v = view.read();
-        dbg_println!("DISPATCH EVENT TO VID {}", view_id);
+        dbg_println!("DISPATCH EVENT TO VID {:?}", view_id);
         assert_eq!(v.id, view_id);
     }
 
@@ -634,7 +634,7 @@ pub fn set_focus_on_view(
     let mut parent_id = view.parent_id;
     loop {
         if let Some(pid) = parent_id {
-            dbg_println!("set_focus update parent_id {}", pid);
+            dbg_println!("set_focus update parent_id {:?}", pid);
             if let Some(pview) = editor.view_map.get(&pid) {
                 let mut pview = pview.write();
                 pview.focus_to = Some(vid);
@@ -662,7 +662,7 @@ fn clip_locked_coordinates_xy(
     let id = env.focus_locked_on.unwrap();
 
     dbg_println!(
-        "CLIPPING LOCKED VID {} ----------------------------------BEGIN",
+        "CLIPPING LOCKED  {:?} ----------------------------------BEGIN",
         id
     );
 
@@ -721,7 +721,7 @@ fn clip_coordinates_xy(
     // check layout type
     dbg_println!("CLIPPING -----------------------------------BEGIN");
     dbg_println!("CLIPPING clipping orig coords ({},{})", *x, *y);
-    dbg_println!("CLIPPING         select vid {}", id);
+    dbg_println!("CLIPPING         select  {:?}", id);
 
     loop {
         'inner: loop {
@@ -739,7 +739,7 @@ fn clip_coordinates_xy(
                     let screen = child_v.screen.read();
 
                     dbg_println!(
-                    "CLIPPING dump child vid {} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                    "CLIPPING dump child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
                     child_v.id,
                     child_v.x,
                     child_v.y,
@@ -754,7 +754,7 @@ fn clip_coordinates_xy(
 
                 let is_layout_vertical = v.layout_direction == LayoutDirection::Vertical;
 
-                let mut last_id = 0;
+                let mut last_id = view::Id(0);
                 for (idx, child) in v.children.iter().enumerate() {
                     let child_v = editor.view_map.get(&child).unwrap().write();
                     let screen = child_v.screen.read();
@@ -762,7 +762,7 @@ fn clip_coordinates_xy(
                     last_id = child_v.id;
 
                     dbg_println!(
-                    "CLIPPING checking child vid {} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                    "CLIPPING checking child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
                     child_v.id,
                     child_v.x,
                     child_v.y,
@@ -784,7 +784,7 @@ fn clip_coordinates_xy(
 
                         // found
                         dbg_println!("CLIPPING         updated clipping coords ({},{})", *x, *y);
-                        dbg_println!("CLIPPING         select vid {}", child_v.id);
+                        dbg_println!("CLIPPING         select  {:?}", child_v.id);
 
                         env.local_x = Some(*x);
                         env.local_y = Some(*y);
@@ -936,7 +936,7 @@ fn run_stage(
                     if env.view_id != env.prev_vid {
                         env.event_processed = true;
 
-                        dbg_println!("view change {} ->  {}", env.prev_vid, env.view_id);
+                        dbg_println!("view change {:?} ->  {:?}", env.prev_vid, env.view_id);
 
                         check_view_dimension(editor, env);
                         {
@@ -1019,10 +1019,10 @@ fn setup_focus_and_event(
     ev: &InputEvent,
     compose: &mut bool,
 ) -> view::Id {
-    env.focus_on = 0;
+    env.focus_on = view::Id(0);
     let root_vid = env.view_id;
     let vid = get_focused_vid(&mut editor, &mut env, root_vid);
-    dbg_println!("FOCUS on vid {}", vid);
+    dbg_println!("FOCUS on  {:?}", vid);
 
     if root_vid != vid {
         // only set, not cleared

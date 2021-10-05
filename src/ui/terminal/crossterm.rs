@@ -48,7 +48,6 @@ use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
 
 use crate::core::codepointinfo::CodepointInfo;
-use crate::core::codepointinfo::TextStyle;
 
 //
 use crate::ui::UiState;
