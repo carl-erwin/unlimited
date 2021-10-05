@@ -12,11 +12,11 @@ pub mod text_mode;
 pub mod vscrollbar_mode;
 pub mod vsplit_mode;
 
-pub use crate::core::editor::Editor;
-pub use crate::core::editor::EditorEnv;
+use crate::core::editor::Editor;
+use crate::core::editor::EditorEnv;
 
-pub use crate::core::editor::InputStageActionMap;
-pub use crate::core::view::View;
+use crate::core::editor::InputStageActionMap;
+use crate::core::view::View;
 
 pub use basic_editor::BasicEditorMode;
 pub use core_mode::CoreMode;
@@ -42,6 +42,7 @@ pub trait Mode {
     /// This function exposes the mode's input function (name, pointer)
     fn build_action_map<'m>(&'m self) -> InputStageActionMap<'static>;
 
+    /// TODO(ceg): find a better way to get back mode ctx
     fn alloc_ctx(&self) -> Box<dyn Any>;
 
     /// This function MUST be called once per document
