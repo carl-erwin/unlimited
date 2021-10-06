@@ -593,7 +593,7 @@ fn get_focused_vid(
     let view = view.unwrap().clone();
 
     let v = view.read();
-    if v.children.len() == 0 {
+    if v.children.is_empty() {
         return vid;
     }
 
@@ -725,7 +725,7 @@ fn clip_coordinates_xy(
             if let Some(v) = editor.view_map.get(&id) {
                 let v = v.read();
 
-                if v.children.len() == 0 {
+                if v.children.is_empty() {
                     dbg_println!("CLIPPING        no more children");
                     dbg_println!("CLIPPING ----------------------------------- END");
                     return id;
@@ -1048,7 +1048,7 @@ fn run_input_stage(
     env.pending_events = crate::core::event::pending_input_event_count();
     let flat_events = events;
     //let flat_events = flatten_input_events(&events);
-    if flat_events.len() == 0 {
+    if flat_events.is_empty() {
         return Stage::Input;
     };
 

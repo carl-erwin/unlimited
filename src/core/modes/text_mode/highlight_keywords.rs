@@ -161,8 +161,8 @@ impl ContentFilter<'_> for HighlightFilter {
                     };
 
                     // need more or accumulae same class
-                    if self.token_io.len() == 0 {
-                        dbg_println!("self.token_io.len() == 0");
+                    if self.token_io.is_empty() {
+                        dbg_println!("self.token_io.is_empty()");
 
                         self.token_io.push(io.clone());
                         self.token_type = token_type;

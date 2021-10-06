@@ -1535,7 +1535,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
     dbg_println!("mark_len {}", marks_len);
 
     dbg_println!("copy_buffer.len() {}", tm.copy_buffer.len());
-    if tm.copy_buffer.len() == 0 {
+    if tm.copy_buffer.is_empty() {
         return;
     }
 

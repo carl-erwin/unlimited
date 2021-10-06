@@ -218,7 +218,7 @@ fn compose_children(
     pass_mask: LayoutPass,
 ) -> bool {
     let mut view = view.write();
-    if view.children.len() == 0 {
+    if view.children.is_empty() {
         return false;
     }
 
@@ -497,7 +497,7 @@ fn run_content_filters(
     }
 
     let mut filters = filters.borrow_mut();
-    if filters.len() == 0 && filters.len() == 0 {
+    if filters.is_empty() && filters.is_empty() {
         layout_env.quit = true;
     }
 
@@ -607,7 +607,7 @@ fn run_screen_overlay_filters(
     }
 
     let mut filters = filters.borrow_mut();
-    if filters.len() == 0 && filters.len() == 0 {
+    if filters.is_empty() && filters.is_empty() {
         layout_env.quit = true;
     }
 

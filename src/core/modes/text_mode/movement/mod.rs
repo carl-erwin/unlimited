@@ -812,7 +812,7 @@ pub fn move_on_screen_mark_to_next_line(
 
     dbg_println!("l.len  {}", l.len());
 
-    if l.len() == 0 {
+    if l.is_empty() {
         // line is empty do nothing
         dbg_println!(" NEXT line is EMPTY do nothing ..........");
         return (true, Some((m.offset, m.offset)), None);
@@ -1102,7 +1102,7 @@ pub fn move_marks_to_next_line(
             panic!();
         }
         let last_line = last_line.unwrap();
-        if last_line.len() == 0 {
+        if last_line.is_empty() {
             panic!(""); // empty line
         }
 
@@ -1291,7 +1291,7 @@ pub fn move_marks_to_next_line(
             }
             let last_line = last_line.unwrap();
 
-            if last_line.len() == 0 {
+            if last_line.is_empty() {
                 panic!(""); // empty line
             }
 

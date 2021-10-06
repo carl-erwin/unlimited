@@ -200,7 +200,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
         }
     }
 
-    if v.len() == 0 {
+    if v.is_empty() {
         // incomplete/truncated stream ?
         return (u32_to_char(0xfffd), from_offset, 1);
     }

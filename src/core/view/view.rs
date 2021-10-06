@@ -426,7 +426,7 @@ impl<'a> View<'a> {
 
         // setup modes/input map/etc..
         for mode_name in modes.iter() {
-            if mode_name.len() == 0 {
+            if mode_name.is_empty() {
                 // TODO(ceg): log error
                 continue;
             }

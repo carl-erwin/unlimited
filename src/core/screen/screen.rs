@@ -473,7 +473,7 @@ impl Screen {
             self.first_offset = cpi.offset.clone();
         }
 
-        if self.line_offset.len() == 0 {
+        if self.line_offset.is_empty() {
             if let Some(off) = self.first_offset {
                 self.line_offset.push((off, off));
                 self.line_index.push((self.push_count, self.push_count));
@@ -533,7 +533,7 @@ impl Screen {
     }
 
     pub fn get_last_used_line_index(&self) -> Option<usize> {
-        if self.line_index.len() == 0 {
+        if self.line_index.is_empty() {
             return None;
         }
         Some(self.line_index.len() - 1)
