@@ -130,6 +130,7 @@ pub enum FilterData {
     TextInfo { real_cp: u32, displayed_cp: u32 },
 }
 
+// TODO(ceg): move to core/view/filterio.rs
 #[derive(Debug, Clone)]
 pub struct FilterIo {
     // general info

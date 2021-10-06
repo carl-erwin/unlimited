@@ -6,7 +6,6 @@ pub mod highlight_selection;
 pub mod mark;
 pub mod screen_filler;
 pub mod tab_expansion;
-pub mod text_mode;
 pub mod text_mode_codec;
 pub mod unicode_to_text;
 pub mod word_wrap;
@@ -15,6 +14,9 @@ pub mod doc_modification;
 pub mod movement;
 pub mod search;
 pub mod selection;
+
+//
+mod text_mode;
 
 pub use char_map::*;
 pub use data_fetch::*;
