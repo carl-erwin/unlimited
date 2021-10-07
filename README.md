@@ -49,9 +49,10 @@ unlimited [FILE1] .. [FILEn]
 Ultimately remove all limitations found in common editors.
 
  - [x] handle large files
+ - [ ] handle directories
  - [ ] handle very-long lines
  - [ ] provide a C API to handle basic primitives
- - [ ] an interactive "configurator" mode to customize a view
+ - [ ] an interactive "mode configurator" to customize a view
 
 ---
 

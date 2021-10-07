@@ -10,7 +10,7 @@ Unlimited design will evolve at will. Suggestions are welcomed.
      1. The ui : another process/thread that presents the documents to the user<br/>
      <br/>
 
-     These two threads communicate using through standard channels (mpsc).<br/>
+     These two threads communicate through standard channels (mpsc).<br/>
      The data sent/received is call an **EventMessage**.<br/>
 
 ------
