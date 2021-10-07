@@ -124,7 +124,10 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
         if let Some(line) = screen.get_line_mut(l) {
             for cell in line {
                 if !cell.cpi.style.is_selected {
-                    cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
+                    // bg already changed ? (ex: trailing spaces)
+                    if cell.cpi.style.bg_color == TextStyle::default_bg_color() {
+                        cell.cpi.style.bg_color = TextStyle::default_mark_line_bg_color();
+                    }
                 }
             }
         }

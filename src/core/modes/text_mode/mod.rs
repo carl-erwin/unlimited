@@ -15,6 +15,8 @@ pub mod movement;
 pub mod search;
 pub mod selection;
 
+pub mod show_trailing_spaces;
+
 //
 mod text_mode;
 
@@ -24,6 +26,7 @@ pub use draw_mark::*;
 pub use highlight_keywords::*;
 pub use highlight_selection::*;
 pub use screen_filler::*;
+pub use show_trailing_spaces::*;
 pub use tab_expansion::*;
 pub use text_mode::*;
 pub use text_mode_codec::*;

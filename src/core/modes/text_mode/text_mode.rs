@@ -168,6 +168,7 @@ use crate::core::modes::text_mode::WordWrapFilter;
 
 // Text mode screen overlay filters
 use crate::core::modes::text_mode::DrawMarks;
+use crate::core::modes::text_mode::ShowTrailingSpaces;
 
 /// CopyData is used to implement the selection/cut/paste buffer
 pub enum CopyData {
@@ -362,6 +363,8 @@ impl<'a> Mode for TextMode {
 
         let use_draw_marks = true; // mandatory
 
+        let show_trailing_spaces = true;
+
         let skip_text_filters = if crate::core::raw_data_filter_to_screen() {
             true
         } else {
@@ -423,6 +426,11 @@ impl<'a> Mode for TextMode {
                     .push(Box::new(CharMapFilter::new()));
             }
             //
+            if show_trailing_spaces {
+                view.compose_content_filters
+                    .borrow_mut()
+                    .push(Box::new(ShowTrailingSpaces::new()));
+            }
 
             if use_word_wrap {
                 // NB: Word Wrap after tab expansion
