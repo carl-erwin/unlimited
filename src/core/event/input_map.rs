@@ -250,7 +250,7 @@ fn parse_event_entry_input_button_press(
         button,
         x: 0,
         y: 0,
-        mods: mods,
+        mods,
     });
 
     //dbg_println!("built button event = {:?}", ev);
@@ -292,7 +292,7 @@ fn parse_event_entry_input_button_release(
         button,
         x: 0,
         y: 0,
-        mods: mods,
+        mods,
     });
 
     //dbg_println!("built button event = {:?}", ev);
@@ -316,16 +316,8 @@ fn parse_event_entry_input_wheel(ctx: &mut ParseCtx, _name: &String, value: &ser
     //dbg_println!("button = {:?}", s);
 
     let ev = match s.as_str() {
-        "Up" => InputEvent::WheelUp {
-            x: 0,
-            y: 0,
-            mods: mods,
-        },
-        "Down" => InputEvent::WheelDown {
-            x: 0,
-            y: 0,
-            mods: mods,
-        },
+        "Up" => InputEvent::WheelUp { x: 0, y: 0, mods },
+        "Down" => InputEvent::WheelDown { x: 0, y: 0, mods },
         _ => {
             return;
         }
@@ -356,11 +348,7 @@ fn parse_event_entry_input_pointer_motion(
 
     let mods = KeyModifiers::new();
 
-    let ev = InputEvent::PointerMotion(PointerEvent {
-        x: 0,
-        y: 0,
-        mods: mods,
-    });
+    let ev = InputEvent::PointerMotion(PointerEvent { x: 0, y: 0, mods });
 
     //dbg_println!("}}");
 

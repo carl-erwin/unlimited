@@ -7,9 +7,8 @@ use std::thread;
 
 // ext
 extern crate clap;
-extern crate unlimited;
-#[macro_use]
 extern crate lazy_static;
+extern crate unlimited;
 
 use clap::{App, Arg};
 

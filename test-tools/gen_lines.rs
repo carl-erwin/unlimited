@@ -18,7 +18,7 @@ fn main() {
     gen_lines(start_num, stop_num, width_num);
 }
 
-fn gen_lines(start: u64, stop: u64, linewidth: u64) -> () {
+fn gen_lines(start: u64, stop: u64, linewidth: u64)  {
     let string = gen_line(linewidth);
 
 

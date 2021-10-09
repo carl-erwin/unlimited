@@ -345,7 +345,7 @@ impl Mark {
             while prev_offset > 0 {
                 let ret = read_char_backward(&doc, prev_offset, codec);
                 prev_offset -= ret.2 as u64;
-                if is_blank(ret.0) == false {
+                if !is_blank(ret.0) {
                     break;
                 }
             }
@@ -359,10 +359,10 @@ impl Mark {
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
 
-        if is_blank(cp) == false {
+        if !is_blank(cp) {
             while prev_offset > 0 {
                 let ret = read_char_backward(&doc, prev_offset, codec);
-                if is_blank(ret.0) == true {
+                if is_blank(ret.0) {
                     prev_offset = ret.1;
                     break;
                 }
@@ -403,7 +403,7 @@ impl Mark {
         if is_blank(cp) {
             while prev_offset < max_offset {
                 let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
-                if is_blank(cp) == false {
+                if !is_blank(cp) {
                     break;
                 }
                 prev_offset += size as u64;
@@ -419,10 +419,10 @@ impl Mark {
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
 
-        if is_blank(cp) == false {
+        if !is_blank(cp) {
             while prev_offset < max_offset {
                 let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
-                if is_blank(cp) == true {
+                if is_blank(cp) {
                     break;
                 }
                 prev_offset += size as u64;

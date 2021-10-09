@@ -266,7 +266,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
             cpi.style.color = TextStyle::default_bg_color();
             cpi.style.bg_color = TextStyle::default_color();
             let (b, _) = env.screen.push(cpi.clone());
-            if b == false {
+            if !b {
                 break;
             }
         }
@@ -284,7 +284,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
             cpi.style.bg_color = TextStyle::default_color(); // remove ?
 
             let (b, _) = env.screen.push(cpi.clone());
-            if b == false {
+            if !b {
                 env.quit = true;
                 return;
             }
@@ -293,5 +293,5 @@ impl ContentFilter<'_> for BasicEditorTitle {
         env.quit = true;
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {}
 }

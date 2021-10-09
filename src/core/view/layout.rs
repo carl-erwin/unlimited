@@ -65,7 +65,7 @@ pub trait ContentFilter<'a> {
         mut env: &mut LayoutEnv,
         input: &Vec<FilterIo>,
         output: &mut Vec<FilterIo>,
-    ) -> () {
+    ) {
         let mut view = view.read();
         self.run(&mut view, &mut env, input, output);
     }
@@ -76,11 +76,11 @@ pub trait ContentFilter<'a> {
         _env: &mut LayoutEnv,
         _input: &Vec<FilterIo>,
         _output: &mut Vec<FilterIo>,
-    ) -> () {
+    ) {
         //*output = input.clone();
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {
         // default
     }
 }
@@ -98,14 +98,14 @@ pub trait ScreenOverlayFilter<'a> {
         /* default implementation is empty*/
     }
 
-    fn run_managed(&mut self, view: &Rc<RwLock<View>>, mut env: &mut LayoutEnv) -> () {
+    fn run_managed(&mut self, view: &Rc<RwLock<View>>, mut env: &mut LayoutEnv) {
         let mut view = view.read();
         self.run(&mut view, &mut env);
     }
 
-    fn run(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+    fn run(&mut self, _view: &View, _env: &mut LayoutEnv) {}
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {
         // default
     }
 }
@@ -172,11 +172,11 @@ impl FilterIo {
     }
 
     pub fn check_invariants(&self) {
-        if self.size > 0 && self.metadata == true {
+        if self.size > 0 && self.metadata {
             dbg_println!("INVALID IO [METADATA] {:?}", self);
             panic!("");
         }
-        if self.size == 0 && self.metadata == false {
+        if self.size == 0 && !self.metadata {
             dbg_println!("INVALID IO [NON META] {:?}", self);
             panic!("");
         }
@@ -195,7 +195,7 @@ pub fn run_compositing_stage(
     run_compositing_stage_direct(
         editor,
         env,
-        &view,
+        view,
         base_offset,
         max_offset,
         screen,
@@ -497,7 +497,7 @@ fn run_content_filters(
     }
 
     let mut filters = filters.borrow_mut();
-    if filters.is_empty() && filters.is_empty() {
+    if filters.is_empty() {
         layout_env.quit = true;
     }
 
@@ -607,7 +607,7 @@ fn run_screen_overlay_filters(
     }
 
     let mut filters = filters.borrow_mut();
-    if filters.is_empty() && filters.is_empty() {
+    if filters.is_empty() {
         layout_env.quit = true;
     }
 

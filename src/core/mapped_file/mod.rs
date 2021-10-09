@@ -505,7 +505,7 @@ impl<'a> Drop for MappedFile<'a> {
 
 impl<'a> MappedFile<'a> {
     fn assert_node_is_unused(n: &mut Node) {
-        assert_eq!(n.used, false);
+        assert!(!n.used);
     }
 
     pub fn empty() -> Option<FileHandle<'a>> {
@@ -1065,7 +1065,7 @@ impl<'a> MappedFile<'a> {
                 }
             }
 
-            if diff == false {
+            if !diff {
                 //                dbg_println!("FIND pattern start @ {}", start_idx);
                 //                dbg_println!("FIND pattern end @ {}", start_idx+data.len());
                 return Some(start_idx);
@@ -1939,7 +1939,6 @@ impl<'a> MappedFile<'a> {
         idx: Option<NodeIndex>,
         pool: &FreeListAllocator<Node>,
     ) {
-        return;
         if !DEBUG {
             return;
         }
@@ -1955,10 +1954,10 @@ impl<'a> MappedFile<'a> {
             dbg_println!(" checking tree idx({})", idx);
         }
 
-        assert_eq!(pool.slot[idx].used, true);
+        assert!(pool.slot[idx].used);
 
         // already visited ?
-        assert_eq!(visited.contains(&idx), false);
+        assert!(!visited.contains(&idx));
         visited.insert(idx);
 
         // check parent / children idx
@@ -1993,7 +1992,7 @@ impl<'a> MappedFile<'a> {
     }
 
     // This function can be very slow O(n)
-    fn check_all_nodes(file: &MappedFile) {
+    fn _check_all_nodes(file: &MappedFile) {
         if DEBUG {
             return;
         }
@@ -2006,10 +2005,10 @@ impl<'a> MappedFile<'a> {
 
         MappedFile::check_tree(&mut visited, file.root_index, &file.pool);
 
-        MappedFile::check_leaves(&file);
+        MappedFile::_check_leaves(&file);
 
         // check all nodes in allocator
-        // if used == false
+        // if !used
         // assert prev/next/parent == None
         if DEBUG {
             dbg_println!("file.size({})", file.size());
@@ -2102,7 +2101,7 @@ impl<'a> MappedFile<'a> {
         }
     }
 
-    fn check_leaves(file: &MappedFile) {
+    fn _check_leaves(file: &MappedFile) {
         let (idx, _, _) = file.find_node_by_offset(0);
         if idx.is_none() {
             return;

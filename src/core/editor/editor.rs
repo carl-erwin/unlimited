@@ -139,7 +139,7 @@ pub type StageFunction = fn(
     view: &Rc<RwLock<View<'static>>>,
     pos: StagePosition,
     stage: Stage,
-) -> ();
+);
 
 //
 pub type RenderStageFunction = fn(
@@ -149,7 +149,7 @@ pub type RenderStageFunction = fn(
     env: &mut LayoutEnv,
     input: &Vec<FilterIo>,
     output: &mut Vec<FilterIo>,
-) -> ();
+);
 
 pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 
@@ -273,7 +273,6 @@ pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
 pub fn update_view_and_send_draw_event(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    ui_tx: &Sender<EventMessage>,
 ) {
     // check size
     check_view_dimension(editor, env);
@@ -997,7 +996,7 @@ fn run_stage(
 
     match stage {
         Stage::Input => {
-            if env.skip_compositing == true {
+            if env.skip_compositing {
                 dbg_println!("skip Stage::Compositing");
                 Stage::UpdateUi
             } else {
@@ -1066,7 +1065,7 @@ fn run_input_stage(
 
         let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         run_stages(Stage::Input, &mut editor, &mut env, id);
-        // if env.skip_compositing == false
+        // if !env.skip_compositing
         {
             run_stages(Stage::Compositing, &mut editor, &mut env, id);
         }
@@ -1147,7 +1146,7 @@ pub fn main_loop(
                     env.height = height;
 
                     env.pending_events = crate::core::event::pending_input_event_dec(1);
-                    update_view_and_send_draw_event(&mut editor, &mut env, ui_tx);
+                    update_view_and_send_draw_event(&mut editor, &mut env);
                 }
 
                 Event::InputEvents { events } => {

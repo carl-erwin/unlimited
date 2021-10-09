@@ -100,7 +100,7 @@ lazy_static! {
 
 struct LineNumberDocumentMetaData {
     cb_installed: bool,
-    root_idx: Option<usize>,
+    _root_idx: Option<usize>,
 }
 
 impl LineNumberDocumentMetaData {
@@ -108,21 +108,21 @@ impl LineNumberDocumentMetaData {
         dbg_println!("LineNumberDocumentMetaData");
         LineNumberDocumentMetaData {
             cb_installed: false,
-            root_idx: None,
+            _root_idx: None,
         }
     }
 }
 
-struct LineNumberDocumentNodeMetaData {
+struct _LineNumberDocumentNodeMetaData {
     nl_count: u64,
     cr_count: u64,
     lf_count: u64,
 }
 
-impl LineNumberDocumentNodeMetaData {
-    pub fn new() -> Self {
+impl _LineNumberDocumentNodeMetaData {
+    pub fn _new() -> Self {
         dbg_println!("LineNumberDocumentNodeMetaData");
-        LineNumberDocumentNodeMetaData {
+        _LineNumberDocumentNodeMetaData {
             nl_count: 0,
             cr_count: 0,
             lf_count: 0,
@@ -285,11 +285,11 @@ impl DocumentEventCb for LineNumberModeDocEventHandler {
                 );
             }
 
-            DocumentEvent::NodeAdded { node_index } => {}
+            DocumentEvent::NodeAdded { node_index: _ } => {}
 
-            DocumentEvent::NodeRemoved { node_index } => {}
+            DocumentEvent::NodeRemoved { node_index: _ } => {}
 
-            DocumentEvent::NodeChanged { node_index } => {}
+            DocumentEvent::NodeChanged { node_index: _ } => {}
 
             _ => {
                 dbg_println!("unhandled event {:?}", event);
@@ -428,7 +428,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     if idx == 0 {
                         offset = cell.cpi.offset.unwrap();
                     }
-                    if cell.cpi.metadata == false && cell.cpi.cp == '\n' {
+                    if !cell.cpi.metadata && cell.cpi.cp == '\n' {
                         line_number += 1;
                         break;
                     }
@@ -438,7 +438,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         }
     }
 
-    fn run(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
+    fn run(&mut self, _view: &View, env: &mut LayoutEnv) {
         env.screen.clear();
 
         let w = env.screen.width();
@@ -487,5 +487,5 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         }
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _: &View, _: &mut LayoutEnv) {}
 }

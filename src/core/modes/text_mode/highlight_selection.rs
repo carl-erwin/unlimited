@@ -67,7 +67,7 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
         self.sel_end_offset = max;
 
         self.skip_filter = false;
-        if env.screen.is_off_screen == true {
+        if env.screen.is_off_screen {
             self.skip_filter = true;
         }
     }
@@ -79,7 +79,7 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
         filter_in: &Vec<FilterIo>,
         filter_out: &mut Vec<FilterIo>,
     ) {
-        if self.skip_filter == true {
+        if self.skip_filter {
             *filter_out = filter_in.clone();
             return;
         }

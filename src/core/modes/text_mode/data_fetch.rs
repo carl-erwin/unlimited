@@ -94,7 +94,7 @@ impl ContentFilter<'_> for RawDataFilter {
             let mut raw_data = vec![]; // TODO(ceg): write directly to next filter input
 
             // disable this block to test until eof
-            if bench_to_eof() == false {
+            if !bench_to_eof() {
                 if self.pos + self.read_size as u64 > self.max_pos {
                     self.read_size = self.max_pos.saturating_sub(self.pos) as usize;
                     if self.debug {
@@ -210,7 +210,7 @@ impl ContentFilter<'_> for RawDataFilter {
                 }
             }
 
-            if bench_to_eof() == false {
+            if !bench_to_eof() {
                 // TODO(ceg): in setup : self.read_to_eof = bench_to_eof()
                 if self.pos >= self.max_pos {
                     env.quit = true;

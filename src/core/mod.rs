@@ -334,7 +334,7 @@ use crate::core::document::DocumentBuilder;
 
 /// TODO(ceg): replace this by load/unload doc functions
 /// the ui will open the documents on demand
-pub fn load_files(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
+pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.read().len();
 
     for f in &editor.config.files_list {

@@ -933,7 +933,7 @@ pub fn destroy_view(
     // current view/id
     let v = view.write();
 
-    if v.destroyable == false {
+    if !v.destroyable {
         return;
     }
 

@@ -116,7 +116,7 @@ pub fn transform_io_data(
     let orig_size = size;
 
     // debug
-    if metadata == true && size > 0 {
+    if metadata && size > 0 {
         dbg_println!(
             "real_cp = {}, displayed_cp = {}, size = {}, metadata = {}",
             real_cp,
@@ -128,7 +128,7 @@ pub fn transform_io_data(
     }
 
     // debug
-    if metadata == false && size == 0 {
+    if !metadata && size == 0 {
         dbg_println!(
             "real_cp = {}, displayed_cp = {}, size = {}, metadata = {}",
             real_cp,

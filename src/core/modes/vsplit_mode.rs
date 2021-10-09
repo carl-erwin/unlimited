@@ -156,7 +156,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
     {
         let mod_ctx = v.mode_ctx_mut::<VsplitModeContext>("vsplit-mode");
-        if mod_ctx.selected == false {
+        if !mod_ctx.selected {
             return;
         }
     }
@@ -250,12 +250,12 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
 
         loop {
             let (b, _) = env.screen.push(cpi.clone());
-            if b == false {
+            if !b {
                 env.quit = true;
                 break;
             }
         }
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {}
 }

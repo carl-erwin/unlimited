@@ -66,8 +66,8 @@ pub trait Mode {
 
     fn on_view_event(
         &self,
-        editor: &mut Editor<'static>,
-        env: &mut EditorEnv<'static>,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
         _src: ViewEventSource,
         _dst: ViewEventDestination,
         _event: &ViewEvent,

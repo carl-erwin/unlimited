@@ -132,7 +132,7 @@ impl ContentFilter<'_> for StatusModeCompose {
         &"StatusModeCompose"
     }
 
-    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
         if env.screen.push_count() <= 1 {
             // eof
             return;

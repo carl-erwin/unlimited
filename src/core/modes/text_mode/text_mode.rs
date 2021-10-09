@@ -308,17 +308,13 @@ impl<'a> Mode for TextMode {
 
     fn configure_view(
         &mut self,
-        editor: &mut Editor<'static>,
+        _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
         dbg_println!("config text-mode for  {:?}", view.id);
 
         view.compose_priority = 256; // TODO: move to caller
-
-        let doc_id = { view.document.as_ref().unwrap().clone().read().id };
-
-        let doc = { editor.document_map.read().get(&doc_id).unwrap().clone() };
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
 

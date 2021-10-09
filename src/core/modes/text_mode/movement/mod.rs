@@ -231,7 +231,7 @@ pub fn move_marks_to_start_of_line(
     for (idx, m) in tm.marks.iter_mut().enumerate() {
         m.move_to_start_of_line(&doc, codec);
 
-        if idx == midx && screen.contains_offset(m.offset) == false {
+        if idx == midx && !screen.contains_offset(m.offset) {
             center = true;
         }
     }
@@ -266,7 +266,7 @@ pub fn move_marks_to_end_of_line(
     for (idx, m) in tm.marks.iter_mut().enumerate() {
         m.move_to_end_of_line(&doc, codec);
 
-        if idx == midx && screen.contains_offset(m.offset) == false {
+        if idx == midx && !screen.contains_offset(m.offset) {
             center = true;
         }
     }
@@ -290,8 +290,8 @@ pub fn move_marks_to_end_of_line(
 
 */
 pub fn move_offset_to_previous_line_index(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     offset: u64,
     line_index: usize,
@@ -410,7 +410,7 @@ fn move_on_screen_mark_to_previous_line(
                 dbg_println!("MARK  look for last non metadata cell");
                 while new_x > 0 {
                     let cpi = screen.get_cpinfo(new_x, new_y).unwrap();
-                    if cpi.metadata == false {
+                    if !cpi.metadata {
                         break;
                     }
                     new_x -= 1;
@@ -927,7 +927,7 @@ pub fn move_mark_to_next_line(
             }
         }
 
-        if ok == true {
+        if ok {
             dbg_println!("MARK FOUND ON SCREEN");
             return offsets;
         }
@@ -1170,7 +1170,7 @@ pub fn move_marks_to_next_line(
 
             // TODO(ceg): that use/match the returned action
             let ret = move_on_screen_mark_to_next_line(&mut mark, &screen);
-            if ret.0 == false {
+            if !ret.0 {
                 dbg_println!(
                     " cannot update marks[{}], offset {} : {:?}",
                     0,
@@ -1347,7 +1347,7 @@ pub fn move_marks_to_next_line(
 
                 // TODO(ceg): that use/match the returned action
                 let ret = move_on_screen_mark_to_next_line(&mut marks[i], &screen);
-                if ret.0 == false {
+                if !ret.0 {
                     dbg_println!(
                         " cannot update marks[{}], offset {} : {:?}",
                         i,

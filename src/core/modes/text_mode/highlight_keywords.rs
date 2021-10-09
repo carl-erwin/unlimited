@@ -109,7 +109,7 @@ impl ContentFilter<'_> for HighlightFilter {
         filter_in: &Vec<FilterIo>,
         filter_out: &mut Vec<FilterIo>,
     ) {
-        if self.skip_filter == true {
+        if self.skip_filter {
             // return NOP hand let the caller skip swap
             *filter_out = filter_in.clone();
             return;
@@ -315,7 +315,7 @@ impl ContentFilter<'_> for HighlightFilter {
         }
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {
         // default
         if !self.token_io.is_empty() {
             // The parsing is incomplete

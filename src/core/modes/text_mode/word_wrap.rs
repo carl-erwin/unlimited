@@ -52,36 +52,8 @@ fn set_io_color(io: &FilterIo, color: (u8, u8, u8)) -> FilterIo {
     new_io
 }
 
-fn set_io_fg_color(io: &FilterIo, color: (u8, u8, u8)) -> FilterIo {
-    // flush new line
-    let mut new_io = FilterIo {
-        // general info
-        metadata: false,
-        style: TextStyle::new(),
-        offset: io.offset,
-        size: io.size,
-        data: io.data.clone(),
-    };
-
-    {
-        new_io.style.is_blinking = true;
-        new_io.style.is_selected = true;
-        new_io.style.color = color;
-    }
-
-    new_io
-}
-
 fn set_first_column_color(io: &FilterIo) -> FilterIo {
     set_io_color(io, (0, 0, 255))
-}
-
-fn set_debug_column_color(io: &FilterIo) -> FilterIo {
-    set_io_color(io, (0, 255, 0))
-}
-
-fn set_debug2_column_color(io: &FilterIo) -> FilterIo {
-    set_io_color(io, (255, 0, 0))
 }
 
 fn build_wrap_point_io(blank_offset: Option<u64>) -> FilterIo {
@@ -340,7 +312,7 @@ impl ContentFilter<'_> for WordWrapFilter {
         }
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {
         dbg_println!("WRAP: FINISH");
         // TODO fnish count ...
         // self.finish_count += 1;

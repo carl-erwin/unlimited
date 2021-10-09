@@ -131,22 +131,6 @@ impl Utf8FilterCtx {
     }
 }
 
-fn utf8_default_codepoint(offset: u64, size: usize, cp: u32) -> FilterIo {
-    assert!(size > 0);
-
-    FilterIo {
-        // general info
-        metadata: false,
-        style: TextStyle::new(),
-        offset: Some(offset),
-        size,
-        data: FilterData::TextInfo {
-            real_cp: cp,
-            displayed_cp: cp,
-        },
-    }
-}
-
 // TODO(ceg): remove Option<>
 // always ?
 #[inline(always)]

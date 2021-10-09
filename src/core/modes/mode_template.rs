@@ -59,8 +59,8 @@ impl<'a> Mode for TemplateMode {
 
     fn on_view_event(
         &self,
-        editor: &mut Editor<'static>,
-        env: &mut EditorEnv<'static>,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
         _src: ViewEventSource,
         _dst: ViewEventDestination,
         _event: &ViewEvent,
@@ -115,7 +115,7 @@ impl ContentFilter<'_> for TemplateComposeFilter {
         *filter_out = filter_in.clone();
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _: &View, _: &mut LayoutEnv) {}
 }
 
 impl ScreenOverlayFilter<'_> for TemplateMode {
@@ -123,5 +123,5 @@ impl ScreenOverlayFilter<'_> for TemplateMode {
         &"template-screen-overlay-filter"
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _: &View, _: &mut LayoutEnv) {}
 }

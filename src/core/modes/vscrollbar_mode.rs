@@ -269,7 +269,7 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
     // TODO(ceg): move scrollbar
     {
         let mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
-        if mode_ctx.selected == false {
+        if !mode_ctx.selected {
             return;
         }
     }
@@ -332,5 +332,5 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         env.quit = true;
     }
 
-    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) -> () {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {}
 }

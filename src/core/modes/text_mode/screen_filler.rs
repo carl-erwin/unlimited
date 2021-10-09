@@ -212,7 +212,7 @@ impl ContentFilter<'_> for ScreenFilter {
                     };
 
                     let ret = self.add_text_to_screen(env, cpi, io.offset);
-                    if ret == false {
+                    if !ret {
                         // return enum ScreenFull, etc ...
                         dbg_println!("self.add_text_to_screen -> false, cpi {:?}", cpi);
                         break;
@@ -248,7 +248,7 @@ impl ContentFilter<'_> for ScreenFilter {
                         };
 
                         let ret = self.add_text_to_screen(env, cpi, Some(cur_offset));
-                        if ret == false {
+                        if !ret {
                             // return enum ScreenFull, etc ...
                             dbg_println!("self.add_text_to_screen -> false, cpi {:?}", cpi);
                             break;
@@ -268,7 +268,7 @@ impl ContentFilter<'_> for ScreenFilter {
         }
     }
 
-    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) -> () {
+    fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
         env.screen.check_invariants();
         env.screen.doc_max_offset = env.max_offset;
         //        assert_eq!(env.base_offset, env.screen.first_offset.unwrap()); // ?

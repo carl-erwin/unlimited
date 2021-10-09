@@ -49,9 +49,6 @@ use crate::core::event::KeyModifiers;
 
 use crate::core::codepointinfo::CodepointInfo;
 
-//
-use crate::ui::UiState;
-
 fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
     // TODO(ceg): generate_test from logs grep | awk >>
     //    let v = autotest_0001();
@@ -89,9 +86,6 @@ pub fn main_loop(
         stdin_thread(&core_tx_clone, &ui_tx_clone);
         return;
     });
-
-    // ui state
-    let mut ui_state = UiState::new();
 
     // ui ctx : TODO move to struct UiCtx
     let mut last_screen = Arc::new(RwLock::new(Box::new(Screen::new(0, 0))));
@@ -141,11 +135,10 @@ pub fn main_loop(
     crate::core::event::pending_input_event_inc(1);
     core_tx.send(msg).unwrap_or(()); // if removed the 1st screen is not displayed
 
-    while !ui_state.quit {
+    loop {
         if let Ok(evt) = ui_rx.recv() {
             match evt.event {
                 Event::ApplicationQuitEvent => {
-                    ui_state.quit = true;
                     let msg =
                         EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
                     crate::core::event::pending_input_event_inc(1);
@@ -228,17 +221,18 @@ pub fn main_loop(
                         // dbg_println!("DRAW: crossterm SKIP frame ----- \r");
                     }
 
-                    let end = Instant::now();
+                    if false {
+                        let p_rdr = crate::core::event::pending_render_event_count();
 
-                    let p_rdr = crate::core::event::pending_render_event_count();
-                    /*
+                        let end = Instant::now();
+
                         dbg_println!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
                         (end - start).as_micros(),
                         fps,
                         p_input,
                         p_rdr, draw
                     );
-                    */
+                    }
                 }
 
                 _ => {}
@@ -388,9 +382,6 @@ fn draw_screen(
     let width = screen.width();
     let height = screen.height();
 
-    let last_width = last_screen.width();
-    let last_height = last_screen.height();
-
     let t0 = Instant::now();
 
     let mut l = 0;
@@ -406,7 +397,7 @@ fn draw_screen(
         while c < width {
             let prev_c = c;
 
-            let mut have_diff = false;
+            // let mut have_diff = false;
             // get next diff
             if true {
                 let prev_line = last_screen.get_line(l).unwrap();
@@ -420,7 +411,7 @@ fn draw_screen(
                         // debug_cpi.style.is_bold = true;
                         //debug_cpi.style.bg_color.0 = 255;
                         //debug_cpi.displayed_cp = 'X';
-                        have_diff = true;
+                        // have_diff = true;
                         break;
                     } else {
                         c += 1;
@@ -745,15 +736,14 @@ fn translate_crossterm_event(
 
         ::crossterm::event::Event::Terminate => {
             // TODO(ceg): not really an input
-            return InputEvent::NoInputEvent;
         }
     }
 
-    // return InputEvent::NoInputEvent;
+    InputEvent::NoInputEvent
 }
 
 fn send_input_events(
-    accum: &Vec<InputEvent>,
+    accum: Vec<InputEvent>,
     tx: &Sender<EventMessage>,
     _ui_tx: &Sender<EventMessage>,
 ) {
@@ -776,12 +766,7 @@ fn send_input_events(
 
             _ => {
                 // send
-                let msg = EventMessage::new(
-                    0,
-                    Event::InputEvents {
-                        events: accum.clone(),
-                    },
-                );
+                let msg = EventMessage::new(0, Event::InputEvents { events: accum });
                 crate::core::event::pending_input_event_inc(1);
                 tx.send(msg).unwrap_or(());
                 return;
@@ -798,8 +783,8 @@ fn send_input_events(
         match evt {
             InputEvent::RefreshUi { width, height } => {
                 refresh = true;
-                new_width = *width;
-                new_height = *height;
+                new_width = width;
+                new_height = height;
             }
 
             InputEvent::KeyPress {
@@ -811,7 +796,7 @@ fn send_input_events(
                         shift: false,
                     },
             } => {
-                codepoints.push(*c);
+                codepoints.push(c);
             }
 
             _ => {
@@ -937,7 +922,7 @@ fn get_input_events(
     let p_input = crate::core::event::pending_input_event_count();
     if p_input < 1 {
         if !accum.is_empty() {
-            send_input_events(&accum, tx, ui_tx);
+            send_input_events(accum, tx, ui_tx);
         }
     }
 

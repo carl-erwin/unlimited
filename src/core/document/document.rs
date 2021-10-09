@@ -335,8 +335,8 @@ impl<'a> Document<'a> {
             document_event_to_string(&evt),
             self.subscribers.len()
         );
-        for (idx, e) in self.subscribers.iter().enumerate() {
-            e.borrow_mut().cb(self, evt);
+        for s in self.subscribers.iter() {
+            s.borrow_mut().cb(self, evt);
         }
     }
 
@@ -881,7 +881,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
         // NB: experimental throttling based on user input freq/rendering
         // TODO <-- user configuration
-        if user_is_active() == true {
+        if user_is_active() {
             let wait = std::time::Duration::from_millis(16);
             std::thread::sleep(wait);
         }
@@ -1083,13 +1083,13 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         // read node bytes
         {
             let doc = doc.read();
-            if doc.abort_indexing == true {
+            if doc.abort_indexing {
                 break;
             }
 
             let file = doc.buffer.data.read();
             let node = &file.pool[idx.unwrap()];
-            if node.indexed == true {
+            if node.indexed {
                 idx = node.link.next;
                 continue;
             }
@@ -1131,7 +1131,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         }
 
         // yield some cpu time
-        if user_is_active() == true {
+        if user_is_active() {
             let wait = std::time::Duration::from_millis(16);
             std::thread::sleep(wait);
         }

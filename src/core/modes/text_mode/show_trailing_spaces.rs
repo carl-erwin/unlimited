@@ -73,22 +73,20 @@ impl ContentFilter<'_> for ShowTrailingSpaces {
                 FilterIo {
                     data: FilterData::TextInfo { real_cp, .. },
                     ..
-                } => {
-                    match u32_to_char(*real_cp) {
-                        '\n' => {
-                            self.colorize_accum();
-                            self.flush_io(filter_out, io.clone());
-                        }
-
-                        ' ' => {
-                            self.accum.push(io.clone());
-                        }
-
-                        _ => {
-                            self.flush_io(filter_out, io.clone());
-                        }
+                } => match u32_to_char(*real_cp) {
+                    '\n' => {
+                        self.colorize_accum();
+                        self.flush_io(filter_out, io.clone());
                     }
-                }
+
+                    ' ' => {
+                        self.accum.push(io.clone());
+                    }
+
+                    _ => {
+                        self.flush_io(filter_out, io.clone());
+                    }
+                },
 
                 _ => {
                     // TextInfo

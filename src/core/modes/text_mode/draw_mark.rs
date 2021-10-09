@@ -12,13 +12,11 @@ use super::TextModeContext;
 
 use crate::core::screen::screen_apply;
 
-pub struct DrawMarks {
-    skip_filter: bool,
-}
+pub struct DrawMarks {}
 
 impl DrawMarks {
     pub fn new() -> Self {
-        DrawMarks { skip_filter: false }
+        Self {}
     }
 }
 
@@ -27,8 +25,8 @@ impl ScreenOverlayFilter<'_> for DrawMarks {
         &"DrawMarks"
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) -> () {
-        if env.screen.is_off_screen == true {
+    fn finish(&mut self, view: &View, env: &mut LayoutEnv) {
+        if env.screen.is_off_screen {
             return;
         }
 
@@ -49,11 +47,9 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
 
     let idx_max = marks.len();
 
-    if idx_max == 1 {
-        if !screen.contains_offset(marks[0].offset) {
-            dbg_println!("MARK is offscreen");
-            return;
-        }
+    if idx_max == 1 && !screen.contains_offset(marks[0].offset) {
+        dbg_println!("MARK is offscreen");
+        return;
     }
 
     if !set {

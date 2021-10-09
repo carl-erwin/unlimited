@@ -111,8 +111,6 @@ impl Screen {
     }
 
     pub fn check_invariants(&self) {
-        return;
-
         if self.push_count == 0 {
             return;
         }
@@ -145,7 +143,7 @@ impl Screen {
 
                 let cpi = &cell.cpi;
 
-                if cell_is_used && cpi.size > 0 && cpi.metadata == true {
+                if cell_is_used && cpi.size > 0 && cpi.metadata {
                     dbg_println!(
                         "INVALID PUSH [META] CHECKING cur_offset = {} , CPI {:?}, ",
                         cur_offset,
@@ -153,7 +151,7 @@ impl Screen {
                     );
                     panic!("");
                 }
-                if cell_is_used && cpi.size == 0 && cpi.metadata == false {
+                if cell_is_used && cpi.size == 0 && !cpi.metadata {
                     dbg_println!(
                         "INVALID PUSH [NON META] CHECKING cur_offset = {} , CPI {:?}, ",
                         cur_offset,
@@ -192,7 +190,7 @@ impl Screen {
                     prev_cpis.push(cpi.clone());
 
                     cur_offset += cpi.size as u64;
-                    if cpi.metadata == false {
+                    if !cpi.metadata {
                         // dbg_println!("CUR : UPDATE {:?}", cpi);
                     }
                     if cur_offset >= last_offset {
@@ -295,7 +293,7 @@ impl Screen {
         self.current_line_index += 1; // go to next line
         self.current_line_remain = self.width;
 
-        if self.is_start_of_line == false {
+        if !self.is_start_of_line {
             self.is_start_of_line = true;
 
             if false {
@@ -330,11 +328,11 @@ impl Screen {
 
         // TODO(ceg): remove check invariant
         if !true {
-            if cpi.metadata == false && cpi.size == 0 {
+            if !cpi.metadata && cpi.size == 0 {
                 dbg_println!("CPI = {:?}", cpi);
                 panic!();
             }
-            if cpi.metadata == true && cpi.size != 0 {
+            if cpi.metadata && cpi.size != 0 {
                 dbg_println!("CPI = {:?}", cpi);
                 panic!();
             }
@@ -396,13 +394,6 @@ impl Screen {
             line_feed = true;
         } else if cpi.cp == '\r' {
             cpi.displayed_cp = ' ';
-        }
-
-        match cpi.displayed_cp {
-            _ => {
-                //cpi.displayed_cp = '�';
-                //cpi.displayed_cp = '.';
-            }
         }
 
         assert!(cpi.displayed_cp >= ' ');
@@ -480,7 +471,7 @@ impl Screen {
             }
         }
 
-        self.last_offset = cpi.offset.clone();
+        self.last_offset = cpi.offset;
 
         self.push_count += unicode_width;
         self.current_line_remain -= unicode_width; // TODO(ceg): saturating sub here ?
@@ -494,7 +485,7 @@ impl Screen {
     pub fn append(&mut self, cpi_vec: &Vec<CodepointInfo>) -> (usize, usize, Option<u64>) {
         for (idx, cpi) in cpi_vec.iter().enumerate() {
             let ret = self.push(*cpi);
-            if ret.0 == false {
+            if !ret.0 {
                 // cannot push screen full
                 return (idx, ret.1, self.last_offset);
             }
@@ -674,7 +665,7 @@ pub fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
         if let Some(line) = screen.get_line_mut(l) {
             for (c, cell) in line.iter_mut().enumerate() {
                 let cpi = &mut cell.cpi;
-                if on_cpi(c, l, cpi) == false {
+                if !on_cpi(c, l, cpi) {
                     return;
                 }
             }
