@@ -445,7 +445,7 @@ pub fn run_compositing_stage_direct(
     }
 
     {
-        dbg_println!("COMPOSE VID {:?}, ", view.read().id);
+        dbg_println!("[START] COMPOSE VID {:?}, ", view.read().id);
     }
 
     // Draw Leaf View
@@ -473,6 +473,10 @@ pub fn run_compositing_stage_direct(
 
     if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ContentAndScreenOverlay {
         run_screen_overlay_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
+    }
+
+    {
+        dbg_println!("[END] COMPOSE VID {:?}, ", view.read().id);
     }
 }
 
