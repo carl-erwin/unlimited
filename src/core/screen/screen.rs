@@ -445,6 +445,8 @@ impl Screen {
                                 self.push_count
                             );
                         }
+
+                        // save end line info
                         self.line_offset.last_mut().unwrap().1 = cpi_offset;
                         self.line_index.last_mut().unwrap().1 = self.push_count;
                     }
