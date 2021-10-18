@@ -293,24 +293,7 @@ impl Screen {
         self.current_line_index += 1; // go to next line
         self.current_line_remain = self.width;
 
-        if !self.is_start_of_line {
-            self.is_start_of_line = true;
-
-            if false {
-                dbg_println!(
-                    "FLUSH line[{}] : off [{:?}], index [{:?} remain {}]",
-                    self.current_line_index - 1,
-                    self.line_offset.last().unwrap(),
-                    self.line_index.last().unwrap(),
-                    self.current_line_remain
-                );
-            }
-        }
-
-        // unlikely
-        if self.push_count >= self.push_capacity {
-            self.push_count = self.push_capacity;
-        }
+        self.is_start_of_line = true;
 
         self.current_line_index
     }
