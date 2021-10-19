@@ -1204,6 +1204,73 @@ mod tests {
     use rand::Rng;
 
     #[test]
+    fn doc_read() {
+        use std::io::prelude::*;
+        use std::os::unix::prelude::FileExt;
+
+        let filename = "/home/ceg/test-1g".to_owned();
+
+        println!("create file....");
+        let mut file = std::fs::File::create(&filename).unwrap();
+        let size = 20 * 1024 * 1024 * 1024;
+        let mut buf = Vec::with_capacity(size);
+        //buf.resize(size, 0);
+        unsafe {
+            buf.set_len(size);
+        } // faster in debug build
+        file.write_all(&buf).unwrap();
+        println!("create file....ok");
+
+        println!("read file....");
+
+        let mut file = std::fs::File::open(&filename).unwrap();
+
+        let doc = DocumentBuilder::new()
+            .document_name("untitled-1")
+            .file_name(&filename)
+            .internal(false)
+            .finalize();
+
+        let doc = doc.as_ref().unwrap().write();
+        let doc_size = doc.size() as u64;
+        let step = 64 * 1024 * 1024;
+        let t0_read = std::time::Instant::now();
+        let mut prev_time = 0;
+
+        let mut data: Vec<u8> = Vec::with_capacity(step);
+
+        for offset in (0..doc_size).into_iter().step_by(step) {
+            if true {
+                data.clear();
+                doc.read(offset, step, &mut data);
+            } else {
+                unsafe {
+                    data.set_len(step);
+                } // faster in debug build
+
+                let res = file.read_at(&mut data[0..step], offset);
+                match res {
+                    Ok(size) => {
+                        println!("read [{}] @ offset {}", size, offset);
+                    }
+                    Err(what) => {
+                        println!("read error [{}] @ offset {}, what {:?}", step, offset, what);
+                    }
+                }
+            }
+
+            let diff = t0_read.elapsed().as_secs();
+            if prev_time != diff {
+                let bytes_per_seconds = offset / diff;
+                println!("bytes_per_seconds {}", bytes_per_seconds);
+                prev_time = diff;
+            }
+        }
+
+        //        let _ = std::fs::remove_file(&filename);
+    }
+
+    #[test]
     fn undo_redo() {
         let doc = DocumentBuilder::new()
             .document_name("untitled-1")
