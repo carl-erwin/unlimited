@@ -89,7 +89,6 @@ pub fn main_loop(
 
     // ui ctx : TODO move to struct UiCtx
     let mut last_screen = Arc::new(RwLock::new(Box::new(Screen::new(0, 0))));
-    let mut last_screen_rdr_time = Instant::now();
 
     let stdout = stdout();
     let mut stdout = stdout.lock();
@@ -163,62 +162,47 @@ pub fn main_loop(
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
-                    if (start - fps_t0).as_millis() >= 1000 {
-                        let screen = screen.read();
+                    if crate::core::bench_to_eof() {
+                        if (start - fps_t0).as_millis() >= 1000 {
+                            let screen = screen.read();
 
-                        dbg_println!(
-                            "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
-                            start.duration_since(startup).as_millis(),
-                            screen.first_offset,
-                            draw_req,
-                            fps,
-                            p_rdr,
-                            p_input
-                        );
+                            eprintln!(
+                                "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
+                                start.duration_since(startup).as_millis(),
+                                screen.first_offset,
+                                draw_req,
+                                fps,
+                                p_rdr,
+                                p_input
+                            );
 
-                        fps = 0;
-                        draw_req = 0;
-                        fps_t0 = start;
+                            fps = 0;
+                            draw_req = 0;
+                            fps_t0 = start;
+                        }
                     }
 
-                    //  continue;
                     let mut draw = false;
 
-                    if
-                    /* p_input < 100 && */
-                    p_rdr < 1 {
+                    if p_rdr < 1 {
                         draw = true;
-                        //dbg_println!("DRAW: crossterm DRAW frame ----- \r");
-                    }
-
-                    let diff = (start - last_screen_rdr_time).as_millis();
-                    //                    dbg_println!("DRAW: crossterm diff {} ----- \r", diff);
-                    if diff >= 1000 / 60 {
-                        // draw = true;
-                        //dbg_println!("DRAW: crossterm DRAW flush timeout ----- \r");
-                    }
-
-                    if crate::core::bench_to_eof() {
-                        //draw = true;
                     }
 
                     if crate::core::no_ui_render() {
                         draw = false;
+                        fps += 1;
                     }
 
                     if draw {
                         fps += 1;
 
+                        // the slow part
                         {
                             let mut screen = screen.write();
                             let mut last_screen = last_screen.write();
                             draw_view(&mut last_screen, &mut screen, &mut stdout);
                         }
                         last_screen = screen;
-
-                        last_screen_rdr_time = Instant::now();
-                    } else {
-                        // dbg_println!("DRAW: crossterm SKIP frame ----- \r");
                     }
 
                     if false {
