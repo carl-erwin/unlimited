@@ -117,7 +117,7 @@ pub struct Unicode {
 }
 
 // content_type == unicode
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterData {
     EndOfStream,
     StreamLimitReached, // user custom limit
@@ -131,7 +131,7 @@ pub enum FilterData {
 }
 
 // TODO(ceg): move to core/view/filterio.rs
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FilterIo {
     // general info
     pub metadata: bool,
