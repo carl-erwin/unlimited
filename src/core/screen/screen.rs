@@ -307,9 +307,9 @@ impl Screen {
 
     /// append
     pub fn push(&mut self, mut cpi: CodepointInfo) -> (bool, usize) {
-        self.check_invariants();
+        // self.check_invariants();
 
-        // TODO(ceg): remove check invariant
+        // TODO(ceg):  cpi.check_invariants();
         if !true {
             if !cpi.metadata && cpi.size == 0 {
                 dbg_println!("CPI = {:?}", cpi);
@@ -321,12 +321,12 @@ impl Screen {
             }
         }
 
+        // screen.is_full() ? all line used ?
         if self.current_line_index == self.height() {
             return (false, self.current_line_index);
         }
 
-        // cur line remain cells = self.line[self.clip.y + self.current_line_index].available()
-
+        // check cpi
         let mut line_feed = false;
 
         let mut unicode_width = self.char_width(cpi.cp);
@@ -336,8 +336,8 @@ impl Screen {
                 cpi.displayed_cp = '.';
             }
         } else {
-            // dbg_println!("unicode_width for cp {} = {}", cpi.cp as u32, unicode_width);
             // do not allow invisible char
+            // no char replacement ?
             if cpi.cp == cpi.displayed_cp {
                 match cpi.cp {
                     '\n' => {
@@ -363,53 +363,58 @@ impl Screen {
                     _ => {}
                 }
             }
+
+            // filter new line/carriage return
+            if cpi.cp == '\n' || cpi.displayed_cp == '\n' {
+                cpi.displayed_cp = ' ';
+                line_feed = true;
+            } else if cpi.cp == '\r' {
+                cpi.displayed_cp = ' ';
+            }
+
+            assert!(cpi.displayed_cp >= ' ');
         }
 
+        // does char fit ?
         if unicode_width > self.current_line_remain {
             self.select_next_line_index();
+            // self.is_full() ?
             if self.current_line_index == self.height() {
                 return (false, self.current_line_index);
             }
         }
 
-        if cpi.cp == '\n' || cpi.displayed_cp == '\n' {
-            cpi.displayed_cp = ' ';
-            line_feed = true;
-        } else if cpi.cp == '\r' {
-            cpi.displayed_cp = ' ';
-        }
+        // update line info: move to self.finalize()
 
-        assert!(cpi.displayed_cp >= ' ');
-
+        // new line start
         if self.is_start_of_line {
             // update current line info :offset/index
             if let Some(off) = cpi.offset {
                 let offset_pair = (off, off);
                 let index_pair = (self.push_count, self.push_count);
-
-                if false {
-                    dbg_println!(
-                        "SAVE line[{}] start @ offset {} , index {}",
-                        self.current_line_index,
-                        off,
-                        self.push_count
-                    );
-                }
-
                 self.line_offset.push(offset_pair);
                 self.line_index.push(index_pair);
-
-                self.is_start_of_line = false; // reset on self.select_next_line_index()
+                self.is_start_of_line = false; // here ? what happens if we push meta char with no offset ?
             }
         }
 
-        if self.push_count > 0 {
+        if self.line_offset.is_empty() {
+            if let Some(off) = self.first_offset {
+                self.line_offset.push((off, off));
+                self.line_index.push((self.push_count, self.push_count));
+            }
+        }
+
+        if self.push_count == 0 {
+            self.first_offset = cpi.offset.clone();
+        } else {
             let cpi_offset = cpi.offset.clone();
             let last_offset = self.last_offset.clone();
 
-            if true {
-                match (cpi_offset, last_offset) {
-                    (Some(cpi_offset), Some(last_offset)) => {
+            match (cpi_offset, last_offset) {
+                (Some(cpi_offset), Some(last_offset)) => {
+                    // check invariants
+                    if !true {
                         if cpi_offset < last_offset {
                             dbg_println!(
                                 "cpi {:?} , cpi_offset {:?} < last_offset {:?}",
@@ -428,31 +433,28 @@ impl Screen {
                                 self.push_count
                             );
                         }
-
-                        // save end line info
-                        self.line_offset.last_mut().unwrap().1 = cpi_offset;
-                        self.line_index.last_mut().unwrap().1 = self.push_count;
                     }
-                    _ => {}
+
+                    // save end line info
+                    self.line_offset.last_mut().unwrap().1 = cpi_offset;
+                    self.line_index.last_mut().unwrap().1 = self.push_count;
                 }
+                _ => {}
             }
         }
 
-        self.buffer[self.push_count].cpi = cpi;
+        unsafe {
+            //self.buffer[self.push_count].cpi = cpi;
+            let mut cell = self.buffer.get_unchecked_mut(self.push_count);
+            cell.cpi = cpi;
 
-        for i in 1..unicode_width {
-            self.buffer[self.push_count + i].cpi = cpi;
-            self.buffer[self.push_count + i].cpi.skip_render = true;
-        }
+            for i in 1..unicode_width {
+                //self.buffer[self.push_count + i].cpi = cpi;
+                //self.buffer[self.push_count + i].cpi.skip_render = true;
 
-        if self.push_count == 0 {
-            self.first_offset = cpi.offset.clone();
-        }
-
-        if self.line_offset.is_empty() {
-            if let Some(off) = self.first_offset {
-                self.line_offset.push((off, off));
-                self.line_index.push((self.push_count, self.push_count));
+                let mut cell = self.buffer.get_unchecked_mut(self.push_count + i);
+                cell.cpi = cpi;
+                cell.cpi.skip_render = true;
             }
         }
 
@@ -466,6 +468,10 @@ impl Screen {
 
         (true, self.current_line_index)
     }
+
+    // call this to compute line start/end offsets, line_indexes
+    // TODO: move all push(..) code that deal with metadata
+    pub fn finalize(&mut self) {}
 
     pub fn append(&mut self, cpi_vec: &Vec<CodepointInfo>) -> (usize, usize, Option<u64>) {
         for (idx, cpi) in cpi_vec.iter().enumerate() {

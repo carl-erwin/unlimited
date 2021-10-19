@@ -122,10 +122,6 @@ impl ContentFilter<'_> for ScreenFilter {
         filter_in: &Vec<FilterIo>,
         _filter_out: &mut Vec<FilterIo>,
     ) {
-        if filter_in.is_empty() {
-            return;
-        }
-
         /*
                 dbg_println!(
                     "screen.push_available({}) + screen.push_count({}) == screen.push_capacity({})",
@@ -140,14 +136,7 @@ impl ContentFilter<'_> for ScreenFilter {
                 );
         */
 
-        if env.screen.push_available() == 0 {
-            dbg_println!("QUIT env.screen.push_available() == 0");
-            if !bench_to_eof() {
-                env.quit = true;
-            }
-        }
-
-        env.screen.check_invariants();
+        //        env.screen.check_invariants();
 
         for io in filter_in.iter() {
             match &io {
@@ -269,6 +258,8 @@ impl ContentFilter<'_> for ScreenFilter {
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
+        //env.screen.finalize();
+
         env.screen.check_invariants();
         env.screen.doc_max_offset = env.max_offset;
         //        assert_eq!(env.base_offset, env.screen.first_offset.unwrap()); // ?
