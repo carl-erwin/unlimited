@@ -60,19 +60,24 @@ impl ContentFilter<'_> for RawDataFilter {
         self.pos = env.base_offset;
         self.max_pos = env.max_offset;
 
-        if self.debug {
-            dbg_println!("DATA FETCH self.pos = {}", self.pos);
-            dbg_println!("DATA FETCH self.max_pos = {}", self.max_pos);
-            dbg_println!("DATA FETCH diff max_pos pos = {}", self.max_pos - self.pos);
-        }
-
         //
         self.read_count = 0;
         self.read_max = env.screen.width() * env.screen.height() * 4;
         self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
 
         if bench_to_eof() {
-            self.read_max = 4 * 1024 * 1024;
+            let bench_size = 2 * 1024 * 1024;
+            self.read_max = (self.max_pos - self.pos) as usize;
+            self.read_max = std::cmp::min(bench_size, self.read_max);
+            self.read_size = self.read_max;
+        }
+
+        if self.debug {
+            dbg_println!("DATA FETCH self.pos         = {}", self.pos);
+            dbg_println!("DATA FETCH self.max_pos     = {}", self.max_pos);
+            dbg_println!("DATA FETCH self.read_size   = {}", self.read_size);
+            dbg_println!("DATA FETCH diff max_pos pos = {}", self.max_pos - self.pos);
+            dbg_println!("DATA FETCH diff max_pos pos = {}", self.max_pos - self.pos);
         }
     }
 
