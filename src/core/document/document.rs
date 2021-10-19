@@ -388,6 +388,8 @@ impl<'a> Document<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
+        return self.buffer.read(offset, nr_bytes, data);
+
         let doc_rev = self.nr_changes();
 
         if let Some(size) = self.cache.read(offset, nr_bytes, data, doc_rev) {
