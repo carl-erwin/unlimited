@@ -415,6 +415,10 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             self.line_number.push((offset.0, n));
         }
 
+        if self.line_number.is_empty() {
+            return;
+        }
+
         let mut line_number = self.line_number[0].1 .0;
         let screen = src.screen.as_ref().read();
         for i in 0..screen.line_index.len() {
