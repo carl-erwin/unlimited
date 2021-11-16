@@ -1,6 +1,7 @@
 //
-// MappedFile is binary tree that provides on-demand data mapping, and keeps only the modified areas in memory.
-// the leaves are linked to allow fast sequential traversal.
+// MappedFile is binary tree that provides on-demand data mapping,
+// and keeps only the modified areas in memory.
+// The leaves are linked to allow fast sequential traversal.
 //
 use std::collections::HashSet;
 use std::fmt;
@@ -26,7 +27,7 @@ use std::sync::Arc;
 
 const DEBUG: bool = false;
 
-//////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type RcLockFile = Arc<RwLock<File>>;
 
@@ -70,7 +71,7 @@ impl Drop for Page {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub enum UpdateHierarchyOp {
@@ -211,8 +212,9 @@ impl Node {
                     let mut fd = fd.as_ref().unwrap().write();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
-                                                                                 //let t1_read = std::time::Instant::now();
-                                                                                 //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
+
+                    //let t1_read = std::time::Instant::now();
+                    //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     assert!(nrd == chunk_size);
                 }
                 pos += chunk_size;
@@ -264,8 +266,9 @@ impl Node {
                     let mut fd = fd.as_ref().unwrap().write();
                     let _ = fd.seek(SeekFrom::Start(storage_offset + pos as u64));
                     let nrd = fd.read(&mut out[pos..pos + chunk_size]).unwrap(); // remove unwrap() )?; TODO(ceg): io error
-                                                                                 //let t1_read = std::time::Instant::now();
-                                                                                 //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
+
+                    //let t1_read = std::time::Instant::now();
+                    //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     assert!(nrd == chunk_size);
                 }
                 pos += chunk_size;
@@ -392,7 +395,7 @@ impl Node {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct FreeListAllocator<T> {
@@ -449,7 +452,7 @@ impl IndexMut<usize> for FreeListAllocator<Node> {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MappedFile<'a> {
     phantom: PhantomData<&'a u8>,
@@ -2219,7 +2222,7 @@ impl<'a> MappedFile<'a> {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Debug, Clone)]
 pub enum MappedFileIterator<'a> {
     End(FileHandle<'a>),
