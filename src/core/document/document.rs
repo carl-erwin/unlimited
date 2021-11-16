@@ -1207,21 +1207,23 @@ mod tests {
         use std::os::unix::prelude::FileExt;
 
         let filename = "/home/ceg/test-1g".to_owned();
-
-        println!("create file....");
-        let mut file = std::fs::File::create(&filename).unwrap();
-        let size = 20 * 1024 * 1024 * 1024;
-        let mut buf = Vec::with_capacity(size);
-        //buf.resize(size, 0);
-        unsafe {
-            buf.set_len(size);
-        } // faster in debug build
-        file.write_all(&buf).unwrap();
-        println!("create file....ok");
+        if false {
+            println!("create file....");
+            let mut file = std::fs::File::create(&filename).unwrap();
+            let size = 20 * 1024 * 1024 * 1024;
+            let mut buf = Vec::with_capacity(size);
+            //buf.resize(size, 0);
+            unsafe {
+                buf.set_len(size);
+            } // faster in debug build
+            file.write_all(&buf).unwrap();
+            println!("create file....ok");
+        }
 
         println!("read file....");
 
-        let mut file = std::fs::File::open(&filename).unwrap();
+        let filename = "/home/ceg/Test-data/12g".to_owned();
+        let file = std::fs::File::open(&filename).unwrap();
 
         let doc = DocumentBuilder::new()
             .document_name("untitled-1")
@@ -1229,17 +1231,24 @@ mod tests {
             .internal(false)
             .finalize();
 
+        build_index(&doc.unwrap());
+
+        return;
+
         let doc = doc.as_ref().unwrap().write();
         let doc_size = doc.size() as u64;
-        let step = 64 * 1024 * 1024;
+        let step = 1024 * 1024;
         let t0_read = std::time::Instant::now();
         let mut prev_time = 0;
 
         let mut data: Vec<u8> = Vec::with_capacity(step);
-
         for offset in (0..doc_size).into_iter().step_by(step) {
-            if true {
-                data.clear();
+            if !true {
+                unsafe {
+                    data.set_len(step);
+                } // faster in debug build
+
+                //                data.clear();
                 doc.read(offset, step, &mut data);
             } else {
                 unsafe {
@@ -1249,7 +1258,7 @@ mod tests {
                 let res = file.read_at(&mut data[0..step], offset);
                 match res {
                     Ok(size) => {
-                        println!("read [{}] @ offset {}", size, offset);
+                        //println!("read [{}] @ offset {}", size, offset);
                     }
                     Err(what) => {
                         println!("read error [{}] @ offset {}, what {:?}", step, offset, what);
@@ -1260,7 +1269,14 @@ mod tests {
             let diff = t0_read.elapsed().as_secs();
             if prev_time != diff {
                 let bytes_per_seconds = offset / diff;
-                println!("bytes_per_seconds {}", bytes_per_seconds);
+                println!("bytes per seconds {}", bytes_per_seconds);
+                println!("kib   per seconds {}", bytes_per_seconds / 1024);
+                println!("mib   per seconds {}", bytes_per_seconds / (1024 * 1024));
+                println!(
+                    "gib   per seconds {}",
+                    bytes_per_seconds / (1024 * 1024 * 1024)
+                );
+
                 prev_time = diff;
             }
         }
