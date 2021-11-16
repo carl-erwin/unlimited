@@ -104,9 +104,10 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 
     // update read cache
     let nr_marks = tm.marks.len();
-    if !nr_marks == 0 {
+    if nr_marks == 0 {
         return;
     }
+
     let min = tm.marks[0].offset;
     let max = tm.marks[nr_marks - 1].offset;
 
