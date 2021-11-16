@@ -1127,9 +1127,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         let mut byte_count: [u64; 256] = [0; 256];
         for b in data.iter() {
             let byte_idx = *b as usize;
-            if *b as char == '\n' {
-                byte_count[byte_idx] += 1;
-            }
+            byte_count[byte_idx] += 1;
         }
 
         // yield some cpu time
