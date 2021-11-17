@@ -5,7 +5,7 @@
        { "in": [{ "key": "F9"     }],                          "action": "text-mode:display-end-of-line" },
        { "in": [{ "key": "F8"     }],                          "action": "text-mode:display-word-wrap" },
 
-       {"moves": "---------------------------------------------------------------------------------"},
+       { "moves": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
@@ -49,12 +49,12 @@
 
        { "in": [{ "button-press":  "0"   }],                   "action": "text-mode:move-mark-to-clicked-area" },
 
-       {"undo/redo": "---------------------------------------------------------------------------------"},
+       { "undo/redo": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
        { "in": [{ "key": "ctrl+r" }],                          "action": "text-mode:redo" },
 
-       {"deletion": "---------------------------------------------------------------------------------"},
+       { "deletion": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+d" }],                          "action": "text-mode:remove-codepoint" },
        { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
@@ -65,7 +65,7 @@
 
        { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
 
-       {"cut/paste/selection": "---------------------------------------------------------------------------------"},
+       { "cut/paste/selection": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
 
@@ -83,17 +83,17 @@
 
        { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
 
-       {"file selection": "---------------------------------------------------------------------------------"},
+       { "file selection": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
        { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
 
-       {"cancel": "---------------------------------------------------------------------------------"},
+       { "cancel": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "Esc"}, { "key": "Esc"}],             "action": "editor:cancel" },
        { "in": [{ "key": "ctrl+g"} ],                          "action": "editor:cancel" },
 
-       {"view manipulation": "------------------------------------------------------------------------"},
+       { "view manipulation": "------------------------------------------------------------------------"},
 
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
        { "in": [{ "key": "F6" } ],                             "action": "split-horizontally" },
@@ -113,9 +113,7 @@
        { "in": [{ "key": "ctrl+x" }, { "key": "v" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "h" } ],         "action": "split-horizontally" },
 
-       {"quit save": "---------------------------------------------------------------------------------"},
-
-       {"fallback/default -> insert character": "-------------------------------------------------------"},
+       { "fallback/default -> insert character": "-------------------------------------------------------"},
 
        { "default": [],                                        "action": "text-mode:self-insert" }
      ]
