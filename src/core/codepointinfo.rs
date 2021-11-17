@@ -61,20 +61,22 @@ impl TextStyle {
 /// The displayed screen is composed of LineCell(s), that contain CodepointInfo(s).
 #[derive(Hash, Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CodepointInfo {
-    pub used: bool,
-
-    pub metadata: bool, // offset cannot be used, TODO(ceg): use enum to tag Eof, Normal
-
-    // pub is_eof ?
-    pub cp: char,            // the real codepoint
-    pub displayed_cp: char,  // the displayed codepoint
-    pub offset: Option<u64>, // TODO(ceg): Option<(u64, usize)>, back end size (codec)
-    pub size: usize,         // TODO(ceg): Option<(u64, usize)>, back end size (codec)
-
+    /// Ignore this CodepointInfo if set to false.
+    pub used: bool, // rename into ignore ?
+    /// The CodepointInfo is some part metadata.<br/>
+    /// When set to true offset must be set to None
+    pub metadata: bool, // TODO(ceg): prefer enum use enum { Normal, Eof, ... }
+    /// The real codepoint found on storage
+    pub cp: char,
+    /// The codepoint to display
+    pub displayed_cp: char,
+    /// Storage offset
+    pub offset: Option<u64>,
+    /// Storage size in bytes
+    pub size: usize,
+    /// Hints for render
     pub skip_render: bool,
-
-    // TODO(ceg): add n/m fragments ie tabs ?
-    // TODO(ceg): add real_size ? in bytes
+    /// Style to apply when rendering
     pub style: TextStyle,
 }
 
