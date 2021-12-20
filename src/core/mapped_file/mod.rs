@@ -3,6 +3,11 @@
 // and keeps only the modified areas in memory.
 // The leaves are linked to allow fast sequential traversal.
 //
+// The "Mapped" prefix here is a bit misleading.
+// Earlier versions used the mmap syscall, but to ease portability and error handling
+// it was removed and replaced by allocation + std::File::read()
+//
+
 use std::collections::HashSet;
 use std::fmt;
 
