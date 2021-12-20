@@ -66,7 +66,7 @@ impl ContentFilter<'_> for RawDataFilter {
         self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
 
         if bench_to_eof() {
-            let bench_size = 2 * 1024 * 1024;
+            let bench_size = 1024 * 32;
             self.read_max = (self.max_pos - self.pos) as usize;
             self.read_max = std::cmp::min(bench_size, self.read_max);
             self.read_size = self.read_max;
