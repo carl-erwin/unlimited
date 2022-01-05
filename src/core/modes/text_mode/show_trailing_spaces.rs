@@ -79,7 +79,7 @@ impl ContentFilter<'_> for ShowTrailingSpaces {
                         self.flush_io(filter_out, io.clone());
                     }
 
-                    ' ' => {
+                    ' ' | '\t' => {
                         self.accum.push(io.clone());
                     }
 
