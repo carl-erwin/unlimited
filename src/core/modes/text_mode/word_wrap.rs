@@ -153,8 +153,6 @@ impl ContentFilter<'_> for WordWrapFilter {
             return;
         }
 
-        let debug = false;
-
         for io in filter_in.iter() {
             if let FilterIo {
                 data: FilterData::TextInfo { real_cp, .. },
@@ -164,25 +162,9 @@ impl ContentFilter<'_> for WordWrapFilter {
                 let c = u32_to_char(*real_cp);
                 let width = env.screen.char_width(c) as u64;
 
-                if debug {
-                    dbg_println!("WRAP: -------------");
-                    dbg_println!("WRAP: BEFORE : char '{}', width {}, column_count {} max_column {} blank_accum_idx {} blank_offset {:?} blank_column_idx {}",
-                    c, width, self.column_count , self.max_column, self.blank_accum_idx , self.blank_offset , self.blank_column_idx);
-                    dbg_println!(
-                        "WRAP: self.column_count + width {}",
-                        self.column_count + width
-                    );
-                    dbg_println!("WRAP: self.accum.len() {}", self.accum.len());
-
-                    dbg_println!("WRAP:    >>>>>");
-                }
-
                 // width overflow  ?
                 if self.column_count + width > self.max_column {
                     // not blank and accum > max column
-                    if debug {
-                        dbg_println!("WRAP: OVERFLOW self.column_count + width >= self.max_column");
-                    }
 
                     // have previous blank ? => split accum after blank, insert '\' wrap point
                     if self.blank_offset.is_some()
@@ -191,11 +173,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                         && self.blank_column_idx > 0
                         && self.blank_column_idx + 1 != self.max_column
                     {
-                        if debug {
-                            dbg_println!("WRAP: line contains blank");
-
-                            dbg_println!("WRAP: add WRAP POINT");
-                        }
                         let mut fnl = build_wrap_point_io(self.blank_offset);
 
                         // TODO(ceg): add use option
@@ -204,16 +181,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                         }
 
                         let mut new = self.accum.split_off(self.blank_accum_idx as usize + 1);
-                        if debug {
-                            dbg_println!(
-                                "WRAP: add WRAP POINT  SPLIT LEFT  , accum.len() {}",
-                                self.accum.len()
-                            );
-                            dbg_println!(
-                                "WRAP: add WRAP POINT  SPLIT RIGHT , new.len()   {}",
-                                new.len()
-                            );
-                        }
 
                         if self.display_wrap {
                             // replace front/back
@@ -227,9 +194,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                         self.accum = new;
 
                         filter_out.push(fnl);
-                        if debug {
-                            dbg_println!("WRAP: *** FLUSH *** accum.len() {}", self.accum.len());
-                        }
 
                         // "current word" size
                         self.column_count = self.max_column - self.blank_column_idx - 1;
@@ -238,10 +202,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                         self.blank_offset = None;
                         self.blank_column_idx = 0;
                     } else {
-                        if debug {
-                            dbg_println!("WRAP: line contains NO leading blank");
-                        }
-
                         if self.display_wrap {
                             // replace  last char
                             if !self.accum.is_empty() {
@@ -251,9 +211,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                         }
 
                         // FLUSH
-                        if debug {
-                            dbg_println!("WRAP: FLUSH accum");
-                        }
                         filter_out.append(&mut self.accum);
                         self.column_count = 0;
                     }
@@ -273,10 +230,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                 // check
                 // new line before max column
                 if c == '\n' {
-                    if debug {
-                        dbg_println!("WRAP: *** LF found: restart @ offset {:?} ***", io.offset);
-                    }
-
                     if self.display_wrap {
                         self.accum.pop();
                         self.accum.push(set_io_color(&io, (128, 255, 255)));
@@ -294,14 +247,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                     self.blank_column_idx = self.column_count - width;
                     self.blank_accum_idx = self.accum.len() as u64 - 1;
                     self.blank_offset = io.offset;
-
-                    if debug {
-                        dbg_println!(
-                            "WRAP: ***found BLANK: @ offset {:?} col_idx {} ***",
-                            io.offset,
-                            self.blank_column_idx
-                        );
-                    }
 
                     if self.display_wrap && self.blank_column_idx > 0 {
                         self.accum.pop();
