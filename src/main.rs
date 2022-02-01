@@ -10,7 +10,7 @@ extern crate clap;
 extern crate lazy_static;
 extern crate unlimited;
 
-use clap::{App, Arg};
+use clap::{arg, App, Arg};
 
 // crate
 use unlimited::core;
@@ -73,42 +73,42 @@ fn parse_command_line() -> Config {
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .args_from_usage("--ui, --ui=[crossterm] 'select user interface frontend'")
+        .args(&[arg!(--ui [UI] "user interface frontend: crossterm")])
         .arg(
-            Arg::with_name("DEBUG")
-                .short("d")
+            Arg::new("DEBUG")
+                .short('d')
                 .long("--debug")
                 .help("enable debug logs on stderr (use redirection to file)"), // TODO(ceg): isatty ?
         )
         .arg(
-            Arg::with_name("NO_READ_CACHE")
+            Arg::new("NO_READ_CACHE")
                 .long("--no-read-cache")
                 .help("disable read cache (debug purpose)"),
         )
         .arg(
-            Arg::with_name("NO_BYTE_INDEX")
-                .short("n")
+            Arg::new("NO_BYTE_INDEX")
+                .short('n')
                 .long("--no-byte-index")
                 .help("disable byte index (wip)"),
         )
         .arg(
-            Arg::with_name("BENCH_TO_EOF")
-                .short("b")
+            Arg::new("BENCH_TO_EOF")
+                .short('b')
                 .long("--bench-to-eof")
                 .help("render all screen until EOF is reached and quit (wip: no proper quit yet)"),
         )
-        .arg(Arg::with_name("NO_UI_RENDER").long("--no-ui-render"))
+        .arg(Arg::new("NO_UI_RENDER").long("--no-ui-render"))
         .arg(
-            Arg::with_name("RAW_FILTER_TO_SCREEN")
-                .short("r") // TODO remove
+            Arg::new("RAW_FILTER_TO_SCREEN")
+                .short('r') // TODO remove
                 .long("--raw-data-to-screen")
                 .help("render all screen until EOF is reached and quit (wip: no proper quit yet)"),
         )
         .arg(
-            Arg::with_name("FILES")
+            Arg::new("FILES")
                 .help("list of the files to open")
                 .required(false)
-                .multiple(true),
+                .multiple_values(true),
         )
         .get_matches();
 
