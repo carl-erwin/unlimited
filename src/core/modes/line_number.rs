@@ -77,6 +77,7 @@ fn num_digit(v: usize) -> usize {
         _ if v < 100000000 => 8,
         _ if v < 1000000000 => 9,
         _ if v < 10000000000 => 10,
+        // TODO(ceg): add compile time 32 bits limitations detection.
         _ if v < 100000000000 => 11,
         _ if v < 1000000000000 => 12,
         _ if v < 10000000000000 => 13,
