@@ -420,7 +420,7 @@ impl ContentFilter<'_> for Utf8Filter {
                     //filter_utf8_bytearray_shift_accum(&mut self.ctx, vec, &mut filter_out);
                 }
 
-                FilterData::EndOfStream | FilterData::StreamLimitReached => {
+                FilterData::EndOfStream | FilterData::CustomLimitReached => {
                     // NB: accumulated bytes means incomplete sequence
                     // flush each byte as invalid char
                     for _i in 0..self.ctx.cp_size {

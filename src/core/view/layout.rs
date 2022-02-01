@@ -120,7 +120,7 @@ pub struct Unicode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterData {
     EndOfStream,
-    StreamLimitReached, // user custom limit
+    CustomLimitReached,
 
     ByteArray { vec: Vec<u8> },
 

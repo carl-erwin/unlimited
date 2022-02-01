@@ -294,7 +294,7 @@ impl ContentFilter<'_> for HighlightFilter {
                 }
 
                 FilterIo {
-                    data: FilterData::EndOfStream | FilterData::StreamLimitReached,
+                    data: FilterData::EndOfStream | FilterData::CustomLimitReached,
                     ..
                 } => {
                     // flush pending token: set color

@@ -63,7 +63,7 @@ impl ContentFilter<'_> for ShowTrailingSpaces {
         for io in filter_in.iter() {
             match io {
                 &FilterIo {
-                    data: FilterData::EndOfStream | FilterData::StreamLimitReached,
+                    data: FilterData::EndOfStream | FilterData::CustomLimitReached,
                     ..
                 } => {
                     self.colorize_accum();

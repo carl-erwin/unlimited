@@ -72,7 +72,7 @@ impl ContentFilter<'_> for UnicodeToTextFilter {
                 }
 
                 FilterIo {
-                    data: FilterData::EndOfStream | FilterData::StreamLimitReached,
+                    data: FilterData::EndOfStream | FilterData::CustomLimitReached,
                     ..
                 } => {
                     filter_out.push(io.clone());

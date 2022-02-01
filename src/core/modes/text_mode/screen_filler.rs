@@ -141,10 +141,10 @@ impl ContentFilter<'_> for ScreenFilter {
         for io in filter_in.iter() {
             match &io {
                 &FilterIo {
-                    data: FilterData::StreamLimitReached,
+                    data: FilterData::CustomLimitReached,
                     ..
                 } => {
-                    dbg_println!("screen filler FilterData::StreamLimitReached");
+                    dbg_println!("screen filler FilterData::CustomLimitReached");
 
                     env.quit = true;
                     break;

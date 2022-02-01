@@ -227,7 +227,7 @@ impl ContentFilter<'_> for RawDataFilter {
                         style: TextStyle::new(),
                         offset: Some(self.pos),
                         size: 0,
-                        data: FilterData::StreamLimitReached,
+                        data: FilterData::CustomLimitReached,
                     });
                 }
             }
