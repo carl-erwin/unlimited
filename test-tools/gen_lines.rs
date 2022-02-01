@@ -2,12 +2,14 @@ use std::env;
 use std::io::BufWriter;
 use std::io::{self, Write};
 
+/// Simple line generator to test very large file indexing/line numbering
+/// each line starts with a line number and is followed by an abitrary number of characters.
 fn main() {
     let os_args = env::args();
     let args: Vec<_> = os_args.collect();
 
     if args.len() != 4 {
-        println!("usage : {} start numline width", args[0]);
+        println!("usage : {} [start] [number of line] [width]", args[0]);
         return;
     }
 
@@ -18,9 +20,8 @@ fn main() {
     gen_lines(start_num, stop_num, width_num);
 }
 
-fn gen_lines(start: u64, stop: u64, linewidth: u64)  {
-    let string = gen_line(linewidth);
-
+fn gen_lines(start: u64, stop: u64, line_width: u64)  {
+    let string = gen_line(line_width);
 
     let stdout = io::stdout();
     let mut buff = BufWriter::new(stdout);
@@ -29,14 +30,14 @@ fn gen_lines(start: u64, stop: u64, linewidth: u64)  {
     }
 }
 
-fn gen_line(linewidth: u64) -> String {
+fn gen_line(line_width: u64) -> String {
     let mut string = String::new();
 
     let table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
                  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
                  'w', 'x', 'y', 'z'];
 
-    for x in 0..linewidth {
+    for x in 0..line_width {
         string.push(table[x as usize % table.len()]);
     }
     string.push('\n');
