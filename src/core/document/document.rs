@@ -1072,6 +1072,10 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
     let mut idx = {
         let doc = doc.read();
         {
+            if doc.indexed {
+                return;
+            }
+
             let file = doc.buffer.data.read();
             let (node_index, _, _) = file.find_node_by_offset(0);
             node_index

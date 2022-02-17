@@ -297,7 +297,7 @@ pub fn worker(
 
 pub fn indexer(
     worker_rx: &Receiver<EventMessage<'static>>,
-    _core_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) {
     if !use_byte_index() {
         return;
@@ -316,9 +316,27 @@ pub fn indexer(
                 Event::IndexTask { document_map } => {
                     dbg_println!("[receive index task ]");
 
+                    let mut refresh_ui = false;
                     let map = document_map.read();
+                    let mut t0 = std::time::Instant::now();
                     for (_id, doc) in map.iter() {
                         document::build_index(doc);
+                        refresh_ui = true;
+                        let t1 = std::time::Instant::now();
+                        if (t1 - t0).as_millis() > 1000 {
+                            // send ui refresh event
+                            let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                            core_tx.send(msg).unwrap_or(());
+
+                            refresh_ui = false;
+                            t0 = t1;
+                        }
+                    }
+
+                    // last ui refresh
+                    if refresh_ui {
+                        let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                        core_tx.send(msg).unwrap_or(());
                     }
                 }
 

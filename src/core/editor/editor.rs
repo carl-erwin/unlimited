@@ -1149,6 +1149,10 @@ pub fn main_loop(
                     update_view_and_send_draw_event(&mut editor, &mut env);
                 }
 
+                Event::RefreshViewEvent => {
+                    update_view_and_send_draw_event(&mut editor, &mut env);
+                }
+
                 Event::InputEvents { events } => {
                     if !editor.view_map.is_empty() {
                         process_input_events(&mut editor, &mut env, &ui_tx, &events);

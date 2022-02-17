@@ -77,6 +77,9 @@ pub enum Event<'a> {
         height: usize, // used to detect change
     },
 
+    /// Sent to core thread to update the view
+    RefreshViewEvent,
+
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     DrawEvent {
         screen: Arc<RwLock<Box<Screen>>>,
