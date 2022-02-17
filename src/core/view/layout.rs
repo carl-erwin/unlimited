@@ -227,7 +227,7 @@ fn compose_children(
     // split direction
     let layout_dir_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
 
-    let (width, height) = (screen.width(), screen.height());
+    let (width, height) = screen.dimension();
     if width == 0 || height == 0 {
         return false;
     }
@@ -299,7 +299,7 @@ fn compose_children(
         child_v.width = w;
         child_v.height = h;
 
-        compose_idx.push((idx, (x, y), (w, h))); // to sort later
+        compose_idx.push((idx, (x, y), (w, h))); // not sorted yet
 
         if layout_dir_is_vertical {
             y += h;
@@ -308,7 +308,7 @@ fn compose_children(
         }
     }
 
-    // TODO(ceg): sort based on depth/priority
+    // sort views based on depth/priority
     compose_idx.sort_by(|idxa, idxb| {
         let vida = view.children[idxa.0];
         let vidb = view.children[idxb.0];
@@ -318,6 +318,7 @@ fn compose_children(
 
         let pa = va.read().compose_priority;
         let pb = vb.read().compose_priority;
+
         dbg_println!("pa vid {:?} priority: {:?}", vida, pa);
         dbg_println!("pb vid {:?} priority: {:?}", vidb, pb);
         dbg_println!("pa.cmp(&pb) {:?}", pb.cmp(&pa));

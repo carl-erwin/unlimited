@@ -860,7 +860,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
             };
 
             if file.fd.is_none() {
-                // TODO(ceg): save as pop up
+                // TODO(ceg): "save as" pop up
                 break;
             }
 
