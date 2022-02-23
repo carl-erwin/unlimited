@@ -297,79 +297,71 @@ pub fn scroll_screen_up(
     offset: u64,
     line_index: usize,
 ) -> u64 {
-    let t0 = Instant::now();
+    let mut rewind = 4 * 1024;
+    let mut loop_count = 0;
+    loop {
+        loop_count +=1 ;
 
-    // NOTE(ceg): this pattern begs for sub function: get_start_offset and dimension
-    let (start_offset, width, height) = {
-        let v = view.read();
-        let screen = v.screen.clone();
-        let screen = screen.read();
-        let (width, height) = screen.dimension();
-        let rewind = (width * height * 4) as u64;
-        let start_offset = offset.saturating_sub(rewind);
-        (start_offset, width, height)
-    };
+        // NOTE(ceg): this pattern begs for sub function: get_start_offset and dimension
+        let (start_offset, width, height) = {
+            let v = view.read();
+            let screen = v.screen.clone();
+            let screen = screen.read();
+            let (width, height) = screen.dimension();
+            let start_offset = offset.saturating_sub(rewind);
+            (start_offset, width, height)
+        };
 
-    // TODO(ceg): codec.sync_forward(off) -> off (start_offset)
-    // if we are in the middle of a utf8 sequence we move max 4 bytes until a starting point is reached
-    // for idx in 0..4 { if codec.is_sync(new_start) { break; } start_offset += codec.encode_min_size() }
+        // TODO(ceg): codec.sync_forward(start_offset) -> start_offset
+        // if we are in the middle of a utf8 sequence we move max 4 bytes until a starting point is reached
+        // for idx in 0..4 { if codec.is_sync(new_start) { break; } start_offset += codec.encode_min_size() }
 
-    if offset - start_offset <= width as u64 {
-        // document first start
-        return 0;
+        if offset - start_offset <= width as u64 {
+            // document first start
+            return 0;
+        }
+
+        let _tmp = Mark::new(start_offset);
+
+        let lines = {
+            crate::core::modes::text_mode::get_lines_offsets_direct(
+                &view,
+                editor,
+                env,
+                start_offset,
+                offset,
+                width,
+                height,
+            )
+        };
+
+        dbg_println!("   get line index --------- loop {}, offset {}, start_offset {}, rewind {} , lines.len() {}", loop_count, offset, start_offset, rewind, lines.len());
+
+        if lines.len() == 0 && offset > 0 {
+            rewind += 4 * width as u64;
+            continue;
+        }
+
+        if lines.len() < line_index {
+            if start_offset == 0 {
+                return 0;
+            }
+
+            // we need more previous lines
+            rewind += 4 * width as u64;
+            continue;
+        }
+
+        // find "offset" line index
+        let index = if line_index < lines.len() - 1 {
+            lines.len() - (line_index + 1)
+        } else {
+            0
+        };
+
+        let line_start_off = lines[index].0;
+        return line_start_off; // return  (lines, index, start,end) ?
     }
-
-    dbg_println!(
-        "MOVE OFFSET({}) W ({}) H  ({}) START ---------",
-        offset,
-        width,
-        height
-    );
-
-    let _tmp = Mark::new(start_offset);
-
-    dbg_println!(
-        "   get lines [{} <--> {}], {} bytes",
-        start_offset,
-        offset,
-        offset - start_offset
-    );
-
-    dbg_println!("line_index {}", line_index);
-
-    let lines = {
-        crate::core::modes::text_mode::get_lines_offsets_direct(
-            &view,
-            editor,
-            env,
-            start_offset,
-            offset,
-            width,
-            height,
-        )
-    };
-
-    dbg_println!("   get line index --------- lines.len() {}", lines.len());
-    //    for (i, e) in lines.iter().enumerate() {
-    //        dbg_println!("      line[{}] = {:?}", i, e);
-    //    }
-
-    // find "offset" line index
-    let index = if line_index < lines.len() - 1 {
-        lines.len() - (line_index + 1)
-    } else {
-        0
-    };
-
-    dbg_println!("found offset {} at index {}", offset, index);
-
-    let line_start_off = lines[index].0;
-
-    let t1 = Instant::now();
-    let diff = (t1 - t0).as_millis();
-    dbg_println!("MOVE OFFSET END --------- time {}", diff);
-
-    return line_start_off; // return  (lines, index, start,end) ?
 }
 
 fn move_on_screen_mark_to_previous_line(
