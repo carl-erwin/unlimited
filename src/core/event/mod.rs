@@ -68,7 +68,7 @@ impl<'a> EventMessage<'a> {
     }
 }
 
-/// Events sent between core and ui threads via EventMesssage encapsulation.
+/// Events sent between core and ui threads via EventMessage encapsulation.
 #[derive(Debug, Clone)]
 pub enum Event<'a> {
     /// Sent by ui thread. Request the rendering of a given view.
@@ -77,7 +77,7 @@ pub enum Event<'a> {
         height: usize, // used to detect change
     },
 
-    /// Sent to core thread to update the view
+    /// Sent to core thread to update the ui
     RefreshViewEvent,
 
     /// Sent by core thread. Contains the rendered screen that maps view_id.
@@ -93,7 +93,7 @@ pub enum Event<'a> {
 
     /// Sent core -> worker thread.
     /// Saving the document's data is done in parallel in a thread.
-    /// The use can still browse the document.
+    /// The user can still browse the document.
     SyncTask {
         doc: Arc<RwLock<Document<'a>>>,
     },
