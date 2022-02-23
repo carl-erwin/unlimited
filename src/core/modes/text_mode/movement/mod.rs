@@ -300,7 +300,7 @@ pub fn scroll_screen_up(
     let mut rewind = 4 * 1024;
     let mut loop_count = 0;
     loop {
-        loop_count +=1 ;
+        loop_count += 1;
 
         // NOTE(ceg): this pattern begs for sub function: get_start_offset and dimension
         let (start_offset, width, height) = {

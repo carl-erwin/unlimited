@@ -257,11 +257,66 @@ impl Mark {
         provide a (r)find byte api in doc/buffer ie:: start using the buffer's bytes population :-) it is its purpose
 
         encode the newline pattern and look for it
+
+
+        TODO(ceg): save start offset
+        loop {
+        end_offset = self.offset
+        start_offset = rewind 256 * loop_count;
+        reverse find \n
+        end_offset = start_offset
+        if start_offset == 0 {
+            break;
+        }
+    }
+
     */
     pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
+
+        let mut last_new_line_info: (char, u64, usize) = ('\0', 0, 0);
+        let rewind = 1024 * 1024 * 2 * 2;
+        let mut end_offset = self.offset;
+        while end_offset > 0 {
+            let start_offset = end_offset.saturating_sub(rewind);
+            let mut offset = start_offset;
+
+            // codec sync forward
+
+            // decode until end_offset
+            let mut nl_count = 0;
+            let mut data: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
+            let nb = doc.read(offset, data.capacity(), &mut data);
+            dbg_println!("MOVE TO START OF LINE :  @ {} read {} bytes", offset, nb);
+            while offset < end_offset {
+                let ret = codec.decode(SyncDirection::Forward, &data, offset);
+                //dbg_println!("MOVE TO START OF LINE : DECODE : offset {} {:?}", offset, ret);
+                match ret.0 {
+                    '\n' => {
+                        nl_count += 1;
+                        last_new_line_info = ret;
+                        last_new_line_info.1 = offset;
+                        // dbg_println!("MOVE TO START OF LINE : FOUND NL : {:?}", ret);
+                    },
+                    _ => {}
+                }
+                offset += ret.2 as u64;
+            }
+            dbg_println!("MOVE TO START OF LINE :  END decode nl_count {}", nl_count);
+
+            if last_new_line_info.0 == '\n' {
+                end_offset = last_new_line_info.1 + last_new_line_info.2 as u64;
+                break;
+            }
+
+            end_offset = start_offset;
+        }
+
+        self.offset = end_offset;
+
+        return self;
 
         //let mut prev_cp = 0 as char;
         //let mut prev_cp_size = 0 as usize;
