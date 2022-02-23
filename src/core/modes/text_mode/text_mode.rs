@@ -2162,7 +2162,7 @@ pub fn scroll_view_up(
             );
             v.start_offset
         };
-        move_offset_to_previous_line_index(editor, env, &view, start_offset, nb_lines)
+        scroll_screen_up(editor, env, &view, start_offset, nb_lines)
     };
     view.write().start_offset = off;
 }

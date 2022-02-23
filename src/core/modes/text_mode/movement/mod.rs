@@ -290,7 +290,7 @@ pub fn move_marks_to_end_of_line(
    - scroll until m_offset is found
 
 */
-pub fn move_offset_to_previous_line_index(
+pub fn scroll_screen_up(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
