@@ -338,7 +338,7 @@ pub fn scroll_screen_up(
         dbg_println!("   get line index --------- loop {}, offset {}, start_offset {}, rewind {} , lines.len() {}", loop_count, offset, start_offset, rewind, lines.len());
 
         if lines.len() == 0 && offset > 0 {
-            rewind += 4 * width as u64;
+            rewind += 1024 * loop_count;
             continue;
         }
 
@@ -347,8 +347,12 @@ pub fn scroll_screen_up(
                 return 0;
             }
 
+            if rewind as usize >= width * height {
+                return start_offset;
+            }
+
             // we need more previous lines
-            rewind += 4 * width as u64;
+            rewind += (width * height / 4) as u64;
             continue;
         }
 
