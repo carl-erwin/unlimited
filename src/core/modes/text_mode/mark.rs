@@ -374,13 +374,13 @@ impl Mark {
     }
 
     pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
-        let max_offset = doc.size() as u64;
-        let mut m = Mark {
-            offset: self.offset,
+        let encode = vec![10]; // TODO: code.encode (\n)
+        self.offset = if let Some(offset) = doc.find(self.offset, &encode) {
+            offset
+        } else {
+            doc.size() as u64
         };
-        // TODO(ceg): fixme there is a bug
-        decode_until_end_of_line_or_offset(&mut m, &doc, codec, max_offset, false);
-        self.offset = m.offset;
+
         self
     }
 
