@@ -277,34 +277,46 @@ impl Mark {
         }
 
         let mut last_new_line_info: (char, u64, usize) = ('\0', 0, 0);
-        let rewind = 1024 * 1024 * 2 * 2;
         let mut end_offset = self.offset;
+
+        dbg_println!("MOVE TO START OF LINE :  end offset {}", end_offset);
+
+        let mut rewind_max = 256;
+
         while end_offset > 0 {
+            let rewind = if end_offset > rewind_max {
+                rewind_max
+            } else {
+                end_offset
+            };
+
             let start_offset = end_offset.saturating_sub(rewind);
             let mut offset = start_offset;
 
-            // codec sync forward
+            // TODO(ceg): codec sync forward
 
             // decode until end_offset
             let mut nl_count = 0;
-            let mut data: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
-            let nb = doc.read(offset, data.capacity(), &mut data);
-            dbg_println!("MOVE TO START OF LINE :  @ {} read {} bytes", offset, nb);
-            while offset < end_offset {
-                let ret = codec.decode(SyncDirection::Forward, &data, offset);
-                //dbg_println!("MOVE TO START OF LINE : DECODE : offset {} {:?}", offset, ret);
+            let mut data: Vec<u8> = Vec::with_capacity(rewind as usize);
+            let nb_read = doc.read(offset, data.capacity(), &mut data);
+            // dbg_println!("MOVE TO START OF LINE :  @ {} read {} bytes, {:?}", offset, nb_read, data);
+            let mut pos: u64 = 0;
+            while pos < nb_read as u64 {
+                let ret = codec.decode(SyncDirection::Forward, &data, pos);
                 match ret.0 {
                     '\n' => {
                         nl_count += 1;
                         last_new_line_info = ret;
                         last_new_line_info.1 = offset;
-                        // dbg_println!("MOVE TO START OF LINE : FOUND NL : {:?}", ret);
-                    },
+                    }
                     _ => {}
                 }
                 offset += ret.2 as u64;
+                pos += ret.2 as u64;
+                if offset >= end_offset {
+                    break;
+                }
             }
-            dbg_println!("MOVE TO START OF LINE :  END decode nl_count {}", nl_count);
 
             if last_new_line_info.0 == '\n' {
                 end_offset = last_new_line_info.1 + last_new_line_info.2 as u64;
@@ -312,63 +324,23 @@ impl Mark {
             }
 
             end_offset = start_offset;
+            rewind_max += 1024 * 256;
+            if rewind_max > 1024 * 1024 * 4 {
+                rewind_max = 1024 * 1024 * 4;
+            }
+            dbg_println!(
+                "MOVE TO START OF LINE : end_offset {} rewind_max = {}",
+                end_offset,
+                rewind_max
+            );
         }
+
+        dbg_println!(
+            "MOVE TO START OF LINE : diff {}",
+            self.offset.saturating_sub(end_offset)
+        );
 
         self.offset = end_offset;
-
-        return self;
-
-        //let mut prev_cp = 0 as char;
-        //let mut prev_cp_size = 0 as usize;
-        let mut count = 0;
-
-        loop {
-            let base_offset = self.offset.saturating_sub(4);
-            let relative_offset = self.offset - base_offset;
-
-            if count >= 10000 {
-                dbg_println!("base_offset = {:?}", base_offset);
-                count = 0;
-            }
-            count += 1;
-
-            //dbg_println!("self.offset({}) doc.size({})", self.offset, doc.size());
-            assert!(self.offset <= doc.size() as u64);
-            assert!(base_offset <= doc.size() as u64);
-
-            let mut data = Vec::with_capacity(4);
-            let nb = doc.read(base_offset, data.capacity(), &mut data);
-
-            assert!(nb <= data.capacity());
-            assert!(nb == data.len());
-
-            let (cp, off, size) = codec.decode(SyncDirection::Backward, &data, relative_offset);
-            let delta = relative_offset - off;
-            self.offset -= delta as u64;
-            if self.offset == 0 {
-                break;
-            }
-
-            match cp {
-                '\n' => {
-                    self.offset += size as u64;
-                    break;
-                }
-                /*                '\r' => {
-                    if prev_cp == '\n' {
-                        self.offset += (size + prev_cp_size) as u64;
-                    } else {
-                        self.offset += size as u64;
-                    }
-                    break;
-                }
-                */
-                _ => {}
-            }
-
-            //prev_cp = cp;
-            //prev_cp_size = size;
-        }
 
         self
     }
