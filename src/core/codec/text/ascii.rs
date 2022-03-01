@@ -86,8 +86,12 @@ impl AsciiCodec {
 }
 
 impl TextCodec for AsciiCodec {
+    fn name(&self) -> &'static str {
+        "text/ascii"
+    }
+
     fn encode_max_size(&self) -> usize {
-        1 // 4 // 1 ?
+        1
     }
 
     fn decode(

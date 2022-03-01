@@ -36,7 +36,11 @@ pub enum EncodeResult {
 //
 
 pub trait TextCodec {
+    fn name(&self) -> &'static str;
+
     fn encode_max_size(&self) -> usize;
+
+    //    fn reset(&self);
 
     // fn decode_byte(&self, direction: SyncDirection, data: u8, data_offset: u64) -> DecodeResult;
 

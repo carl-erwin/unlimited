@@ -348,6 +348,10 @@ impl Utf8Codec {
 }
 
 impl TextCodec for Utf8Codec {
+    fn name(&self) -> &'static str {
+        "text/utf-8"
+    }
+
     fn encode_max_size(&self) -> usize {
         4
     }
