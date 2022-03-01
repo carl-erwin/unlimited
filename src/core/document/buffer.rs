@@ -175,8 +175,8 @@ impl<'a> Buffer<'a> {
         (nb, events)
     }
 
-    pub fn find(&self, from_offset: u64, data: &Vec<u8>) -> Option<u64> {
-        MappedFile::find(&self.data, from_offset, &data)
+    pub fn find(&self, data: &Vec<u8>, from_offset: u64, to_offset: Option<u64>) -> Option<u64> {
+        MappedFile::find(&self.data, &data, from_offset, to_offset)
     }
 
     /// can be used to know the number of blocks that compose the buffer,

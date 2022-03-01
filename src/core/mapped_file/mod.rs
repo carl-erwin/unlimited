@@ -1035,7 +1035,6 @@ impl<'a> MappedFile<'a> {
         nr_read
     }
 
-    // strstr ?
     fn find_in_vec(v: &Vec<u8>, data: &Vec<u8>) -> Option<usize> {
         let last_byte = *data.last().unwrap();
 
@@ -1049,14 +1048,10 @@ impl<'a> MappedFile<'a> {
                     break;
                 }
             }
-            //            dbg_println!("FIND found_last {:?}", found_last);
 
             let found_idx = found_last?;
-            //            dbg_println!("FIND found_idx {:?}", found_idx);
-            //            dbg_println!("FIND data.len() = {}", data.len());
 
             if data.len() - 1 > found_idx {
-                // dbg_println!("FIND  data.len() >= found_idx");
                 // too short
                 pos = found_idx + 1;
                 continue;
@@ -1065,17 +1060,13 @@ impl<'a> MappedFile<'a> {
             let start_idx = found_idx - (data.len() - 1);
             let mut diff = false;
             for i in 0..data.len() {
-                //                dbg_println!("FIND v[start_idx({}) + i({})] {}] == data[{}] = {} ?", start_idx, i, v[start_idx+i], i, data[i]);
                 if v[start_idx + i] != data[i] {
-                    //                    dbg_println!("no match");
                     diff = true;
                     break;
                 }
             }
 
             if !diff {
-                //                dbg_println!("FIND pattern start @ {}", start_idx);
-                //                dbg_println!("FIND pattern end @ {}", start_idx+data.len());
                 return Some(start_idx);
             }
 
@@ -1086,12 +1077,19 @@ impl<'a> MappedFile<'a> {
     }
 
     /// find
-    pub fn find(file: &FileHandle<'a>, from_offset: u64, data: &Vec<u8>) -> Option<u64> {
+    pub fn find(
+        file: &FileHandle<'a>,
+        data: &Vec<u8>,
+        from_offset: u64,
+        to_offset: Option<u64>,
+    ) -> Option<u64> {
         dbg_println!("FIND {:?} ----", data);
 
         if data.is_empty() {
             return None;
         }
+
+        let mut max_offset = file.read().size();
 
         let mut it = MappedFile::iter_from(&file, from_offset);
         if let MappedFileIterator::End(..) = it {
@@ -1102,15 +1100,21 @@ impl<'a> MappedFile<'a> {
 
         let mut cur_offset = from_offset;
 
+        if to_offset.is_some() {
+            max_offset = std::cmp::min(to_offset.unwrap(), max_offset);
+        }
+        let mut remain = max_offset - from_offset;
+
         // TODO(ceg): rd.len() >= data.len()
         let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
 
-        loop {
+        while remain > 0 {
             // read block
             //            dbg_println!("FIND cur_offset = {}", cur_offset);
             rd_buff.clear();
 
-            let n_read = MappedFile::read(&mut it, rd_buff.capacity(), &mut rd_buff);
+            let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
+            let n_read = MappedFile::read(&mut it, rd_size, &mut rd_buff);
             if n_read == 0 {
                 dbg_println!("FIND eof");
                 break;
@@ -1126,6 +1130,7 @@ impl<'a> MappedFile<'a> {
 
             // skip block
             cur_offset += n_read as u64;
+            remain -= n_read as u64;
         }
 
         None

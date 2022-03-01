@@ -323,7 +323,7 @@ pub fn find_next(
 
             let doc = v.document().unwrap();
             let doc = doc.write();
-            let offset = doc.find(offset, &encoded_str);
+            let offset = doc.find(&encoded_str, offset, None);
             dbg_println!("FIND offset = {:?}", offset);
             if let Some(offset) = offset {
                 {
