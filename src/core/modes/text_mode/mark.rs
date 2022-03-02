@@ -348,8 +348,7 @@ impl Mark {
     pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
-        let encode = encode[..sz].to_vec();
-        self.offset = if let Some(offset) = doc.find(&encode, self.offset, None) {
+        self.offset = if let Some(offset) = doc.find(&encode[..sz], self.offset, None) {
             offset
         } else {
             doc.size() as u64
