@@ -346,7 +346,7 @@ impl Mark {
     }
 
     pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
-        let encode = vec![10]; // TODO: code.encode (\n)
+        let encode = vec![10]; // TODO: codec.encode (\n)
         self.offset = if let Some(offset) = doc.find(&encode, self.offset, None) {
             offset
         } else {
