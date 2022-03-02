@@ -345,6 +345,20 @@ impl Mark {
         self
     }
 
+    /*
+    pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+        let mut encode = [0; 4];
+        let sz = codec.encode('\n' as u32, &mut encode);
+        self.offset = if let Some(offset) = doc.reverse_find(&encode[..sz], self.offset, None) {
+            offset
+        } else {
+            doc.size() as u64
+        };
+
+        self
+    }
+    */
+
     pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);

@@ -1127,6 +1127,64 @@ impl<'a> MappedFile<'a> {
         None
     }
 
+    /*
+        TODO:
+
+      [][][]
+      rewind(from_current) + read_until(from_current)
+      reverse.find 1st byte etc ...
+
+    */
+    pub fn reverse_find(
+        file: &FileHandle<'a>,
+        data: &[u8],
+        from_offset: u64,
+        to_offset: Option<u64>,
+    ) -> Option<u64> {
+        if data.is_empty() {
+            return None;
+        }
+
+        let mut it = MappedFile::iter_from(&file, from_offset);
+        if let MappedFileIterator::End(..) = it {
+            return None;
+        }
+
+        let mut cur_offset = from_offset;
+
+        let mut max_offset = file.read().size();
+        if to_offset.is_some() {
+            max_offset = std::cmp::min(to_offset.unwrap(), max_offset);
+        }
+        let mut remain = max_offset - from_offset;
+
+        // TODO(ceg): rd.len() < data.len()
+        let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
+
+        while remain > 0 {
+            rd_buff.clear();
+
+            let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
+            let n_read = MappedFile::read(&mut it, rd_size, &mut rd_buff);
+            if n_read == 0 {
+                // end of range
+                break;
+            }
+
+            // look in block
+            let found = MappedFile::find_in_vec(&rd_buff, &data);
+            if let Some(found) = found {
+                return Some(cur_offset + found as u64);
+            }
+
+            // skip block
+            cur_offset += n_read as u64;
+            remain -= n_read as u64;
+        }
+
+        None
+    }
+
     fn update_hierarchy(
         pool: &mut FreeListAllocator<Node>,
         parent_idx: Option<NodeIndex>,
