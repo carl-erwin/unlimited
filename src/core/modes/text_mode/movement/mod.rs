@@ -297,7 +297,7 @@ pub fn scroll_screen_up(
     offset: u64,
     line_index: usize,
 ) -> u64 {
-    let mut rewind = 4 * 1024;
+    let mut rewind = 8 * 1024;
     let mut loop_count = 0;
     loop {
         loop_count += 1;
@@ -338,6 +338,7 @@ pub fn scroll_screen_up(
         dbg_println!("   get line index --------- loop {}, offset {}, start_offset {}, rewind {} , lines.len() {}", loop_count, offset, start_offset, rewind, lines.len());
 
         if lines.len() == 0 && offset > 0 {
+            // and when folding large block(s) ?
             rewind += 1024 * loop_count;
             continue;
         }
@@ -357,8 +358,8 @@ pub fn scroll_screen_up(
         }
 
         // find "offset" line index
-        let index = if line_index < lines.len() - 1 {
-            lines.len() - (line_index + 1)
+        let index = if line_index < lines.len() {
+            lines.len() - line_index
         } else {
             0
         };
