@@ -1035,7 +1035,7 @@ impl<'a> MappedFile<'a> {
         nr_read
     }
 
-    fn find_in_vec(v: &Vec<u8>, data: &Vec<u8>) -> Option<usize> {
+    fn find_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
         let last_byte = *data.last().unwrap();
 
         let mut pos = 0;
@@ -1079,7 +1079,7 @@ impl<'a> MappedFile<'a> {
     /// find
     pub fn find(
         file: &FileHandle<'a>,
-        data: &Vec<u8>,
+        data: &[u8],
         from_offset: u64,
         to_offset: Option<u64>,
     ) -> Option<u64> {

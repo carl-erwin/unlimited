@@ -620,7 +620,7 @@ impl<'a> Document<'a> {
         nr_bytes_removed
     }
 
-    pub fn find(&self, data: &Vec<u8>, from_offset: u64, to_offset: Option<u64>) -> Option<u64> {
+    pub fn find(&self, data: &[u8], from_offset: u64, to_offset: Option<u64>) -> Option<u64> {
         self.buffer.find(&data, from_offset, to_offset)
     }
 
