@@ -1083,48 +1083,39 @@ impl<'a> MappedFile<'a> {
         from_offset: u64,
         to_offset: Option<u64>,
     ) -> Option<u64> {
-        dbg_println!("FIND {:?} ----", data);
-
         if data.is_empty() {
             return None;
         }
-
-        let mut max_offset = file.read().size();
 
         let mut it = MappedFile::iter_from(&file, from_offset);
         if let MappedFileIterator::End(..) = it {
             return None;
         }
 
-        //        dbg_println!("FIND from_offset = {:?}", from_offset);
-
         let mut cur_offset = from_offset;
 
+        let mut max_offset = file.read().size();
         if to_offset.is_some() {
             max_offset = std::cmp::min(to_offset.unwrap(), max_offset);
         }
         let mut remain = max_offset - from_offset;
 
-        // TODO(ceg): rd.len() >= data.len()
+        // TODO(ceg): rd.len() < data.len()
         let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
 
         while remain > 0 {
-            // read block
-            //            dbg_println!("FIND cur_offset = {}", cur_offset);
             rd_buff.clear();
 
             let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
             let n_read = MappedFile::read(&mut it, rd_size, &mut rd_buff);
             if n_read == 0 {
-                dbg_println!("FIND eof");
+                // end of range
                 break;
             }
-            //            dbg_println!("FIND read {} bytes", n_read);
 
             // look in block
             let found = MappedFile::find_in_vec(&rd_buff, &data);
             if let Some(found) = found {
-                dbg_println!("FIND cur_offset {} + found {}", cur_offset, found);
                 return Some(cur_offset + found as u64);
             }
 
