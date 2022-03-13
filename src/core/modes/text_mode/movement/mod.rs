@@ -718,6 +718,18 @@ pub fn move_mark_to_screen_start(
     }
 }
 
+
+
+// TODO(ceg): change implementation
+//  alloc tmp screen
+//  set first mark as current mark
+//  1 - if mark offset offscreen, sync tmp screen : fn (offset) -> screen
+//      and rewind until the screen contains at least contains 2 lines
+//      use get_lines_offsets_direct (use current view plugins)
+//  2 - move mark to next line
+//  3 - select next mark
+//  4 - restart @1
+//
 pub fn move_marks_to_previous_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -776,8 +788,6 @@ pub fn move_on_screen_mark_to_next_line(
 ) -> (bool, Option<(u64, u64)>, Option<Action>) {
     // TODO(ceg): add hints: check in screen range
     if !screen.contains_offset(m.offset) {
-        dbg_println!(" offset {} not found in screen", m.offset);
-
         return (false, None, None);
     }
 
@@ -785,22 +795,15 @@ pub fn move_on_screen_mark_to_next_line(
     let (_, x, y) = screen.find_cpi_by_offset(m.offset);
     let screen_height = screen.height();
 
-    dbg_println!("FOUND m.offset @ (X({}), Y({}))", x, y);
-    dbg_println!("screen_height {}", screen_height);
-
     // mark on last line -> must scroll
     let new_y = y + 1;
     if new_y >= screen_height {
         // mark on last screen line cannot be updated
         assert_eq!(y, screen_height - 1);
-
-        dbg_println!(" next line off_screen MUST scroll to compute");
-
         return (false, None, Some(Action::ScrollDown { n: 1 }));
     }
 
     // new_y < screen_height
-    dbg_println!("new_y  {}", new_y);
     let l = screen.get_used_line(new_y);
     if l.is_none() {
         // new_y does not exist, return
@@ -808,34 +811,27 @@ pub fn move_on_screen_mark_to_next_line(
     }
     let l = l.unwrap();
 
-    dbg_println!("l.len  {}", l.len());
 
     if l.is_empty() {
         // line is empty do nothing
-        dbg_println!(" NEXT line is EMPTY do nothing ..........");
         return (true, Some((m.offset, m.offset)), None);
     }
 
     // l.len() > 0
     // get last line char
     let new_x = ::std::cmp::min(x, l.len() - 1);
-    dbg_println!("new_x  {}", new_x);
     let cpi = screen.get_cpinfo(new_x, new_y);
     if cpi.is_none() {
-        dbg_println!("HUMMMMM");
         return (false, None, None);
     }
     let cpi = cpi.unwrap();
     if cpi.offset.is_none() {
-        dbg_println!("HUMMMMM");
         return (false, None, None);
     }
 
     let old_offset = m.offset;
 
     m.offset = cpi.offset.unwrap();
-
-    dbg_println!("update mark : offset => {} -> {}", old_offset, m.offset);
 
     /*
      TODO(ceg):
@@ -844,10 +840,8 @@ pub fn move_on_screen_mark_to_next_line(
      The offset mechanism is broken
       ex: if a filter expands a cp on multiple lines
 
-     To fix this the "injected" metadata span must be stored elsewhere.
+     To fix this, the "injected" metadata span must be stored elsewhere.
      (internal, doc_id, offset, size)
-     and use a portal like mechanism
-
     */
     if old_offset == m.offset {
         if let Some(l) = screen.get_used_line(new_y + 1) {
