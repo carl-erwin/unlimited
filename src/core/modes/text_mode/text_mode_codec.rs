@@ -16,7 +16,7 @@ use crate::core::Editor;
 
 use crate::core::codepointinfo::TextStyle;
 
-// the consecutive offsets are derive from size
+// the consecutive offsets are derived from size
 pub struct TextCodecFilter {
     // data
 }
@@ -88,7 +88,7 @@ impl ContentFilter<'_> for TextCodecFilter {
                     });
                 }
 
-                FilterData::EndOfStream => {
+                FilterData::EndOfStream | FilterData::CustomLimitReached => {
                     filter_out.push(d.clone());
                 }
 
@@ -274,10 +274,6 @@ pub fn filter_utf8_bytearray_shift_accum(
                     cp: ctx.codep as u32,
                     size: ctx.cp_size as u32,
                 });
-
-                //                dbg_println!("flush previous ctx.codep({}) as '{}'", ctx.codep, unsafe {
-                //                    char::from_u32_unchecked(ctx.codep)
-                //                });
             }
 
             //            dbg_println!("decoded ctx.codep({}) as '{}'", ctx.codep, unsafe {

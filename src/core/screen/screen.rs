@@ -119,9 +119,6 @@ impl Screen {
             return;
         }
 
-        // getenv ?
-        let mut prev_cpis = vec![];
-
         if self.last_offset.is_none() {
             return;
         }
@@ -129,86 +126,32 @@ impl Screen {
             return;
         }
 
-        let last_offset = *self.last_offset.as_ref().clone().unwrap();
-        let mut cur_offset = *self.first_offset.as_ref().clone().unwrap();
+        let mut cur_offset = self.first_offset.clone();
+
+        match (cur_offset, self.buffer[0].cpi.offset) {
+            (Some(cur), Some(first)) => {
+                assert_eq!(cur, first)
+            }
+            _ => {}
+        }
 
         if self.has_eof() {
             // last_offset += 1;
         }
 
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let cell = &self.buffer[y * self.width + x];
-                let cell_is_used = cell.cpi.used;
+        for cell in &self.buffer {
+            if !cell.cpi.used {
+                continue;
+            }
 
-                let cpi = &cell.cpi;
-
-                if cell_is_used && cpi.size > 0 && cpi.metadata {
-                    dbg_println!(
-                        "INVALID PUSH [META] CHECKING cur_offset = {} , CPI {:?}, ",
-                        cur_offset,
-                        cpi
-                    );
-                    panic!("");
-                }
-                if cell_is_used && cpi.size == 0 && !cpi.metadata {
-                    dbg_println!(
-                        "INVALID PUSH [NON META] CHECKING cur_offset = {} , CPI {:?}, ",
-                        cur_offset,
-                        cpi
-                    );
-                    panic!("");
-                }
-
-                if cpi.metadata {
-                    continue; // ignore offset + size
-                }
-
-                if let Some(offset) = cpi.offset {
-                    if cur_offset < offset || cur_offset > last_offset {
-                        dbg_println!(
-                            "(X({}), Y({})) cur_offset( {} ) >= offset( {} ) < last_offset( {} ) NOT TRUE",
-                            x,
-                            y,
-                            cur_offset,
-                            offset,
-                            last_offset
-                        );
-                        dbg_println!("----- BUG screen invariants broken ------- ");
-                        dbg_println!("cpi = {:?}", cpi);
-
-                        for prev_cpi in prev_cpis.iter().rev().take(32).rev() {
-                            dbg_println!("PREV_CPI = {:?}", prev_cpi);
-                        }
-
-                        loop {
-                            let wait = std::time::Duration::from_millis(2000);
-                            std::thread::sleep(wait);
-                        }
-                    };
-
-                    prev_cpis.push(cpi.clone());
-
-                    cur_offset += cpi.size as u64;
-                    if !cpi.metadata {
-                        // dbg_println!("CUR : UPDATE {:?}", cpi);
+            match (cur_offset, cell.cpi.offset) {
+                (Some(cur), Some(cpi_offset)) => {
+                    if cpi_offset < cur {
+                        panic!("cpi_offset {} < cur {}", cpi_offset, cur);
                     }
-                    if cur_offset >= last_offset {
-                        break;
-                    }
-                } else {
-                    assert!(cpi.size == 0);
-                    continue;
-                    /*
-                    dbg_println!(
-                        "(X({}), Y({})) NO offset CPI.cp = {:?} CPI.size {}",
-                        x,
-                        y,
-                        cpi.cp,
-                        cpi.size
-                    );
-                    */
+                    cur_offset = Some(cpi_offset);
                 }
+                _ => {}
             }
         }
     }
@@ -414,7 +357,7 @@ impl Screen {
             match (cpi_offset, last_offset) {
                 (Some(cpi_offset), Some(last_offset)) => {
                     // check invariants
-                    if !true {
+                    if true {
                         if cpi_offset < last_offset {
                             dbg_println!(
                                 "cpi {:?} , cpi_offset {:?} < last_offset {:?}",

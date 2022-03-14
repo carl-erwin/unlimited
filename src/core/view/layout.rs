@@ -172,13 +172,27 @@ impl FilterIo {
     }
 
     pub fn check_invariants(&self) {
-        if self.size > 0 && self.metadata {
-            dbg_println!("INVALID IO [METADATA] {:?}", self);
-            panic!("");
-        }
-        if self.size == 0 && !self.metadata {
-            dbg_println!("INVALID IO [NON META] {:?}", self);
-            panic!("");
+        match self {
+            FilterIo {
+                metadata,
+                size,
+                offset,
+                data: FilterData::TextInfo { .. },
+                ..
+            } => {
+                if self.size > 0 && self.metadata {
+                    dbg_println!("INVALID IO [METADATA] {:?}", self);
+                    panic!("");
+                }
+                if self.size == 0 && !self.metadata {
+                    dbg_println!("INVALID IO [NON META] {:?}", self);
+                    panic!("");
+                }
+            }
+
+            _ => {
+                // TODO:
+            }
         }
     }
 }
@@ -559,7 +573,7 @@ fn run_content_filters(
                 );
             }
 
-            if false {
+            if true {
                 for i in filter_out.iter() {
                     i.check_invariants();
                 }

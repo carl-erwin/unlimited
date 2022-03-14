@@ -184,8 +184,11 @@ pub fn transform_io_data(
     let s = s.unwrap();
 
     for (idx, displayed_cp) in s.chars().enumerate() {
-        let size = if idx == 0 { orig_size } else { 0 };
-        let metadata = if idx == 0 { orig_metadata } else { true };
+        let (size, metadata) = if idx == 0 {
+            (orig_size, orig_metadata)
+        } else {
+            (0, true)
+        };
 
         cp_vec.push(FilterIo {
             metadata,

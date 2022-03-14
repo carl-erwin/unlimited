@@ -227,6 +227,25 @@ impl<'a> Mode for TextMode {
         char_map.insert('\u{7f}', "<DEL>".to_string());
 
         if true {
+            for i in 0..0x9 {
+                let fmt = format!("\\x{i:02x}");
+
+                let c = unsafe { char::from_u32_unchecked(i) };
+                char_map.insert(c, fmt);
+            }
+            for i in 0xb..0x1f {
+                let fmt = format!("\\x{i:02x}");
+                let c = unsafe { char::from_u32_unchecked(i) };
+                char_map.insert(c, fmt);
+            }
+            for i in 0x07f..0x80 {
+                let fmt = format!("\\x{i:02x}");
+                let c = unsafe { char::from_u32_unchecked(i) };
+                char_map.insert(c, fmt);
+            }
+        }
+
+        if !true {
             // config toggle ?
             char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
             char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
@@ -421,6 +440,7 @@ impl<'a> Mode for TextMode {
                     .borrow_mut()
                     .push(Box::new(CharMapFilter::new()));
             }
+
             //
             if show_trailing_spaces {
                 view.compose_content_filters

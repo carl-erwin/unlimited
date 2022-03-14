@@ -718,8 +718,6 @@ pub fn move_mark_to_screen_start(
     }
 }
 
-
-
 // TODO(ceg): change implementation
 //  alloc tmp screen
 //  set first mark as current mark
@@ -810,7 +808,6 @@ pub fn move_on_screen_mark_to_next_line(
         return (true, Some((m.offset, m.offset)), None);
     }
     let l = l.unwrap();
-
 
     if l.is_empty() {
         // line is empty do nothing

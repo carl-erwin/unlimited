@@ -65,6 +65,8 @@ impl ContentFilter<'_> for RawDataFilter {
         self.read_max = env.screen.width() * env.screen.height() * 4;
         self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
 
+        //        self.read_size = self.read_max;
+
         if bench_to_eof() {
             let bench_size = 1024 * 32;
             self.read_max = (self.max_pos - self.pos) as usize;
