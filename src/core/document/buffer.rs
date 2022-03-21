@@ -7,7 +7,7 @@ pub type Id = u64;
 pub type Offset = u64;
 pub type PageSize = usize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum OpenMode {
     ReadOnly = 0,
     ReadWrite = 1,
@@ -96,6 +96,11 @@ impl<'a> Buffer<'a> {
     pub fn close(&mut self) -> bool {
         unimplemented!();
         // false
+    }
+
+    /// returns the buffer's open mode
+    pub fn mode(&self) -> OpenMode {
+        self.mode
     }
 
     /// returns the name of the file associated to the buffer

@@ -252,7 +252,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                             self.lines.push(vec![]);
 
                             if self.line_index >= self.max_row as usize {
-                                dbg_println!("WORD WRAP: quit after new line");
                                 self.quit = true;
                             }
 
@@ -343,7 +342,7 @@ impl ContentFilter<'_> for WordWrapFilter {
                                 let e = WordWrapElement::new(arrow, c, 1, &split_offset);
                                 l.push(e);
 
-                                 // padding ?
+                                // padding ?
                                 if l.len() < self.max_column as usize {
                                     let fnl = build_wrap_point_new_line(split_offset);
                                     let e = WordWrapElement::new(fnl, c, 1, &split_offset);
@@ -355,7 +354,6 @@ impl ContentFilter<'_> for WordWrapFilter {
                             for e in l.iter() {
                                 filter_out.push(e.io.clone());
                             }
-
 
                             self.line_index += 1;
                             self.lines.push(next_line);

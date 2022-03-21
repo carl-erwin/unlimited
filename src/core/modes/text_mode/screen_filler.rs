@@ -136,9 +136,6 @@ impl ContentFilter<'_> for ScreenFilter {
                 );
         */
 
-        dbg_println!("ScreenFilter :  ----------------------------------------");
-        dbg_println!("ScreenFilter :  last_offset = {:?} ---- ", self.last_offset);
-
         env.screen.check_invariants();
 
         for io in filter_in.iter() {
@@ -251,11 +248,8 @@ impl ContentFilter<'_> for ScreenFilter {
                             break;
                         }
 
-                        dbg_println!("ScreenFilter :  cur_offset = {:?}", io.offset);
                         cur_offset += 1;
                     }
-
-                    dbg_println!("ScreenFilter :  next pass offset = {:?}", io.offset);
 
                     // save last offset for next pass ?
                     self.last_offset = Some(cur_offset);

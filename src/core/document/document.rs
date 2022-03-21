@@ -40,7 +40,7 @@ pub struct DocumentBuilder {
 
 #[derive(Debug)]
 struct DocumentMappedFileEventHandler<'a> {
-    doc: Weak<RwLock<Document<'a>>>,
+    _doc: Weak<RwLock<Document<'a>>>,
 }
 
 fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> DocumentEvent {
@@ -388,7 +388,7 @@ impl<'a> Document<'a> {
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
-        return self.buffer.read(offset, nr_bytes, data);
+        // return self.buffer.read(offset, nr_bytes, data);
 
         let doc_rev = self.nr_changes();
 

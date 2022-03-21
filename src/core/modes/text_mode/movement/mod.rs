@@ -1,6 +1,6 @@
 use parking_lot::RwLock;
 use std::rc::Rc;
-use std::time::Instant;
+//use std::time::Instant;
 
 use super::*;
 
@@ -956,7 +956,7 @@ pub fn move_mark_to_next_line(
         // get lines start, end offset
         // NB: run full layout code for one screen line ( folding etc ... )
 
-        // TODO(ceg): return Vec<Box<screen>> ? update contenet
+        // TODO(ceg): return Vec<Box<screen>> ? update content
         // TODO(ceg): add perf view screen cache ? sorted by screens.start_offset
         // with same width/heigh as v.screen
         let lines = {

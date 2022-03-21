@@ -364,6 +364,8 @@ impl<'a> Mode for TextMode {
             no-marks
             no-utf8-filter
             no-word-wrap
+
+            --filter word-wrap,tab // respect order ?
         */
 
         //

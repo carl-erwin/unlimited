@@ -176,15 +176,15 @@ impl FilterIo {
             FilterIo {
                 metadata,
                 size,
-                offset,
+                offset: _,
                 data: FilterData::TextInfo { .. },
                 ..
             } => {
-                if self.size > 0 && self.metadata {
+                if *size > 0 && *metadata {
                     dbg_println!("INVALID IO [METADATA] {:?}", self);
                     panic!("");
                 }
-                if self.size == 0 && !self.metadata {
+                if *size == 0 && !metadata {
                     dbg_println!("INVALID IO [NON META] {:?}", self);
                     panic!("");
                 }

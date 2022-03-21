@@ -296,7 +296,7 @@ impl Mark {
             // TODO(ceg): codec sync forward
 
             // decode until end_offset
-            let mut nl_count = 0;
+            // let mut nl_count = 0;
             let mut data: Vec<u8> = Vec::with_capacity(rewind as usize);
             let nb_read = doc.read(offset, data.capacity(), &mut data);
             // dbg_println!("MOVE TO START OF LINE :  @ {} read {} bytes, {:?}", offset, nb_read, data);
@@ -305,7 +305,7 @@ impl Mark {
                 let ret = codec.decode(SyncDirection::Forward, &data, pos);
                 match ret.0 {
                     '\n' => {
-                        nl_count += 1;
+                        // nl_count += 1;
                         last_new_line_info = ret;
                         last_new_line_info.1 = offset;
                     }
