@@ -9,7 +9,7 @@ use std::thread;
 extern crate clap;
 extern crate unlimited;
 
-use clap::{arg, App, Arg};
+use clap::{arg, Arg, Command};
 
 // crate
 use unlimited::core;
@@ -68,7 +68,7 @@ fn _check_env_flags() {
 
 /// Parse command and an return a Config
 fn parse_command_line() -> Config {
-    let matches = App::new("unlimited")
+    let matches = Command::new("unlimited")
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
