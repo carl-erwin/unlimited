@@ -130,7 +130,6 @@ pub struct ButtonEvent {
     pub mods: KeyModifiers,
 }
 
-
 impl Hash for ButtonEvent {
     // special hash for ButtonPress/ButtonRelease that ignores (x,y)
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -233,11 +232,11 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
                 button,
             } => {
                 "ButtonPress".hash(&mut s);
-                (*button).hash(&mut s);
+                button.hash(&mut s);
                 // ignore x y
-                // (*x).hash(&mut s);
-                // (*y).hash(&mut s);
-                (*mods).hash(&mut s)
+                // x.hash(&mut s);
+                // y.hash(&mut s);
+                mods.hash(&mut s)
             }
         },
 
@@ -249,36 +248,36 @@ fn compute_input_event_hash(t: &InputEvent) -> InputEventHash {
                 button,
             } => {
                 "ButtonRelease".hash(&mut s);
-                (*button).hash(&mut s);
+                button.hash(&mut s);
                 // ignore x y
-                // (*x).hash(&mut s);
-                // (*y).hash(&mut s);
-                (*mods).hash(&mut s)
+                // x.hash(&mut s);
+                // y.hash(&mut s);
+                mods.hash(&mut s)
             }
         },
 
         InputEvent::WheelUp { mods, x: _, y: _ } => {
             "WheelUp".hash(&mut s);
             // ignore x y
-            // (*x).hash(&mut s);
-            // (*y).hash(&mut s);
-            (*mods).hash(&mut s)
+            // x.hash(&mut s);
+            // y.hash(&mut s);
+            mods.hash(&mut s)
         }
 
         InputEvent::WheelDown { mods, x: _, y: _ } => {
             "WheelDown".hash(&mut s);
             // ignore x y
-            // (*x).hash(&mut s);
-            // (*y).hash(&mut s);
-            (*mods).hash(&mut s)
+            // x.hash(&mut s);
+            // y.hash(&mut s);
+            mods.hash(&mut s)
         }
 
         InputEvent::PointerMotion(PointerEvent { mods, x: _, y: _ }) => {
             "PointerMotion".hash(&mut s);
             // ignore x y
-            // (*x).hash(&mut s);
-            // (*y).hash(&mut s);
-            (*mods).hash(&mut s)
+            // x.hash(&mut s);
+            // y.hash(&mut s);
+            mods.hash(&mut s)
         }
 
         _ => t.hash(&mut s),
