@@ -1,5 +1,6 @@
 use core::panic;
 //
+use std::fs;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -356,6 +357,20 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.read().len();
 
     for f in &editor.config.files_list {
+        // check file type
+        if let Ok(metadata) = fs::metadata(f) {
+            let file_type = metadata.file_type();
+
+            // ignore directories for now
+            if file_type.is_dir() {
+                continue;
+            }
+        } else {
+            // log error
+            eprintln!("cannot check {} file type", f);
+            continue;
+        }
+
         let b = DocumentBuilder::new()
             .document_name(f)
             .file_name(f)
