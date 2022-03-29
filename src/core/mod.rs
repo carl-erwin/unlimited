@@ -268,7 +268,7 @@ pub fn run<'a>(
 
 pub fn worker(
     worker_rx: &Receiver<EventMessage<'static>>,
-    _core_tx: &Sender<EventMessage<'static>>,
+    core_tx: &Sender<EventMessage<'static>>,
 ) {
     dbg_println!("[starting worker thread]");
     loop {
@@ -281,6 +281,9 @@ pub fn worker(
 
                 Event::SyncTask { doc } => {
                     document::sync_to_storage(&doc);
+
+                    let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                    core_tx.send(msg).unwrap_or(());
                 }
 
                 //                Event::OutsourcedTask { task_uid,  editor, editor_env, doc_id, vid, action, params ? } => {
