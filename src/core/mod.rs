@@ -192,7 +192,7 @@ It comes with:
 
 
 [Edit]
-    ctrl+o          => Open file
+    ctrl+o          => Open file (TODO)
 
     ctrl+u          => Undo
     ctrl+r          => Redo
@@ -204,9 +204,7 @@ It comes with:
 
 [Save]
     ctrl+x ctrl+s   => Save
-                    synchronization of large file(s) does not block the ui.
-                    the the is in "synchronization"
-
+                    synchronization of large file(s) is done in the background and does not block the ui.
 
 
 
