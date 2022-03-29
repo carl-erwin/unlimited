@@ -130,7 +130,9 @@ pub struct ButtonEvent {
     pub mods: KeyModifiers,
 }
 
+
 impl Hash for ButtonEvent {
+    // special hash for ButtonPress/ButtonRelease that ignores (x,y)
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.button.hash(state);
         // ignore (x, y) coordinates
@@ -155,8 +157,6 @@ impl PointerEvent {
         s.finish()
     }
 }
-
-// TODO(ceg): special hash for ButtonPress/ButtonRelease that ignores (x,y)
 
 /// Supported input events
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
