@@ -1056,7 +1056,7 @@ pub fn move_marks_to_next_line(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // fast mode: 1 mark, on screen
-    // check main mark, TODO(cef) proper function ?
+    // check main mark, TODO(ceg) proper function ?
     loop {
         let screen = {
             let v = view.read();

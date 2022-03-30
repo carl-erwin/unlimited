@@ -17,7 +17,7 @@ use crate::core::document::Document;
 use crate::core::screen::Screen;
 
 //
-// TODO(ceg): implement functions ti update the counters
+// TODO(ceg): implement functions to update the counters
 // on send (++) / receive (--)
 // add per Event counters
 //

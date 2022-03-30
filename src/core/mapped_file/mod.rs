@@ -1,5 +1,5 @@
 //
-// MappedFile is binary tree that provides on-demand data mapping,
+// MappedFile is a binary tree that provides on-demand data mapping,
 // and keeps only the modified areas in memory.
 // The leaves are linked to allow fast sequential traversal.
 //
