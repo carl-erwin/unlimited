@@ -1210,8 +1210,8 @@ mod tests {
         use std::io::prelude::*;
         use std::os::unix::prelude::FileExt;
 
-        let filename = "/home/ceg/test-1g".to_owned();
-        if false {
+        let filename = "/tmp/test-1g".to_owned();
+        {
             println!("create file....");
             let mut file = std::fs::File::create(&filename).unwrap();
             let size = 20 * 1024 * 1024 * 1024;
@@ -1226,19 +1226,16 @@ mod tests {
 
         println!("read file....");
 
-        let filename = "/home/ceg/Test-data/12g".to_owned();
-        let file = std::fs::File::open(&filename).unwrap();
-
         let doc = DocumentBuilder::new()
             .document_name("untitled-1")
             .file_name(&filename)
             .internal(false)
             .finalize();
 
-        build_index(&doc.unwrap());
+        build_index(doc.as_ref().unwrap());
 
-        return;
 
+        let file = std::fs::File::open(&filename).unwrap();
         let doc = doc.as_ref().unwrap().write();
         let doc_size = doc.size() as u64;
         let step = 1024 * 1024;
@@ -1261,7 +1258,7 @@ mod tests {
 
                 let res = file.read_at(&mut data[0..step], offset);
                 match res {
-                    Ok(size) => {
+                    Ok(_size) => {
                         //println!("read [{}] @ offset {}", size, offset);
                     }
                     Err(what) => {
