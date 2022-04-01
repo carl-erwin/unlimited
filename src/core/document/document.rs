@@ -1234,7 +1234,6 @@ mod tests {
 
         build_index(doc.as_ref().unwrap());
 
-
         let file = std::fs::File::open(&filename).unwrap();
         let doc = doc.as_ref().unwrap().write();
         let doc_size = doc.size() as u64;

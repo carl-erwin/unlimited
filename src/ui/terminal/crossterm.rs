@@ -7,7 +7,6 @@ use crossterm::{
     event,
     event::{DisableMouseCapture, EnableMouseCapture},
     queue,
-    style::Stylize,
     style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
     Result,
@@ -162,7 +161,7 @@ pub fn main_loop(
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
-                    if crate::core::bench_to_eof() {
+                    if true | crate::core::bench_to_eof() {
                         if (start - fps_t0).as_millis() >= 1000 {
                             let screen = screen.read();
 
@@ -258,13 +257,31 @@ fn draw_view(
     }
 }
 
+enum ScreenOp {
+    MoveTo(u16, u16),
+    SetFgColor(u8, u8, u8),
+    SetBgColor(u8, u8, u8),
+    SetNormal,
+    SetInverse,
+    PrintText(char),
+}
+
 fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
     // queue!(stdout, ResetColor)?;
     // queue!(stdout, Clear(ClearType::All))?;
 
+    let mut ops = vec![];
+
+    // current Brush/Pen
+    let mut prev_fg = None;
+    let mut prev_bg = None;
+    let mut is_inverse = false;
+
+    // reset Style
+    queue!(stdout, SetAttribute(Attribute::NoReverse))?;
+
     for li in 0..screen.height() {
-        queue!(stdout, MoveTo(0, li as u16))?;
-        //            queue!(stdout, Clear(ClearType::CurrentLine))?; //  key : crossterm.dumb_render.clear_line_before_render=true ?
+        ops.push(ScreenOp::MoveTo(0, li as u16));
 
         // TODO(ceg): fill len.len()..screen.width()
         let line = screen.get_line(li).unwrap();
@@ -273,47 +290,85 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
             let cpi = &line[c].cpi;
 
             // dbg_println!("RENDER Y={} X={} : cpi {:?}", li, c, cpi);
-
             if cpi.skip_render {
-                queue!(stdout, MoveTo(c as u16 + 1, li as u16))?;
-                continue;
+                // ops.push(ScreenOp::MoveTo(c as u16 + 1, li as u16));
+                // continue;
             }
 
-            // color
+            // fg color
             let color = Color::Rgb {
                 r: cpi.style.color.0,
                 g: cpi.style.color.1,
                 b: cpi.style.color.2,
             };
-            // color
+            if prev_fg.is_none() {
+                ops.push(ScreenOp::SetFgColor(
+                    cpi.style.color.0,
+                    cpi.style.color.1,
+                    cpi.style.color.2,
+                ));
+            } else {
+                if *prev_fg.as_ref().unwrap() != color {
+                    ops.push(ScreenOp::SetFgColor(
+                        cpi.style.color.0,
+                        cpi.style.color.1,
+                        cpi.style.color.2,
+                    ));
+                }
+            }
+            prev_fg = Some(color);
+
+            // bg color
             let bg_color = Color::Rgb {
                 r: cpi.style.bg_color.0,
                 g: cpi.style.bg_color.1,
                 b: cpi.style.bg_color.2,
             };
 
-            match cpi.displayed_cp {
-                '\n' | '\r' | '\t' => panic!("invalid char on screen"),
-                _ => {}
-            }
-            // draw with style
-            let s = cpi.displayed_cp.to_string();
-            if cpi.style.is_inverse {
-                // || c + 1 == line.max_width() {  // show last column
-                queue!(
-                    stdout,
-                    SetBackgroundColor(bg_color),
-                    SetForegroundColor(color),
-                    ::crossterm::style::PrintStyledContent(s.reverse())
-                )?;
+            if prev_bg.is_none() {
+                ops.push(ScreenOp::SetBgColor(
+                    cpi.style.bg_color.0,
+                    cpi.style.bg_color.1,
+                    cpi.style.bg_color.2,
+                ));
             } else {
-                queue!(
-                    stdout,
-                    SetBackgroundColor(bg_color),
-                    SetForegroundColor(color),
-                    Print(cpi.displayed_cp)
-                )?;
+                if *prev_bg.as_ref().unwrap() != bg_color {
+                    ops.push(ScreenOp::SetBgColor(
+                        cpi.style.bg_color.0,
+                        cpi.style.bg_color.1,
+                        cpi.style.bg_color.2,
+                    ));
+                }
             }
+
+            prev_bg = Some(bg_color);
+
+            // inverse
+            if cpi.style.is_inverse != is_inverse {
+                if cpi.style.is_inverse {
+                    ops.push(ScreenOp::SetInverse);
+                } else {
+                    ops.push(ScreenOp::SetNormal);
+                }
+            }
+            is_inverse = cpi.style.is_inverse;
+
+            ops.push(ScreenOp::PrintText(cpi.displayed_cp));
+        }
+    }
+
+    for op in ops {
+        match op {
+            ScreenOp::MoveTo(x, y) => queue!(stdout, MoveTo(x, y))?,
+            ScreenOp::SetFgColor(r, g, b) => {
+                queue!(stdout, SetForegroundColor(Color::Rgb { r, g, b }))?
+            }
+            ScreenOp::SetBgColor(r, g, b) => {
+                queue!(stdout, SetBackgroundColor(Color::Rgb { r, g, b }))?
+            }
+            ScreenOp::SetNormal => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetInverse => queue!(stdout, SetAttribute(Attribute::Reverse))?,
+            ScreenOp::PrintText(c) => queue!(stdout, Print(c))?,
         }
     }
 
@@ -360,13 +415,21 @@ fn draw_screen(
         return Ok(());
     }
 
-    // dbg_println!("check_hash = {}", check_hash);
-
     // current style
     let width = screen.width();
     let height = screen.height();
 
     let t0 = Instant::now();
+
+    // reset Style
+    queue!(stdout, SetAttribute(Attribute::NoReverse))?;
+
+    let mut ops = vec![];
+
+    // current Brush/Pen
+    let mut prev_fg = None;
+    let mut prev_bg = None;
+    let mut is_inverse = false;
 
     let mut l = 0;
     while l < height {
@@ -414,63 +477,98 @@ fn draw_screen(
             }
 
             if c != prev_c {
-                queue!(stdout, MoveTo(c as u16, l as u16))?;
+                ops.push(ScreenOp::MoveTo(c as u16, l as u16));
             } else if c == 0 {
-                queue!(stdout, MoveTo(0, l as u16))?;
+                ops.push(ScreenOp::MoveTo(0, l as u16));
             }
 
             let cpi = &line[c].cpi;
             if cpi.skip_render {
                 c += 1;
-                queue!(stdout, MoveTo(c as u16, l as u16))?;
                 continue;
             }
 
-            if cpi.style.is_inverse {
-                queue!(stdout, SetAttribute(Attribute::Reverse))?;
-            } else {
-                queue!(stdout, SetAttribute(Attribute::NoReverse))?;
+            // inverse
+            if cpi.style.is_inverse != is_inverse {
+                if cpi.style.is_inverse {
+                    ops.push(ScreenOp::SetInverse);
+                } else {
+                    ops.push(ScreenOp::SetNormal);
+                }
             }
+            is_inverse = cpi.style.is_inverse;
 
-            /*
-            if cpi.style.is_bold {
-                queue!(stdout, SetAttribute(Attribute::Bold))?;
-            } else {
-                queue!(stdout, SetAttribute(Attribute::NoBold))?;
-            }
-            */
-
-            //            SlowBlink
-
+            // fg color
             let color = Color::Rgb {
                 r: cpi.style.color.0,
                 g: cpi.style.color.1,
                 b: cpi.style.color.2,
             };
+            if prev_fg.is_none() {
+                ops.push(ScreenOp::SetFgColor(
+                    cpi.style.color.0,
+                    cpi.style.color.1,
+                    cpi.style.color.2,
+                ));
+            } else {
+                if *prev_fg.as_ref().unwrap() != color {
+                    ops.push(ScreenOp::SetFgColor(
+                        cpi.style.color.0,
+                        cpi.style.color.1,
+                        cpi.style.color.2,
+                    ));
+                }
+            }
+            prev_fg = Some(color);
 
+            // bg color
             let bg_color = Color::Rgb {
                 r: cpi.style.bg_color.0,
                 g: cpi.style.bg_color.1,
                 b: cpi.style.bg_color.2,
             };
-            queue!(
-                stdout,
-                SetForegroundColor(color),
-                SetBackgroundColor(bg_color)
-            )?;
 
-            // draw character
-            // TODO(ceg): assert ! \r \n \t , etc.
-            match cpi.displayed_cp {
-                '\n' | '\r' | '\t' => panic!("invalid char on screen"),
-                _ => {}
+            if prev_bg.is_none() {
+                ops.push(ScreenOp::SetBgColor(
+                    cpi.style.bg_color.0,
+                    cpi.style.bg_color.1,
+                    cpi.style.bg_color.2,
+                ));
+            } else {
+                if *prev_bg.as_ref().unwrap() != bg_color {
+                    ops.push(ScreenOp::SetBgColor(
+                        cpi.style.bg_color.0,
+                        cpi.style.bg_color.1,
+                        cpi.style.bg_color.2,
+                    ));
+                }
             }
-            queue!(stdout, Print(cpi.displayed_cp))?;
+
+            prev_bg = Some(bg_color);
+
+            ops.push(ScreenOp::PrintText(cpi.displayed_cp));
 
             c += 1;
         }
 
         l += 1;
+    }
+
+    dbg_println!("NB ops {}\r", ops.len());
+
+    for op in ops {
+        match op {
+            ScreenOp::MoveTo(x, y) => queue!(stdout, MoveTo(x, y))?,
+            ScreenOp::SetFgColor(r, g, b) => {
+                queue!(stdout, SetForegroundColor(Color::Rgb { r, g, b }))?
+            }
+            ScreenOp::SetBgColor(r, g, b) => {
+                queue!(stdout, SetBackgroundColor(Color::Rgb { r, g, b }))?
+            }
+            ScreenOp::SetNormal => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetInverse => queue!(stdout, SetAttribute(Attribute::Reverse))?,
+            ScreenOp::PrintText(c) => queue!(stdout, Print(c))?,
+        }
     }
 
     let t1 = Instant::now();
