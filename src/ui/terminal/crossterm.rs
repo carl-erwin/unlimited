@@ -161,7 +161,7 @@ pub fn main_loop(
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
-                    if true | crate::core::bench_to_eof() {
+                    if crate::core::bench_to_eof() {
                         if (start - fps_t0).as_millis() >= 1000 {
                             let screen = screen.read();
 
