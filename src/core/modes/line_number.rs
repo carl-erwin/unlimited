@@ -20,7 +20,7 @@
     each time a node is indexed
     the document impl must call update hierarchy with the build metadata diff
 
-    the mode subscribe to the document events
+    the mode subscribes to the document events
 
     When a node is indexed/added/removed, the document notify us
     Then we build the node metadata
@@ -187,12 +187,14 @@ impl<'a> Mode for LineNumberMode {
 
         let meta = DOC_METADATA_MAP.as_ref().write();
         let meta = meta.get(&doc_id);
-        let meta = meta.as_ref().unwrap().write();
+        let mut meta = meta.as_ref().unwrap().write();
 
         if !meta.cb_installed {
             let cb = Box::new(LineNumberModeDocEventHandler { count: 0 });
 
             self.doc_subscription = doc.register_subscriber(cb);
+
+            meta.cb_installed = true;
         }
     }
 
@@ -250,8 +252,9 @@ impl<'a> Mode for LineNumberMode {
                 };
 
                 if let Some(p_view) = parent {
-                    p_view.layout_ops[dst_view.layout_index.unwrap()] =
-                        LayoutOperation::Fixed { size: width as usize };
+                    p_view.layout_ops[dst_view.layout_index.unwrap()] = LayoutOperation::Fixed {
+                        size: width as usize,
+                    };
                 } else {
                     panic!("");
                 }
