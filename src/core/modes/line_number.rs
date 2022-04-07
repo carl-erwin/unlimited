@@ -65,7 +65,7 @@ use crate::core::view::ViewEventSource;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-fn num_digit(v: usize) -> usize {
+fn num_digit(v: u64) -> u64 {
     match v {
         _ if v < 10 => 1,
         _ if v < 100 => 2,
@@ -77,7 +77,6 @@ fn num_digit(v: usize) -> usize {
         _ if v < 100000000 => 8,
         _ if v < 1000000000 => 9,
         _ if v < 10000000000 => 10,
-        // TODO(ceg): add compile time 32 bits limitations detection.
         _ if v < 100000000000 => 11,
         _ if v < 1000000000000 => 12,
         _ if v < 10000000000000 => 13,
@@ -241,10 +240,10 @@ impl<'a> Mode for LineNumberMode {
                 let max_offset = doc.size() as u64 + 1;
                 let width = if !doc.indexed {
                     // '@offset '
-                    1 + num_digit(max_offset as usize) + 1
+                    1 + num_digit(max_offset) + 1
                 } else {
                     let ret = get_document_byte_count_at_offset(&doc, '\n' as usize, max_offset);
-                    let n = num_digit(ret.0 as usize + 1); // nb line = line count + 1
+                    let n = num_digit(ret.0 + 1); // nb line = line count + 1
 
                     // 'xxxx '
                     n + 1
@@ -252,7 +251,7 @@ impl<'a> Mode for LineNumberMode {
 
                 if let Some(p_view) = parent {
                     p_view.layout_ops[dst_view.layout_index.unwrap()] =
-                        LayoutOperation::Fixed { size: width };
+                        LayoutOperation::Fixed { size: width as usize };
                 } else {
                     panic!("");
                 }
