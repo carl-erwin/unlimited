@@ -617,8 +617,9 @@ fn translate_crossterm_event(
     evt: ::crossterm::event::Event,
     pending_resize: &mut bool,
 ) -> InputEvent {
-    // translate termion event
+    // translate crossterm event
     *pending_resize = false;
+
     //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
 
     match evt {
@@ -970,6 +971,8 @@ fn get_input_events(
 
     let mut count = 0;
     let mut pending_resize = false;
+
+    // accumulate events up to 1 millisecond
     loop {
         if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             if let Ok(cross_evt) = ::crossterm::event::read() {
@@ -1002,11 +1005,15 @@ fn get_input_events(
 
     // TODO(ceg): --limit-input-rate
     let p_input = crate::core::event::pending_input_event_count();
-    if p_input < 1 {
-        if !accum.is_empty() {
-            send_input_events(accum, tx, ui_tx);
-        }
+    if p_input > 0 {
+        return Ok(());
     }
+
+    if accum.is_empty() {
+        return Ok(());
+    }
+
+    send_input_events(accum, tx, ui_tx);
 
     Ok(())
 }
