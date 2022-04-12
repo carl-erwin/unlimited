@@ -101,7 +101,7 @@ fn parse_command_line() -> Config {
             Arg::new("RAW_FILTER_TO_SCREEN")
                 .short('r') // TODO remove
                 .long("--raw-data-to-screen")
-                .help("render all screen until EOF is reached and quit (wip: no proper quit yet)"),
+                .help("disable all filters and put the file's bytes directly to screen"),
         )
         .arg(
             Arg::new("FILES")
