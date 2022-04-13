@@ -7,6 +7,7 @@ use std::sync::Weak;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::Result;
 
 //
 use crate::core::editor::user_is_active;
@@ -308,6 +309,10 @@ impl<'a> Document<'a> {
 
     pub fn file_name(&self) -> String {
         self.buffer.file_name.clone()
+    }
+
+    pub fn metadata(&self) -> Result<std::fs::Metadata> {
+        self.buffer.metadata()
     }
 
     /// copy the content of the buffer up to 'nr_bytes' into the data Vec
@@ -891,10 +896,15 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
     // update
     {
+        use std::os::unix::fs::PermissionsExt;
+
         let mut doc = doc.write();
 
-        let metadata = ::std::fs::metadata(&doc.file_name()).unwrap();
-        let perms = metadata.permissions();
+        // TODO(ceg): use mapped file fd, will panic if file is removed
+        let perms = match doc.metadata() {
+            Ok(metadata) => metadata.permissions(),
+            Err(_) => std::fs::Permissions::from_mode(0o644),
+        };
 
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move '.update' to global config
 

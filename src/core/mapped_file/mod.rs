@@ -304,14 +304,22 @@ impl Node {
 
         let _ = fd.seek(SeekFrom::Start(storage_offset));
 
-        let nrd = fd.read(&mut v[..capacity]).unwrap();
-        if nrd != capacity {
-            dbg_println!(
-                "MAPPED FILE: read error error : disk_offset = {}, size = {}",
-                storage_offset,
-                self.size
-            );
-            panic!("read error"); // if file changed on disk ...
+        let nrd = fd.read(&mut v[..capacity]);
+        match nrd {
+            Ok(nrd) => {
+                if nrd != capacity {
+                    dbg_println!(
+                        "MAPPED FILE: read error error : disk_offset = {}, size = {}",
+                        storage_offset,
+                        self.size
+                    );
+                    panic!("read error"); // if file changed on disk ...
+                }
+            }
+
+            Err(e) => {
+                panic!("read error {:?}", e); // if file changed on disk ...
+            }
         }
 
         // 5 - build "MAPPED FILE: new" page

@@ -1,3 +1,6 @@
+use std::io::Result;
+use std::io::{Error, ErrorKind};
+
 use crate::core::mapped_file::FileHandle;
 use crate::core::mapped_file::MappedFile;
 use crate::core::mapped_file::MappedFileEvent;
@@ -96,6 +99,16 @@ impl<'a> Buffer<'a> {
     pub fn close(&mut self) -> bool {
         unimplemented!();
         // false
+    }
+
+    pub fn metadata(&self) -> Result<std::fs::Metadata> {
+        let d = self.data.as_ref().read();
+
+        if let Some(fd) = &d.fd {
+            fd.as_ref().read().metadata()
+        } else {
+            Err(Error::new(ErrorKind::NotFound, "File not found"))
+        }
     }
 
     /// returns the buffer's open mode
