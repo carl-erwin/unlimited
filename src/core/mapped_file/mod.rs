@@ -274,7 +274,9 @@ impl Node {
 
                     //let t1_read = std::time::Instant::now();
                     //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
-                    assert!(nrd == chunk_size);
+                    if nrd != chunk_size {
+                        dbg_println!("cannot read node : nrd {} != chunk_size {}", nrd, chunk_size);
+                    }
                 }
                 pos += chunk_size;
             }
@@ -308,11 +310,16 @@ impl Node {
         match nrd {
             Ok(nrd) => {
                 if nrd != capacity {
-                    dbg_println!(
-                        "MAPPED FILE: read error error : disk_offset = {}, size = {}",
+                    eprintln!(
+                        "MAPPED FILE: read error error : disk_offset = {}, size = {}, nrd {} != capacity {}",
                         storage_offset,
-                        self.size
+                        self.size,
+                        nrd,
+                        capacity
                     );
+
+                    return None;
+
                     panic!("read error"); // if file changed on disk ...
                 }
             }

@@ -903,7 +903,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         // TODO(ceg): use mapped file fd, will panic if file is removed
         let perms = match doc.metadata() {
             Ok(metadata) => metadata.permissions(),
-            Err(_) => std::fs::Permissions::from_mode(0o644),
+            Err(_) => std::fs::Permissions::from_mode(0o600),
         };
 
         let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move '.update' to global config
