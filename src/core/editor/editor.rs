@@ -196,6 +196,10 @@ impl<'a> Editor<'a> {
         }
     }
 
+    pub fn is_root_view(&self, id: view::Id) -> bool {
+        self.root_views.iter().find(|&&x| x == id).is_some()
+    }
+
     ///
     pub fn setup_default_buffers(&mut self) {
         let mut builder = DocumentBuilder::new();

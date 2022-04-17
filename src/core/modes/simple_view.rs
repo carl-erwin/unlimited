@@ -112,13 +112,13 @@ impl<'a> Mode for SimpleViewMode {
             &modes,
         );
 
-        v.is_group_leader = true; // allow generic split code
+        v.is_group_leader = true; // Nb: do not remove , allow recursive splitting
 
         // TODO(ceg): set focus
         // set focus on text view
         let line_numbers_view_idx = 0;
-        let text_view_idx = ops_modes.len() - 2;
-        let scroll_bar_idx = ops_modes.len() - 1;
+        let text_view_idx = 1;
+        let scroll_bar_idx = 2;
 
         v.main_child = Some(text_view_idx); // index in children
         v.focus_to = Some(v.children[text_view_idx]); // TODO(ceg):

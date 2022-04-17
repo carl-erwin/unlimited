@@ -116,7 +116,7 @@ impl<'a> Mode for BasicEditorMode {
             v.write().destroyable = false;
         }
 
-        // TODO(ceg): put some kind of label on
+        // TODO(ceg): put some kind of label/name? on
         // like view.label = 'text-view'
         // like view.label = 'status-line'
         // view.children_by_label<String, (vid, index)>
@@ -129,7 +129,7 @@ impl<'a> Mode for BasicEditorMode {
             .borrow_mut()
             .push(Box::new(BasicEditorTitle::new()));
 
-        // set focus on text view
+        // set focus on text view (simple-view mode)
         view.main_child = Some(1); // index in children
         view.focus_to = Some(view.children[1]); // TODO(ceg):
         env.focus_changed_to = Some(view.children[1]); // TODO(ceg):

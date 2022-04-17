@@ -266,6 +266,9 @@ pub fn save_document(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &
     }
 }
 
+// NB:
+//     a  Vertical split   <-> LayoutDirection::Horizontal <-> Left-To-Right
+//     an Horizontal split <-> LayoutDirection::Vertical   <-> Top-To-Bottom
 pub fn split_with_direction(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
@@ -330,6 +333,8 @@ pub fn split_with_direction(
         if idx == 0 {
             env.focus_changed_to = Some(view.id); // post input
         }
+
+        dbg_println!("ALLOCATE new : {:?}", view.id);
 
         let id = view.id;
         v.children.push(id);
@@ -479,7 +484,6 @@ build_layout  for p2
     v1  splitter  v2
 
 
-
     look for first view with the is_group_leader flag set
 
     create a new_parent with width height
@@ -499,14 +503,13 @@ build_layout  for p2
         Vec<view::Id>);
 
 */
-
 pub fn split_view_with_direction(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     dir: view::LayoutDirection,
 ) {
-    let id = find_first_splitable_parent(editor, env, view);
+    let id = find_first_splitable_parent(editor, env, view); // group leader (ex: simple_view)
     if id.is_none() {
         return;
     }
@@ -515,7 +518,19 @@ pub fn split_view_with_direction(
     let view = editor.view_map.get(&id);
     let view = view.unwrap().clone();
 
-    let (v_id, parent_id, x, y, width, height, doc, original_modes, layout_index) = {
+    struct SplitInfo {
+        v1_id: view::Id,
+        parent_id: Option<view::Id>,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        doc: Option<Arc<RwLock<Document<'static>>>>,
+        original_modes: Vec<String>,
+        layout_index: Option<usize>,
+    }
+
+    let split_info = {
         let v = view.read();
 
         dbg_println!("SPLITTING {:?}  {:?}", dir, v.id);
@@ -546,28 +561,28 @@ pub fn split_view_with_direction(
             }
         };
 
-        (
-            v.id,
-            v.parent_id,
-            v.x,
-            v.y,
+        SplitInfo {
+            v1_id: v.id,
+            parent_id: v.parent_id,
+            x: v.x,
+            y: v.y,
             width,
             height,
             doc,
-            v.modes.clone(),
-            v.layout_index,
-        )
+            original_modes: v.modes.clone(),
+            layout_index: v.layout_index,
+        }
     };
 
-    // create new parent p2
+    // create new parent p2 (will be inserted as new parent of v.parent_id)
     let mut p2 = View::new(
         &mut editor,
         &mut env,
-        parent_id,
-        x, // relative to parent, i32 allow negative moves?
-        y, // relative to parent, i32 allow negative moves?
-        width,
-        height,
+        split_info.parent_id, // group leader's parent
+        split_info.x,         // relative to parent, i32 allow negative moves?
+        split_info.y,         // relative to parent, i32 allow negative moves?
+        split_info.width,
+        split_info.height,
         None,
         &vec![], // TODO(ceg): add core mode fr save/quit/quit/abort/split{V,H}
         0,
@@ -575,70 +590,94 @@ pub fn split_view_with_direction(
 
     // children_layout_and_modes
     let ops_modes = vec![
-        LayoutOperation::Percent { p: 50.0 },
-        LayoutOperation::Fixed { size: 1 },
-        LayoutOperation::RemainPercent { p: 100.0 },
+        LayoutOperation::Percent { p: 50.0 },        // left (v1)
+        LayoutOperation::Fixed { size: 1 },          // splitter
+        LayoutOperation::RemainPercent { p: 100.0 }, // right (v2)
     ];
-
     p2.layout_ops = ops_modes;
+    p2.layout_index = split_info.layout_index;
     let p2_id = p2.id;
 
+    dbg_println!("new parent = {:?}", p2_id);
+
+    // insert p2 into editor global map
     let rc = Rc::new(RwLock::new(p2));
     editor.view_map.insert(p2_id, Rc::clone(&rc)); // move to View::new
 
-    if let Some(parent_id) = parent_id {
+    // update grand parent, replace v1_id by p2_id
+    if let Some(parent_id) = split_info.parent_id {
         if let Some(gp) = editor.view_map.get(&parent_id) {
             let mut gp = gp.write();
-            if let Some(layout_index) = layout_index {
+            if let Some(layout_index) = split_info.layout_index {
                 gp.children[layout_index] = p2_id;
             }
         }
     }
 
-    let splitter_mode = match dir {
-        view::LayoutDirection::Horizontal => vec!["vsplit-mode".to_owned()],
-        view::LayoutDirection::Vertical => vec!["hsplit-mode".to_owned()],
-        _ => panic!(),
+    // create splitter
+    let splitter_id = {
+        let splitter_mode = match dir {
+            view::LayoutDirection::Horizontal => vec!["vsplit-mode".to_owned()],
+            view::LayoutDirection::Vertical => vec!["hsplit-mode".to_owned()],
+            _ => panic!(),
+        };
+
+        let splitter = View::new(
+            &mut editor,
+            &mut env,
+            Some(p2_id),
+            split_info.x, // relative to parent, i32 allow negative moves?
+            split_info.y, // relative to parent, i32 allow negative moves?
+            split_info.width,
+            split_info.height,
+            None,
+            &splitter_mode,
+            0,
+        );
+
+        let splitter_id = splitter.id;
+        let rc = Rc::new(RwLock::new(splitter));
+        editor.view_map.insert(splitter_id, Rc::clone(&rc)); // move to View::new
+
+        dbg_println!("splitter_id = {:?}", splitter_id);
+
+        splitter_id
     };
 
-    // create splitter
-    let splitter = View::new(
+    // create new view v2, aka clone of v1
+    let v2_id = {
+        let v2 = View::new(
+            &mut editor,
+            &mut env,
+            Some(p2_id),
+            split_info.x, // relative to parent, i32 allow negative moves?
+            split_info.y, // relative to parent, i32 allow negative moves?
+            split_info.width,
+            split_info.height,
+            split_info.doc.clone(),
+            &split_info.original_modes,
+            0,
+        );
+        let v2_id = v2.id;
+        let rc = Rc::new(RwLock::new(v2));
+        editor.view_map.insert(v2_id, Rc::clone(&rc)); // move to View::new
+
+        dbg_println!("v2_id = {:?}", v2_id);
+
+        v2_id
+    };
+
+    // set v1 splitter v2 as children of p2
+    let view_ids = vec![split_info.v1_id, splitter_id, v2_id];
+    layout_view_ids_with_direction(
         &mut editor,
         &mut env,
-        Some(p2_id),
-        x, // relative to parent, i32 allow negative moves?
-        y, // relative to parent, i32 allow negative moves?
-        width,
-        height,
-        None,
-        &splitter_mode,
-        0,
+        p2_id,
+        split_info.width,
+        split_info.height,
+        dir,
+        &view_ids,
     );
-
-    let splitter_id = splitter.id;
-    let rc = Rc::new(RwLock::new(splitter));
-    editor.view_map.insert(splitter_id, Rc::clone(&rc)); // move to View::new
-
-    // create new parent v2
-    let v2 = View::new(
-        &mut editor,
-        &mut env,
-        Some(p2_id),
-        x, // relative to parent, i32 allow negative moves?
-        y, // relative to parent, i32 allow negative moves?
-        width,
-        height,
-        doc.clone(),
-        &original_modes,
-        0,
-    );
-    let v2_id = v2.id;
-    let rc = Rc::new(RwLock::new(v2));
-    editor.view_map.insert(v2_id, Rc::clone(&rc)); // move to View::new
-
-    let view_ids = vec![v_id, splitter_id, v2_id];
-
-    layout_view_ids_with_direction(&mut editor, &mut env, p2_id, width, height, dir, &view_ids);
 }
 
 pub fn split_vertically(
@@ -880,24 +919,25 @@ pub fn decrease_right(
     add view.is_group_leader = true aka is_group_leader
 
 
-                     ggparent
+                     Option<gparent>
                         |
-                     gparent
+                     Option<parent>
                         |
              __________|_____________________
-            |                                \
+            |                  |             \
          group_leader (1)    splitter     group_leader (2)
            /  |    \                          /  |      \
          /   |      \                       /    |       \
       /     |        \                   /       |        \
-    lines text_view  vscrollbar           lines text_view  vscrollbar
+    lines text_view  vscrollbar         lines text_view  vscrollbar
 
-                     ggparent
-                        |
+
                      gparent
                         |
+                     parent
                         |
-                 group_leader (1)
+                        |
+                 group_leader (1 or 2)
                     /  |    \
                   /   |      \
                /     |        \
@@ -905,23 +945,19 @@ pub fn decrease_right(
 
 
 
-    (1) look for sibling group leader
+    (1) look for "sibling" group leader
 
     save it's parent_layout_index
 
-    (2) look for first ancestor (gparent) with the is_group_leader flag set if none -> return
+    (2) look for first ancestor (parent) with the is_group_leader flag set if none -> return
     save gparent_layout_index
 
     ------
 
-    (3) destroy all gparent children except parent
+    (3) destroy all parent children except other "sibling"
 
     fn destroy_view_sibling(vidx) { only keep parent_layout_index }
 
-
-    ggparent.children[gparent_layout_index] = parent.id
-
-    destroy gparent
 
 */
 
@@ -933,16 +969,19 @@ pub fn destroy_view(
     // current view/id
     let v = view.write();
 
+    dbg_println!("-- DESTROY VIEW {:?}", v.id);
+
     if !v.destroyable {
         return;
     }
+
+    let mut destroy = vec![];
 
     // check parent
     if v.parent_id.is_none() {
         // nothing to do
         // check root_views presence
         dbg_println!("No parent, ignore");
-
         return;
     }
 
@@ -952,113 +991,98 @@ pub fn destroy_view(
         return;
     }
 
-    let v_layout_index = v.layout_index.unwrap();
-
-    let mut destroy = vec![];
-
-    // get parent view/id
+    // get parent view's id
     let pvid = *v.parent_id.as_ref().unwrap();
     let pv = editor.view_map.get(&pvid).unwrap().clone();
     let mut pv = pv.write();
-
-    if pv.children.len() != 3 {
-        dbg_println!(" pv.children.len({}) != 3", pv.children.len());
-        // not handled yet
+    if !pv.is_group_leader {
+        // parent is not a group leader
         return;
     }
 
-    if let Some(ppvid) = pv.parent_id {
-        // get grand parent view/id
-        let ppv = editor.view_map.get(&ppvid).unwrap().clone();
-        let mut ppv = ppv.write();
+    if pv.children.len() != 3 {
+        // more than 3 children not handled yet
+        dbg_println!(" pv.children.len({}) != 3", pv.children.len());
+        return;
+    }
 
-        let pv_layout_index = pv.layout_index.unwrap();
+    // no grand parent?
+    if pv.parent_id.is_none() {
+        return;
+    }
+    let ppvid = pv.parent_id.unwrap();
 
-        let mut kept_vid = None;
-
-        // TODO(ceg): get sibling ids
-        // mark siblings for delete
-        for (idx, view_id) in pv.children.iter().enumerate() {
-            if idx == v_layout_index {
-                dbg_println!("prepare delete of {:?}", *view_id);
-                destroy.push(*view_id);
-            } else if idx == 1 {
-                // separator index
-                // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
-                dbg_println!("prepare delete of {:?} (separator)", *view_id);
-                destroy.push(*view_id);
-            } else {
-                dbg_println!("keep {:?}", *view_id);
-                kept_vid = Some(*view_id);
-            }
-        }
-
-        if let Some(kept_vid) = kept_vid {
-            // replace parent in grand-parent
-            ppv.children[pv_layout_index] = kept_vid;
-            pv.parent_id = Some(ppvid);
-            // update grand parent focus: // TODO(ceg): find a better way
-            ppv.focus_to = Some(kept_vid);
-
-            // update link to grand-parent  (new parent)
-            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
-            let mut kept_v = kept_v.write();
-            kept_v.parent_id = Some(ppvid);
-            kept_v.layout_index = Some(pv_layout_index);
-
-            kept_v.destroyable = pv.destroyable; // NB: take parent policy
-
-            dbg_println!("prepare delete of {:?} (parent)", pvid);
-            dbg_println!("set focus to {:?}", kept_vid);
-            destroy.push(pvid);
-            env.focus_changed_to = Some(kept_vid); // post input
-        }
-    } else {
-        // TODO(ceg): get sibling ids
-        // mark self+siblings for delete
-        let mut kept_vid = None;
-
-        for (idx, view_id) in pv.children.iter().enumerate() {
-            if idx == v_layout_index {
-                dbg_println!("prepare delete of view id {:?}", *view_id);
-                destroy.push(*view_id);
-            } else if idx == 1 {
-                // separator index
-                // TODO(ceg): add view_kind ? text/scrollbar/hsplit/vsplit etc ?
-                dbg_println!("prepare delete of view id {:?} (separator)", *view_id);
-                destroy.push(*view_id);
-            } else {
-                dbg_println!("keep view id {:?}", *view_id);
-                kept_vid = Some(*view_id);
-            }
-        }
-
-        if let Some(kept_vid) = kept_vid {
-            dbg_println!("root view update");
-            dbg_println!("delete {:?}", pvid);
-            destroy.push(pvid);
-
-            for i in 0..editor.root_views.len() {
-                if editor.root_views[i] == pvid {
-                    dbg_println!("update root view slot {}", i);
-
-                    editor.root_views[i] = kept_vid;
-                    env.view_id = kept_vid;
-                    break;
-                }
-            }
-
-            let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
-            let mut kept_v = kept_v.write();
-            kept_v.parent_id = None;
-            kept_v.layout_index = None;
-
-            env.focus_changed_to = Some(kept_vid); // post input
-        }
+    if editor.is_root_view(ppvid) {
+        dbg_println!("Cannot destroy 1st level view");
+        return;
     };
 
+    // get grand parent view/id
+    let ppv = editor.view_map.get(&ppvid).unwrap().clone();
+    let mut ppv = ppv.write();
+
+    // mark children for deletion
+    for (idx, view_id) in pv.children.iter().enumerate() {
+        dbg_println!("prepare deletion of {:?}", *view_id);
+        destroy.push(*view_id);
+    }
+
+    let mut kept_vid = None;
+
+    dbg_println!("pvid of {:?}", pvid);
+    dbg_println!("ppvid of {:?}", ppvid);
+    // find other group leader != pvid
+    for (idx, view_id) in ppv.children.iter().enumerate() {
+        dbg_println!("checking {:?}", *view_id);
+        if *view_id == pvid {
+            // already locked
+            destroy.push(pvid);
+            continue;
+        }
+
+        let v = editor.view_map.get(view_id).unwrap().clone();
+        let v = v.read();
+
+        if !v.is_group_leader {
+            dbg_println!("prepare deletion of {:?}", *view_id);
+            destroy.push(*view_id);
+        } else {
+            kept_vid = Some(*view_id);
+        }
+    }
+
+    dbg_println!("kept_vid {:?}", kept_vid);
+
+    if let Some(kept_vid) = kept_vid {
+        // grand grand parent
+        let pppvid = ppv.parent_id.unwrap();
+
+        let pppv = editor.view_map.get(&pppvid).unwrap().clone();
+        let mut pppv = pppv.write();
+
+        // replace parent in grand-parent
+        pppv.children[ppv.layout_index.unwrap()] = kept_vid;
+
+        // update grand parent focus: // TODO(ceg): find a better way
+        pppv.focus_to = Some(kept_vid);
+
+        // update link to grand-parent  (new parent)
+        let kept_v = editor.view_map.get(&kept_vid).unwrap().clone();
+        let mut kept_v = kept_v.write();
+        kept_v.parent_id = Some(pppvid);
+        kept_v.layout_index = Some(ppv.layout_index.unwrap());
+
+        kept_v.destroyable = pv.destroyable; // NB: take parent policy
+
+        dbg_println!("prepare delete of {:?} (parent)", pvid);
+        dbg_println!("set focus to {:?}", kept_vid);
+        env.focus_changed_to = Some(kept_vid); // post input
+
+        destroy.push(ppvid);
+    }
+
     dbg_println!("destroy view(s) {:?}", destroy);
-    for vid in destroy {
-        editor.view_map.remove(&vid);
+    for id in destroy {
+        editor.view_map.remove(&id);
     }
 }
