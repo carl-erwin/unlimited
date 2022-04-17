@@ -362,7 +362,44 @@ impl<'a> View<'a> {
         self.document.clone()
     }
 
-    /// Create a new View at a gin offset in the Document.<br/>
+    // Setup view modes. (respect vector order)
+    fn setup_modes(
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
+        mut view: &mut View<'static>,
+        modes: &Vec<String>,
+    ) {
+        // setup modes/input map/etc..
+        for mode_name in modes.iter() {
+            if mode_name.is_empty() {
+                // TODO(ceg): log error
+                continue;
+            }
+
+            let mode = editor.get_mode(mode_name);
+            if mode.is_none() {
+                panic!("cannot find mode {}", mode_name);
+            }
+            let mut mode = mode.as_ref().unwrap().borrow_mut();
+
+            // TODO(ceg): add doc
+            let action_map = mode.build_action_map();
+            for (name, fnptr) in action_map {
+                view.input_ctx.action_map.insert(name.clone(), fnptr);
+            }
+
+            // create per view mode context
+            // allocate per view ModeCtx shared between the stages
+            {
+                let ctx = mode.alloc_ctx();
+                view.set_mode_ctx(mode.name(), ctx);
+                dbg_println!("mode[{}] configure  {:?}", mode.name(), view.id);
+                mode.configure_view(editor, env, &mut view);
+            }
+        }
+    }
+
+    /// Create a new View at a given offset of the Document.<br/>
     pub fn new(
         editor: &mut Editor<'static>,
         env: &mut EditorEnv<'static>,
@@ -372,7 +409,7 @@ impl<'a> View<'a> {
         width: usize,
         height: usize,
         document: Option<Arc<RwLock<Document<'static>>>>,
-        modes: &Vec<String>, // TODO(ceg): add core mode fr save/quit/quit/abort/split{V,H}
+        modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
     ) -> View<'static> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
@@ -424,34 +461,7 @@ impl<'a> View<'a> {
             subscribers: vec![], // list of other views to notify when the current view changes
         };
 
-        // setup modes/input map/etc..
-        for mode_name in modes.iter() {
-            if mode_name.is_empty() {
-                // TODO(ceg): log error
-                continue;
-            }
-
-            let mode = editor.get_mode(mode_name);
-            if mode.is_none() {
-                panic!("cannot find mode {}", mode_name);
-            }
-            let mut mode = mode.as_ref().unwrap().borrow_mut();
-
-            // TODO(ceg): add doc
-            let action_map = mode.build_action_map();
-            for (name, fnptr) in action_map {
-                v.input_ctx.action_map.insert(name.clone(), fnptr);
-            }
-
-            // create view's mode context
-            // allocate per view ModeCtx shared between the stages
-            {
-                let ctx = mode.alloc_ctx();
-                v.set_mode_ctx(mode.name(), ctx);
-                dbg_println!("mode[{}] configure  {:?}", mode.name(), v.id);
-                mode.configure_view(editor, env, &mut v);
-            }
-        }
+        View::setup_modes(editor, env, &mut v, modes);
 
         v
     }
