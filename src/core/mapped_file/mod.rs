@@ -324,7 +324,7 @@ impl Node {
 
                     return None;
 
-                    panic!("read error"); // if file changed on disk ...
+                    // panic!("read error"); // if file changed on disk ...
                 }
             }
 
