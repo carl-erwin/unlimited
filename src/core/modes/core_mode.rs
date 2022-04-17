@@ -248,8 +248,8 @@ pub fn save_document(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &
     // - send sync job to worker -
     //
     // NB: We must take the doc clone from Editor not View
-    // because of lifetime(editor) > lifetime(view)
-    // and view.doc is a clone from editor.document_map,
+    // because lifetime(editor) >= lifetime(view)
+    // ( view.doc is a clone from editor.document_map ),
     // doing this let us avoid the use manual lifetime annotations ('static)
     // and errors like "data from `view` flows into `editor`"
     let document_map = editor.document_map.clone();
