@@ -340,10 +340,12 @@ fn get_document_byte_count_at_offset(
 ) -> (u64, Option<usize>) {
     assert!(byte_index < 256);
 
-    let mut file = doc.buffer.data.as_ref().write();
-    let mut cur_index = file.root_index();
     let mut total_count = 0;
     let mut local_offset = offset;
+
+    let mut file = doc.buffer.data.as_ref().write();
+
+    let mut cur_index = file.root_index();
     while cur_index != None {
         let idx = cur_index.unwrap();
         let p_node = &file.pool[idx];
@@ -351,6 +353,8 @@ fn get_document_byte_count_at_offset(
         let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
         if is_leaf {
             let data = document::get_node_data(&mut file, Some(idx));
+
+            // count by until local_offset is reached
             for b in data.iter().take(local_offset as usize) {
                 if *b as usize == byte_index {
                     total_count += 1;
@@ -380,6 +384,8 @@ fn get_document_byte_count_at_offset(
             cur_index = Some(right_index);
             continue;
         }
+
+        // invariant broken panic here ?
     }
 
     (0, None)
