@@ -662,7 +662,7 @@ pub fn split_horizontally(
     split_view_with_direction(&mut editor, &mut env, view, view::LayoutDirection::Vertical);
 }
 
-// quit hack ignoring other children
+// quick hack ignoring other children
 pub fn increase_layout_op(
     op: LayoutOperation,
     max_size: usize,
@@ -712,7 +712,7 @@ pub fn increase_layout_op(
     new_op
 }
 
-// quit hack ignoring other children
+// quick hack ignoring other children
 pub fn decrease_layout_op(
     op: LayoutOperation,
     // TODO(ceg): min_size: usize,

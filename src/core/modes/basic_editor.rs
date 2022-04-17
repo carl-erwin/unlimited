@@ -63,7 +63,7 @@ impl<'a> Mode for BasicEditorMode {
 
         let status_doc = status_doc;
 
-        // hsplt
+        // hsplit
 
         // children_layout_and_modes
         let ops_modes = vec![
