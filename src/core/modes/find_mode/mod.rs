@@ -124,36 +124,38 @@ pub fn find_start(
 ) {
     let status_vid = view::get_status_view(&editor, &env, view);
 
-    if let Some(svid) = status_vid {
-        let status_view = editor.view_map.get(&svid).unwrap();
-        //
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
-        // clear doc
-        let sz = doc.size();
-        doc.remove(0, sz, None);
-        // set status text
-        let text = "Find: ";
-        let bytes = text.as_bytes();
-        doc.insert(0, bytes.len(), &bytes);
-
-        // push new input map for y/n
-        {
-            let mut v = view.write();
-            // lock focus on v
-            // env.focus_locked_on = Some(v.id);
-
-            dbg_println!("configure find  {:?}", v.id);
-            v.input_ctx.stack_pos = None;
-            let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
-            let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-            input_map_stack.push(input_map);
-            // TODO(ceg): add lock flag
-            // to not exec lower input level
-        }
-    } else {
+    if status_vid.is_none() {
         // TODO(ceg): log missing status mode
+        return;
     }
+
+    let svid = status_vid.unwrap();
+
+    let status_view = editor.view_map.get(&svid).unwrap();
+    //
+    let doc = status_view.read().document().unwrap();
+    let mut doc = doc.write();
+
+    // clear status view
+    doc.delete_content(None);
+
+    // set status text
+    let text = "Find: ";
+    let bytes = text.as_bytes();
+    doc.insert(0, bytes.len(), &bytes);
+
+    // push new input map for y/n
+    let mut v = view.write();
+    // lock focus on v
+    // env.focus_locked_on = Some(v.id);
+
+    dbg_println!("configure find  {:?}", v.id);
+    v.input_ctx.stack_pos = None;
+    let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
+    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+    input_map_stack.push(input_map);
+    // TODO(ceg): add lock flag
+    // to not exec lower input level
 }
 
 pub fn find_stop(
