@@ -275,7 +275,11 @@ impl Node {
                     //let t1_read = std::time::Instant::now();
                     //dbg_println!("read node chunk[{}..{}]/{} time {:?} ms", pos, pos+chunk_size, n, (t1_read - t0_read).as_millis());
                     if nrd != chunk_size {
-                        dbg_println!("cannot read node : nrd {} != chunk_size {}", nrd, chunk_size);
+                        dbg_println!(
+                            "cannot read node : nrd {} != chunk_size {}",
+                            nrd,
+                            chunk_size
+                        );
                     }
                 }
                 pos += chunk_size;
@@ -1017,6 +1021,8 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn read(it_: &mut FileIterator<'a>, nr_to_read: usize, vec: &mut Vec<u8>) -> usize {
+        // TODO(ceg): if file has changed ? return Result<usize, MappedfileError { ExternalChangeDetected }>
+
         if let MappedFileIterator::End(..) = *it_ {
             return 0;
         }
@@ -1303,6 +1309,9 @@ impl<'a> MappedFile<'a> {
             let mut file = rcfile.as_ref().write();
             file.cleanup_events();
         }
+
+        // TODO(ceg): underlying file has changed  ? return
+        // fd.as_ref().read().metadata() != file.previous_metadata()
 
         let mut events = vec![];
 
