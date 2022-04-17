@@ -625,6 +625,13 @@ impl<'a> Document<'a> {
         nr_bytes_removed
     }
 
+    pub fn delete_content(&mut self, removed_data: Option<&mut Vec<u8>>) -> usize {
+        let sz = self.size();
+        self.remove(0, sz, removed_data);
+
+        sz
+    }
+
     pub fn find(&self, data: &[u8], from_offset: u64, to_offset: Option<u64>) -> Option<u64> {
         self.buffer.find(&data, from_offset, to_offset)
     }
