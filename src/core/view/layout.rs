@@ -253,7 +253,6 @@ fn compose_children(
     let children_idx = view.children.clone();
     for (_idx, vid) in children_idx.iter().enumerate() {
         let child_rc = Rc::clone(editor.view_map.get(&vid).unwrap());
-        let child_rc = child_rc.clone();
         let cbs = {
             let child_v = child_rc.read();
             child_v.subscribers.clone()
