@@ -153,7 +153,7 @@ pub fn main_loop(
                     core_tx.send(msg).unwrap_or(());
                 }
 
-                DrawEvent { screen, time: _ } => {
+                Draw { screen, time: _ } => {
                     draw_req += 1;
 
                     let start = Instant::now();

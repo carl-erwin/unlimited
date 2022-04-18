@@ -81,7 +81,7 @@ pub enum Event<'a> {
     RefreshView,
 
     /// Sent by core thread. Contains the rendered screen that maps view_id.
-    DrawEvent {
+    Draw {
         screen: Arc<RwLock<Box<Screen>>>,
         time: Instant,
     },

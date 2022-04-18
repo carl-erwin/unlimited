@@ -61,7 +61,7 @@ impl<'a> ScreenFilter {
 
                 let msg = EventMessage::new(
                     0, // get_next_seq(&mut seq), TODO
-                    crate::core::event::Event::DrawEvent {
+                    crate::core::event::Event::Draw {
                         screen: std::sync::Arc::new(RwLock::new(Box::new(new_screen))),
                         time: std::time::Instant::now(),
                     },

@@ -24,7 +24,7 @@ use crate::core::event::input_map::eval_input_event;
 use crate::core::event::input_map::DefaultActionMode;
 
 use crate::core::event::Event;
-use crate::core::event::Event::DrawEvent;
+use crate::core::event::Event::Draw;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
 use crate::core::event::Key;
@@ -305,7 +305,7 @@ pub fn send_draw_event(
 
     let msg = EventMessage::new(
         0, // get_next_seq(&mut seq), TODO
-        DrawEvent {
+        Draw {
             screen: new_screen,
             time: Instant::now(),
         },
