@@ -87,7 +87,7 @@ pub enum Event<'a> {
     },
 
     /// Sent by ui thread. contains user input information.
-    InputEvents {
+    Input {
         events: Vec<InputEvent>,
     },
 

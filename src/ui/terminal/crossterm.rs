@@ -849,7 +849,7 @@ fn send_input_events(
 
             _ => {
                 // send
-                let msg = EventMessage::new(0, Event::InputEvents { events: accum });
+                let msg = EventMessage::new(0, Event::Input { events: accum });
                 crate::core::event::pending_input_event_inc(1);
                 tx.send(msg).unwrap_or(());
                 return;
@@ -930,7 +930,7 @@ fn send_input_events(
     // send
     if !v.is_empty() {
         let ev_count = v.len();
-        let msg = EventMessage::new(0, Event::InputEvents { events: v });
+        let msg = EventMessage::new(0, Event::Input { events: v });
         crate::core::event::pending_input_event_inc(ev_count);
         tx.send(msg).unwrap_or(());
     }
