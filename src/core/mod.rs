@@ -282,7 +282,7 @@ pub fn worker(
                 Event::SyncTask { doc } => {
                     document::sync_to_storage(&doc);
 
-                    let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                    let msg = EventMessage::new(0, Event::RefreshView);
                     core_tx.send(msg).unwrap_or(());
                 }
 
@@ -327,7 +327,7 @@ pub fn indexer(
                         let t1 = std::time::Instant::now();
                         if (t1 - t0).as_millis() > 1000 {
                             // send ui refresh event
-                            let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                            let msg = EventMessage::new(0, Event::RefreshView);
                             core_tx.send(msg).unwrap_or(());
 
                             refresh_ui = false;
@@ -337,7 +337,7 @@ pub fn indexer(
 
                     // last ui refresh
                     if refresh_ui {
-                        let msg = EventMessage::new(0, Event::RefreshViewEvent);
+                        let msg = EventMessage::new(0, Event::RefreshView);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }

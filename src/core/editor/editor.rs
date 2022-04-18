@@ -1153,7 +1153,7 @@ pub fn main_loop(
                     update_view_and_send_draw_event(&mut editor, &mut env);
                 }
 
-                Event::RefreshViewEvent => {
+                Event::RefreshView => {
                     update_view_and_send_draw_event(&mut editor, &mut env);
                 }
 

@@ -78,7 +78,7 @@ pub enum Event<'a> {
     },
 
     /// Sent to core thread to update the ui
-    RefreshViewEvent,
+    RefreshView,
 
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     DrawEvent {
