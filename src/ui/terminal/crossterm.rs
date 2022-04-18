@@ -125,7 +125,7 @@ pub fn main_loop(
     let (width, height) = crossterm::terminal::size().ok().unwrap();
     let msg = EventMessage::new(
         get_next_seq(&mut seq),
-        Event::UpdateViewEvent {
+        Event::UpdateView {
             width: width as usize,
             height: height as usize,
         },
@@ -144,10 +144,10 @@ pub fn main_loop(
                     break;
                 }
 
-                UpdateViewEvent { width, height } => {
+                UpdateView { width, height } => {
                     let msg = EventMessage::new(
                         get_next_seq(&mut seq),
-                        Event::UpdateViewEvent { width, height },
+                        Event::UpdateView { width, height },
                     );
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
@@ -838,7 +838,7 @@ fn send_input_events(
     if accum.len() == 1 {
         match accum[0] {
             InputEvent::RefreshUi { width, height } => {
-                let msg = EventMessage::new(0, Event::UpdateViewEvent { width, height });
+                let msg = EventMessage::new(0, Event::UpdateView { width, height });
 
                 // ui_tx.send(msg).unwrap_or(()); ?
 
@@ -906,7 +906,7 @@ fn send_input_events(
     if refresh {
         let msg = EventMessage::new(
             0,
-            Event::UpdateViewEvent {
+            Event::UpdateView {
                 width: new_width,
                 height: new_height,
             },

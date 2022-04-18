@@ -1145,7 +1145,7 @@ pub fn main_loop(
     while !env.quit {
         if let Ok(evt) = core_rx.recv() {
             match evt.event {
-                Event::UpdateViewEvent { width, height } => {
+                Event::UpdateView { width, height } => {
                     env.width = width;
                     env.height = height;
 

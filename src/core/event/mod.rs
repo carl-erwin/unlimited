@@ -72,7 +72,7 @@ impl<'a> EventMessage<'a> {
 #[derive(Debug, Clone)]
 pub enum Event<'a> {
     /// Sent by ui thread. Request the rendering of a given view.
-    UpdateViewEvent {
+    UpdateView {
         width: usize,  // used to detect change
         height: usize, // used to detect change
     },
