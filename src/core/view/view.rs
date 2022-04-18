@@ -578,44 +578,34 @@ pub fn compute_view_layout(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) -> Option<()> {
-    let (dimension, max_offset) = {
+    let (dimension, start_offset, max_offset) = {
         let v = view.read();
         let doc = v.document()?;
         let max_offset = { doc.read().size() as u64 };
         let dimension = v.screen.read().dimension();
-        (dimension, max_offset)
+        let start_offset = v.start_offset;
+        (dimension, start_offset, max_offset)
     };
 
-    let screen = {
-        let start_offset = {
-            let v = view.read();
-            v.start_offset
-        };
+    // TODO(ceg): screen cache/allocator
+    let mut screen = Screen::with_dimension(dimension);
 
-        // TODO(ceg): screen cache/allocator
-        let mut screen = Screen::with_dimension(dimension);
+    run_compositing_stage_direct(
+        editor,
+        env,
+        &view,
+        start_offset,
+        max_offset,
+        &mut screen,
+        LayoutPass::ContentAndScreenOverlay,
+    );
 
-        run_compositing_stage_direct(
-            editor,
-            env,
-            &view,
-            start_offset,
-            max_offset,
-            &mut screen,
-            LayoutPass::ContentAndScreenOverlay,
-        );
-
-        screen
-    };
-
-    {
-        let mut v = view.write();
-        if let Some(last_offset) = screen.last_offset {
-            v.end_offset = last_offset;
-        }
-        v.screen = Arc::new(RwLock::new(Box::new(screen)));
-        v.check_invariants();
+    let mut v = view.write();
+    if let Some(last_offset) = screen.last_offset {
+        v.end_offset = last_offset;
     }
+    v.screen = Arc::new(RwLock::new(Box::new(screen)));
+    v.check_invariants();
 
     Some(())
 }
