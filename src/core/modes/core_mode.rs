@@ -994,7 +994,7 @@ pub fn destroy_view(
     // get parent view's id
     let pvid = *v.parent_id.as_ref().unwrap();
     let pv = editor.view_map.get(&pvid).unwrap().clone();
-    let mut pv = pv.write();
+    let pv = pv.read();
     if !pv.is_group_leader {
         // parent is not a group leader
         return;
@@ -1011,7 +1011,6 @@ pub fn destroy_view(
         return;
     }
     let ppvid = pv.parent_id.unwrap();
-
     if editor.is_root_view(ppvid) {
         dbg_println!("Cannot destroy 1st level view");
         return;
@@ -1019,12 +1018,13 @@ pub fn destroy_view(
 
     // get grand parent view/id
     let ppv = editor.view_map.get(&ppvid).unwrap().clone();
-    let mut ppv = ppv.write();
+    let ppv = ppv.read();
 
     // mark children for deletion
     for (idx, view_id) in pv.children.iter().enumerate() {
         dbg_println!("prepare deletion of {:?}", *view_id);
         destroy.push(*view_id);
+        // TODO(ceg): update layout index/pv.children must be pruned
     }
 
     let mut kept_vid = None;
