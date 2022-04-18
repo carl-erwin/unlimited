@@ -1175,15 +1175,15 @@ pub fn main_loop(
         }
     }
 
-    // send ApplicationQuitEvent to worker thread
-    let msg = EventMessage::new(0, Event::ApplicationQuitEvent);
+    // send ApplicationQuit to worker thread
+    let msg = EventMessage::new(0, Event::ApplicationQuit);
     editor.worker_tx.send(msg).unwrap_or(());
 
-    // send ApplicationQuitEvent to ui thread
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+    // send ApplicationQuit to ui thread
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
     ui_tx.send(msg).unwrap_or(());
 
-    // send ApplicationQuitEvent to indexer thread
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+    // send ApplicationQuit to indexer thread
+    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
     editor.indexer_tx.send(msg).unwrap_or(());
 }

@@ -102,7 +102,7 @@ pub enum Event<'a> {
         document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'a>>>>>>,
     },
 
-    ApplicationQuitEvent,
+    ApplicationQuit,
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]

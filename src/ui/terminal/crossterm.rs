@@ -136,9 +136,8 @@ pub fn main_loop(
     loop {
         if let Ok(evt) = ui_rx.recv() {
             match evt.event {
-                Event::ApplicationQuitEvent => {
-                    let msg =
-                        EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuitEvent);
+                Event::ApplicationQuit => {
+                    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                     break;

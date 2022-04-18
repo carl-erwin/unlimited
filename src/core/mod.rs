@@ -274,7 +274,7 @@ pub fn worker(
     loop {
         if let Ok(evt) = worker_rx.recv() {
             match evt.event {
-                Event::ApplicationQuitEvent => {
+                Event::ApplicationQuit => {
                     dbg_println!("[stopping worker thread]");
                     break;
                 }
@@ -309,7 +309,7 @@ pub fn indexer(
     loop {
         if let Ok(evt) = worker_rx.recv() {
             match evt.event {
-                Event::ApplicationQuitEvent => {
+                Event::ApplicationQuit => {
                     dbg_println!("[stopping worker thread]");
                     break;
                 }
