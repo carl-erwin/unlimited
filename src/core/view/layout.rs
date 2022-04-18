@@ -361,6 +361,8 @@ fn compose_children(
             let child_v = child_rc.write();
             child_v.start_offset
         };
+
+        //
         {
             let (w, h) = if layout_dir_is_vertical {
                 (width, sizes[idx])
@@ -371,7 +373,7 @@ fn compose_children(
             assert!(w > 0);
             assert!(h > 0);
 
-            // TODO(ceg): resize instead of replace
+            // TODO(ceg): resize instead of replace ?
             let mut child_screen = Screen::new(w, h);
             run_compositing_stage_direct(
                 editor,
@@ -383,12 +385,14 @@ fn compose_children(
                 pass_mask,
             );
 
+            // replace previous screen
             {
                 let mut child_v = child_rc.write();
                 child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
             }
         }
 
+        //
         {
             let cbs = {
                 let mut child_v = child_rc.write();
@@ -429,7 +433,7 @@ fn compose_children(
 
 // This function can be considered as the core of the editor.<br/>
 // It will run the configured filters until the screen is filled or eof is reached.<br/>
-// the screen should be cleared first
+// the screen MUST be cleared first (for LayoutPass::Content,  LayoutPass::ContentAndScreenOverlay)
 pub fn run_compositing_stage_direct(
     mut editor: &mut Editor<'static>,
     mut editor_env: &mut EditorEnv<'static>,
@@ -592,8 +596,6 @@ fn run_content_filters(
         time_spent[idx] += diff;
     }
 
-    //    return;
-
     let mut total_time = 0;
     for (idx, f) in filters.iter_mut().enumerate() {
         dbg_println!("time spent in {:32} : {:4} µs\r", f.name(), time_spent[idx]);
@@ -650,8 +652,6 @@ fn run_screen_overlay_filters(
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;
     }
-
-    //    return;
 
     let mut total_time = 0;
     for (idx, f) in filters.iter_mut().enumerate() {

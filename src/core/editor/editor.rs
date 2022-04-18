@@ -46,7 +46,7 @@ use crate::core::view::View;
  InputStageActionMap is kept in EditorEnv
  Have a map per view
  and if eval fails, fallback to EditorEnv's
- It will allow per mode actions instanciate for each view
+ It will allow per mode actions instantiate for each view
  transform into STACK of map ?
 
  TODO(ceg):
