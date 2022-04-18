@@ -431,11 +431,9 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
                     "button-release" => {
                         parse_event_entry_input_button_release(&mut ctx, k, v);
                     }
-
                     "wheel" => {
                         parse_event_entry_input_wheel(&mut ctx, k, v);
                     }
-
                     "pointer-motion" => {
                         parse_event_entry_input_pointer_motion(&mut ctx, k, v);
                     }
