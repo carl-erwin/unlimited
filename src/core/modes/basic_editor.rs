@@ -208,44 +208,10 @@ impl ContentFilter<'_> for BasicEditorTitle {
             doc_info.push_str("  ");
         }
         if d.is_syncing {
-            doc_info.push_str(" (sync) ");
+            doc_info.push_str("(sync)");
         }
 
-        if true {
-            let mut have_offset = false;
-            let mut view_start_offset = 0;
-            let mut view_end_offset = 0;
-
-            if let Some(parent) = parent_view {
-                if let Some(focus) = parent.focus_to {
-                    if let Some(v) = editor.view_map.get(&focus) {
-                        let v = &v.read();
-                        view_start_offset = v.start_offset;
-                        view_end_offset = v.end_offset;
-
-                        have_offset = true;
-                    }
-                }
-            }
-
-            if have_offset {
-                doc_info.push_str(&format!(
-                    " {}-{}/{}",
-                    view_start_offset,
-                    view_end_offset,
-                    d.size()
-                ));
-            } else {
-                doc_info.push_str(&format!(" size {:<12}", d.size()));
-                doc_info.push_str(&format!(" unknown @offset"));
-            }
-        }
-
-        {
-            let p_input = crate::core::event::pending_input_event_count();
-            let p_rdr = crate::core::event::pending_render_event_count();
-            doc_info.push_str(&format!(" pending input:{} rdr:{}", p_input, p_rdr));
-        }
+        doc_info.push_str(&format!(" size {:<12}", d.size()));
 
         self.title.push_str(&doc_info);
     }
