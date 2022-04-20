@@ -20,27 +20,34 @@ fn main() {
     gen_lines(start_num, stop_num, width_num);
 }
 
-fn gen_lines(start: u64, stop: u64, line_width: u64)  {
-    let string = gen_line(line_width);
+fn gen_lines(start: u64, stop: u64, line_width: u64) {
 
     let stdout = io::stdout();
     let mut buff = BufWriter::new(stdout);
-    for x in start..start + stop {
-        buff.write_fmt(format_args!("{:012} {}", x, string)).unwrap();
+
+    let v = gen_line(line_width);
+    let sz = v.len();
+    for line_number in start..start + stop {
+        let s = &v[line_number as usize % sz];
+        buff.write_fmt(format_args!("{:012} {}\n", line_number, s)).unwrap();
     }
 }
 
-fn gen_line(line_width: u64) -> String {
-    let mut string = String::new();
+fn gen_line(line_width: u64) -> Vec<String> {
+    let mut v = vec![];
 
-    let table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-                 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                 'w', 'x', 'y', 'z'];
+    let table = [
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+        'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    ];
 
-    for x in 0..line_width {
-        string.push(table[x as usize % table.len()]);
+    for c in &table {
+        let mut string = String::new();
+        for _ in 0..line_width {
+          string.push(*c as char);
+        }
+        v.push(string);
     }
-    string.push('\n');
 
-    string
+    v
 }
