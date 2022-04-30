@@ -16,6 +16,14 @@ use crate::core::codepointinfo::TextStyle;
 
 use crate::core::view::View;
 
+//
+
+static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
+static COLOR_GREEN: (u8, u8, u8) = (0, 128, 0);
+static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
+
+static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
+
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Unknown,
@@ -208,7 +216,7 @@ impl ContentFilter<'_> for HighlightFilter {
 
                     self.new_color = match token_str.as_ref() {
                         // some Rust keywords
-                        "use" | "crate" | "pub" => (189, 35, 24),
+                        "use" | "crate" | "pub" => COLOR_RED,
 
                         // some Rust keywords
                         "let" | "mut" | "fn" | "impl" | "trait" => (0, 128, 128),
@@ -218,7 +226,7 @@ impl ContentFilter<'_> for HighlightFilter {
 
                         // C preprocessor
                         "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
-                        | "#define" | "#pragma" => (255, 0, 0),
+                        | "#define" | "#pragma" => COLOR_RED,
 
                         // C keywords
                         "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
@@ -231,7 +239,13 @@ impl ContentFilter<'_> for HighlightFilter {
 
                         // C operators
                         "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<"
-                        | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => (0, 128, 0),
+                        | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => COLOR_GREEN,
+
+                        // easy hack, TODO(ceg): transform this module into proper tokenizer
+                        "((" | "))" => COLOR_GREEN,
+                        "(((" | ")))" => COLOR_GREEN,
+                        "((((" | "))))" => COLOR_GREEN,
+                        "(((((" | ")))))" => COLOR_GREEN,
 
                         "/*" | "*/" => (255, 255, 255),
                         "//" => (255, 255, 255),
@@ -239,11 +253,11 @@ impl ContentFilter<'_> for HighlightFilter {
                         // C++ keywords
                         "bool" | "class" | "template" | "namespace" => (0, 128, 128),
 
-                        "\"" | "\"\"" | "'" | "''" => (247, 104, 38),
+                        "\"" | "\"\"" | "'" | "''" => COLOR_ORANGE,
 
                         "," | ";" => (0, 128, 0),
 
-                        "&" => (0, 128, 0),
+                        "&" => COLOR_CYAN,
 
                         _ => {
                             let mut non_alnum = 0;

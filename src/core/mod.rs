@@ -174,7 +174,7 @@ It comes with:
   - very large file support
   - "infinite" undo/redo
   - multi-cursors
-  - mouse selection (X11 terminal)
+  - mouse selection (graphical terminal)
 
 [Quit]
     Quit:           => ctrl+x ctrl+c
