@@ -40,7 +40,7 @@ impl<'a> ScreenFilter {
             last_offset: None,
 
             screen_is_full: false,
-            display_eof: false,
+            display_eof: true,
             ui_tx: None,
         }
     }

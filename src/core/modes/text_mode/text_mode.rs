@@ -170,6 +170,17 @@ use crate::core::modes::text_mode::WordWrapFilter;
 use crate::core::modes::text_mode::DrawMarks;
 use crate::core::modes::text_mode::ShowTrailingSpaces;
 
+use crate::core::view::ContentFilter;
+use crate::core::view::ScreenOverlayFilter;
+
+struct ContentFilterInfo<'a> {
+    allocator: fn() -> Box<dyn ContentFilter<'a>>,
+}
+
+struct ScreenOverlayFilterInfo<'a> {
+    allocator: fn() -> Box<dyn ScreenOverlayFilter<'a>>,
+}
+
 /// CopyData is used to implement the selection/cut/paste buffer
 pub enum CopyData {
     BufferLogIndex(usize), // the data is in the document buffer log index see BufferLog
@@ -204,6 +215,217 @@ pub struct TextModeContext {
     pub prev_action: ActionType,
 }
 
+/* TODO(ceg): command line option opt-in/opt-out ?
+
+  per file extension config file
+
+{
+  ".txt" : "text/plain",
+  .c   -> { content filter [], screen overlay filter }
+  .h   -> { content filter [], screen overlay filter }
+  .rs  -> { content filter [], screen overlay filter }
+  "default" : "text/plain",
+}
+
+text_filters.json
+{
+
+"text/plain" -> {
+    "content filter": [ "binary/raw",
+                        "text/utf8",
+                        "text/unicode-to-text",
+                        "text/highlight-keywords",
+                        "text/highlight-selection",
+                        "text/tab-expansion",
+                        "text/highlight-keywords",
+                        "text/char-map",
+                        "text/show-trailing-spaces",
+                        "text/word-wrap",
+                        "text/screen"
+                       ]
+
+    "screen overlay filter": [] }
+}
+
+"text/rust" -> {
+    "content filter": [ "name1", "name2" ],
+    "screen overlay filter": [] }
+}
+
+}
+
+*/
+fn build_text_mode_content_filters_map() -> HashMap<&'static str, ContentFilterInfo<'static>> {
+    let mut content_filter_map = HashMap::new();
+
+    content_filter_map
+        .entry("binary/raw")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(RawDataFilter::new()),
+        });
+    content_filter_map
+        .entry("text/utf8")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(Utf8Filter::new()),
+        });
+    content_filter_map
+        .entry("text/codec")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(TextCodecFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/unicode-to-text")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(UnicodeToTextFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/highlight-keywords")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(HighlightFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/highlight-selection")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(HighlightSelectionFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/tab-expansion")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(TabFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/char-map")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(CharMapFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/show-trailing-spaces")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(ShowTrailingSpaces::new()),
+        });
+
+    content_filter_map
+        .entry("text/word-wrap")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(WordWrapFilter::new()),
+        });
+
+    content_filter_map
+        .entry("text/screen")
+        .or_insert(ContentFilterInfo {
+            allocator: || Box::new(ScreenFilter::new()),
+        });
+
+    content_filter_map
+}
+
+fn build_text_mode_screen_overlay_filters_map(
+) -> HashMap<&'static str, ScreenOverlayFilterInfo<'static>> {
+    let mut screen_overlay_filter_map = HashMap::new();
+
+    screen_overlay_filter_map
+        .entry("text/draw-marks")
+        .or_insert(ScreenOverlayFilterInfo {
+            allocator: || Box::new(DrawMarks::new()),
+        });
+
+    screen_overlay_filter_map
+}
+
+fn build_text_mode_char_map() -> HashMap<char, String> {
+    let mut char_map = HashMap::new();
+
+    char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
+    char_map.insert('\u{7f}', "<DEL>".to_string());
+
+    if true {
+        for i in 0..0x9 {
+            let fmt = format!("\\x{i:02x}");
+
+            let c = unsafe { char::from_u32_unchecked(i) };
+            char_map.insert(c, fmt);
+        }
+        for i in 0xb..0x1f {
+            let fmt = format!("\\x{i:02x}");
+            let c = unsafe { char::from_u32_unchecked(i) };
+            char_map.insert(c, fmt);
+        }
+        for i in 0x07f..0x80 {
+            let fmt = format!("\\x{i:02x}");
+            let c = unsafe { char::from_u32_unchecked(i) };
+            char_map.insert(c, fmt);
+        }
+    }
+
+    if !true {
+        // config toggle ?
+        char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
+        char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
+        char_map.insert('\u{02}', "<STX>".to_string()); // (start of text)
+        char_map.insert('\u{03}', "<ETX>".to_string()); // (end of text)
+        char_map.insert('\u{04}', "<EOT>".to_string()); // (end of transmission)
+        char_map.insert('\u{05}', "<ENQ>".to_string()); // (enquiry)
+        char_map.insert('\u{06}', "<ACK>".to_string()); // (acknowledge)
+        char_map.insert('\u{07}', "<BEL>".to_string()); // '\a' (bell)
+        char_map.insert('\u{08}', "<BS>".to_string()); //  '\b' (backspace)
+                                                       /* tab */
+        char_map.insert('\u{09}', "<HT>".to_string()); //  '\t' (horizontal tab)
+                                                       // do not do this if tab expansion is enabled
+                                                       /* new line */
+        // char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
+        /* */
+        char_map.insert('\u{0B}', "<VT>".to_string()); //  '\v' (vertical tab)
+        char_map.insert('\u{0C}', "<FF>".to_string()); //  '\f' (form feed)
+        char_map.insert('\u{0D}', "<CR>".to_string()); //  '\r' (carriage ret)
+        char_map.insert('\u{0E}', "<SO>".to_string()); //  (shift out)
+        char_map.insert('\u{0F}', "<SI>".to_string()); //  (shift in)
+        char_map.insert('\u{10}', "<DLE>".to_string()); // (data link escape)
+        char_map.insert('\u{11}', "<DC1>".to_string()); // (device control 1)
+        char_map.insert('\u{12}', "<DC2>".to_string()); // (device control 2)
+        char_map.insert('\u{13}', "<DC3>".to_string()); // (device control 3)
+        char_map.insert('\u{14}', "<DC4>".to_string()); // (device control 4)
+        char_map.insert('\u{15}', "<NAK>".to_string()); // (negative ack.)
+        char_map.insert('\u{16}', "<SYN>".to_string()); // (synchronous idle)
+        char_map.insert('\u{17}', "<ETB>".to_string()); // (end of trans. blk)
+        char_map.insert('\u{18}', "<CAN>".to_string()); // (cancel)
+        char_map.insert('\u{19}', "<EM>".to_string()); //  (end of medium)
+        char_map.insert('\u{1A}', "<SUB>".to_string()); // (substitute)
+        char_map.insert('\u{1B}', "<ESC>".to_string()); // (escape)
+        char_map.insert('\u{1C}', "<FS>".to_string()); //  (file separator)
+        char_map.insert('\u{1D}', "<GS>".to_string()); //  (group separator)
+        char_map.insert('\u{1E}', "<RS>".to_string()); //  (record separator)
+        char_map.insert('\u{1F}', "<US>".to_string()); //  (unit separator)
+        char_map.insert('\u{7f}', "<DEL>".to_string());
+    }
+
+    char_map
+}
+
+fn build_text_mode_color_map() -> HashMap<char, (u8, u8, u8)> {
+    let mut color_map = HashMap::new();
+    for i in '\0'..' ' {
+        color_map.insert(i as char, (0, 128, 0));
+    }
+    color_map.insert('\u{7f}', (0x00, 0xff, 0xff));
+    color_map.insert('\r', (0x00, 0xaa, 0xff));
+
+    let tab_color = (242, 71, 132);
+    //  = if env.graphic_display {
+    //    (242, 71, 132) // purple-like
+    //} else {
+    //    (128, 0, 128) // magenta
+    //};
+    color_map.insert('\t', tab_color);
+
+    color_map
+}
+
 impl<'a> Mode for TextMode {
     fn name(&self) -> &'static str {
         &"text-mode"
@@ -218,88 +440,8 @@ impl<'a> Mode for TextMode {
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("allocate text-mode ctx");
 
-        let marks = vec![Mark { offset: 0 }];
-        let copy_buffer = vec![];
-
-        let mut char_map = HashMap::new();
-
-        char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
-        char_map.insert('\u{7f}', "<DEL>".to_string());
-
-        if true {
-            for i in 0..0x9 {
-                let fmt = format!("\\x{i:02x}");
-
-                let c = unsafe { char::from_u32_unchecked(i) };
-                char_map.insert(c, fmt);
-            }
-            for i in 0xb..0x1f {
-                let fmt = format!("\\x{i:02x}");
-                let c = unsafe { char::from_u32_unchecked(i) };
-                char_map.insert(c, fmt);
-            }
-            for i in 0x07f..0x80 {
-                let fmt = format!("\\x{i:02x}");
-                let c = unsafe { char::from_u32_unchecked(i) };
-                char_map.insert(c, fmt);
-            }
-        }
-
-        if !true {
-            // config toggle ?
-            char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
-            char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
-            char_map.insert('\u{02}', "<STX>".to_string()); // (start of text)
-            char_map.insert('\u{03}', "<ETX>".to_string()); // (end of text)
-            char_map.insert('\u{04}', "<EOT>".to_string()); // (end of transmission)
-            char_map.insert('\u{05}', "<ENQ>".to_string()); // (enquiry)
-            char_map.insert('\u{06}', "<ACK>".to_string()); // (acknowledge)
-            char_map.insert('\u{07}', "<BEL>".to_string()); // '\a' (bell)
-            char_map.insert('\u{08}', "<BS>".to_string()); //  '\b' (backspace)
-                                                           /* tab */
-            char_map.insert('\u{09}', "<HT>".to_string()); //  '\t' (horizontal tab)
-                                                           // do not do this if tab expansion is enabled
-                                                           /* new line */
-            // char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
-            /* */
-            char_map.insert('\u{0B}', "<VT>".to_string()); //  '\v' (vertical tab)
-            char_map.insert('\u{0C}', "<FF>".to_string()); //  '\f' (form feed)
-            char_map.insert('\u{0D}', "<CR>".to_string()); //  '\r' (carriage ret)
-            char_map.insert('\u{0E}', "<SO>".to_string()); //  (shift out)
-            char_map.insert('\u{0F}', "<SI>".to_string()); //  (shift in)
-            char_map.insert('\u{10}', "<DLE>".to_string()); // (data link escape)
-            char_map.insert('\u{11}', "<DC1>".to_string()); // (device control 1)
-            char_map.insert('\u{12}', "<DC2>".to_string()); // (device control 2)
-            char_map.insert('\u{13}', "<DC3>".to_string()); // (device control 3)
-            char_map.insert('\u{14}', "<DC4>".to_string()); // (device control 4)
-            char_map.insert('\u{15}', "<NAK>".to_string()); // (negative ack.)
-            char_map.insert('\u{16}', "<SYN>".to_string()); // (synchronous idle)
-            char_map.insert('\u{17}', "<ETB>".to_string()); // (end of trans. blk)
-            char_map.insert('\u{18}', "<CAN>".to_string()); // (cancel)
-            char_map.insert('\u{19}', "<EM>".to_string()); //  (end of medium)
-            char_map.insert('\u{1A}', "<SUB>".to_string()); // (substitute)
-            char_map.insert('\u{1B}', "<ESC>".to_string()); // (escape)
-            char_map.insert('\u{1C}', "<FS>".to_string()); //  (file separator)
-            char_map.insert('\u{1D}', "<GS>".to_string()); //  (group separator)
-            char_map.insert('\u{1E}', "<RS>".to_string()); //  (record separator)
-            char_map.insert('\u{1F}', "<US>".to_string()); //  (unit separator)
-            char_map.insert('\u{7f}', "<DEL>".to_string());
-        }
-
-        let mut color_map = HashMap::new();
-        for i in '\0'..' ' {
-            color_map.insert(i as char, (0, 128, 0));
-        }
-        color_map.insert('\u{7f}', (0x00, 0xff, 0xff));
-        color_map.insert('\r', (0x00, 0xaa, 0xff));
-
-        let tab_color = (242, 71, 132);
-        //  = if env.graphic_display {
-        //    (242, 71, 132) // purple-like
-        //} else {
-        //    (128, 0, 128) // magenta
-        //};
-        color_map.insert('\t', tab_color);
+        let char_map = build_text_mode_char_map();
+        let color_map = build_text_mode_color_map();
 
         let ctx = TextModeContext {
             center_on_mark_move: false, // add movement enums and pass it to center fn
@@ -309,8 +451,8 @@ impl<'a> Mode for TextMode {
             prev_buffer_log_revision: 0,
             prev_mark_revision: 0,
             mark_revision: 0,
-            marks,
-            copy_buffer,
+            marks: vec![Mark { offset: 0 }],
+            copy_buffer: vec![],
             mark_index: 0,
             select_point: vec![],
             button_state: [0; 8],
@@ -368,114 +510,58 @@ impl<'a> Mode for TextMode {
             --filter word-wrap,tab // respect order ?
         */
 
-        //
-        let use_utf8_codec = true;
+        let content_filter_map = build_text_mode_content_filters_map();
+        let screen_overlay_filter_map = build_text_mode_screen_overlay_filters_map();
 
-        let use_highlight_keywords = true; // TODO(ceg): transform in overlay filter
-        let use_highlight_selection = true; // mandatory
-        let use_tabulation_exp = true;
-        // TODO(ceg) filter '\r'
-        let use_char_map = true; // mandatory very slow \r have side effects -> ' '
-        let use_word_wrap = true;
+        // NB: build pipeline in this strict order
+        let content_filters_pipeline = if crate::core::raw_data_filter_to_screen() {
+            vec![
+                "binary/raw",  // mandatory
+                "text/screen", // mandatory
+            ]
+        } else {
+            vec![
+                "binary/raw",
+                "text/utf8", // TODO(ceg) update/remove TextCodecFilter
+                "text/unicode-to-text",
+                "text/highlight-keywords",
+                "text/highlight-selection",
+                "text/tab-expansion",
+                "text/highlight-keywords",
+                "text/char-map",
+                "text/show-trailing-spaces",
+                "text/word-wrap",
+                "text/screen", // mandatory
+            ]
+        };
+
+        for f in content_filters_pipeline {
+            if let Some(info) = content_filter_map.get(&f) {
+                view.compose_content_filters
+                    .borrow_mut()
+                    .push((info.allocator)());
+            } else {
+            }
+        }
 
         let use_draw_marks = true; // mandatory
 
-        let show_trailing_spaces = true;
-
-        let skip_text_filters = if crate::core::raw_data_filter_to_screen() {
-            true
+        let screen_overlay_filters_pipeline = if use_draw_marks {
+            vec!["text/draw-marks"]
         } else {
-            // if use_raw_data_filter_to_screen
-            false
+            vec![]
         };
 
-        // NB: Execution in push order
-
-        // mandatory data reader
-        view.compose_content_filters
-            .borrow_mut()
-            .push(Box::new(RawDataFilter::new()));
-
-        if !skip_text_filters {
-            if use_utf8_codec {
-                //
-                // DEBUG codec error
-                view.compose_content_filters
+        for f in screen_overlay_filters_pipeline {
+            if let Some(info) = screen_overlay_filter_map.get(&f) {
+                view.compose_screen_overlay_filters
                     .borrow_mut()
-                    .push(Box::new(Utf8Filter::new()));
+                    .push((info.allocator)());
             } else {
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(TextCodecFilter::new()));
             }
-
-            //
-            view.compose_content_filters
-                .borrow_mut()
-                .push(Box::new(UnicodeToTextFilter::new()));
-
-            //
-            if use_highlight_keywords {
-                //
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(HighlightFilter::new()));
-            }
-
-            if use_highlight_selection {
-                //
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(HighlightSelectionFilter::new()));
-                //
-            }
-
-            if use_tabulation_exp {
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(TabFilter::new()));
-            }
-
-            if use_char_map {
-                // NB: Word Wrap after tab expansion
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(CharMapFilter::new()));
-            }
-
-            //
-            if show_trailing_spaces {
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(ShowTrailingSpaces::new()));
-            }
-
-            if use_word_wrap {
-                // NB: Word Wrap after tab expansion
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(WordWrapFilter::new()));
-            }
-        } // skip_text_filters ?
-          //
-
-        // Comment(s)
-
-        // Folding
-
-        // mandatory screen filler
-        let mut screen_filter = ScreenFilter::new();
-        screen_filter.display_eof = true;
-
-        view.compose_content_filters
-            .borrow_mut()
-            .push(Box::new(screen_filter));
-
-        if use_draw_marks {
-            view.compose_screen_overlay_filters
-                .borrow_mut()
-                .push(Box::new(DrawMarks::new()));
         }
+
+        // setup view action for text mode
 
         // fix dedup marks, scrolling etc ...
         view.stage_actions
