@@ -979,7 +979,7 @@ fn get_input_events(
                 let evt = translate_crossterm_event(cross_evt, &mut pending_resize);
                 accum.push(evt);
                 if pending_resize {
-                    min_wait_ms = 16; // wait for other resize events
+                    min_wait_ms = 4; // wait for other resize events
                 }
             }
         }
