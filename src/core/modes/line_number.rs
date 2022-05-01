@@ -48,6 +48,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::document;
+use crate::core::document::get_document_byte_count_at_offset;
 use crate::core::document::Document;
 use crate::core::document::DocumentEvent;
 use crate::core::document::DocumentEventCb;
@@ -317,78 +318,6 @@ impl LineNumberOverlayFilter {
             line_number: vec![],
         }
     }
-}
-
-// TODO(ceg): move to document.rs
-//
-// walk through the binary tree and while looking for the node containing "offset"
-// and track byte_index count
-//                                   SZ(19)   ,       LF(9)
-//                   _________[ SZ(7+12),  LF(3+6) ]____________________
-//                  /                                                 \
-//        __[ 7=SZ(3+4), LF 3=(1+2) ]__                        _____[ 12=(5+7),  LF 6=(2+4) ]__
-//       /                             \                      /                                 \
-//  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
-//                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
-//
-//
-// return (line_count, offset's node_index)
-fn get_document_byte_count_at_offset(
-    doc: &Document,
-    byte_index: usize,
-    offset: u64,
-) -> (u64, Option<usize>) {
-    assert!(byte_index < 256);
-
-    let mut total_count = 0;
-    let mut local_offset = offset;
-
-    let mut file = doc.buffer.data.as_ref().write();
-
-    let mut cur_index = file.root_index();
-    while cur_index != None {
-        let idx = cur_index.unwrap();
-        let p_node = &file.pool[idx];
-
-        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
-        if is_leaf {
-            let data = document::get_node_data(&mut file, Some(idx));
-
-            // count by until local_offset is reached
-            for b in data.iter().take(local_offset as usize) {
-                if *b as usize == byte_index {
-                    total_count += 1;
-                }
-            }
-            return (total_count, cur_index);
-        }
-
-        let mut left_node_size = 0;
-        let mut left_byte_count = 0;
-
-        if let Some(left_index) = p_node.link.left {
-            let left_node = &file.pool[left_index];
-
-            if local_offset < left_node.size {
-                cur_index = Some(left_index);
-                continue;
-            }
-
-            left_byte_count = left_node.byte_count[byte_index];
-            left_node_size = left_node.size;
-        }
-
-        if let Some(right_index) = p_node.link.right {
-            total_count += left_byte_count;
-            local_offset -= left_node_size;
-            cur_index = Some(right_index);
-            continue;
-        }
-
-        // invariant broken panic here ?
-    }
-
-    (0, None)
 }
 
 impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {

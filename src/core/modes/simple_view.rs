@@ -82,6 +82,7 @@ impl<'a> Mode for SimpleViewMode {
                     "core-mode".to_owned(),
                     "text-mode".to_owned(),
                     "find-mode".to_owned(),
+                    "goto-line-mode".to_owned(),
                 ],
             ),
             // scrollbar

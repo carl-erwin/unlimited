@@ -501,6 +501,7 @@ use crate::core::modes::VsplitMode;
 
 use crate::core::modes::VscrollbarMode;
 
+use crate::core::modes::GotoLineMode;
 use crate::core::modes::LineNumberMode;
 
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
@@ -520,4 +521,5 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(FindMode::new()));
 
     editor.register_mode(Box::new(LineNumberMode::new()));
+    editor.register_mode(Box::new(GotoLineMode::new()));
 }

@@ -1214,6 +1214,136 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
     }
 }
 
+//
+// walk through the binary tree and while looking for the node containing "offset"
+// and track byte_index count
+//                                   SZ(19)   ,       LF(9)
+//                   _________[ SZ(7+12),  LF(3+6) ]____________________
+//                  /                                                 \
+//        __[ 7=SZ(3+4), LF 3=(1+2) ]__                        _____[ 12=(5+7),  LF 6=(2+4) ]__
+//       /                             \                      /                                 \
+//  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
+//                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
+//
+//
+// return (line_count, offset's node_index)
+pub fn get_document_byte_count_at_offset(
+    doc: &Document,
+    byte_index: usize,
+    offset: u64,
+) -> (u64, Option<usize>) {
+    assert!(byte_index < 256);
+
+    let mut total_count = 0;
+    let mut local_offset = offset;
+
+    let mut file = doc.buffer.data.as_ref().write();
+
+    let mut cur_index = file.root_index();
+    while cur_index != None {
+        let idx = cur_index.unwrap();
+        let p_node = &file.pool[idx];
+
+        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
+        if is_leaf {
+            let data = get_node_data(&mut file, Some(idx));
+
+            // count by until local_offset is reached
+            for b in data.iter().take(local_offset as usize) {
+                if *b as usize == byte_index {
+                    total_count += 1;
+                }
+            }
+            return (total_count, cur_index);
+        }
+
+        if let Some(left_index) = p_node.link.left {
+            let left_node = &file.pool[left_index];
+
+            if local_offset < left_node.size {
+                cur_index = Some(left_index);
+                continue;
+            }
+
+            total_count += left_node.byte_count[byte_index];
+            local_offset -= left_node.size
+        }
+
+        cur_index = p_node.link.right;
+    }
+
+    (0, None)
+}
+
+//
+// walk through the binary tree and while looking for the node containing "offset"
+// and track byte_index count
+//                                   SZ(19)   ,       LF(9)
+//                   _________[ SZ(7+12),  LF(3+6) ]____________________
+//                  /                                                 \
+//        __[ 7=SZ(3+4), LF 3=(1+2) ]__                        _____[ 12=(5+7),  LF 6=(2+4) ]__
+//       /                             \                      /                                 \
+//  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
+//                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
+//
+pub fn find_nth_byte_offset(doc: &Document, byte: u8, index: u64) -> Option<u64> {
+    assert!(index > 0);
+
+    let mut index = index;
+
+    let mut file = doc.buffer.data.as_ref().write();
+    let mut global_offset = 0;
+
+    let mut cur_index = file.root_index();
+    while cur_index != None {
+        let idx = cur_index.unwrap();
+        let p_node = &file.pool[idx];
+
+        let is_leaf = p_node.link.left.is_none() && p_node.link.right.is_none();
+        if is_leaf {
+            let data = get_node_data(&mut file, Some(idx));
+
+            // count by until index is reached
+            for b in data.iter() {
+                if *b == byte {
+                    index -= 1;
+                    if index == 0 {
+                        break;
+                    };
+                }
+                global_offset += 1;
+            }
+
+            return Some(global_offset);
+        }
+
+        let count = file.pool[idx].byte_count[byte as usize];
+        if index >= count {
+            // not fully indexed, or this byte does not exists
+            return None;
+        }
+
+        if let Some(left_index) = p_node.link.left {
+            let left_node = &file.pool[left_index];
+            let left_byte_count = left_node.byte_count[byte as usize];
+
+            // byte in left sub-tree ?
+            if index <= left_byte_count {
+                cur_index = Some(left_index);
+                continue;
+            }
+
+            global_offset += left_node.size; // count skipped offsets
+            index -= left_byte_count;
+        }
+
+        // byte in right sub-tree
+        cur_index = p_node.link.right;
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
 
