@@ -242,6 +242,11 @@ impl<'a> Editor<'a> {
         }
         Some(m.unwrap().clone())
     }
+
+    // insert view into editor global map, no checks
+    pub fn add_view(&mut self, id: view::Id, view: Rc<RwLock<View<'a>>>) {
+        self.view_map.insert(id, Rc::clone(&view)); // move to View::new ?
+    }
 }
 
 //////////////////////////////////////////////
@@ -735,7 +740,7 @@ fn clip_coordinates_xy(
                 }
 
                 for child in v.children.iter() {
-                    let child_v = editor.view_map.get(&child).unwrap().write();
+                    let child_v = editor.view_map.get(&child.id).unwrap().write();
                     let screen = child_v.screen.read();
 
                     dbg_println!(
@@ -756,7 +761,7 @@ fn clip_coordinates_xy(
 
                 let mut last_id = view::Id(0);
                 for (idx, child) in v.children.iter().enumerate() {
-                    let child_v = editor.view_map.get(&child).unwrap().write();
+                    let child_v = editor.view_map.get(&child.id).unwrap().write();
                     let screen = child_v.screen.read();
 
                     last_id = child_v.id;

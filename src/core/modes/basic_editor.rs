@@ -91,9 +91,15 @@ impl<'a> Mode for BasicEditorMode {
             ),
         ];
 
-        view.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
-        let docs = ops_modes.iter().map(|e| e.1.clone()).collect();
-        let modes = ops_modes.iter().map(|e| e.2.clone()).collect();
+        let mut layout_ops = vec![];
+        let mut docs = vec![];
+        let mut modes = vec![];
+
+        for e in &ops_modes {
+            layout_ops.push(e.0.clone());
+            docs.push(e.1.clone());
+            modes.push(e.2.clone());
+        }
 
         let (width, height) = view.dimension();
         dbg_println!("width {}  height {}", width, height);
@@ -105,13 +111,14 @@ impl<'a> Mode for BasicEditorMode {
             width,
             height,
             LayoutDirection::Vertical,
+            &layout_ops,
             &docs,
             &modes,
         );
 
         // mark children as non destroyable
         for i in 0..view.children.len() {
-            let vid = view.children[i];
+            let vid = view.children[i].id;
             let v = editor.view_map.get(&vid).unwrap();
             v.write().destroyable = false;
         }
@@ -120,9 +127,10 @@ impl<'a> Mode for BasicEditorMode {
         // like view.label = 'text-view'
         // like view.label = 'status-line'
         // view.children_by_label<String, (vid, index)>
+        view.destroyable = false; // root view
 
         // set focus on text view : TODO(ceg): title mode + configure
-        let title_vid = view.children[0];
+        let title_vid = view.children[0].id;
         let v = editor.view_map.get(&title_vid).unwrap();
         v.write()
             .compose_content_filters
@@ -130,16 +138,20 @@ impl<'a> Mode for BasicEditorMode {
             .push(Box::new(BasicEditorTitle::new()));
 
         // set focus on text view (simple-view mode)
-        view.main_child = Some(1); // index in children
-        view.focus_to = Some(view.children[1]); // TODO(ceg):
-        env.focus_changed_to = Some(view.children[1]); // TODO(ceg):
+        let simple_view_idx = 1;
+        let simple_view_id = view.children[simple_view_idx].id;
+        view.main_child = Some(simple_view_idx); // index in children
+        view.focus_to = Some(simple_view_id); // TODO(ceg):
+        env.focus_changed_to = Some(simple_view_id); // TODO(ceg):
 
         // TODO(ceg): status mode + configure
         // setup status view
-        let status_vid = view.children[view.children.len() - 1];
+        let status_view_idx = view.children.len() - 1;
+        let status_view_id = view.children[status_view_idx].id;
+
         // set status_vid
-        view.status_view_id = Some(status_vid);
-        env.status_view_id = Some(status_vid);
+        view.status_view_id = Some(status_view_id);
+        env.status_view_id = Some(status_view_id);
     }
 }
 
@@ -179,10 +191,10 @@ impl ContentFilter<'_> for BasicEditorTitle {
 
     fn setup(
         &mut self,
-        editor: &Editor,
+        _editor: &Editor,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
-        parent_view: Option<&View<'static>>,
+        _parent_view: Option<&View<'static>>,
     ) {
         self.width = env.screen.width();
         self.height = env.screen.height();

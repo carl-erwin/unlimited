@@ -264,7 +264,7 @@ fn build_text_mode_content_filters_map() -> HashMap<&'static str, ContentFilterI
             allocator: || Box::new(RawDataFilter::new()),
         });
     content_filter_map
-        .entry("text/utf8")
+        .entry("text/utf8-to-unicode")
         .or_insert(ContentFilterInfo {
             allocator: || Box::new(Utf8Filter::new()),
         });
@@ -522,7 +522,7 @@ impl<'a> Mode for TextMode {
         } else {
             vec![
                 "binary/raw",
-                "text/utf8", // TODO(ceg) update/remove TextCodecFilter
+                "text/utf8-to-unicode", // TODO(ceg) update/remove TextCodecFilter
                 "text/unicode-to-text",
                 "text/highlight-keywords",
                 "text/highlight-selection",

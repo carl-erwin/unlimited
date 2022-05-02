@@ -93,9 +93,15 @@ impl<'a> Mode for SimpleViewMode {
             ),
         ];
 
-        v.layout_ops = ops_modes.iter().map(|e| e.0.clone()).collect();
-        let docs = ops_modes.iter().map(|e| e.1.clone()).collect();
-        let modes = ops_modes.iter().map(|e| e.2.clone()).collect();
+        let mut layout_ops = vec![];
+        let mut docs = vec![];
+        let mut modes = vec![];
+
+        for e in &ops_modes {
+            layout_ops.push(e.0.clone());
+            docs.push(e.1.clone());
+            modes.push(e.2.clone());
+        }
 
         let width = v.width;
         let height = v.height;
@@ -109,11 +115,12 @@ impl<'a> Mode for SimpleViewMode {
             width,
             height,
             LayoutDirection::Horizontal,
+            &layout_ops,
             &docs,
             &modes,
         );
 
-        v.is_group_leader = true; // Nb: do not remove , allow recursive splitting
+        v.is_splittable = true; // Nb: do not remove , allow recursive splitting
 
         // TODO(ceg): set focus
         // set focus on text view
@@ -122,8 +129,8 @@ impl<'a> Mode for SimpleViewMode {
         let scroll_bar_idx = 2;
 
         v.main_child = Some(text_view_idx); // index in children
-        v.focus_to = Some(v.children[text_view_idx]); // TODO(ceg):
-        env.focus_changed_to = Some(v.children[text_view_idx]); // TODO(ceg):
+        v.focus_to = Some(v.children[text_view_idx].id); // TODO(ceg):
+        env.focus_changed_to = Some(v.children[text_view_idx].id); // TODO(ceg):
 
         dbg_println!("simple-view: children: {:?}", v.children);
         // register siblings view
@@ -132,11 +139,11 @@ impl<'a> Mode for SimpleViewMode {
         let vscrollbar_mode = editor.get_mode("vscrollbar-mode").unwrap();
 
         let text_view_src = ViewEventSource {
-            id: v.children[text_view_idx],
+            id: v.children[text_view_idx].id,
         };
 
         let scrollbar_dst = ViewEventDestination {
-            id: v.children[scroll_bar_idx],
+            id: v.children[scroll_bar_idx].id,
         };
 
         // view events -> scrollbar
@@ -150,7 +157,7 @@ impl<'a> Mode for SimpleViewMode {
 
         // view events -> line_number
         let line_number_dst = ViewEventDestination {
-            id: v.children[line_numbers_view_idx],
+            id: v.children[line_numbers_view_idx].id,
         };
 
         let line_number_mode = editor.get_mode("line-number-mode").unwrap();

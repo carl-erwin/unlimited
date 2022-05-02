@@ -497,12 +497,10 @@ impl Screen {
 
     pub fn get_used_line(&self, index: usize) -> Option<&[ScreenCell]> {
         if index >= self.line_index.len() {
-            dbg_println!("get used line {} >= {}", index, self.line_index.len());
             return None;
         }
 
         let (start, end) = self.line_index[index];
-        dbg_println!("get used line {} start {} end {}", index, start, end);
         Some(&self.buffer[start..end + 1])
     }
 

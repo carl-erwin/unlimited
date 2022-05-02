@@ -170,7 +170,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
         let max_size = pv.screen.read().height();
 
-        let sibling_vid = pv.children[lidx];
+        let sibling_vid = pv.children[lidx].id;
         let sbv = editor.view_map.get(&sibling_vid).unwrap();
         let sbv = sbv.read();
         let cur_size = sbv.screen.read().height();
@@ -193,18 +193,28 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
             let gy = gy.saturating_sub(-env.diff_y);
             env.global_y = Some(gy);
             //
-            decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, diff as usize)
+            decrease_layout_op(
+                &pv.children[lidx].layout_op,
+                max_size,
+                cur_size,
+                diff as usize,
+            )
         } else if env.diff_y > 0 {
             // TODO(ceg): find a better way to refresh global coords
             let gy = env.global_y.unwrap() + env.diff_y;
             env.global_y = Some(gy);
 
-            increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, env.diff_y as usize)
+            increase_layout_op(
+                &pv.children[lidx].layout_op,
+                max_size,
+                cur_size,
+                env.diff_y as usize,
+            )
         } else {
             return;
         };
 
-        pv.layout_ops[lidx] = new_op;
+        pv.children[lidx].layout_op = new_op;
     }
     // TODO(ceg): refresh global coords
 }

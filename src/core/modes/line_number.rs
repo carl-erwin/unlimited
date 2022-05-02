@@ -253,9 +253,10 @@ impl<'a> Mode for LineNumberMode {
                 };
 
                 if let Some(p_view) = parent {
-                    p_view.layout_ops[dst_view.layout_index.unwrap()] = LayoutOperation::Fixed {
-                        size: width as usize,
-                    };
+                    p_view.children[dst_view.layout_index.unwrap()].layout_op =
+                        LayoutOperation::Fixed {
+                            size: width as usize,
+                        };
                 } else {
                     panic!("");
                 }

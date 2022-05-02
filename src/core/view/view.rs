@@ -106,7 +106,7 @@ pub enum LayoutDirection {
     Horizontal,
 }
 // store this in parent and reuse in resize
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum LayoutOperation {
     // We want a fixed size of sz cells vertically/horizontally in the parent
     // used = size
@@ -255,6 +255,12 @@ pub enum ViewEvent {
 // the notification should be done in post input, before composition
 //
 
+#[derive(Debug, Clone)]
+pub struct ChildView {
+    pub id: Id,
+    pub layout_op: LayoutOperation,
+}
+
 /// The **View** is a way to present a given Document.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
@@ -270,7 +276,7 @@ pub enum ViewEvent {
 pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,
-    pub is_group_leader: bool, // This flags marks a view that can be cloned when doing split views
+    pub is_splittable: bool, // This flags marks a view that can be cloned when doing split views
 
     pub parent_id: Option<Id>,
     pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
@@ -287,7 +293,6 @@ pub struct View<'a> {
       maybe allow to change compose filter of status_view_id ?
       for custom status display ?
     */
-    //pub root_view_index: Option<usize>, // ?
     pub document: Option<Arc<RwLock<Document<'static>>>>, // if none and no children ... panic ?
 
     pub modes: Vec<String>,
@@ -314,8 +319,9 @@ pub struct View<'a> {
     pub layout_index: Option<usize>,
 
     pub layout_direction: LayoutDirection,
-    pub layout_ops: Vec<LayoutOperation>,
-    pub children: Vec<Id>,
+
+    pub children: Vec<ChildView>,
+
     pub main_child: Option<usize>, // index in children
 
     //
@@ -418,10 +424,12 @@ impl<'a> View<'a> {
         let mode_ctx = HashMap::new();
         let input_ctx = InputContext::new();
 
+        dbg_println!("CREATE new VIEW {id}, modes {modes:?}");
+
         let mut v = View {
             parent_id,
             destroyable: true,
-            is_group_leader: false,
+            is_splittable: false,
             focus_to: None,
             status_view_id: None,
             id: Id(id),
@@ -442,7 +450,7 @@ impl<'a> View<'a> {
             //
             layout_index: None,
             layout_direction: LayoutDirection::NotSet,
-            layout_ops: vec![],
+
             children: vec![],
             main_child: None,
             //

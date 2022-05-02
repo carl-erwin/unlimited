@@ -170,7 +170,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
         let max_size = pv.screen.read().width();
 
-        let sibling_vid = pv.children[lidx];
+        let sibling_vid = pv.children[lidx].id;
         let sbv = editor.view_map.get(&sibling_vid).unwrap();
         let sbv = sbv.read();
         let cur_size = sbv.screen.read().width();
@@ -198,7 +198,12 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
             let gx = gx.saturating_sub(-env.diff_x);
             env.global_x = Some(gx);
             //
-            decrease_layout_op(pv.layout_ops[lidx], max_size, cur_size, diff as usize)
+            decrease_layout_op(
+                &pv.children[lidx].layout_op,
+                max_size,
+                cur_size,
+                diff as usize,
+            )
         } else if env.diff_x > 0 {
             if cur_size + env.diff_x as usize > max_size {
                 return;
@@ -207,12 +212,17 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
             // TODO(ceg): find a better way to refresh global coords
             let gx = env.global_x.unwrap() + env.diff_x;
             env.global_x = Some(gx);
-            increase_layout_op(pv.layout_ops[lidx], max_size, cur_size, env.diff_x as usize)
+            increase_layout_op(
+                &pv.children[lidx].layout_op,
+                max_size,
+                cur_size,
+                env.diff_x as usize,
+            )
         } else {
             return;
         };
 
-        pv.layout_ops[lidx] = new_op;
+        pv.children[lidx].layout_op = new_op;
     }
     // TODO(ceg): refresh global coords
 }

@@ -250,9 +250,11 @@ fn compose_children(
     // ex: line view width depends on target view number of line
     // add: flag to allow resize ?
     // View::self_resize_allowed: bool
-    let children_idx = view.children.clone();
-    for (_idx, vid) in children_idx.iter().enumerate() {
-        let child_rc = Rc::clone(editor.view_map.get(&vid).unwrap());
+    let children = view.children.clone();
+    for (_idx, child) in children.iter().enumerate() {
+        dbg_println!(" check CHILD  {:?}", child);
+
+        let child_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
         let cbs = {
             let child_v = child_rc.read();
             child_v.subscribers.clone()
@@ -278,10 +280,11 @@ fn compose_children(
     }
 
     // cache size ?
+    let layout_ops = view.children.iter().map(|e| e.layout_op.clone()).collect();
     let sizes = if layout_dir_is_vertical {
-        view::compute_layout_sizes(height, &view.layout_ops)
+        view::compute_layout_sizes(height, &layout_ops)
     } else {
-        view::compute_layout_sizes(width, &view.layout_ops)
+        view::compute_layout_sizes(width, &layout_ops)
     };
 
     dbg_println!(
@@ -298,9 +301,9 @@ fn compose_children(
     // 2 - compose based on sibling dependencies/priority
     let mut x = 0;
     let mut y = 0;
-    let children_idx = view.children.clone();
-    for (idx, vid) in children_idx.iter().enumerate() {
-        let mut child_v = editor.view_map.get(vid).unwrap().write();
+    let children = view.children.clone();
+    for (idx, child) in children.iter().enumerate() {
+        let mut child_v = editor.view_map.get(&child.id).unwrap().write();
         let (w, h) = if layout_dir_is_vertical {
             (width, sizes[idx])
         } else {
@@ -323,8 +326,8 @@ fn compose_children(
 
     // sort views based on depth/priority
     compose_idx.sort_by(|idxa, idxb| {
-        let vida = view.children[idxa.0];
-        let vidb = view.children[idxb.0];
+        let vida = view.children[idxa.0].id;
+        let vidb = view.children[idxb.0].id;
 
         let va = Rc::clone(editor.view_map.get(&vida).unwrap());
         let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
@@ -352,7 +355,7 @@ fn compose_children(
 
         dbg_println!("COMPOSE VID index {:?}, ", idx);
 
-        let vid = view.children[idx];
+        let vid = view.children[idx].id;
 
         let child_rc = editor.view_map.get(&vid).clone();
         let child_rc = child_rc.unwrap().clone();
