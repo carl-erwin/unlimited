@@ -47,11 +47,7 @@ pub fn disable_dbg_println() {
 }
 pub fn toggle_dbg_println() {
     let v = DBG_PRINTLN_FLAG.load(Ordering::Relaxed);
-    if v != 0 {
-        disable_dbg_println();
-    } else {
-        enable_dbg_println();
-    }
+    DBG_PRINTLN_FLAG.store(!v, Ordering::Relaxed);
 }
 
 //
@@ -95,11 +91,7 @@ pub fn raw_data_filter_to_screen() -> bool {
 //
 pub static NO_UI_RENDER: AtomicUsize = AtomicUsize::new(0);
 pub fn set_no_ui_render(b: bool) {
-    if b {
-        NO_UI_RENDER.store(1, Ordering::Relaxed);
-    } else {
-        NO_UI_RENDER.store(0, Ordering::Relaxed);
-    }
+    NO_UI_RENDER.store(b as usize, Ordering::Relaxed);
 }
 pub fn no_ui_render() -> bool {
     NO_UI_RENDER.load(Ordering::Relaxed) != 0

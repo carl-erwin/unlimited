@@ -15,11 +15,7 @@ pub fn disable_screen_checks() {
 }
 pub fn toggle_screen_checks() {
     let v = SCREEN_CHECK_FLAG.load(Ordering::Relaxed);
-    if v != 0 {
-        disable_screen_checks();
-    } else {
-        enable_screen_checks();
-    }
+    SCREEN_CHECK_FLAG.store(!v, Ordering::Relaxed);
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
