@@ -1097,6 +1097,9 @@ pub fn destroy_view(
         to_keep.layout_index = v_pp_layout_index;
         to_keep.parent_id = Some(ppp_id);
 
+        // set focus on
+        env.focus_changed_to = Some(v_to_keep_id);
+
         dbg_println!("-- DESTROY to_destroy {to_destroy:?}");
 
         assert_eq!(to_destroy, pp_id);
