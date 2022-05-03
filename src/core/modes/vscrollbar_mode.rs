@@ -95,7 +95,7 @@ impl<'a> Mode for VscrollbarMode {
     fn on_view_event(
         &self,
         editor: &mut Editor<'static>,
-        _env: &mut EditorEnv<'static>,
+        env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,
         _event: &ViewEvent,
@@ -134,6 +134,8 @@ impl<'a> Mode for VscrollbarMode {
 
         dbg_println!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
         dbg_println!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
+
+        env.focus_changed_to = Some(mode_ctx.target_vid);
     }
 }
 
