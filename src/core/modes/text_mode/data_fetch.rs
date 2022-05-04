@@ -46,7 +46,7 @@ impl ContentFilter<'_> for RawDataFilter {
         &mut self,
         _editor: &Editor,
         env: &mut LayoutEnv,
-        _view: &Rc<RwLock<View>>,
+        view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
     ) {
         if self.debug {
@@ -65,7 +65,8 @@ impl ContentFilter<'_> for RawDataFilter {
         self.read_max = env.screen.width() * env.screen.height() * 4;
         self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
 
-        //        self.read_size = self.read_max;
+        // EOF
+        self.max_pos = view.read().document().unwrap().read().size() as u64;
 
         if bench_to_eof() {
             let bench_size = 1024 * 32;
