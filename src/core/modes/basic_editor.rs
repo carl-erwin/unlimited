@@ -56,7 +56,7 @@ impl<'a> Mode for BasicEditorMode {
         let doc = view.document();
 
         let status_doc = DocumentBuilder::new()
-            .document_name("")
+            .document_name("status-bar")
             .internal(true)
             //           .use_buffer_log(false)
             .finalize();
