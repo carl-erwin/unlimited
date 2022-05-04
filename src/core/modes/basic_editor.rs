@@ -235,14 +235,15 @@ impl ContentFilter<'_> for BasicEditorTitle {
         _filter_in: &Vec<FilterIo>,
         _filter_out: &mut Vec<FilterIo>,
     ) {
-        let _bg_color = (113, 114, 123);
+        let color = TextStyle::title_color();
+        let bg_color = TextStyle::title_bg_color();
 
         let len = self.title.len();
         for c in self.title.chars() {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
-            cpi.style.color = TextStyle::default_bg_color();
-            cpi.style.bg_color = TextStyle::default_color();
+            cpi.style.color = color;
+            cpi.style.bg_color = bg_color;
             let (b, _) = env.screen.push(cpi.clone());
             if !b {
                 break;
@@ -258,8 +259,8 @@ impl ContentFilter<'_> for BasicEditorTitle {
         let _fill = ' ' as char;
         for _i in 0..remain {
             let mut cpi = CodepointInfo::new();
-            cpi.style.color = TextStyle::default_bg_color(); // remove ?
-            cpi.style.bg_color = TextStyle::default_color(); // remove ?
+            cpi.style.color = color;
+            cpi.style.bg_color = bg_color;
 
             let (b, _) = env.screen.push(cpi.clone());
             if !b {

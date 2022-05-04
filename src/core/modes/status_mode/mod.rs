@@ -22,6 +22,8 @@ use crate::core::view::ContentFilter;
 
 use crate::core::view::LayoutEnv;
 
+use crate::core::codepointinfo::TextStyle;
+
 pub struct StatusModeContext {}
 
 pub struct StatusMode {}
@@ -140,9 +142,9 @@ impl ContentFilter<'_> for StatusModeCompose {
 
         // default
         screen_apply(&mut env.screen, |_, _, cpi| {
-            //cpi.style.color = (255, 255, 255);
-            cpi.style.color = (0, 0, 0);
-            cpi.style.bg_color = (113, 114, 123);
+            cpi.style.color = TextStyle::title_color();
+            cpi.style.bg_color = TextStyle::title_bg_color();
+
             true
         });
     }

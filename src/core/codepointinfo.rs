@@ -34,14 +34,27 @@ impl TextStyle {
         // (192, 192, 192) // White
         // (128, 128, 128)    // Gray
         //(177, 177, 177)
-        (160, 160, 160)
+
+        // (160, 160, 160)
+
+        (180, 180, 180)
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
         // (30, 34, 39)
         //(45, 55, 67)
         //(40, 44, 49)
+
         (39, 40, 54)
+    }
+
+    pub fn title_color() -> (u8, u8, u8) {
+        Self::default_bg_color()
+    }
+
+    pub fn title_bg_color() -> (u8, u8, u8) {
+        // (131, 165, 152)
+        Self::default_color()
     }
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {

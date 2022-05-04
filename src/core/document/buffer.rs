@@ -115,7 +115,6 @@ impl<'a> Buffer<'a> {
         })
     }
 
-
     /// not implemented: close a previously opened buffer see buffer_open
     pub fn close(&mut self) -> bool {
         unimplemented!();

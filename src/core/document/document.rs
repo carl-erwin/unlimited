@@ -241,7 +241,6 @@ impl<'a> Document<'a> {
         file_name: &String,
         mode: OpenMode,
     ) -> Option<Arc<RwLock<Document<'static>>>> {
-
         dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
 
         let buffer = if file_name.is_empty() {

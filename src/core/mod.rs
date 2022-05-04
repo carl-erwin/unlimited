@@ -475,7 +475,6 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     dbg_println!("processing arg_info {:?}", arg_info);
 
     for arg in &arg_info {
-
         dbg_println!("processing arg {:?}", arg);
 
         // check file type
@@ -619,7 +618,6 @@ use crate::core::modes::VscrollbarMode;
 
 use crate::core::modes::GotoLineMode;
 use crate::core::modes::LineNumberMode;
-
 
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
