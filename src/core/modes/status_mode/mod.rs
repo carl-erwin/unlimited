@@ -135,12 +135,7 @@ impl ContentFilter<'_> for StatusModeCompose {
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
-        if env.screen.push_count() <= 1 {
-            // eof
-            return;
-        }
-
-        // default
+        // fill the whole status bar
         screen_apply(&mut env.screen, |_, _, cpi| {
             cpi.style.color = TextStyle::title_color();
             cpi.style.bg_color = TextStyle::title_bg_color();

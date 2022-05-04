@@ -75,15 +75,17 @@ impl<'a> Mode for BasicEditorMode {
                 vec![], // TODO(ceg): title-mode
             ),
             (
-                LayoutOperation::RemainMinus { minus: 2 },
+                LayoutOperation::RemainMinus { minus: 1 },
                 doc.clone(),
                 vec!["simple-view".to_owned()],
             ),
+            /*
             (
                 LayoutOperation::Fixed { size: 1 },
                 None,
                 vec!["hsplit-mode".to_owned()],
             ),
+            */
             (
                 LayoutOperation::RemainPercent { p: 100.0 },
                 status_doc,
