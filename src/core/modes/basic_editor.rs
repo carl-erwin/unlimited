@@ -239,7 +239,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
         let bg_color = TextStyle::title_bg_color();
 
         let len = self.title.len();
-        for c in self.title.chars() {
+        for c in self.title.chars().take(self.width) {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
             cpi.style.color = color;
