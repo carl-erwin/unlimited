@@ -10,6 +10,8 @@ use parking_lot::RwLock;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use regex::Regex;
+
 #[macro_use]
 pub(crate) mod macros;
 
@@ -344,14 +346,131 @@ pub fn indexer(
 
 use crate::core::document::DocumentBuilder;
 
+/*
+  We wil filter file list array
+
+  "+${line}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1 }
+  "+@${offset}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1, offset:${off} }
+  "filename:${line}:${col}" ->  FileInfo { name: start_line:${num}, start_column:${col} }
+
+*/
+#[derive(Debug)]
+struct ArgInfo {
+    path: String, // todo pathbuf
+    offset: Option<u64>,
+    line: Option<u64>,
+    column: Option<u64>,
+}
+
+impl ArgInfo {
+    fn new(path: String) -> Self {
+        ArgInfo {
+            path,
+            offset: None,
+            line: None,
+            column: None,
+        }
+    }
+}
+
+fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
+    let mut v = vec![];
+
+    let re_line_col = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
+    let re_offset = Regex::new(r"@([0-9]+)").unwrap();
+    let re_flc = Regex::new(r"^([^:]+):([0-9]+):?([0-9]+)?").unwrap();
+
+    let mut it = editor.config.files_list.iter();
+    loop {
+        let f = it.next();
+        if f.is_none() {
+            break;
+        }
+
+        let f = f.unwrap();
+
+        // check file exits ?
+        match fs::metadata(f) {
+            Ok(_metadata) => {
+                // let file_type = metadata.file_type();
+                // yes -> simple FileInfo
+                v.push(ArgInfo::new(f.clone()));
+            }
+
+            Err(_e) => {
+                match re_line_col.captures(f) {
+                    None => {}
+                    Some(cap) => {
+                        dbg_println!("found re_line_col match {:?}", cap);
+                        // take next arg as file, no checking
+                        match it.next() {
+                            None => {}
+                            Some(path) => {
+                                let mut arg = ArgInfo::new(path.clone());
+                                arg.line = Some(cap[1].trim_end().parse::<u64>().unwrap_or(1));
+                                if let Some(col) = cap.get(2) {
+                                    arg.column =
+                                        Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                                }
+                                dbg_println!("new arg {:?}", arg);
+                                v.push(arg);
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                match re_offset.captures(f) {
+                    None => {}
+                    Some(cap) => {
+                        dbg_println!("found re_offset match {:?}", cap);
+                        // take next arg as file, no checking
+                        match it.next() {
+                            None => {}
+                            Some(path) => {
+                                let mut arg = ArgInfo::new(path.clone());
+                                arg.offset = Some(cap[1].trim_end().parse::<u64>().unwrap_or(0));
+                                dbg_println!("new arg {:?}", arg);
+                                v.push(arg);
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                match re_flc.captures(f) {
+                    None => {}
+                    Some(cap) => {
+                        dbg_println!("found re_flc match {:?}", cap);
+
+                        let mut arg = ArgInfo::new(cap[1].to_owned());
+                        arg.line = Some(cap[2].trim_end().parse::<u64>().unwrap_or(1));
+
+                        if let Some(col) = cap.get(3) {
+                            arg.column = Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                        }
+                        dbg_println!("new arg {:?}", arg);
+                        v.push(arg);
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+
+    v
+}
+
 /// TODO(ceg): replace this by load/unload doc functions
 /// the ui will open the documents on demand
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.read().len();
 
-    for f in &editor.config.files_list {
+    let arg_info = build_file_options(&editor);
+
+    for arg in &arg_info {
         // check file type
-        if let Ok(metadata) = fs::metadata(f) {
+        if let Ok(metadata) = fs::metadata(&arg.path) {
             let file_type = metadata.file_type();
 
             // ignore directories for now
@@ -359,14 +478,15 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
                 continue;
             }
         } else {
+            // TODO(ceg): fill name for later save
             // log error
-            eprintln!("cannot check {} file type", f);
+            eprintln!("cannot check {} file type", arg.path);
             continue;
         }
 
         let b = DocumentBuilder::new()
-            .document_name(f)
-            .file_name(f)
+            .document_name(&arg.path)
+            .file_name(&arg.path)
             .internal(false)
             .finalize();
 
