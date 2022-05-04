@@ -454,6 +454,10 @@ fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                         continue;
                     }
                 }
+
+                // check permission ...
+                dbg_println!("no match for file {:?}, try create", f);
+                v.push(ArgInfo::new(f.clone()));
             }
         }
     }
@@ -468,7 +472,12 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
 
     let arg_info = build_file_options(&editor);
 
+    dbg_println!("processing arg_info {:?}", arg_info);
+
     for arg in &arg_info {
+
+        dbg_println!("processing arg {:?}", arg);
+
         // check file type
         if let Ok(metadata) = fs::metadata(&arg.path) {
             let file_type = metadata.file_type();
@@ -477,11 +486,6 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             if file_type.is_dir() {
                 continue;
             }
-        } else {
-            // TODO(ceg): fill name for later save
-            // log error
-            eprintln!("cannot check {} file type", arg.path);
-            continue;
         }
 
         let b = DocumentBuilder::new()
@@ -583,7 +587,7 @@ pub fn create_views(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'s
 
         // top level views
         editor.root_views.push(view.id);
-        editor.view_map.insert(view.id, Rc::new(RwLock::new(view)));
+        editor.add_view(view.id, Rc::new(RwLock::new(view)));
     }
 
     // index documents
@@ -615,6 +619,7 @@ use crate::core::modes::VscrollbarMode;
 
 use crate::core::modes::GotoLineMode;
 use crate::core::modes::LineNumberMode;
+
 
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)

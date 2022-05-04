@@ -95,6 +95,27 @@ impl<'a> Buffer<'a> {
         })
     }
 
+    pub fn empty_with_name(file_name: &String, mode: OpenMode) -> Option<Buffer<'a>> {
+        let file = match MappedFile::empty() {
+            Some(file) => file,
+            None => {
+                return None;
+            }
+        };
+
+        let size = file.as_ref().read().size() as usize;
+
+        Some(Buffer {
+            id: 0,
+            file_name: file_name.clone(),
+            mode,
+            size,
+            nr_changes: 0,
+            data: file,
+        })
+    }
+
+
     /// not implemented: close a previously opened buffer see buffer_open
     pub fn close(&mut self) -> bool {
         unimplemented!();

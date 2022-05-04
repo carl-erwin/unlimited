@@ -241,15 +241,23 @@ impl<'a> Document<'a> {
         file_name: &String,
         mode: OpenMode,
     ) -> Option<Arc<RwLock<Document<'static>>>> {
+
+        dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
+
         let buffer = if file_name.is_empty() {
             Buffer::empty(mode.clone())
         } else {
             Buffer::new(&file_name, mode.clone())
         };
 
-        if buffer.is_none() {
-            panic!("cannot open {} {} {:?}", document_name, file_name, mode);
-        }
+        let mut changed = false;
+        // fallback
+        let buffer = if buffer.is_none() {
+            changed = true;
+            Buffer::empty_with_name(&document_name, mode.clone())
+        } else {
+            buffer
+        };
 
         let doc = Document {
             id: Id(0),
@@ -260,7 +268,7 @@ impl<'a> Document<'a> {
             use_buffer_log: true,
             abort_indexing: false,
             indexed: false,
-            changed: false,
+            changed,
             is_syncing: false,
             last_tag_time: std::time::Instant::now(),
             subscribers: vec![],
@@ -834,6 +842,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
         if doc.file_name().is_empty() {
             // TODO(ceg): save as pop up/notification
+            dbg_println!("cannot dsave  target filename is empty");
             return;
         }
 
