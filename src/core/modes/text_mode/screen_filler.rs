@@ -152,6 +152,7 @@ impl ContentFilter<'_> for ScreenFilter {
 
                 &FilterIo {
                     data: FilterData::EndOfStream,
+                    offset,
                     ..
                 } => {
                     let mut style = TextStyle::new();
@@ -164,7 +165,7 @@ impl ContentFilter<'_> for ScreenFilter {
                         metadata: true,
                         cp: u32_to_char(eof_char as u32),
                         displayed_cp: u32_to_char(eof_char as u32),
-                        offset: Some(env.max_offset),
+                        offset: offset.clone(),
                         size: 0,
                         skip_render: false,
                         style,
