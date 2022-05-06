@@ -128,7 +128,6 @@ impl<'a> Mode for SimpleViewMode {
         let text_view_idx = 1;
         let scroll_bar_idx = 2;
 
-        v.main_child = Some(text_view_idx); // index in children
         v.focus_to = Some(v.children[text_view_idx].id); // TODO(ceg):
         env.focus_changed_to = Some(v.children[text_view_idx].id); // TODO(ceg):
 

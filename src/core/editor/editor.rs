@@ -276,7 +276,11 @@ pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
         }
     }
 
+    dbg_println!("resize view {}x{}", env.width, env.height);
+
     view.screen = Arc::new(RwLock::new(Box::new(Screen::new(env.width, env.height))));
+    view.width = env.width; // remove view.width/height ?
+    view.height = env.height;
 }
 
 pub fn update_view_and_send_draw_event(
@@ -1153,6 +1157,8 @@ pub fn main_loop(
                 Event::UpdateView { width, height } => {
                     env.width = width;
                     env.height = height;
+
+                    dbg_print!("UpdateView env.width {} env.height {}", env.width, env.height);
 
                     env.pending_events = crate::core::event::pending_input_event_dec(1);
                     update_view_and_send_draw_event(&mut editor, &mut env);

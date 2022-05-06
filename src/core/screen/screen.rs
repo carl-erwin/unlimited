@@ -153,10 +153,6 @@ impl Screen {
     }
 
     pub fn copy_screen_at_xy(&mut self, src: &Screen, x: usize, y: usize) -> bool {
-        if x + src.width() > self.width() || y + src.height() > self.height() {
-            return false;
-        }
-
         for src_y in 0..src.height() {
             for src_x in 0..src.width() {
                 if let Some(cpi_src) = src.get_cpinfo(src_x, src_y) {
@@ -523,9 +519,8 @@ impl Screen {
 
     pub fn get_cpinfo(&self, x: usize, y: usize) -> Option<&CodepointInfo> {
         let l = self.get_line(y)?;
-        if x > l.len() {
-            panic!();
-            //return None;
+        if x >= l.len() {
+            return None;
         }
 
         Some(&l[x].cpi)
@@ -533,9 +528,8 @@ impl Screen {
 
     pub fn get_cpinfo_mut(&mut self, x: usize, y: usize) -> Option<&mut CodepointInfo> {
         let l = self.get_line_mut(y)?;
-        if x > l.len() {
-            panic!();
-            //return None;
+        if x >= l.len() {
+            return None;
         }
 
         Some(&mut l[x].cpi)

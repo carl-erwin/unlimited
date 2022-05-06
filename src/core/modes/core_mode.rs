@@ -29,7 +29,9 @@ static CORE_INPUT_MAP: &str = r#"
      { "in": [{ "key": "F4"     }],                          "action": "toggle-debug-print" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" }
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
+     { "in": [{ "key": "ctrl+p" } ],                         "action": "command-palette" }
+
     ]
   }
 ]"#;
@@ -108,6 +110,8 @@ impl CoreMode {
             "application:quit-abort-no",
             application_quit_abort_no,
         );
+
+        register_input_stage_action(&mut map, "command-palette", command_palette);
 
         register_input_stage_action(&mut map, "save-document", save_document); // core ?
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
@@ -1108,4 +1112,78 @@ pub fn destroy_view(
     };
 
     destroy_view_hierarchy(editor, to_destroy_id);
+}
+
+use crate::core::document::DocumentBuilder;
+
+pub fn command_palette(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    _view: &Rc<RwLock<View>>,
+) {
+    let main_vid = view::Id(1);
+
+    let (main_width, main_height) = {
+        let main = editor.view_map.get(&main_vid).unwrap().read();
+        (main.width, main.height)
+    };
+
+    let command_doc = DocumentBuilder::new()
+        .document_name("command-palette")
+        .internal(true)
+        //           .use_buffer_log(false)
+        .finalize();
+
+
+    let text = format!("Command Palette: main_width {} main_height {}", main_width, main_height);
+    let text_width = text.len();
+    let x = (main_width / 2).saturating_sub(text_width / 2) ;
+
+    {
+        let mut d = command_doc.as_ref().unwrap().write();
+        d.insert(0, text_width, text.as_bytes());
+    }
+
+    // create view
+    let p_view = View::new(
+        &mut editor,
+        &mut env,
+        Some(main_vid),
+        x, // TODO: move recompute
+        2,
+        text_width,
+        25,
+        command_doc,
+        &vec!["status-mode".to_owned()],
+        0,
+    );
+
+    {
+        let mut main = editor.view_map.get(&main_vid).unwrap().write();
+
+        main.floating_children.push(
+            ChildView {
+                id: p_view.id,
+                layout_op: LayoutOperation::Fixed { size: 1 },
+            },
+        );
+    }
+
+    editor.add_view(p_view.id, Rc::new(RwLock::new(p_view)));
+
+
+    /*
+    TODO(ceg): update view x, y
+    lambda ?
+
+    mode.borrow().on_view_event(
+                    &mut editor,
+                    &mut editor_env,
+                    cb.1,
+                    cb.2,
+                    &ViewEvent::PreComposition,
+                    Some(&mut view),
+                );
+
+    */
 }

@@ -232,7 +232,7 @@ fn compose_children(
     pass_mask: LayoutPass,
 ) -> bool {
     let mut view = view.write();
-    if view.children.is_empty() {
+    if view.children.is_empty() && view.floating_children.is_empty() {
         return false;
     }
 
@@ -250,8 +250,11 @@ fn compose_children(
     // ex: line view width depends on target view number of line
     // add: flag to allow resize ?
     // View::self_resize_allowed: bool
-    let children = view.children.clone();
-    for (_idx, child) in children.iter().enumerate() {
+    let mut all_children = view.children.clone();
+    let mut floating_children = view.floating_children.clone();
+    all_children.append(&mut floating_children);
+
+    for child in all_children.iter() {
         dbg_println!(" check CHILD  {:?}", child);
 
         let child_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
@@ -279,6 +282,7 @@ fn compose_children(
         }
     }
 
+    // non floating children
     // cache size ?
     let layout_ops = view.children.iter().map(|e| e.layout_op.clone()).collect();
     let sizes = if layout_dir_is_vertical {
@@ -286,17 +290,20 @@ fn compose_children(
     } else {
         view::compute_layout_sizes(width, &layout_ops)
     };
-
-    dbg_println!(
-        "ITER over  {:?}, CHILDREN {:?}, size {:?}",
-        view.id,
-        view.children,
-        sizes
-    );
-
     assert_eq!(view.children.len(), sizes.len());
 
-    let mut compose_idx = vec![];
+    #[derive(Debug)]
+    struct ComposeInfo {
+        pub floating: bool,
+        pub parent_idx: usize,
+        pub view_id: view::Id,
+        pub x: usize,
+        pub y: usize,
+        pub w: usize,
+        pub h: usize,
+    }
+
+    let mut compose_info = vec![];
     // 1 - compute position and size
     // 2 - compose based on sibling dependencies/priority
     let mut x = 0;
@@ -315,7 +322,15 @@ fn compose_children(
         child_v.width = w;
         child_v.height = h;
 
-        compose_idx.push((idx, (x, y), (w, h))); // not sorted yet
+        compose_info.push(ComposeInfo {
+            floating: false,
+            parent_idx: idx,
+            view_id: child.id,
+            x,
+            y,
+            w,
+            h,
+        }); // not sorted yet
 
         if layout_dir_is_vertical {
             y += h;
@@ -325,9 +340,9 @@ fn compose_children(
     }
 
     // sort views based on depth/priority
-    compose_idx.sort_by(|idxa, idxb| {
-        let vida = view.children[idxa.0].id;
-        let vidb = view.children[idxb.0].id;
+    compose_info.sort_by(|idxa, idxb| {
+        let vida = idxa.view_id;
+        let vidb = idxb.view_id;
 
         let va = Rc::clone(editor.view_map.get(&vida).unwrap());
         let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
@@ -335,27 +350,42 @@ fn compose_children(
         let pa = va.read().compose_priority;
         let pb = vb.read().compose_priority;
 
-        dbg_println!("pa vid {:?} priority: {:?}", vida, pa);
-        dbg_println!("pb vid {:?} priority: {:?}", vidb, pb);
-        dbg_println!("pa.cmp(&pb) {:?}", pb.cmp(&pa));
-
         pb.cmp(&pa)
     });
+
+    // add floating children
+    let floating_children = view.floating_children.clone();
+    for (idx, child) in floating_children.iter().enumerate() {
+        let child_v = editor.view_map.get(&child.id).unwrap().read();
+
+        let x= child_v.x;
+        let y = child_v.y;
+        let w = child_v.width;
+        let h = child_v.height;
+
+        compose_info.push(ComposeInfo {
+            floating: true,
+            parent_idx: idx,
+            view_id: child.id,
+            x,
+            y,
+            w,
+            h,
+        }); // just append no sort
+    }
+
     //
+    for info in &compose_info {
+        let idx = info.parent_idx;
+        let (x, y) = (info.x, info.y);
+        let (_w, _h) = (info.w, info.h);
 
-    dbg_println!("COMPOSE sub VIDs indexes {:?}, ", compose_idx);
-
-    for info in &compose_idx {
-        let idx = info.0;
-        let (x, y) = info.1;
-        let (_w, _h) = info.2;
-        if sizes[idx] == 0 {
+        if info.floating == false && sizes[idx] == 0 {
             continue;
         }
 
-        dbg_println!("COMPOSE VID index {:?}, ", idx);
 
-        let vid = view.children[idx].id;
+        let vid = info.view_id;
 
         let child_rc = editor.view_map.get(&vid).clone();
         let child_rc = child_rc.unwrap().clone();
@@ -367,11 +397,7 @@ fn compose_children(
 
         //
         {
-            let (w, h) = if layout_dir_is_vertical {
-                (width, sizes[idx])
-            } else {
-                (sizes[idx], height)
-            };
+            let (w, h) = (info.w, info.h);
 
             assert!(w > 0);
             assert!(h > 0);
@@ -392,6 +418,8 @@ fn compose_children(
             {
                 let mut child_v = child_rc.write();
                 child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
+                child_v.width = w;
+                child_v.height = h;
             }
         }
 

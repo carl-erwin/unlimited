@@ -61,12 +61,11 @@ impl<'a> Mode for BasicEditorMode {
             //           .use_buffer_log(false)
             .finalize();
 
-        let status_doc = status_doc;
-
         // hsplit
 
         // children_layout_and_modes
         let ops_modes = vec![
+            // title
             (
                 LayoutOperation::Fixed {
                     size: 1 + 0, /* nano-like */
@@ -74,6 +73,7 @@ impl<'a> Mode for BasicEditorMode {
                 doc.clone(),
                 vec![], // TODO(ceg): title-mode
             ),
+            // main text view
             (
                 LayoutOperation::RemainMinus { minus: 1 },
                 doc.clone(),
@@ -86,6 +86,7 @@ impl<'a> Mode for BasicEditorMode {
                 vec!["hsplit-mode".to_owned()],
             ),
             */
+            // status bar
             (
                 LayoutOperation::RemainPercent { p: 100.0 },
                 status_doc,
@@ -142,7 +143,6 @@ impl<'a> Mode for BasicEditorMode {
         // set focus on text view (simple-view mode)
         let simple_view_idx = 1;
         let simple_view_id = view.children[simple_view_idx].id;
-        view.main_child = Some(simple_view_idx); // index in children
         view.focus_to = Some(simple_view_id); // TODO(ceg):
         env.focus_changed_to = Some(simple_view_id); // TODO(ceg):
 

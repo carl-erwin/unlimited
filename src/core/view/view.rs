@@ -322,7 +322,7 @@ pub struct View<'a> {
 
     pub children: Vec<ChildView>,
 
-    pub main_child: Option<usize>, // index in children
+    pub floating_children: Vec<ChildView>,
 
     //
     pub stage_actions: Vec<(String, StageFunction)>,
@@ -452,7 +452,8 @@ impl<'a> View<'a> {
             layout_direction: LayoutDirection::NotSet,
 
             children: vec![],
-            main_child: None,
+            floating_children: vec![],
+
             //
             stage_actions: vec![],
 
@@ -613,6 +614,8 @@ pub fn compute_view_layout(
         v.end_offset = last_offset;
     }
     v.screen = Arc::new(RwLock::new(Box::new(screen)));
+    v.width = dimension.0;
+    v.height = dimension.1;
     v.check_invariants();
 
     Some(())
