@@ -65,8 +65,16 @@ impl TextStyle {
 
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
         let sbg = Self::default_bg_color();
-        let add = 5;
-        (sbg.0 + add, sbg.1 + add, sbg.2 + add)
+
+        let add = 10;
+        (
+            sbg.0.saturating_add(add),
+            sbg.1.saturating_add(add),
+            sbg.2.saturating_add(add),
+        )
+
+        // let sub = 7;
+        // (sbg.0.saturating_sub(sub), sbg.1.saturating_sub(sub), sbg.2.saturating_sub(sub))
     }
 }
 
