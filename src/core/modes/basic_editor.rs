@@ -144,7 +144,6 @@ impl<'a> Mode for BasicEditorMode {
         let simple_view_idx = 1;
         let simple_view_id = view.children[simple_view_idx].id;
         view.focus_to = Some(simple_view_id); // TODO(ceg):
-        env.focus_changed_to = Some(simple_view_id); // TODO(ceg):
 
         // TODO(ceg): status mode + configure
         // setup status view

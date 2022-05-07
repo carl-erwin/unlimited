@@ -40,6 +40,9 @@ use crate::core::view::LayoutEnv;
 use crate::core::view::LayoutDirection;
 
 use crate::core::view::View;
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
 
 /* TODO(ceg):
 
@@ -605,6 +608,9 @@ fn get_focused_vid(
     let view = view.unwrap().clone();
 
     let v = view.read();
+
+    // TODO(ceg): floating_children in priority ?
+
     if v.children.is_empty() {
         return vid;
     }
@@ -627,6 +633,12 @@ pub fn set_focus_on_vid(
     }
     let view = Rc::clone(view.unwrap());
     let mut v = view.write();
+
+    if v.ignore_focus == true {
+        // require:  explicit focus grabbing
+        return;
+    }
+
     set_focus_on_view(&mut editor, &mut env, &mut v);
 }
 
@@ -638,18 +650,19 @@ pub fn set_focus_on_view(
     // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
-    //    assert!(view.children.is_empty());
+    dbg_println!("set_focus_on_view ---------");
+    dbg_println!("set_focus_on_view update vid {:?}", vid);
 
     let mut parent_id = view.parent_id;
     loop {
         if let Some(pid) = parent_id {
-            dbg_println!("set_focus update parent_id {:?}", pid);
             if let Some(pview) = editor.view_map.get(&pid) {
                 let mut pview = pview.write();
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
+
                 env.focus_on = vid; // Option ?
-                dbg_println!("next  parent_id {:?}", parent_id);
+                dbg_println!("set_focus_on_view next parent_id {:?}", parent_id);
             } else {
                 break;
             }
@@ -657,6 +670,8 @@ pub fn set_focus_on_view(
             break;
         }
     }
+
+    dbg_println!("set focus on view {:?}", env.focus_on);
 }
 
 // always compute ?
@@ -1028,10 +1043,9 @@ fn setup_focus_and_event(
     ev: &InputEvent,
     compose: &mut bool,
 ) -> view::Id {
-    env.focus_on = view::Id(0);
     let root_vid = env.view_id;
     let vid = get_focused_vid(&mut editor, &mut env, root_vid);
-    dbg_println!("FOCUS on  {:?}", vid);
+    dbg_println!(">> setup_focus_and_event FOCUS on {:?}", vid);
 
     if root_vid != vid {
         // only set, not cleared
@@ -1076,6 +1090,7 @@ fn run_input_stage(
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
 
+        // select view that will receive the event
         let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         run_stages(Stage::Input, &mut editor, &mut env, id);
         // if !env.skip_compositing
@@ -1084,13 +1099,6 @@ fn run_input_stage(
         }
         // flush_ui_event(editor, env, &ui_tx);
         //run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
-    }
-
-    // MOVE TO POST ?
-    if let Some(focus_vid) = env.focus_changed_to {
-        set_focus_on_vid(editor, env, focus_vid);
-        env.focus_changed_to = None;
-        // Stage::Restart ?
     }
 
     // POST ?
@@ -1158,7 +1166,11 @@ pub fn main_loop(
                     env.width = width;
                     env.height = height;
 
-                    dbg_print!("UpdateView env.width {} env.height {}", env.width, env.height);
+                    dbg_print!(
+                        "UpdateView env.width {} env.height {}",
+                        env.width,
+                        env.height
+                    );
 
                     env.pending_events = crate::core::event::pending_input_event_dec(1);
                     update_view_and_send_draw_event(&mut editor, &mut env);

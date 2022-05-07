@@ -75,5 +75,11 @@ pub trait Mode {
         _event: &ViewEvent,
         _parent: Option<&mut View<'static>>,
     ) {
+        dbg_println!(
+            "(default) on_view_event src: {:?} dst: {:?}, event {:?}",
+            _src,
+            _dst,
+            _event
+        );
     }
 }

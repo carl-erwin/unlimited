@@ -1130,7 +1130,7 @@ pub fn move_marks_to_next_line(
                 new_start,
                 max_offset,
                 &mut screen,
-                LayoutPass::Content,
+                LayoutPass::ScreenContent,
             );
 
             // NB: update view after scroll
@@ -1246,7 +1246,7 @@ pub fn move_marks_to_next_line(
                 m.offset,
                 max_offset,
                 &mut screen,
-                LayoutPass::ContentAndScreenOverlay,
+                LayoutPass::ScreenContentAndOverlay,
             );
 
             dbg_println!("\n\n\n---------");

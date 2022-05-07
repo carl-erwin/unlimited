@@ -475,6 +475,8 @@ impl<'a> Mode for TextMode {
     ) {
         dbg_println!("config text-mode for  {:?}", view.id);
 
+        view.ignore_focus = false;
+
         view.compose_priority = 256; // TODO: move to caller
 
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1882,7 +1884,7 @@ pub fn cut_selection(
     copy_maybe_remove_selection(editor, env, view, true, true);
 }
 
-pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write();
 
     let (button, x, y) = match v.input_ctx.trigger[0] {
@@ -2192,7 +2194,7 @@ pub fn get_lines_offsets_direct(
             tmp.offset,
             end_offset,
             &mut screen,
-            LayoutPass::Content,
+            LayoutPass::ScreenContent,
         );
 
         if count > 0 {

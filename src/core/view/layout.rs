@@ -24,9 +24,9 @@ use crate::core::view::ViewEvent;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum LayoutPass {
-    Content = 1,
+    ScreenContent = 1,
     ScreenOverlay = 2,
-    ContentAndScreenOverlay = 3,
+    ScreenContentAndOverlay = 3,
 }
 
 //
@@ -358,7 +358,7 @@ fn compose_children(
     for (idx, child) in floating_children.iter().enumerate() {
         let child_v = editor.view_map.get(&child.id).unwrap().read();
 
-        let x= child_v.x;
+        let x = child_v.x;
         let y = child_v.y;
         let w = child_v.width;
         let h = child_v.height;
@@ -383,7 +383,6 @@ fn compose_children(
         if info.floating == false && sizes[idx] == 0 {
             continue;
         }
-
 
         let vid = info.view_id;
 
@@ -464,7 +463,7 @@ fn compose_children(
 
 // This function can be considered as the core of the editor.<br/>
 // It will run the configured filters until the screen is filled or eof is reached.<br/>
-// the screen MUST be cleared first (for LayoutPass::Content,  LayoutPass::ContentAndScreenOverlay)
+// the screen MUST be cleared first (for LayoutPass::ScreenContent,  LayoutPass::ScreenContentAndOverlay)
 pub fn run_compositing_stage_direct(
     mut editor: &mut Editor<'static>,
     mut editor_env: &mut EditorEnv<'static>,
@@ -508,7 +507,7 @@ pub fn run_compositing_stage_direct(
     };
 
     // screen must be cleared by caller
-    if pass_mask == LayoutPass::Content || pass_mask == LayoutPass::ContentAndScreenOverlay {
+    if pass_mask == LayoutPass::ScreenContent || pass_mask == LayoutPass::ScreenContentAndOverlay {
         assert_eq!(0, layout_env.screen.push_count());
     }
 
@@ -516,11 +515,11 @@ pub fn run_compositing_stage_direct(
 
     let mut time_spent: Vec<u128> = vec![];
 
-    if pass_mask == LayoutPass::Content || pass_mask == LayoutPass::ContentAndScreenOverlay {
+    if pass_mask == LayoutPass::ScreenContent || pass_mask == LayoutPass::ScreenContentAndOverlay {
         run_content_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
     }
 
-    if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ContentAndScreenOverlay {
+    if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ScreenContentAndOverlay {
         run_screen_overlay_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
     }
 

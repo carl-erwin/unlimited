@@ -277,6 +277,7 @@ pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,
     pub is_splittable: bool, // This flags marks a view that can be cloned when doing split views
+    pub ignore_focus: bool,  // never set focus on this view
 
     pub parent_id: Option<Id>,
     pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
@@ -430,6 +431,7 @@ impl<'a> View<'a> {
             parent_id,
             destroyable: true,
             is_splittable: false,
+            ignore_focus: true,
             focus_to: None,
             status_view_id: None,
             id: Id(id),
@@ -467,7 +469,7 @@ impl<'a> View<'a> {
             filter_out: Rc::new(RefCell::new(vec![])),
 
             //
-            subscribers: vec![], // list of other views to notify when the current view changes
+            subscribers: vec![], // list of other views to notify when this view changes
         };
 
         View::setup_modes(editor, env, &mut v, modes);
@@ -606,7 +608,7 @@ pub fn compute_view_layout(
         start_offset,
         max_offset,
         &mut screen,
-        LayoutPass::ContentAndScreenOverlay,
+        LayoutPass::ScreenContentAndOverlay,
     );
 
     let mut v = view.write();

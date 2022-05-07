@@ -8,8 +8,10 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::editor::register_input_stage_action;
+use crate::core::editor::set_focus_on_vid;
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::input_map::build_input_event_map;
+
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
@@ -95,47 +97,54 @@ impl<'a> Mode for VscrollbarMode {
     fn on_view_event(
         &self,
         editor: &mut Editor<'static>,
-        env: &mut EditorEnv<'static>,
+        _env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,
-        _event: &ViewEvent,
+        event: &ViewEvent,
         _parent: Option<&mut View<'static>>,
     ) {
-        let src = editor.view_map.get(&src.id).unwrap().write();
+        match event {
+            ViewEvent::Subscribe => {}
 
-        let dim = src.screen.read().dimension();
+            ViewEvent::PreComposition => {
+                let src = editor.view_map.get(&src.id).unwrap().write();
 
-        let mut dst = editor.view_map.get(&dst.id).unwrap().write();
+                let dim = src.screen.read().dimension();
 
-        let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                let mut dst = editor.view_map.get(&dst.id).unwrap().write();
 
-        mode_ctx.target_vid = src.id;
+                let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
 
-        let doc = src.document.as_ref().unwrap();
-        let doc = doc.read();
-        let doc_size = doc.size();
+                mode_ctx.target_vid = src.id;
 
-        let off = src.start_offset as f64 / doc_size as f64;
-        let off2 = src.end_offset as f64 / doc_size as f64;
+                let doc = src.document.as_ref().unwrap();
+                let doc = doc.read();
+                let doc_size = doc.size();
 
-        mode_ctx.percent = off * 100.0;
-        mode_ctx.percent_end = off2 * 100.0;
+                let off = src.start_offset as f64 / doc_size as f64;
+                let off2 = src.end_offset as f64 / doc_size as f64;
 
-        let height = dim.1 as f64 / 100.0;
-        mode_ctx.scroll_start = (height * mode_ctx.percent) as usize;
-        mode_ctx.scroll_start = std::cmp::min(dim.1.saturating_sub(1), mode_ctx.scroll_start);
-        mode_ctx.scroll_end = (height * mode_ctx.percent_end) as usize;
-        mode_ctx.scroll_end = if mode_ctx.scroll_end == mode_ctx.scroll_start {
-            mode_ctx.scroll_start + 1
-        } else {
-            mode_ctx.scroll_end
-        };
-        mode_ctx.scroll_end = std::cmp::min(dim.1, mode_ctx.scroll_end);
+                mode_ctx.percent = off * 100.0;
+                mode_ctx.percent_end = off2 * 100.0;
 
-        dbg_println!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
-        dbg_println!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
+                let height = dim.1 as f64 / 100.0;
+                mode_ctx.scroll_start = (height * mode_ctx.percent) as usize;
+                mode_ctx.scroll_start =
+                    std::cmp::min(dim.1.saturating_sub(1), mode_ctx.scroll_start);
+                mode_ctx.scroll_end = (height * mode_ctx.percent_end) as usize;
+                mode_ctx.scroll_end = if mode_ctx.scroll_end == mode_ctx.scroll_start {
+                    mode_ctx.scroll_start + 1
+                } else {
+                    mode_ctx.scroll_end
+                };
+                mode_ctx.scroll_end = std::cmp::min(dim.1, mode_ctx.scroll_end);
 
-        env.focus_changed_to = Some(mode_ctx.target_vid);
+                dbg_println!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
+                dbg_println!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
+            }
+
+            _ => {}
+        }
     }
 }
 
@@ -154,7 +163,11 @@ impl VscrollbarMode {
 // TODO?: mode:on_button_release(btn ?) ...
 // TODO?: mode:on_pointer_drag(btn, x,y)
 
-pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn vscrollbar_input_event(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View>>,
+) {
     let mut v = view.write();
 
     let evt = v.input_ctx.trigger.last();
@@ -180,6 +193,7 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                         mode_ctx.selected = true;
                         env.focus_locked_on = Some(v.id);
                     }
+
                     return;
                 }
             }
@@ -203,6 +217,9 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                     let mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                     mode_ctx.selected = false;
                     env.focus_locked_on = None;
+
+                    // explicit focus on target view
+                    set_focus_on_vid(&mut editor, &mut env, mode_ctx.target_vid);
                 }
             }
         },
@@ -211,6 +228,10 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
             dbg_println!("VSCROLLBAR CLIPPING x {} y {}", x, y);
             let target_vid = {
                 let mode_ctx = v.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
+
+                // explicit focus on target view
+                // set_focus_on_vid(&mut editor, &mut env, mode_ctx.target_vid);
+
                 if !mode_ctx.selected {
                     return;
                 }
@@ -218,6 +239,7 @@ pub fn vscrollbar_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &R
                 if mode_ctx.target_vid == view::Id(0) {
                     return;
                 }
+
                 mode_ctx.target_vid
             };
 

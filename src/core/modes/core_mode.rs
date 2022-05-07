@@ -337,9 +337,6 @@ pub fn split_with_direction(
 
         // move this after call
         // focus on first child ? // check again clipping code
-        if idx == 0 {
-            env.focus_changed_to = Some(view.id); // post input
-        }
 
         dbg_println!("ALLOCATE new : {:?}", view.id);
 
@@ -418,11 +415,6 @@ pub fn layout_view_ids_with_direction(
         view.layout_index = Some(idx);
 
         // TODO(ceg): move this to caller
-        // focus on first child ? // check again clipping code
-        if idx == 0 {
-            env.focus_changed_to = Some(view.id); // post input
-        }
-
         parent.children.push(ChildView {
             id: view.id,
             layout_op: layout_ops[idx].clone(),
@@ -997,39 +989,34 @@ pub fn destroy_view(
     let to_destroy_id = {
         dbg_println!(">>> DESTROY -------------------");
         // current view/id
-        let id = {
-            let v = view.read();
 
-            dbg_println!("-- DESTROY VIEW {:?}", v.id);
+        let v = view.read();
 
-            if !v.destroyable {
-                return;
-            }
+        dbg_println!("-- DESTROY VIEW {:?}", v.id);
 
-            // check parent
-            if v.parent_id.is_none() {
-                // nothing to do
-                // check root_views presence
-                dbg_println!("No parent, ignore");
-                return;
-            }
+        if !v.destroyable {
+            return;
+        }
 
-            // no index in parent : not a split, etc..
-            if v.layout_index.is_none() {
-                dbg_println!("No layout index found, ignore");
-                return;
-            }
+        // check parent
+        if v.parent_id.is_none() {
+            // nothing to do
+            // check root_views presence
+            dbg_println!("No parent, ignore");
+            return;
+        }
 
-            v.id
-        };
-
-        let v = view.as_ref().read();
+        // no index in parent : not a split, etc..
+        if v.layout_index.is_none() {
+            dbg_println!("No layout index found, ignore");
+            return;
+        }
 
         // get PARENT
         let p_id = v.parent_id;
         let p_id = p_id.unwrap();
 
-        dbg_println!("-- DESTROY PARENT VIEW {:?}", p_id);
+        dbg_println!("-- DESTROY VEW : PARENT {:?}", p_id);
         let v_p = editor.view_map.get(&p_id);
         if v_p.is_none() {
             return;
@@ -1039,7 +1026,7 @@ pub fn destroy_view(
 
         // get PARENT PARENT
         let pp_id = v_p.parent_id.unwrap();
-        dbg_println!("-- DESTROY PARENT PARENT VIEW {:?}", pp_id);
+        dbg_println!("-- DESTROY VIEW: PARENT PARENT {:?}", pp_id);
 
         let v_pp = editor.view_map.get(&pp_id);
         if v_pp.is_none() {
@@ -1101,9 +1088,6 @@ pub fn destroy_view(
         to_keep.layout_index = v_pp_layout_index;
         to_keep.parent_id = Some(ppp_id);
 
-        // set focus on
-        env.focus_changed_to = Some(v_to_keep_id);
-
         dbg_println!("-- DESTROY to_destroy {to_destroy:?}");
 
         assert_eq!(to_destroy, pp_id);
@@ -1138,10 +1122,12 @@ pub fn command_palette(
         //           .use_buffer_log(false)
         .finalize();
 
-
-    let text = format!("Command Palette: main_width {} main_height {}", main_width, main_height);
+    let text = format!(
+        "Command Palette: main_width {} main_height {}",
+        main_width, main_height
+    );
     let text_width = text.len();
-    let x = (main_width / 2).saturating_sub(text_width / 2) ;
+    let x = (main_width / 2).saturating_sub(text_width / 2);
 
     {
         let mut d = command_doc.as_ref().unwrap().write();
@@ -1165,16 +1151,13 @@ pub fn command_palette(
     {
         let mut main = editor.view_map.get(&main_vid).unwrap().write();
 
-        main.floating_children.push(
-            ChildView {
-                id: p_view.id,
-                layout_op: LayoutOperation::Fixed { size: 1 },
-            },
-        );
+        main.floating_children.push(ChildView {
+            id: p_view.id,
+            layout_op: LayoutOperation::Fixed { size: 1 },
+        });
     }
 
     editor.add_view(p_view.id, Rc::new(RwLock::new(p_view)));
-
 
     /*
     TODO(ceg): update view x, y

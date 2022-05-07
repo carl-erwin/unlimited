@@ -129,7 +129,6 @@ impl<'a> Mode for SimpleViewMode {
         let scroll_bar_idx = 2;
 
         v.focus_to = Some(v.children[text_view_idx].id); // TODO(ceg):
-        env.focus_changed_to = Some(v.children[text_view_idx].id); // TODO(ceg):
 
         dbg_println!("simple-view: children: {:?}", v.children);
         // register siblings view
