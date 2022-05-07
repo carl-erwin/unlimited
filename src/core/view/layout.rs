@@ -401,8 +401,30 @@ fn compose_children(
             assert!(w > 0);
             assert!(h > 0);
 
-            // TODO(ceg): resize instead of replace ?
-            let mut child_screen = Screen::new(w, h);
+            // alloc new screen or clear ?
+            let mut do_clear = true;
+            let child_screen = {
+                let mut child_v = child_rc.write();
+                let dim = {
+                    let screen = child_v.screen.read();
+                    screen.dimension()
+                };
+                if dim.0 != w || dim.1 != h {
+                    child_v.screen = Arc::new(RwLock::new(Box::new(Screen::new(w, h))));
+                    child_v.width = w;
+                    child_v.height = h;
+                    do_clear = false;
+                }
+
+                child_v.screen.clone()
+            };
+
+            let mut child_screen = child_screen.write();
+
+            if do_clear {
+                child_screen.clear();
+            }
+
             run_compositing_stage_direct(
                 editor,
                 editor_env,
@@ -412,14 +434,6 @@ fn compose_children(
                 &mut child_screen,
                 pass_mask,
             );
-
-            // replace previous screen
-            {
-                let mut child_v = child_rc.write();
-                child_v.screen = Arc::new(RwLock::new(Box::new(child_screen)));
-                child_v.width = w;
-                child_v.height = h;
-            }
         }
 
         //
