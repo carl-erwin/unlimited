@@ -431,6 +431,7 @@ impl Screen {
         self.is_start_of_line = true;
 
         self.current_line_index = 0;
+        self.current_line_remain = self.width;
         self.push_count = 0;
 
         self.first_offset = None;
