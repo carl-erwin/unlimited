@@ -1108,6 +1108,10 @@ pub fn destroy_view(
 
         assert_eq!(to_destroy, pp_id);
 
+        // TODO: find in v_to_keep_id hierarchy the 1st child with a grab input flag
+        // editor.find_first_child_view(parent, |&v| { v.grab == true });
+        // env.recompute_focus = true;
+
         pp_id
     };
 

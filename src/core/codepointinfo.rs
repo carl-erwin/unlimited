@@ -37,15 +37,13 @@ impl TextStyle {
 
         // (160, 160, 160)
 
-        (180, 180, 180)
+        // (180, 180, 180)
+
+        (199, 199, 199)
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
-        // (30, 34, 39)
-        //(45, 55, 67)
-        //(40, 44, 49)
-
-        (39, 40, 54)
+        (11, 16, 39)
     }
 
     pub fn title_color() -> (u8, u8, u8) {
@@ -66,7 +64,7 @@ impl TextStyle {
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
         let sbg = Self::default_bg_color();
 
-        let add = 10;
+        let add = 20;
         (
             sbg.0.saturating_add(add),
             sbg.1.saturating_add(add),
