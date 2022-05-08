@@ -298,7 +298,7 @@ pub struct View<'a> {
 
     pub modes: Vec<String>,
 
-    pub mode_ctx: HashMap<String, Box<dyn Any>>,
+    pub mode_ctx: HashMap<&'static str, Box<dyn Any>>,
     //
     pub screen: Arc<RwLock<Box<Screen>>>,
 
@@ -481,19 +481,19 @@ impl<'a> View<'a> {
         self.screen.read().dimension()
     }
 
-    pub fn set_mode_ctx(&mut self, name: &str, ctx: Box<dyn Any>) -> bool {
-        let res = self.mode_ctx.insert(name.to_owned(), ctx);
+    pub fn set_mode_ctx(&mut self, name: &'static str, ctx: Box<dyn Any>) -> bool {
+        let res = self.mode_ctx.insert(name, ctx);
         assert!(res.is_none());
         true
     }
 
-    pub fn check_mode_ctx<T: 'static>(&self, name: &str) -> bool {
-        let ret = self.mode_ctx.get(&name.to_owned());
+    pub fn check_mode_ctx<T: 'static>(&self, name: &'static str) -> bool {
+        let ret = self.mode_ctx.get(&name);
         ret.is_some()
     }
 
-    pub fn mode_ctx_mut<T: 'static>(&mut self, name: &str) -> &mut T {
-        match self.mode_ctx.get_mut(&name.to_owned()) {
+    pub fn mode_ctx_mut<T: 'static>(&mut self, name: &'static str) -> &mut T {
+        match self.mode_ctx.get_mut(&name) {
             Some(box_any) => {
                 let any = box_any.as_mut();
                 match any.downcast_mut::<T>() {
@@ -508,8 +508,8 @@ impl<'a> View<'a> {
         }
     }
 
-    pub fn mode_ctx<T: 'static>(&self, name: &str) -> &T {
-        match self.mode_ctx.get(&name.to_owned()) {
+    pub fn mode_ctx<T: 'static>(&self, name: &'static str) -> &T {
+        match self.mode_ctx.get(&name) {
             Some(box_any) => {
                 let any = box_any.as_ref();
                 match any.downcast_ref::<T>() {
