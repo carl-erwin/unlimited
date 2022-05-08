@@ -7,6 +7,7 @@ use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
 
+use crate::core::codepointinfo::TextStyle;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_vid;
 use crate::core::editor::InputStageActionMap;
@@ -344,8 +345,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
                 let add = 25;
                 cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
                 if mode_ctx.selected {
-                    let add = 50;
-                    cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
+                    cpi.style.bg_color = TextStyle::default_color();
                 } else {
                     let add = 25;
                     cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
