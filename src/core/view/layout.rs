@@ -270,6 +270,11 @@ fn compose_children(
         if !screen.is_off_screen {
             for cb in cbs.iter() {
                 let mode = cb.0.as_ref();
+
+                if cb.1.id == cb.2.id {
+                    continue;
+                }
+
                 mode.borrow().on_view_event(
                     &mut editor,
                     &mut editor_env,
@@ -459,6 +464,11 @@ fn compose_children(
             if !screen.is_off_screen {
                 for cb in cbs.iter() {
                     let mode = cb.0.as_ref();
+
+                    if cb.1.id == cb.2.id {
+                        continue;
+                    }
+
                     mode.borrow().on_view_event(
                         &mut editor,
                         &mut editor_env,

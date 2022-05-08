@@ -98,6 +98,7 @@ pub struct EditorEnv<'a> {
     pub prev_vid: view::Id,
     pub view_id: view::Id,
     pub focus_on: view::Id,
+    pub hover_on: view::Id,
     pub focus_locked_on: Option<view::Id>,
     pub status_view_id: Option<view::Id>,
 
@@ -144,6 +145,7 @@ impl<'a> EditorEnv<'a> {
             center_offset: None,
             skip_compositing: false,
             focus_on: view::Id(0),
+            hover_on: view::Id(0),
             focus_locked_on: None,
             status_view_id: None,
             time_spent: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],

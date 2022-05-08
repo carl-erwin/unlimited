@@ -68,6 +68,8 @@ use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
+use crate::core::view::view_self_subscribe;
+
 use crate::core::event::*;
 
 use lazy_static::lazy_static;
@@ -280,9 +282,9 @@ impl<'a> Mode for LineNumberMode {
 
     fn configure_view(
         &mut self,
-        _editor: &mut Editor<'static>,
-        _env: &mut EditorEnv<'static>,
-        view: &mut View<'static>,
+        mut editor: &mut Editor<'static>,
+        mut env: &mut EditorEnv<'static>,
+        mut view: &mut View<'static>,
     ) {
         // setup input map for core actions
         let input_map = build_input_event_map(LINENUM_INPUT_MAP).unwrap();
@@ -296,24 +298,28 @@ impl<'a> Mode for LineNumberMode {
 
     fn on_view_event(
         &self,
-        mut editor: &mut Editor<'static>,
-        mut env: &mut EditorEnv<'static>,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,
         event: &ViewEvent,
         parent: Option<&mut View<'static>>,
     ) {
+        dbg_println!(
+            "dbg LINENUM on_view_event src: {:?} dst: {:?}, event {:?}",
+            src,
+            dst,
+            event
+        );
+
         match event {
             ViewEvent::Subscribe => {
+                if src.id == dst.id {
+                    // ignore self subscription
+                    return;
+                }
+
                 let mut dst_view = editor.view_map.get(&dst.id).unwrap().write();
-
-                dbg_println!(
-                    "dbg focus LINENUM on_view_event src: {:?} dst: {:?}, event {:?}",
-                    src,
-                    dst,
-                    event
-                );
-
                 let mut mode_ctx =
                     dst_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
                 mode_ctx.text_vid = src.id;
@@ -321,6 +327,12 @@ impl<'a> Mode for LineNumberMode {
             }
 
             ViewEvent::PreComposition => {
+                if src.id == dst.id {
+                    // ignore self subscription
+                    // or deadlock
+                    return;
+                }
+
                 let src_view = editor.view_map.get(&src.id).unwrap().write();
                 let dst_view = editor.view_map.get(&dst.id).unwrap().read();
 
@@ -430,6 +442,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
         let doc = src.document();
         let doc = doc.as_ref().unwrap().read();
+
         if !doc.indexed {
             return;
         }
@@ -468,6 +481,8 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         env.screen.clear();
 
         let w = env.screen.width();
+
+        // show line numbers
         if !self.line_number.is_empty() {
             let mut prev_line = 0;
             for (idx, e) in self.line_number.iter().enumerate() {
@@ -498,6 +513,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
+        // show offsets
         for e in self.line_offsets.iter() {
             let s = format!("@{}", e.0);
             for c in s.chars() {

@@ -650,8 +650,14 @@ pub fn set_focus_on_view(
     // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
+    let prev_vid = env.focus_on;
+    if prev_vid == vid {
+        return;
+    }
+
     dbg_println!("set_focus_on_view ---------");
     dbg_println!("set_focus_on_view update vid {:?}", vid);
+    dbg_println!("focus changed {:?} -> {:?}", prev_vid, vid);
 
     let mut parent_id = view.parent_id;
     loop {
@@ -1061,6 +1067,67 @@ fn setup_focus_and_event(
     vid
 }
 
+fn check_hover_change(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    prev_vid: view::Id,
+    new_vid: view::Id,
+) {
+    if prev_vid == new_vid {
+        return;
+    }
+
+    dbg_println!("hover changed {:?} -> {:?}", prev_vid, new_vid);
+
+    {
+        if let Some(prev_v) = editor.view_map.get(&prev_vid) {
+            let prev_v = prev_v.clone();
+            let prev_v = prev_v.read();
+
+            for cb in prev_v.subscribers.iter() {
+                let mode = cb.0.as_ref();
+
+                if cb.1.id != prev_vid || cb.2.id != prev_vid {
+                    continue;
+                }
+
+                mode.borrow().on_view_event(
+                    &mut editor,
+                    &mut env,
+                    ViewEventSource { id: prev_vid },
+                    ViewEventDestination { id: prev_vid },
+                    &ViewEvent::Leave,
+                    None,
+                );
+            }
+        }
+
+        if let Some(new_v) = editor.view_map.get(&new_vid) {
+            let new_v = new_v.clone();
+            let new_v = new_v.read();
+
+            for cb in new_v.subscribers.iter() {
+                let mode = cb.0.as_ref();
+
+                if cb.1.id != new_vid || cb.2.id != new_vid {
+                    continue;
+                }
+
+                mode.borrow().on_view_event(
+                    &mut editor,
+                    &mut env,
+                    ViewEventSource { id: new_vid },
+                    ViewEventDestination { id: new_vid },
+                    &ViewEvent::Enter,
+                    None,
+                );
+            }
+        }
+    }
+
+    env.hover_on = new_vid;
+}
+
 // Loop over all input events
 fn run_input_stage(
     mut editor: &mut Editor<'static>,
@@ -1091,8 +1158,13 @@ fn run_input_stage(
         }
 
         // select view that will receive the event
+        let hover_vid = env.hover_on;
+
         let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
+        check_hover_change(&mut editor, &mut env, hover_vid, id);
+
         run_stages(Stage::Input, &mut editor, &mut env, id);
+
         // if !env.skip_compositing
         {
             run_stages(Stage::Compositing, &mut editor, &mut env, id);

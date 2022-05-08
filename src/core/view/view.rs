@@ -236,6 +236,8 @@ pub enum ViewEvent {
     PreComposition,
     PostComposition,
     OffsetsChange { start_offset: u64, end_offset: u64 },
+    Enter,
+    Leave,
 }
 
 // marks | selectionsRefreshew_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
@@ -364,6 +366,26 @@ pub fn register_view_subscriber(
     Some(())
 }
 
+// TODO(ceg): we must find a better way to store subscribers and avoid recursive locking
+// register_view_subscriber call rc(src_view).write().subscribers.push(...)
+// NB: self registering by hand to avoid dead lock
+// see register_view_subscriber
+// move subscriptions to editor , to avoid interior mut
+// editor.subscription[view.id] ?
+pub fn view_self_subscribe(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    mode: Rc<RefCell<Box<dyn Mode>>>, // TODO: use type
+    view: &mut View<'static>,
+) -> Option<()> {
+    let src = ViewEventSource { id: view.id };
+    let dst = ViewEventDestination { id: view.id };
+    let ctx = (mode, src, dst);
+    view.subscribers.push(ctx);
+
+    Some(())
+}
+
 impl<'a> View<'a> {
     pub fn document(&self) -> Option<Arc<RwLock<Document<'static>>>> {
         self.document.clone()
@@ -371,8 +393,8 @@ impl<'a> View<'a> {
 
     // Setup view modes. (respect vector order)
     fn setup_modes(
-        editor: &mut Editor<'static>,
-        env: &mut EditorEnv<'static>,
+        mut editor: &mut Editor<'static>,
+        mut env: &mut EditorEnv<'static>,
         mut view: &mut View<'static>,
         modes: &Vec<String>,
     ) {
@@ -387,10 +409,11 @@ impl<'a> View<'a> {
             if mode.is_none() {
                 panic!("cannot find mode {}", mode_name);
             }
-            let mut mode = mode.as_ref().unwrap().borrow_mut();
+            let mode_rc = mode.unwrap();
+            let mut m = mode_rc.borrow_mut();
 
             // TODO(ceg): add doc
-            let action_map = mode.build_action_map();
+            let action_map = m.build_action_map();
             for (name, fnptr) in action_map {
                 view.input_ctx.action_map.insert(name.clone(), fnptr);
             }
@@ -398,10 +421,11 @@ impl<'a> View<'a> {
             // create per view mode context
             // allocate per view ModeCtx shared between the stages
             {
-                let ctx = mode.alloc_ctx();
-                view.set_mode_ctx(mode.name(), ctx);
-                dbg_println!("mode[{}] configure  {:?}", mode.name(), view.id);
-                mode.configure_view(editor, env, &mut view);
+                let ctx = m.alloc_ctx();
+                view.set_mode_ctx(m.name(), ctx);
+                dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
+                m.configure_view(editor, env, &mut view);
+                view_self_subscribe(&mut editor, &mut env, mode_rc.clone(), &mut view);
             }
         }
     }
