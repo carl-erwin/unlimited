@@ -452,7 +452,7 @@ pub fn move_mark_to_previous_line(
     // offset = move_off_screen_mark_to_previous_line(&editor, &env, &v, midx, &mut marks);
 
     dbg_println!(
-        "MARK next position is offscreen ---------------- current m_offset = {}",
+        "MARK next position is offscreen ---------------- current mark offset = {}",
         m_offset
     );
     {
@@ -464,16 +464,30 @@ pub fn move_mark_to_previous_line(
 
             let doc = v.document().unwrap();
             let doc = doc.read();
-            let _doc_size = doc.size() as u64;
+            let doc_size = doc.size() as u64;
 
-            // rewind at least "1 full" screen
+            // rewind at least "1 full line" bytes
             let max_encode_size = 4;
-            let rewind = (width * height * max_encode_size) as u64;
+            let rewind = (width * max_encode_size) as u64;
+
             let start_offset = m_offset.saturating_sub(rewind);
+            dbg_println!(
+                "MARK next position is offscreen ---------------- rewind offset = {}",
+                start_offset
+            );
+
             if start_offset == m_offset {
                 return;
             }
-            let end_offset = screen.last_offset.unwrap();
+
+            let end_offset = std::cmp::min(doc_size, m_offset + rewind);
+
+            dbg_println!(
+                "MARK next position is offscreen ---------------- end offset = {}",
+                end_offset
+            );
+
+            assert!(end_offset >= start_offset);
 
             (start_offset, end_offset, width, height)
         };
@@ -509,7 +523,7 @@ pub fn move_mark_to_previous_line(
         {
             None => {
                 // return last index
-                lines.len() - 1
+                lines.len().saturating_sub(1)
             }
             Some(0) => {
                 dbg_println!("no previous line");
@@ -517,9 +531,15 @@ pub fn move_mark_to_previous_line(
             }
             Some(i) => {
                 dbg_println!("m_offset {} FOUND @ index {:?}", m_offset, i);
-                i - 1
+                i.saturating_sub(1)
             }
         };
+
+        if index >= lines.len() {
+            // BUG!
+            // offscreen marks not correctly handled
+            // return;
+        }
 
         let line_start_off = lines[index].0;
 
