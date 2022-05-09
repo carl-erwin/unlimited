@@ -108,6 +108,9 @@ pub enum LayoutDirection {
 // store this in parent and reuse in resize
 #[derive(Debug, Clone)]
 pub enum LayoutOperation {
+    // Child at View::{.x, .y}
+    Floating,
+
     // We want a fixed size of sz cells vertically/horizontally in the parent
     // used = size
     // remain = remain - sz
@@ -148,6 +151,8 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
         }
 
         match op {
+            LayoutOperation::Floating => {}
+
             LayoutOperation::Fixed { size } => {
                 remain = remain.saturating_sub(*size);
                 sizes.push(*size);

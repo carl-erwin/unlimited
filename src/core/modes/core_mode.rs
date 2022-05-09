@@ -1153,7 +1153,7 @@ pub fn command_palette(
 
         main.floating_children.push(ChildView {
             id: p_view.id,
-            layout_op: LayoutOperation::Fixed { size: 1 },
+            layout_op: LayoutOperation::Floating,
         });
     }
 
