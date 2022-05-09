@@ -19,7 +19,10 @@ use crate::core::view::View;
 //
 
 static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
-static COLOR_GREEN: (u8, u8, u8) = (0, 128, 0);
+// static COLOR_GREEN: (u8, u8, u8) = (0, 128, 0);
+static COLOR_GREEN: (u8, u8, u8) = (85, 170, 127);
+
+
 static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
 
 static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
