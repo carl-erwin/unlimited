@@ -43,6 +43,7 @@ enum TokenType {
     SingleQuote,  // '
     DoubleQuote,  // "
     Comma,        // ,
+    Colon,        // :
     Semicolon,    // ;
     Ampersand,
     Equal,
@@ -164,6 +165,7 @@ impl ContentFilter<'_> for HighlightFilter {
                         '<' => TokenType::LowerThan,
                         '>' => TokenType::GreaterThan,
                         ',' => TokenType::Comma,
+                        ':' => TokenType::Colon,
                         ';' => TokenType::Semicolon,
                         '&' => TokenType::Ampersand,
                         '%' => TokenType::Mod,
@@ -241,7 +243,7 @@ impl ContentFilter<'_> for HighlightFilter {
                         }
 
                         // C operators
-                        "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<"
+                        "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<" | "!"
                         | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => COLOR_GREEN,
 
                         // easy hack, TODO(ceg): transform this module into proper tokenizer
@@ -260,7 +262,7 @@ impl ContentFilter<'_> for HighlightFilter {
 
                         "\"" | "\"\"" | "'" | "''" => COLOR_ORANGE,
 
-                        "," | ";" => (0, 128, 0),
+                        "," | ":" | "::" | ";" => COLOR_GREEN,
 
                         "&" => COLOR_CYAN,
 
