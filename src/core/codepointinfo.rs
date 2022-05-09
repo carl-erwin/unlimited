@@ -51,14 +51,11 @@ impl TextStyle {
     }
 
     pub fn title_bg_color() -> (u8, u8, u8) {
-        // (131, 165, 152)
         Self::default_color()
     }
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
-        let sbg = Self::default_bg_color();
-        let add = 25;
-        (sbg.0 + add, sbg.1 + add, sbg.2 + add)
+        Self::default_mark_line_bg_color()
     }
 
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
