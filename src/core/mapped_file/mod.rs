@@ -572,7 +572,7 @@ impl<'a> MappedFile<'a> {
         } else if file_size > (512 * 1024) {
             1024 * 4 * 2
         } else {
-            1024 * 1024
+            1024 * 4
         };
 
         let mut file = MappedFile {
