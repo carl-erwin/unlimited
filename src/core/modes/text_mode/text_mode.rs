@@ -529,7 +529,6 @@ impl<'a> Mode for TextMode {
                 "text/highlight-keywords",
                 "text/highlight-selection",
                 "text/tab-expansion",
-                "text/highlight-keywords",
                 "text/char-map",
                 "text/show-trailing-spaces",
                 "text/word-wrap",
