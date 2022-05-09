@@ -31,14 +31,21 @@ impl ScreenOverlayFilter<'_> for DrawMarks {
         }
 
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
+
+        let highlight_line_with_marks = tm.select_point.is_empty();
         let marks = &tm.marks;
 
         let _draw_marks = true;
-        refresh_screen_marks(&mut env.screen, marks, true);
+        refresh_screen_marks(&mut env.screen, marks, true, highlight_line_with_marks);
     }
 }
 
-pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
+pub fn refresh_screen_marks(
+    screen: &mut Screen,
+    marks: &Vec<Mark>,
+    set: bool,
+    highlight_line_with_marks: bool,
+) {
     dbg_println!(
         "DRAW MARKS TRY DRAW OFFSET : FIRST {:?}  LAST {:?}",
         screen.first_offset,
@@ -116,6 +123,10 @@ pub fn refresh_screen_marks(screen: &mut Screen, marks: &Vec<Mark>, set: bool) {
     }
 
     // highlight mark-line
+    if !highlight_line_with_marks {
+        return;
+    }
+
     for l in lines_with_marks {
         if let Some(line) = screen.get_line_mut(l) {
             for cell in line {
