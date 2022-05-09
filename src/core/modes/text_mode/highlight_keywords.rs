@@ -253,6 +253,8 @@ impl ContentFilter<'_> for HighlightFilter {
                         // C++ keywords
                         "bool" | "class" | "template" | "namespace" => (0, 128, 128),
 
+                        "true" | "false" => (35, 168, 242),
+
                         "\"" | "\"\"" | "'" | "''" => COLOR_ORANGE,
 
                         "," | ";" => (0, 128, 0),
