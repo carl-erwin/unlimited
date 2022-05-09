@@ -230,7 +230,7 @@ impl ContentFilter<'_> for HighlightFilter {
                         | "i64" | "i128" | "f32" | "f64" => (0, 128, 128),
 
                         // C preprocessor
-                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
+                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else" | "#undef"
                         | "#define" | "#pragma" => COLOR_RED,
 
                         // C keywords
