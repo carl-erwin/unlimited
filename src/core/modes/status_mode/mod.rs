@@ -11,7 +11,6 @@ use crate::core::modes::text_mode::TabFilter;
 use crate::core::modes::text_mode::TextCodecFilter;
 use crate::core::modes::text_mode::UnicodeToTextFilter;
 use crate::core::modes::text_mode::Utf8Filter;
-use crate::core::modes::text_mode::WordWrapFilter;
 use crate::core::view::View;
 
 use crate::core::screen::screen_apply;
@@ -64,7 +63,6 @@ impl<'a> Mode for StatusMode {
         //
         let use_utf8_codec = true;
         let use_tabulation_exp = true;
-        let use_word_wrap = true;
 
         // mandatory data reader
         view.compose_content_filters
@@ -88,19 +86,11 @@ impl<'a> Mode for StatusMode {
             .borrow_mut()
             .push(Box::new(UnicodeToTextFilter::new()));
 
-        //
-
+        // TODO: char map 0x9 -> "\t"
         if use_tabulation_exp {
             view.compose_content_filters
                 .borrow_mut()
                 .push(Box::new(TabFilter::new()));
-        }
-
-        if use_word_wrap {
-            // NB: Word Wrap after tab expansion
-            view.compose_content_filters
-                .borrow_mut()
-                .push(Box::new(WordWrapFilter::new()));
         }
 
         let mut screen_filter = ScreenFilter::new();
