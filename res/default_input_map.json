@@ -2,9 +2,6 @@
   {
     "events": [
 
-       { "in": [{ "key": "F9"     }],                          "action": "text-mode:display-end-of-line" },
-       { "in": [{ "key": "F8"     }],                          "action": "text-mode:display-word-wrap" },
-
        { "moves": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "Left"     }],                        "action": "text-mode:move-marks-backward" },

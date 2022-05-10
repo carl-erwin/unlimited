@@ -207,7 +207,6 @@ pub struct TextModeContext {
     // TODO ? char_map_and_color HashMap<char, String, Option<(u8,u8,u8)>>,
     pub char_map: Option<HashMap<char, String>>,
     pub color_map: Option<HashMap<char, (u8, u8, u8)>>,
-    pub display_word_wrap: bool,
 
     pub pre_compose_action: Vec<Action>,
     pub post_compose_action: Vec<Action>,
@@ -458,7 +457,6 @@ impl<'a> Mode for TextMode {
             button_state: [0; 8],
             char_map: Some(char_map),
             color_map: Some(color_map),
-            display_word_wrap: false,
             pre_compose_action: vec![],
             post_compose_action: vec![],
             prev_action: ActionType::MarksMove,
@@ -582,9 +580,6 @@ impl TextMode {
 
     pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
         let v: Vec<(&str, InputStageFunction)> = vec![
-            // tools
-            ("text-mode:display-end-of-line", display_end_of_line),
-            ("text-mode:display-word-wrap", display_word_wrap),
             // navigation
             // marks
             ("text-mode:move-marks-backward", move_marks_backward),
@@ -2108,32 +2103,6 @@ pub fn center_around_offset(
 
         center_view_around_offset(view, editor, env, offset); // TODO(ceg): enum { top center bottom } ? in text-mode
     }
-}
-
-pub fn display_end_of_line(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write();
-    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-    let s = if let Some(s) = tm.char_map.as_mut().unwrap().get(&'\n') {
-        if *s == " " {
-            '\u{2936}'
-        } else {
-            ' '
-        }
-    } else {
-        ' '
-    };
-
-    dbg_println!("\\n -> {}", s);
-
-    tm.char_map.as_mut().unwrap().insert('\n', s.to_string());
-}
-
-pub fn display_word_wrap(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let mut v = view.write();
-    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-    tm.display_word_wrap = !tm.display_word_wrap;
 }
 
 /// This function computes start/end of lines between start_offset end_offset.<br/>

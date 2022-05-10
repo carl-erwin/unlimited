@@ -75,7 +75,6 @@ pub struct WordWrapFilter {
     max_row: u64,
     column_count: u64,
     accum: Vec<FilterIo>,
-    display_wrap: bool,
 
     prev_offset: Option<u64>,
 
@@ -93,7 +92,6 @@ impl WordWrapFilter {
             max_row: 0,
             column_count: 0,
             accum: vec![],
-            display_wrap: !false,
             prev_offset: None,
             lines: vec![Vec::new()],
             line_index: 0,
@@ -168,12 +166,6 @@ impl ContentFilter<'_> for WordWrapFilter {
         );
 
         self.reset(&env);
-
-        let v = view.read();
-        if v.check_mode_ctx::<TextModeContext>("text-mode") {
-            let tm = v.mode_ctx::<TextModeContext>("text-mode");
-            self.display_wrap = tm.display_word_wrap;
-        }
     }
 
     fn run(
