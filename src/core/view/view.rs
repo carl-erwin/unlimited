@@ -207,7 +207,7 @@ static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 
 pub struct InputContext {
     pub action_map: InputStageActionMap<'static>, // ref to current focused widget ?
-    pub input_map: Rc<RefCell<Vec<InputEventMap>>>,
+    pub input_map: Rc<RefCell<Vec<(&'static str, InputEventMap)>>>, // mode name
     pub stack_pos: Option<usize>,
     pub current_node: Option<Rc<InputEventRule>>,
     pub trigger: Vec<InputEvent>,
@@ -270,6 +270,11 @@ pub struct ChildView {
     pub layout_op: LayoutOperation,
 }
 
+pub struct ControllerView {
+    pub id: Id,
+    pub mode_name: &'static str,
+}
+
 /// The **View** is a way to present a given Document.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
@@ -291,6 +296,9 @@ pub struct View<'a> {
     pub parent_id: Option<Id>,
     pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
     pub status_view_id: Option<Id>, // TODO(ceg): remove this ?  or per view see env.status_view_id
+
+    pub controller: Option<ControllerView>, // this view is controlled by an other View's mode
+
     /*
       any view that can display some text,
       TODO(ceg): use special document for this
@@ -474,6 +482,7 @@ impl<'a> View<'a> {
             ignore_focus: true,
             focus_to: None,
             status_view_id: None,
+            controller: None,
             id: Id(id),
             document,
             screen,

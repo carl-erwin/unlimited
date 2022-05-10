@@ -352,7 +352,7 @@ fn eval_input_stack_level(
             let input_map = &v.input_ctx.input_map.borrow()[stack_index];
             action_name = eval_input_event(
                 &ev,
-                &input_map,
+                &input_map.1,
                 default_action_mode,
                 &mut in_node,
                 &mut out_node,

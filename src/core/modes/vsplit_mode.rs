@@ -69,7 +69,7 @@ impl<'a> Mode for VsplitMode {
         // setup input map for core actions
         let input_map = build_input_event_map(VSPLIT_INPUT_MAP).unwrap();
         let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push(input_map);
+        input_map_stack.push((self.name(), input_map));
 
         view.compose_content_filters
             .borrow_mut()

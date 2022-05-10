@@ -26,6 +26,8 @@ use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
+use crate::core::view::ControllerView;
+
 static FIND_TRIGGER_MAP: &str = r#"
 [
   {
@@ -77,7 +79,7 @@ impl<'a> Mode for FindMode {
         // setup input map for core actions
         let input_map = build_input_event_map(FIND_TRIGGER_MAP).unwrap();
         let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push(input_map);
+        input_map_stack.push((self.name(), input_map));
     }
 
     fn on_view_event(
@@ -87,21 +89,51 @@ impl<'a> Mode for FindMode {
         _src: ViewEventSource,
         _dst: ViewEventDestination,
         event: &ViewEvent,
-        _src_view: &mut View<'static>,
+        src_view: &mut View<'static>,
         _parent: Option<&mut View<'static>>,
     ) {
-        dbg_println!(
-            "mode '{}' on_view_event src: {:?} dst: {:?}, event {:?}",
-            self.name(),
-            _src,
-            _dst,
-            event
-        );
+        if env.status_view_id.is_none() {
+            return;
+        }
 
+        let src_view_id = src_view.id;
+        let svid = env.status_view_id.clone().unwrap();
+        dbg_println!("find-mode svid = {:?}", svid);
         match event {
-            &ViewEvent::ViewDeselected => {}
+            &ViewEvent::ViewDeselected => {
+                let mut fm = src_view.mode_ctx_mut::<FindModeContext>("find-mode");
+                dbg_println!("find-mode fm.active = {}", fm.active);
+                if fm.active {
+                    let status_view = editor.view_map.get(&svid).unwrap();
+                    let mut status_view = status_view.write();
+                    match &mut status_view.controller {
+                        Some(ControllerView { id, mode_name }) => {
+                            if *id == src_view_id && *mode_name == "find-mode" {
+                                clear_status_view(&mut status_view, &mut fm);
+                            }
+                        }
 
-            &ViewEvent::ViewSelected => {}
+                        _ => {}
+                    }
+                    status_view.controller = None;
+                }
+            }
+
+            &ViewEvent::ViewSelected => {
+                let src_view_id = src_view.id;
+                let mut fm = src_view.mode_ctx_mut::<FindModeContext>("find-mode");
+                dbg_println!("find-mode fm.active = {}", fm.active);
+                if fm.active {
+                    let status_view = editor.view_map.get(&svid).unwrap();
+                    let mut status_view = status_view.write();
+
+                    status_view.controller = Some(view::ControllerView {
+                        id: src_view_id,
+                        mode_name: &"find-mode",
+                    });
+                    update_status_view(&mut status_view, &mut fm);
+                }
+            }
 
             _ => {}
         }
@@ -119,6 +151,7 @@ impl FindModeContext {
     pub fn new() -> Self {
         dbg_println!("FindMode");
         FindModeContext {
+            active: false,
             find_str: Vec::new(),
             match_start: None,
             previous_encoded_str_len: 0,
@@ -144,6 +177,32 @@ impl FindMode {
     }
 }
 
+// cut and paste from display_find_string
+fn update_status_view(status_view: &mut View, fm: &mut FindModeContext) {
+    // clear status
+    let doc = status_view.document().unwrap();
+    let mut doc = doc.write();
+
+    doc.delete_content(None);
+
+    // set status text
+    let text = "Find: ".as_bytes();
+    doc.append(text);
+    let w = status_view.width.saturating_sub(text.len() + 1);
+    let s: String = fm.find_str.iter().collect();
+    let d = &s.as_bytes()[s.len().saturating_sub(w)..];
+    doc.append(d);
+}
+
+fn clear_status_view(status_view: &mut View, fm: &mut FindModeContext) {
+    // clear status
+    let doc = status_view.document().unwrap();
+    let mut doc = doc.write();
+    // clear buffer. doc.erase_all();
+    let sz = doc.size();
+    doc.remove(0, sz, None);
+}
+
 // TODO(ceg): env.focus_stack.push(view.id)
 // TODO(ceg): env.set_focus_to.push(status.id)
 // Mode "find"
@@ -162,6 +221,22 @@ pub fn find_start(
     let svid = status_vid.unwrap();
 
     let status_view = editor.view_map.get(&svid).unwrap();
+
+    // start/resume ?
+    {
+        let vid = {
+            let mut v = view.write();
+            let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+            fm.active = true;
+            v.id
+        };
+
+        status_view.write().controller = Some(view::ControllerView {
+            id: vid,
+            mode_name: &"find-mode",
+        });
+    }
+
     //
     let doc = status_view.read().document().unwrap();
     let mut doc = doc.write();
@@ -170,20 +245,19 @@ pub fn find_start(
     doc.delete_content(None);
 
     // set status text
-    let text = "Find: ";
-    let bytes = text.as_bytes();
-    doc.insert(0, bytes.len(), &bytes);
+    doc.append("Find: ".as_bytes());
 
     // push new input map for y/n
     let mut v = view.write();
     // lock focus on v
     // env.focus_locked_on = Some(v.id);
 
+    // TODO:
     dbg_println!("configure find  {:?}", v.id);
     v.input_ctx.stack_pos = None;
     let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
     let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-    input_map_stack.push(input_map);
+    input_map_stack.push(("find-mode", input_map));
     // TODO(ceg): add lock flag
     // to not exec lower input level
 }
@@ -219,7 +293,7 @@ pub fn find_stop(
             fm.find_str.clear();
             fm.match_start = None;
             fm.previous_encoded_str_len = 0;
-
+            fm.active = false;
             //
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.select_point.clear();
@@ -390,25 +464,9 @@ pub fn display_find_string(
 
     if let Some(status_vid) = status_vid {
         let mut v = view.write();
-        let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+        let mut fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
 
-        let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
-
-        // clear buffer. doc.erase_all();
-        let sz = doc.size();
-        doc.remove(0, sz, None);
-
-        // set status text
-        let text = "Find: ";
-        let bytes = text.as_bytes();
-        doc.insert(0, bytes.len(), &bytes);
-
-        let s: String = fm.find_str.iter().collect();
-        // doc.append() ?
-        let bytes = s.as_bytes();
-        let sz = doc.size() as u64;
-        doc.insert(sz, bytes.len(), &bytes);
+        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+        update_status_view(&mut status_view, &mut fm);
     }
 }

@@ -585,6 +585,11 @@ impl<'a> Document<'a> {
         sz
     }
 
+    pub fn append(&mut self, data: &[u8]) -> usize {
+        let sz = self.size() as u64;
+        self.insert(sz, data.len(), &data)
+    }
+
     /// remove up to 'nr_bytes' from the buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data)
     /// before remove the bytes

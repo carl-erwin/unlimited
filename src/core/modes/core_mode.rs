@@ -74,7 +74,7 @@ impl<'a> Mode for CoreMode {
         // setup input map for core actions
         let input_map = build_input_event_map(CORE_INPUT_MAP).unwrap();
         let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push(input_map);
+        input_map_stack.push((self.name(), input_map));
     }
 }
 
@@ -177,7 +177,7 @@ pub fn application_quit_abort_setup(
             v.input_ctx.stack_pos = None;
             let input_map = build_input_event_map(CORE_QUIT_ABORT_MAP).unwrap();
             let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-            input_map_stack.push(input_map);
+            input_map_stack.push(("core-mode", input_map));
             // TODO(ceg): add lock flag
             // to not exec lower input level
         }

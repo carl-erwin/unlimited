@@ -496,7 +496,7 @@ impl<'a> Mode for TextMode {
         {
             let input_map = build_input_event_map(DEFAULT_INPUT_MAP).unwrap();
             let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-            input_map_stack.push(input_map);
+            input_map_stack.push((self.name(), input_map));
         }
 
         /*

@@ -22,6 +22,12 @@ use crate::core::modes::text_mode::mark::Mark;
 use crate::core::view;
 use crate::core::view::View;
 
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
+
+use crate::core::view::ControllerView;
+
 use crate::core::document::find_nth_byte_offset;
 
 static GOTO_LINE_TRIGGER_MAP: &str = r#"
@@ -75,7 +81,64 @@ impl<'a> Mode for GotoLineMode {
         // setup input map for core actions
         let input_map = build_input_event_map(GOTO_LINE_TRIGGER_MAP).unwrap();
         let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push(input_map);
+        input_map_stack.push((self.name(), input_map));
+    }
+
+    fn on_view_event(
+        &self,
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
+        _src: ViewEventSource,
+        _dst: ViewEventDestination,
+        event: &ViewEvent,
+        src_view: &mut View<'static>,
+        _parent: Option<&mut View<'static>>,
+    ) {
+        if env.status_view_id.is_none() {
+            dbg_println!("goto-line-mode env.status_view_id.is_none()");
+            return;
+        }
+
+        let src_view_id = src_view.id;
+        let svid = env.status_view_id.clone().unwrap();
+        dbg_println!("goto-line-mode svid = {:?}", svid);
+        match event {
+            &ViewEvent::ViewDeselected => {
+                let mut gtm = src_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+                dbg_println!("goto-line-mode gtm.active = {}", gtm.active);
+                if gtm.active {
+                    let status_view = editor.view_map.get(&svid).unwrap();
+                    let mut status_view = status_view.write();
+                    match &mut status_view.controller {
+                        Some(ControllerView { id, mode_name }) => {
+                            if *id == src_view_id && *mode_name == "goto-line-mode" {
+                                clear_status_view(&mut status_view, &mut gtm);
+                            }
+                        }
+
+                        _ => {}
+                    }
+                }
+            }
+
+            &ViewEvent::ViewSelected => {
+                let src_view_id = src_view.id;
+                let mut gtm = src_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+                dbg_println!("goto-line-mode gtm.active = {}", gtm.active);
+                if gtm.active {
+                    let status_view = editor.view_map.get(&svid).unwrap();
+                    let mut status_view = status_view.write();
+
+                    status_view.controller = Some(view::ControllerView {
+                        id: src_view_id,
+                        mode_name: &"goto-line-mode",
+                    });
+                    update_status_view(&mut status_view, &mut gtm);
+                }
+            }
+
+            _ => {}
+        }
     }
 }
 
@@ -88,6 +151,7 @@ impl GotoLineModeContext {
     pub fn new() -> Self {
         dbg_println!("GotoLineMode");
         GotoLineModeContext {
+            active: false,
             goto_line_str: Vec::new(),
         }
     }
@@ -125,6 +189,22 @@ pub fn goto_line_start(
     let svid = status_vid.unwrap();
 
     let status_view = editor.view_map.get(&svid).unwrap();
+
+    // start/resume ?
+    {
+        let vid = {
+            let mut v = view.write();
+            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+            gtm.active = true;
+            v.id
+        };
+
+        status_view.write().controller = Some(view::ControllerView {
+            id: vid,
+            mode_name: &"goto-line-mode",
+        });
+    }
+
     //
     let doc = status_view.read().document().unwrap();
     let mut doc = doc.write();
@@ -133,16 +213,14 @@ pub fn goto_line_start(
     doc.delete_content(None);
 
     // set status text
-    let text = "Goto: ";
-    let bytes = text.as_bytes();
-    doc.insert(0, bytes.len(), &bytes);
+    doc.append("Goto: ".as_bytes());
 
     // setup new input map
     let mut v = view.write();
     v.input_ctx.stack_pos = None;
     let input_map = build_input_event_map(GOTO_LINE_INTERACTIVE_MAP).unwrap();
     let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-    input_map_stack.push(input_map);
+    input_map_stack.push(("goto-line-mode", input_map));
 }
 
 pub fn goto_line_stop(
@@ -172,6 +250,7 @@ pub fn goto_line_stop(
 
             // gtm.reset();
             gtm.goto_line_str.clear();
+            gtm.active = false;
         }
     }
 }
@@ -271,7 +350,6 @@ pub fn goto_line_add_char(
         let line_str: String = gtm.goto_line_str.iter().collect();
 
         let n = line_str.parse::<u64>().unwrap_or(0);
-
         if n > size {
             gtm.goto_line_str.pop();
             return;
@@ -306,6 +384,25 @@ pub fn goto_line_del_char(
     goto_line_set_target_line(&view, target_line);
 }
 
+fn update_status_view(status_view: &mut View, gtm: &mut GotoLineModeContext) {
+    let doc = status_view.document().unwrap();
+    let mut doc = doc.write();
+
+    doc.delete_content(None);
+    doc.append("Goto: ".as_bytes());
+
+    let s: String = gtm.goto_line_str.iter().collect();
+    doc.append(s.as_bytes());
+}
+
+fn clear_status_view(status_view: &mut View, fm: &mut GotoLineModeContext) {
+    // clear status
+    let doc = status_view.document().unwrap();
+    let mut doc = doc.write();
+    // clear buffer. doc.erase_all();
+    doc.delete_content(None);
+}
+
 pub fn display_goto_line_string(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -317,25 +414,9 @@ pub fn display_goto_line_string(
 
     if let Some(status_vid) = status_vid {
         let mut v = view.write();
-        let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+        let mut gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
 
-        let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
-
-        // clear buffer. doc.erase_all();
-        let sz = doc.size();
-        doc.remove(0, sz, None);
-
-        // set status text
-        let text = "Goto: ";
-        let bytes = text.as_bytes();
-        doc.insert(0, bytes.len(), &bytes);
-
-        let s: String = gtm.goto_line_str.iter().collect();
-        // doc.append() ?
-        let bytes = s.as_bytes();
-        let sz = doc.size() as u64;
-        doc.insert(sz, bytes.len(), &bytes);
+        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+        update_status_view(&mut status_view, &mut gtm);
     }
 }
