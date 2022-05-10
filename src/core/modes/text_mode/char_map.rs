@@ -73,6 +73,22 @@ impl ContentFilter<'_> for CharMapFilter {
                         },
                     ..
                 } => {
+                    // enable only for invisible ascii chars
+                    let do_transform = if *real_cp < 0x9 {
+                        true
+                    } else if *real_cp >= 0xb && *real_cp <= 0x1f {
+                        true
+                    } else if *real_cp == 0x07f || *real_cp == 0x80 {
+                        true
+                    } else {
+                        false
+                    };
+
+                    if !do_transform {
+                        filter_out.push(io.clone());
+                        continue;
+                    }
+
                     let v = transform_io_data(
                         self.char_map.as_ref(),
                         self.color_map.as_ref(),
