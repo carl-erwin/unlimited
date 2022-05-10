@@ -189,7 +189,7 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
 // trait ?
 // collection of functions, at each pass
 // layout
-// see process_input_event and augment the signatrue
+// see process_input_event and augment the signature
 
 // pre()
 // process
@@ -240,12 +240,14 @@ pub enum ViewEvent {
     Subscribe,
     PreComposition,
     PostComposition,
-    OffsetsChange { start_offset: u64, end_offset: u64 },
+    OffsetsChange { start_offset: u64, end_offset: u64 }, // ContentChanged
     Enter,
     Leave,
+    ViewSelected,
+    ViewDeselected,
 }
 
-// marks | selectionsRefreshew_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
+// marks | selections Refresh_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
 // cb signature  fn cb_on_document_event(editor, env, DocumentEventSource { doc_id }, doc_event)
 
 // register siblings view
@@ -419,8 +421,8 @@ impl<'a> View<'a> {
 
             // TODO(ceg): add doc
             let action_map = m.build_action_map();
-            for (name, fnptr) in action_map {
-                view.input_ctx.action_map.insert(name.clone(), fnptr);
+            for (name, cb) in action_map {
+                view.input_ctx.action_map.insert(name.clone(), cb);
             }
 
             // create per view mode context

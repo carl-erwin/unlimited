@@ -527,7 +527,7 @@ pub fn run_compositing_stage_direct(
         base_offset,
         max_offset,
         screen,
-        focus_vid: editor_env.focus_on,
+        focus_vid: editor_env.active_view,
     };
 
     // screen must be cleared by caller

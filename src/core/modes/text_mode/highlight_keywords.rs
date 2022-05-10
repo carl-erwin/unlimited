@@ -22,7 +22,6 @@ static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
 // static COLOR_GREEN: (u8, u8, u8) = (0, 128, 0);
 static COLOR_GREEN: (u8, u8, u8) = (85, 170, 127);
 
-
 static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
 
 static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
@@ -230,8 +229,8 @@ impl ContentFilter<'_> for HighlightFilter {
                         | "i64" | "i128" | "f32" | "f64" => (0, 128, 128),
 
                         // C preprocessor
-                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else" | "#undef"
-                        | "#define" | "#pragma" => COLOR_RED,
+                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
+                        | "#undef" | "#define" | "#pragma" => COLOR_RED,
 
                         // C keywords
                         "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
@@ -243,8 +242,8 @@ impl ContentFilter<'_> for HighlightFilter {
                         }
 
                         // C operators
-                        "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<" | "!"
-                        | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => COLOR_GREEN,
+                        "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<"
+                        | "!" | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => COLOR_GREEN,
 
                         // easy hack, TODO(ceg): transform this module into proper tokenizer
                         "((" | "))" => COLOR_GREEN,

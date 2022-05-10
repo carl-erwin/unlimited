@@ -639,10 +639,10 @@ pub fn set_focus_on_vid(
         return;
     }
 
-    set_focus_on_view(&mut editor, &mut env, &mut v);
+    set_active_view(&mut editor, &mut env, &mut v);
 }
 
-pub fn set_focus_on_view(
+pub fn set_active_view(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &mut View<'static>,
@@ -650,13 +650,13 @@ pub fn set_focus_on_view(
     // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
-    let prev_vid = env.focus_on;
+    let prev_vid = env.active_view;
     if prev_vid == vid {
         return;
     }
 
-    dbg_println!("set_focus_on_view ---------");
-    dbg_println!("set_focus_on_view update vid {:?}", vid);
+    dbg_println!("set_active_view ---------");
+    dbg_println!("set_active_view update vid {:?}", vid);
     dbg_println!("focus changed {:?} -> {:?}", prev_vid, vid);
 
     let mut parent_id = view.parent_id;
@@ -667,8 +667,8 @@ pub fn set_focus_on_view(
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
 
-                env.focus_on = vid; // Option ?
-                dbg_println!("set_focus_on_view next parent_id {:?}", parent_id);
+                env.active_view = vid; // Option ?
+                dbg_println!("set_active_view next parent_id {:?}", parent_id);
             } else {
                 break;
             }
@@ -677,7 +677,7 @@ pub fn set_focus_on_view(
         }
     }
 
-    dbg_println!("set focus on view {:?}", env.focus_on);
+    dbg_println!("set focus on view {:?}", env.active_view);
 }
 
 // always compute ?
@@ -845,7 +845,9 @@ fn clip_coordinates_and_get_vid(
 
     let vid = match &mut ev {
         InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
-            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+            let vid = clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y);
+            env.last_selected = vid;
+            vid
         }
         InputEvent::ButtonRelease(event::ButtonEvent { x, y, .. }) => {
             clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
@@ -1059,7 +1061,7 @@ fn setup_focus_and_event(
     };
 
     let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
-    // - - TODO(ceg): if button press only: env.focus_on = Option<vid> ? -
+    // - - TODO(ceg): if button press only: env.active_view = Option<vid> ? -
     set_focus_on_vid(&mut editor, &mut env, vid);
 
     env.current_input_event = ev;
@@ -1128,6 +1130,76 @@ fn check_hover_change(
     env.hover_on = new_vid;
 }
 
+fn check_selection_change(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    prev_vid: view::Id,
+    new_vid: view::Id,
+) {
+    if prev_vid == new_vid {
+        return;
+    }
+
+    {
+        if let Some(new_v) = editor.view_map.get(&new_vid) {
+            let new_v = new_v.clone();
+            let new_v = new_v.read();
+
+            // TODO(ceg): use event mask
+            if new_v.ignore_focus {
+                dbg_println!("clicked changed ignored");
+                env.last_selected = prev_vid;
+                return;
+            }
+
+            // notify prev
+            if let Some(prev_v) = editor.view_map.get(&prev_vid) {
+                let prev_v = prev_v.clone();
+                let prev_v = prev_v.read();
+
+                for cb in prev_v.subscribers.iter() {
+                    let mode = cb.0.as_ref();
+
+                    if cb.1.id != prev_vid || cb.2.id != prev_vid {
+                        continue;
+                    }
+
+                    mode.borrow().on_view_event(
+                        &mut editor,
+                        &mut env,
+                        ViewEventSource { id: prev_vid },
+                        ViewEventDestination { id: prev_vid },
+                        &ViewEvent::ViewDeselected,
+                        None,
+                    );
+                }
+            }
+
+            dbg_println!("clicked changed {:?} -> {:?}", prev_vid, new_vid);
+
+            // notify new
+            for cb in new_v.subscribers.iter() {
+                let mode = cb.0.as_ref();
+
+                if cb.1.id != new_vid || cb.2.id != new_vid {
+                    continue;
+                }
+
+                mode.borrow().on_view_event(
+                    &mut editor,
+                    &mut env,
+                    ViewEventSource { id: new_vid },
+                    ViewEventDestination { id: new_vid },
+                    &ViewEvent::ViewSelected,
+                    None,
+                );
+            }
+        }
+    }
+
+    env.last_selected = new_vid;
+}
+
 // Loop over all input events
 fn run_input_stage(
     mut editor: &mut Editor<'static>,
@@ -1159,9 +1231,13 @@ fn run_input_stage(
 
         // select view that will receive the event
         let hover_vid = env.hover_on;
+        let last_selected = env.last_selected;
 
         let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         check_hover_change(&mut editor, &mut env, hover_vid, id);
+
+        let new_clicked = env.last_selected;
+        check_selection_change(&mut editor, &mut env, last_selected, new_clicked);
 
         run_stages(Stage::Input, &mut editor, &mut env, id);
 
