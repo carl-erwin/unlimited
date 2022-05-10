@@ -79,10 +79,10 @@ impl<'a> Mode for CoreMode {
 }
 
 pub struct CoreMode {
-    // add common filed
+    // add common fields
 }
 pub struct CoreModeContext {
-    // add common filed
+    // add common fields
 }
 
 impl CoreMode {

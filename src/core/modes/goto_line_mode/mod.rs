@@ -80,7 +80,7 @@ impl<'a> Mode for GotoLineMode {
 }
 
 pub struct GotoLineModeContext {
-    // add common filed
+    pub active: bool,
     pub goto_line_str: Vec<char>,
 }
 
@@ -93,7 +93,7 @@ impl GotoLineModeContext {
     }
 }
 pub struct GotoLineMode {
-    // add common filed
+    // add common fields
 }
 
 impl GotoLineMode {

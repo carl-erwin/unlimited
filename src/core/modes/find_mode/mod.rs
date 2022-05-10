@@ -109,7 +109,7 @@ impl<'a> Mode for FindMode {
 }
 
 pub struct FindModeContext {
-    // add common filed
+    pub active: bool,
     pub find_str: Vec<char>,
     pub match_start: Option<u64>,
     pub previous_encoded_str_len: usize,
@@ -126,7 +126,7 @@ impl FindModeContext {
     }
 }
 pub struct FindMode {
-    // add common filed
+    // add common fields
 }
 
 impl FindMode {

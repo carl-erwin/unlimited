@@ -117,7 +117,7 @@ impl<'a> Mode for StatusMode {
 }
 
 pub struct StatusModeCompose {
-    // add common filed
+    // add common fields
 }
 
 impl StatusModeCompose {

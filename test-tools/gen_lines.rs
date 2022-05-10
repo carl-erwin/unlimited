@@ -3,7 +3,7 @@ use std::io::BufWriter;
 use std::io::{self, Write};
 
 /// Simple line generator to test very large file indexing/line numbering
-/// each line starts with a line number and is followed by an abitrary number of characters.
+/// each line starts with a line number and is followed by an arbitrary number of characters.
 fn main() {
     let os_args = env::args();
     let args: Vec<_> = os_args.collect();

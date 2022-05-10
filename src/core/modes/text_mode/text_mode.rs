@@ -571,7 +571,7 @@ impl<'a> Mode for TextMode {
 }
 
 pub struct TextMode {
-    // add common field
+    // add common fields
 }
 
 impl TextMode {
