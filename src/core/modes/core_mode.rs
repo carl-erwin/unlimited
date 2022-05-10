@@ -30,7 +30,7 @@ static CORE_INPUT_MAP: &str = r#"
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-     { "in": [{ "key": "ctrl+p" } ],                         "action": "command-palette" }
+     { "in": [{ "key": "ctrl+p" } ],                         "action": "pop-up" }
 
     ]
   }
@@ -111,7 +111,7 @@ impl CoreMode {
             application_quit_abort_no,
         );
 
-        register_input_stage_action(&mut map, "command-palette", command_palette);
+        register_input_stage_action(&mut map, "pop-up", view_popup);
 
         register_input_stage_action(&mut map, "save-document", save_document); // core ?
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
@@ -1104,7 +1104,7 @@ pub fn destroy_view(
 
 use crate::core::document::DocumentBuilder;
 
-pub fn command_palette(
+pub fn view_popup(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
@@ -1116,22 +1116,57 @@ pub fn command_palette(
         (main.width, main.height)
     };
 
+    // destroy previous
+    {
+        if let Some(info) = {
+            let mut main = editor.view_map.get(&main_vid).unwrap().write();
+            main.floating_children.pop()
+        } {
+            editor.view_map.remove(&info.id);
+            return;
+        }
+    }
+
     let command_doc = DocumentBuilder::new()
-        .document_name("command-palette")
+        .document_name("pop-up")
         .internal(true)
         //           .use_buffer_log(false)
         .finalize();
 
     let text = format!(
-        "Command Palette: main_width {} main_height {}",
-        main_width, main_height
+        "Pop-up: parent_width {} parent_height {}\n",
+        main_width, main_height,
     );
+    let pop_height = 25;
     let text_width = text.len();
+    let pop_width = text_width;
     let x = (main_width / 2).saturating_sub(text_width / 2);
+    let y = (main_height / 2).saturating_sub(pop_height / 2);
 
     {
         let mut d = command_doc.as_ref().unwrap().write();
-        d.insert(0, text_width, text.as_bytes());
+        d.append(text.as_bytes());
+
+        let text = format!("pop_width {} pop_height {}\n", x, pop_height);
+        d.append(text.as_bytes());
+
+        let text = format!("pop_x {} pop_y {}\n", x, y);
+        d.append(text.as_bytes());
+
+        let mut text: String = String::new();
+        for _ in 0..text_width {
+            text.push_str(&"-")
+        }
+        d.append(text.as_bytes());
+
+        let text = format!("This is a simple pop-up test\n\n\n\n\n");
+        d.append(text.as_bytes());
+
+        let mut text: String = String::new();
+        for _ in 0..text_width {
+            text.push_str(&"-")
+        }
+        d.append(text.as_bytes());
     }
 
     // create view
@@ -1139,10 +1174,10 @@ pub fn command_palette(
         &mut editor,
         &mut env,
         Some(main_vid),
-        x, // TODO: move recompute
-        2,
-        text_width,
-        25,
+        x,
+        y,
+        pop_width,
+        pop_height,
         command_doc,
         &vec!["status-mode".to_owned()],
         0,
