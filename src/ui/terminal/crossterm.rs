@@ -553,7 +553,7 @@ fn draw_screen(
         l += 1;
     }
 
-    dbg_println!("NB ops {}\r", ops.len());
+    // dbg_println!("NB screen ops {}\r", ops.len());
 
     for op in ops {
         match op {
