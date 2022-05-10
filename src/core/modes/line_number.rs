@@ -303,13 +303,15 @@ impl<'a> Mode for LineNumberMode {
         src: ViewEventSource,
         dst: ViewEventDestination,
         event: &ViewEvent,
+        src_view: &mut View<'static>,
         parent: Option<&mut View<'static>>,
     ) {
         dbg_println!(
-            "dbg LINENUM on_view_event src: {:?} dst: {:?}, event {:?}",
+            "dbg LINENUM on_view_event src: {:?} dst: {:?}, event {:?} src_view {:?}",
             src,
             dst,
-            event
+            event,
+            src_view.id
         );
 
         match event {
@@ -319,25 +321,23 @@ impl<'a> Mode for LineNumberMode {
                     return;
                 }
 
-                let mut dst_view = editor.view_map.get(&dst.id).unwrap().write();
+                let mut linenum_view = editor.view_map.get(&dst.id).unwrap().write();
                 let mut mode_ctx =
-                    dst_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+                    linenum_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+
                 mode_ctx.text_vid = src.id;
                 mode_ctx.linenum_vid = dst.id;
             }
 
             ViewEvent::PreComposition => {
-                if src.id == dst.id {
-                    // ignore self subscription
-                    // or deadlock
+                if src_view.id != dst.id {
                     return;
                 }
 
-                let src_view = editor.view_map.get(&src.id).unwrap().write();
-                let dst_view = editor.view_map.get(&dst.id).unwrap().read();
+                let text_view = src_view;
 
                 // TODO(ceg): resize line-number view
-                let doc = src_view.document();
+                let doc = text_view.document();
                 let doc = doc.as_ref().unwrap().read();
                 let max_offset = doc.size() as u64 + 1;
                 let width = if !doc.indexed {
@@ -352,7 +352,7 @@ impl<'a> Mode for LineNumberMode {
                 };
 
                 if let Some(p_view) = parent {
-                    p_view.children[dst_view.layout_index.unwrap()].layout_op =
+                    p_view.children[text_view.layout_index.unwrap()].layout_op =
                         LayoutOperation::Fixed {
                             size: width as usize,
                         };

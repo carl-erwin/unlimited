@@ -254,26 +254,33 @@ fn compose_children(
     let mut floating_children = view.floating_children.clone();
     all_children.append(&mut floating_children);
 
+    dbg_println!("COMPOSE checking {:?} children", view.id);
+
     for child in all_children.iter() {
         dbg_println!(" check CHILD  {:?}", child);
 
         let child_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
-        let cbs = {
+        let subscribers = {
             let child_v = child_rc.read();
             child_v.subscribers.clone()
         };
+
+        let mut child_v = child_rc.write();
 
         //
         // NB: notify subscribers just before composition
         // use View::compose_priority to order notifications
         // NOTE(ceg): currently we do not have event filters
         if !screen.is_off_screen {
-            for cb in cbs.iter() {
+            for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
                 if cb.1.id == cb.2.id {
+                    // ignore self registration
                     continue;
                 }
+
+                dbg_println!("call mode {} on_view_event ", mode.borrow().name());
 
                 mode.borrow().on_view_event(
                     &mut editor,
@@ -281,11 +288,14 @@ fn compose_children(
                     cb.1,
                     cb.2,
                     &ViewEvent::PreComposition,
+                    &mut child_v,
                     Some(&mut view),
                 );
             }
         }
     }
+
+    dbg_println!("COMPOSE checking {:?} floating children", view.id);
 
     // non floating children
     // cache size ?
@@ -443,7 +453,7 @@ fn compose_children(
 
         //
         {
-            let cbs = {
+            let subscribers = {
                 let mut child_v = child_rc.write();
                 let last_offset = {
                     let child_screen = child_v.screen.as_ref().read();
@@ -462,12 +472,17 @@ fn compose_children(
             //
             // NOTE(ceg): currently we do not have event filters
             if !screen.is_off_screen {
-                for cb in cbs.iter() {
+                let mut child_v = child_rc.write();
+
+                for cb in subscribers.iter() {
                     let mode = cb.0.as_ref();
 
                     if cb.1.id == cb.2.id {
+                        // ignore self registration
                         continue;
                     }
+
+                    dbg_println!("call mode {} on_view_event ", mode.borrow().name());
 
                     mode.borrow().on_view_event(
                         &mut editor,
@@ -475,6 +490,7 @@ fn compose_children(
                         cb.1,
                         cb.2,
                         &ViewEvent::PostComposition,
+                        &mut child_v,
                         None,
                     );
                 }

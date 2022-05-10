@@ -1084,9 +1084,11 @@ fn check_hover_change(
     {
         if let Some(prev_v) = editor.view_map.get(&prev_vid) {
             let prev_v = prev_v.clone();
-            let prev_v = prev_v.read();
 
-            for cb in prev_v.subscribers.iter() {
+            let mut prev_v = prev_v.write();
+            let subscribers = { prev_v.subscribers.clone() };
+
+            for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
                 if cb.1.id != prev_vid || cb.2.id != prev_vid {
@@ -1099,6 +1101,7 @@ fn check_hover_change(
                     ViewEventSource { id: prev_vid },
                     ViewEventDestination { id: prev_vid },
                     &ViewEvent::Leave,
+                    &mut prev_v,
                     None,
                 );
             }
@@ -1106,9 +1109,10 @@ fn check_hover_change(
 
         if let Some(new_v) = editor.view_map.get(&new_vid) {
             let new_v = new_v.clone();
-            let new_v = new_v.read();
+            let mut new_v = new_v.write();
+            let subscribers = { new_v.subscribers.clone() };
 
-            for cb in new_v.subscribers.iter() {
+            for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
                 if cb.1.id != new_vid || cb.2.id != new_vid {
@@ -1121,6 +1125,7 @@ fn check_hover_change(
                     ViewEventSource { id: new_vid },
                     ViewEventDestination { id: new_vid },
                     &ViewEvent::Enter,
+                    &mut new_v,
                     None,
                 );
             }
@@ -1143,7 +1148,7 @@ fn check_selection_change(
     {
         if let Some(new_v) = editor.view_map.get(&new_vid) {
             let new_v = new_v.clone();
-            let new_v = new_v.read();
+            let mut new_v = new_v.write();
 
             // TODO(ceg): use event mask
             if new_v.ignore_focus {
@@ -1155,9 +1160,10 @@ fn check_selection_change(
             // notify prev
             if let Some(prev_v) = editor.view_map.get(&prev_vid) {
                 let prev_v = prev_v.clone();
-                let prev_v = prev_v.read();
+                let mut prev_v = prev_v.write();
 
-                for cb in prev_v.subscribers.iter() {
+                let subscribers = prev_v.subscribers.clone();
+                for cb in subscribers {
                     let mode = cb.0.as_ref();
 
                     if cb.1.id != prev_vid || cb.2.id != prev_vid {
@@ -1170,6 +1176,7 @@ fn check_selection_change(
                         ViewEventSource { id: prev_vid },
                         ViewEventDestination { id: prev_vid },
                         &ViewEvent::ViewDeselected,
+                        &mut prev_v,
                         None,
                     );
                 }
@@ -1178,7 +1185,9 @@ fn check_selection_change(
             dbg_println!("clicked changed {:?} -> {:?}", prev_vid, new_vid);
 
             // notify new
-            for cb in new_v.subscribers.iter() {
+            let subscribers = new_v.subscribers.clone();
+
+            for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
                 if cb.1.id != new_vid || cb.2.id != new_vid {
@@ -1191,6 +1200,7 @@ fn check_selection_change(
                     ViewEventSource { id: new_vid },
                     ViewEventDestination { id: new_vid },
                     &ViewEvent::ViewSelected,
+                    &mut new_v,
                     None,
                 );
             }

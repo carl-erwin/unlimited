@@ -102,21 +102,36 @@ impl<'a> Mode for VscrollbarMode {
         src: ViewEventSource,
         dst: ViewEventDestination,
         event: &ViewEvent,
+        src_view: &mut View<'static>,
         _parent: Option<&mut View<'static>>,
     ) {
+        dbg_println!(
+            "mode '{}' on_view_event src: {:?} dst: {:?}, event {:?} view.id {:?}",
+            self.name(),
+            src,
+            dst,
+            event,
+            src_view.id
+        );
+
         match event {
-            ViewEvent::Subscribe => {}
+            ViewEvent::Subscribe => {
+                // we subscribe to src events
+                if src.id == dst.id {
+                    return;
+                }
+
+                let mut dst = editor.view_map.get(&dst.id).unwrap().write();
+                let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                mode_ctx.target_vid = src.id;
+            }
 
             ViewEvent::PreComposition => {
-                let src = editor.view_map.get(&src.id).unwrap().write();
-
+                let src = src_view;
                 let dim = src.screen.read().dimension();
 
                 let mut dst = editor.view_map.get(&dst.id).unwrap().write();
-
                 let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
-
-                mode_ctx.target_vid = src.id;
 
                 let doc = src.document.as_ref().unwrap();
                 let doc = doc.read();

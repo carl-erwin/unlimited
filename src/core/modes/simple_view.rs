@@ -149,8 +149,8 @@ impl<'a> Mode for SimpleViewMode {
             editor,
             env,
             vscrollbar_mode.clone(),
-            text_view_src,
-            scrollbar_dst,
+            text_view_src, // publisher
+            scrollbar_dst, // subscriber
         );
 
         // view events -> line_number
@@ -163,8 +163,8 @@ impl<'a> Mode for SimpleViewMode {
             editor,
             env,
             line_number_mode.clone(),
-            text_view_src,
-            line_number_dst,
+            text_view_src,   // publisher
+            line_number_dst, // subscriber
         );
     }
 }

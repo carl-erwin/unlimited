@@ -22,6 +22,10 @@ use crate::core::modes::text_mode::mark::Mark;
 use crate::core::view;
 use crate::core::view::View;
 
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
+
 static FIND_TRIGGER_MAP: &str = r#"
 [
   {
@@ -74,6 +78,33 @@ impl<'a> Mode for FindMode {
         let input_map = build_input_event_map(FIND_TRIGGER_MAP).unwrap();
         let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
         input_map_stack.push(input_map);
+    }
+
+    fn on_view_event(
+        &self,
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
+        _src: ViewEventSource,
+        _dst: ViewEventDestination,
+        event: &ViewEvent,
+        _src_view: &mut View<'static>,
+        _parent: Option<&mut View<'static>>,
+    ) {
+        dbg_println!(
+            "mode '{}' on_view_event src: {:?} dst: {:?}, event {:?}",
+            self.name(),
+            _src,
+            _dst,
+            event
+        );
+
+        match event {
+            &ViewEvent::ViewDeselected => {}
+
+            &ViewEvent::ViewSelected => {}
+
+            _ => {}
+        }
     }
 }
 

@@ -362,13 +362,22 @@ pub fn register_view_subscriber(
     src: ViewEventSource,
     dst: ViewEventDestination,
 ) -> Option<()> {
-    mode.borrow()
-        .on_view_event(&mut editor, &mut env, src, dst, &ViewEvent::Subscribe, None);
+    let src_view = editor.view_map.get(&src.id)?.clone();
+    let ctx = (mode.clone(), src, dst);
 
-    let ctx = (mode, src, dst);
-    let src_view = editor.view_map.get(&src.id)?;
+    let mut src_view = src_view.write();
 
-    src_view.write().subscribers.push(ctx);
+    src_view.subscribers.push(ctx);
+
+    mode.borrow().on_view_event(
+        &mut editor,
+        &mut env,
+        src,
+        dst,
+        &ViewEvent::Subscribe,
+        &mut src_view,
+        None,
+    );
 
     Some(())
 }
