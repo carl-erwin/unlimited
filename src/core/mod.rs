@@ -20,6 +20,7 @@ pub mod codepointinfo;
 pub mod config;
 pub mod document;
 pub mod editor;
+pub mod error;
 pub mod event;
 pub mod mapped_file;
 pub mod modes;
@@ -33,6 +34,10 @@ use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
 use crate::core::event::EventMessage;
 use crate::core::view::View;
+
+use crate::core::error::Error;
+
+type AppResult<T> = Result<T, Error>;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
