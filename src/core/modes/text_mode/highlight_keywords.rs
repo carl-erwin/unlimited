@@ -26,25 +26,36 @@ static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
 
 static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
 
+static COLOR_BLUE: (u8, u8, u8) = (35, 168, 242);
+
+//static COLOR_BRACE: (u8, u8, u8) = (0,223,199);
+static COLOR_BRACE: (u8, u8, u8) = (0, 185, 163);
+
 #[derive(Debug, PartialEq)]
 enum TokenType {
     Unknown,
     InvalidUnicode,
     Blank, // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
     // Num,
-    Identifier,   // _a-zA-Z unicode // default ?
-    ParenOpen,    // (
-    ParenClose,   // )
-    BraceOpen,    // {
-    BraceClose,   // }
-    BracketOpen,  // [
-    BracketClose, // ]
-    SingleQuote,  // '
-    DoubleQuote,  // "
-    Comma,        // ,
-    Colon,        // :
-    Semicolon,    // ;
-    Ampersand,
+    Identifier,       // _a-zA-Z unicode // default ?
+    ParenOpen,        // (
+    ParenClose,       // )
+    BraceOpen,        // {
+    BraceClose,       // }
+    BracketOpen,      // [
+    BracketClose,     // ]
+    SingleQuote,      // '
+    DoubleQuote,      // "
+    Comma,            // ,
+    Colon,            // :
+    Semicolon,        // ;
+    Ampersand,        // &
+    VerticalBar,      // |
+    Tilde,            // ~
+    CircumflexAccent, // ^
+    Dot,              // .
+    Slash,            // /
+    ExclamationPoint, // !
     Equal,
     Plus,
     Minus,
@@ -168,6 +179,13 @@ impl ContentFilter<'_> for HighlightFilter {
                         ';' => TokenType::Semicolon,
                         '&' => TokenType::Ampersand,
                         '%' => TokenType::Mod,
+                        '|' => TokenType::VerticalBar,
+                        '~' => TokenType::Tilde,
+                        '^' => TokenType::CircumflexAccent,
+                        '.' => TokenType::Dot,
+                        '/' => TokenType::Slash,
+                        '!' => TokenType::ExclamationPoint,
+
                         // '0'...'9' => TokenType::NUM,
                         _ => TokenType::Identifier,
                     };
@@ -223,27 +241,41 @@ impl ContentFilter<'_> for HighlightFilter {
                         "use" | "crate" | "pub" => COLOR_RED,
 
                         // some Rust keywords
-                        "let" | "mut" | "fn" | "impl" | "trait" => (0, 128, 128),
+                        "let" | "ref" | "mut" | "fn" | "impl" | "trait" | "type" => (0, 128, 128),
+                        "Option" | "Some" | "None" | "Result" => (0, 128, 128),
+
+                        "unsafe" | "panic" => COLOR_RED,
+
+                        "borrow" | "unwrap" => (0, 128, 128),
+                        ".." => COLOR_GREEN,
+
 
                         "str" | "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32"
                         | "i64" | "i128" | "f32" | "f64" => (0, 128, 128),
 
-                        // C preprocessor
+                        // some C preprocessor tokens
                         "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
                         | "#undef" | "#define" | "#pragma" => COLOR_RED,
 
-                        // C keywords
-                        "if" | "auto" | "break" | "case" | "char" | "const" | "continue"
-                        | "default" | "do" | "double" | "else" | "enum" | "extern" | "float"
-                        | "for" | "goto" | "int" | "long" | "register" | "return" | "short"
+
+                        // some C keywords
+                        "auto" | "break" | "case" | "char" | "const" | "continue"
+                        | "default" | "do" | "double" | "enum" | "extern" | "float"
+                        | "for" | "int" | "long" | "register"  | "short"
                         | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
                         | "union" | "unsigned" | "void" | "volatile" | "while" | "inline" => {
                             (0, 128, 128)
                         }
 
+
+                        "if" | "then" |  "else" => COLOR_BRACE,
+
+
                         // C operators
                         "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<"
-                        | "!" | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "~" | "^" => COLOR_GREEN,
+                        | "!" | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "<<" | ">>" => COLOR_GREEN,
+
+                        "[" | "]" |  "{" | "}" => COLOR_BRACE,
 
                         // easy hack, TODO(ceg): transform this module into proper tokenizer
                         "((" | "))" => COLOR_GREEN,
@@ -251,19 +283,26 @@ impl ContentFilter<'_> for HighlightFilter {
                         "((((" | "))))" => COLOR_GREEN,
                         "(((((" | ")))))" => COLOR_GREEN,
 
+                        // easy hack, TODO(ceg): transform this module into proper tokenizer
+                        "{{" | "}}" => COLOR_BRACE,
+                        "{{{" | "}}}" => COLOR_BRACE,
+                        "{{{{" | "}}}}" => COLOR_BRACE,
+                        "{{{{{" | "}}}}}" => COLOR_BRACE,
+
                         "/*" | "*/" => (255, 255, 255),
                         "//" => (255, 255, 255),
 
-                        // C++ keywords
-                        "bool" | "class" | "template" | "namespace" => (0, 128, 128),
+                        // some C++ keywords
+                        "bool" | "class" | "template" | "namespace" | "auto" => (0, 128, 128),
 
-                        "true" | "false" => (35, 168, 242),
+                        //
+                        "return" | "goto" | "true" | "false" => COLOR_BLUE,
 
                         "\"" | "\"\"" | "'" | "''" => COLOR_ORANGE,
 
                         "," | ":" | "::" | ";" => COLOR_GREEN,
 
-                        "&" => COLOR_CYAN,
+                        "&" | "|" | "~" | "^" => COLOR_CYAN,
 
                         _ => {
                             let mut non_alnum = 0;
@@ -341,5 +380,6 @@ impl ContentFilter<'_> for HighlightFilter {
             // The parsing is incomplete
             // panic!("");
         }
+
     }
 }
