@@ -43,7 +43,9 @@ impl TextStyle {
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
-        (11, 16, 39)
+        // (40, 44, 52) // soft grey
+        // (11, 16, 39) // deep blue
+        (35, 35, 35)    // black
     }
 
     pub fn title_color() -> (u8, u8, u8) {
