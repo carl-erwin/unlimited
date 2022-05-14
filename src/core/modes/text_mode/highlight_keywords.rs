@@ -17,26 +17,20 @@ use crate::core::codepointinfo::TextStyle;
 use crate::core::view::View;
 
 //
-
+static COLOR_DEFAULT: (u8, u8, u8) = (192, 192, 192);
 static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
-// static COLOR_GREEN: (u8, u8, u8) = (0, 128, 0);
 static COLOR_GREEN: (u8, u8, u8) = (85, 170, 127);
-
 static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
-
 static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
-
 static COLOR_BLUE: (u8, u8, u8) = (35, 168, 242);
-
-//static COLOR_BRACE: (u8, u8, u8) = (0,223,199);
 static COLOR_BRACE: (u8, u8, u8) = (0, 185, 163);
+static COLOR_NUMBER: (u8, u8, u8) = (111, 100, 80);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum TokenType {
     Unknown,
     InvalidUnicode,
-    Blank, // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
-    // Num,
+    Blank,            // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
     Identifier,       // _a-zA-Z unicode // default ?
     ParenOpen,        // (
     ParenClose,       // )
@@ -54,7 +48,6 @@ enum TokenType {
     Tilde,            // ~
     CircumflexAccent, // ^
     Dot,              // .
-    Slash,            // /
     ExclamationPoint, // !
     Equal,
     Plus,
@@ -68,7 +61,7 @@ enum TokenType {
 
 pub struct HighlightFilter {
     token_io: Vec<FilterIo>,
-    token_type: TokenType,
+    prev_token_type: TokenType,
     utf8_token: Vec<u8>,
     new_color: (u8, u8, u8),
     utf8_codec: Box<dyn TextCodec>, // internal token representation is utf8
@@ -80,13 +73,190 @@ impl HighlightFilter {
     pub fn new() -> Self {
         HighlightFilter {
             token_io: Vec::new(),
-            token_type: TokenType::Unknown,
+            prev_token_type: TokenType::Unknown,
             utf8_token: Vec::new(),
             new_color: TextStyle::default_color(),
             utf8_codec: Box::new(utf8::Utf8Codec::new()),
             skip_filter: false,
             max_token_size: 1024,
         }
+    }
+
+    fn colorize_token(&mut self) {
+        // build token utf8 string
+        for tok in self.token_io.iter() {
+            match tok {
+                &FilterIo {
+                    data: FilterData::TextInfo { real_cp, .. },
+                    ..
+                } => {
+                    let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
+                    let nr_bytes = self.utf8_codec.encode(real_cp, &mut utf8_out);
+                    for b in utf8_out.iter().take(nr_bytes) {
+                        self.utf8_token.push(*b);
+                    }
+                }
+                _ => {
+                    panic!();
+                }
+            }
+        }
+
+        self.new_color = match self.prev_token_type {
+            TokenType::Unknown => COLOR_DEFAULT,
+            TokenType::InvalidUnicode => COLOR_DEFAULT,
+            TokenType::Blank => COLOR_DEFAULT, // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
+            TokenType::ParenOpen => COLOR_GREEN, // (
+            TokenType::ParenClose => COLOR_GREEN, // )
+            TokenType::BraceOpen => COLOR_BRACE, // {
+            TokenType::BraceClose => COLOR_BRACE, // }
+            TokenType::BracketOpen => COLOR_BRACE, // [
+            TokenType::BracketClose => COLOR_BRACE, // ]
+            TokenType::SingleQuote => COLOR_ORANGE, // '
+            TokenType::DoubleQuote => COLOR_ORANGE, // "
+            TokenType::Comma => COLOR_GREEN,   // ,
+            TokenType::Colon => COLOR_GREEN,   // :
+            TokenType::Semicolon => COLOR_GREEN, // ;
+            TokenType::Ampersand => COLOR_CYAN, // &
+            TokenType::VerticalBar => COLOR_CYAN, // |
+            TokenType::Tilde => COLOR_CYAN,    // ~
+            TokenType::CircumflexAccent => COLOR_CYAN, // ^
+            TokenType::Dot => COLOR_GREEN,     // .
+            TokenType::ExclamationPoint => COLOR_GREEN, // !
+            TokenType::Equal => COLOR_GREEN,
+            TokenType::Plus => COLOR_GREEN,
+            TokenType::Minus => COLOR_GREEN,
+            TokenType::Mul => COLOR_GREEN,
+            TokenType::Div => COLOR_GREEN,
+            TokenType::Mod => COLOR_GREEN,
+            TokenType::LowerThan => COLOR_GREEN,
+            TokenType::GreaterThan => COLOR_GREEN,
+            TokenType::Identifier => {
+                self.set_indentifier_color();
+                self.new_color
+            }
+        };
+    }
+
+    fn set_indentifier_color(&mut self) {
+        // select color
+        let token_str = if let Ok(s) = String::from_utf8(self.utf8_token.clone()) {
+            s
+        } else {
+            "�".to_string()
+        };
+
+        // dbg_println!("TOKEN_STR = '{}'", token_str);
+        self.new_color = match token_str.as_ref() {
+            // some Rust keywords
+            "use" | "crate" | "pub" => COLOR_RED,
+
+            // some Rust keywords
+            "let" | "ref" | "mut" | "fn" | "impl" | "trait" | "type" => (0, 128, 128),
+            "Option" | "Some" | "None" | "Result" => (0, 128, 128),
+
+            "unsafe" | "panic" => COLOR_RED,
+
+            "borrow" | "unwrap" => (0, 128, 128),
+
+            "str" | "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64"
+            | "i128" | "f32" | "f64" => (0, 128, 128),
+
+            // some C preprocessor tokens
+            "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else" | "#undef"
+            | "#define" | "#pragma" => COLOR_RED,
+
+            // some C keywords
+            "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do"
+            | "double" | "enum" | "extern" | "float" | "for" | "int" | "long" | "register"
+            | "short" | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
+            | "union" | "unsigned" | "void" | "volatile" | "while" | "inline" => (0, 128, 128),
+
+            "if" | "then" | "else" => COLOR_BRACE,
+
+            // some C++ keywords
+            "bool" | "class" | "template" | "namespace" | "auto" => (0, 128, 128),
+
+            //
+            "return" | "goto" | "true" | "false" => COLOR_BLUE,
+
+            _ => {
+                let mut non_alnum = 0;
+                let mut digit_count = 0;
+
+                let skip_n = if self.utf8_token.len() >= 2
+                    && self.utf8_token[0] == b'0'
+                    && self.utf8_token[1] == b'x'
+                {
+                    2
+                } else {
+                    0
+                };
+
+                for c in self.utf8_token.iter().skip(skip_n) {
+                    if *c == b'_' {
+                        continue;
+                    }
+
+                    if *c >= b'0' && *c <= b'9' {
+                        digit_count += 1;
+                        continue;
+                    }
+
+                    if *c >= b'a' && *c <= b'f' {
+                        continue;
+                    }
+
+                    if *c >= b'A' && *c <= b'F' {
+                        continue;
+                    }
+
+                    non_alnum += 1;
+                    break;
+                }
+
+                if non_alnum == 0 && digit_count != 0 {
+                    COLOR_NUMBER
+                } else {
+                    self.new_color
+                }
+            }
+        };
+    }
+}
+
+fn get_token_type(c: char) -> TokenType {
+    match c {
+        '�' => TokenType::InvalidUnicode,
+        ' ' | '\n' | '\t' => TokenType::Blank,
+        '(' => TokenType::ParenOpen,
+        ')' => TokenType::ParenClose,
+        '{' => TokenType::BraceOpen,
+        '}' => TokenType::BraceClose,
+        '[' => TokenType::BracketOpen,
+        ']' => TokenType::BracketClose,
+        '\'' => TokenType::SingleQuote,
+        '"' => TokenType::DoubleQuote,
+        '=' => TokenType::Equal,
+        '*' => TokenType::Mul,
+        '+' => TokenType::Plus,
+        '-' => TokenType::Minus,
+        '/' => TokenType::Div,
+        '<' => TokenType::LowerThan,
+        '>' => TokenType::GreaterThan,
+        ',' => TokenType::Comma,
+        ':' => TokenType::Colon,
+        ';' => TokenType::Semicolon,
+        '&' => TokenType::Ampersand,
+        '%' => TokenType::Mod,
+        '|' => TokenType::VerticalBar,
+        '~' => TokenType::Tilde,
+        '^' => TokenType::CircumflexAccent,
+        '.' => TokenType::Dot,
+        '!' => TokenType::ExclamationPoint,
+
+        // '0'...'9' => TokenType::NUM,
+        _ => TokenType::Identifier,
     }
 }
 
@@ -105,7 +275,7 @@ impl ContentFilter<'_> for HighlightFilter {
         _parent_view: Option<&View<'static>>,
     ) {
         self.token_io = Vec::new();
-        self.token_type = TokenType::Unknown;
+        self.prev_token_type = TokenType::Unknown;
         self.utf8_token = Vec::new();
         self.new_color = TextStyle::default_color();
         // self.utf8_codec =  Box::new(utf8::Utf8Codec::new());
@@ -155,201 +325,30 @@ impl ContentFilter<'_> for HighlightFilter {
 
                     // dbg_println!("-----------");
                     // dbg_println!("parsing char : '{}'", c);
+                    let token_type = get_token_type(c);
 
-                    let token_type = match c {
-                        '�' => TokenType::InvalidUnicode,
-                        ' ' | '\n' | '\t' => TokenType::Blank,
-                        '(' => TokenType::ParenOpen,
-                        ')' => TokenType::ParenClose,
-                        '{' => TokenType::BraceOpen,
-                        '}' => TokenType::BraceClose,
-                        '[' => TokenType::BracketOpen,
-                        ']' => TokenType::BracketClose,
-                        '\'' => TokenType::SingleQuote,
-                        '"' => TokenType::DoubleQuote,
-                        '=' => TokenType::Equal,
-                        '*' => TokenType::Mul,
-                        '+' => TokenType::Plus,
-                        '-' => TokenType::Minus,
-                        '/' => TokenType::Div,
-                        '<' => TokenType::LowerThan,
-                        '>' => TokenType::GreaterThan,
-                        ',' => TokenType::Comma,
-                        ':' => TokenType::Colon,
-                        ';' => TokenType::Semicolon,
-                        '&' => TokenType::Ampersand,
-                        '%' => TokenType::Mod,
-                        '|' => TokenType::VerticalBar,
-                        '~' => TokenType::Tilde,
-                        '^' => TokenType::CircumflexAccent,
-                        '.' => TokenType::Dot,
-                        '/' => TokenType::Slash,
-                        '!' => TokenType::ExclamationPoint,
-
-                        // '0'...'9' => TokenType::NUM,
-                        _ => TokenType::Identifier,
-                    };
-
-                    // need more or accumulae same class
-                    if self.token_io.is_empty() {
-                        dbg_println!("self.token_io.is_empty()");
-
-                        self.token_io.push(io.clone());
-                        self.token_type = token_type;
-
-                        continue;
-                    }
-
-                    if token_type == self.token_type && token_type != TokenType::InvalidUnicode {
-                        self.token_io.push(io.clone());
-                        continue;
-                    }
-
-                    // flush token
-                    // dbg_println!("FLUSH prev TOKEN");
-
-                    // build token utf8 string
-                    for tok in self.token_io.iter() {
-                        match tok {
-                            &FilterIo {
-                                data: FilterData::TextInfo { real_cp, .. },
-                                ..
-                            } => {
-                                let mut utf8_out: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-                                let nr_bytes = self.utf8_codec.encode(real_cp, &mut utf8_out);
-                                for b in utf8_out.iter().take(nr_bytes) {
-                                    self.utf8_token.push(*b);
-                                }
-                            }
-                            _ => {
-                                panic!();
-                            }
-                        }
-                    }
-
-                    // select color
-                    let token_str = if let Ok(s) = String::from_utf8(self.utf8_token.clone()) {
-                        s
+                    if token_type != TokenType::Identifier && token_type != self.prev_token_type {
                     } else {
-                        "�".to_string()
-                    };
-
-                    // dbg_println!("TOKEN_STR = '{}'", token_str);
-
-                    self.new_color = match token_str.as_ref() {
-                        // some Rust keywords
-                        "use" | "crate" | "pub" => COLOR_RED,
-
-                        // some Rust keywords
-                        "let" | "ref" | "mut" | "fn" | "impl" | "trait" | "type" => (0, 128, 128),
-                        "Option" | "Some" | "None" | "Result" => (0, 128, 128),
-
-                        "unsafe" | "panic" => COLOR_RED,
-
-                        "borrow" | "unwrap" => (0, 128, 128),
-                        ".." => COLOR_GREEN,
-
-
-                        "str" | "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32"
-                        | "i64" | "i128" | "f32" | "f64" => (0, 128, 128),
-
-                        // some C preprocessor tokens
-                        "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else"
-                        | "#undef" | "#define" | "#pragma" => COLOR_RED,
-
-
-                        // some C keywords
-                        "auto" | "break" | "case" | "char" | "const" | "continue"
-                        | "default" | "do" | "double" | "enum" | "extern" | "float"
-                        | "for" | "int" | "long" | "register"  | "short"
-                        | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
-                        | "union" | "unsigned" | "void" | "volatile" | "while" | "inline" => {
-                            (0, 128, 128)
+                        if self.prev_token_type == TokenType::Identifier {
+                            self.token_io.push(io.clone());
+                            self.prev_token_type = token_type;
+                            continue;
                         }
-
-
-                        "if" | "then" |  "else" => COLOR_BRACE,
-
-
-                        // C operators
-                        "(" | ")" | "." | "->" | "+" | "-" | "*" | "/" | "%" | "=" | "==" | "<"
-                        | "!" | ">" | "<=" | ">=" | "!=" | "&&" | "||" | "<<" | ">>" => COLOR_GREEN,
-
-                        "[" | "]" |  "{" | "}" => COLOR_BRACE,
-
-                        // easy hack, TODO(ceg): transform this module into proper tokenizer
-                        "((" | "))" => COLOR_GREEN,
-                        "(((" | ")))" => COLOR_GREEN,
-                        "((((" | "))))" => COLOR_GREEN,
-                        "(((((" | ")))))" => COLOR_GREEN,
-
-                        // easy hack, TODO(ceg): transform this module into proper tokenizer
-                        "{{" | "}}" => COLOR_BRACE,
-                        "{{{" | "}}}" => COLOR_BRACE,
-                        "{{{{" | "}}}}" => COLOR_BRACE,
-                        "{{{{{" | "}}}}}" => COLOR_BRACE,
-
-                        "/*" | "*/" => (255, 255, 255),
-                        "//" => (255, 255, 255),
-
-                        // some C++ keywords
-                        "bool" | "class" | "template" | "namespace" | "auto" => (0, 128, 128),
-
-                        //
-                        "return" | "goto" | "true" | "false" => COLOR_BLUE,
-
-                        "\"" | "\"\"" | "'" | "''" => COLOR_ORANGE,
-
-                        "," | ":" | "::" | ";" => COLOR_GREEN,
-
-                        "&" | "|" | "~" | "^" => COLOR_CYAN,
-
-                        _ => {
-                            let mut non_alnum = 0;
-                            let mut digit_count = 0;
-
-                            for c in self.utf8_token.iter() {
-                                //dbg_println!("*c = {} b'0' {}", *c as u32, b'0' as u32);
-                                //dbg_println!("*c = {} b'9' {}", *c as u32, b'9' as u32);
-                                if *c >= b'0' && *c <= b'9' {
-                                    digit_count += 1;
-                                    continue;
-                                }
-
-                                if *c >= b'a' && *c <= b'f' {
-                                    continue;
-                                }
-
-                                if *c >= b'A' && *c <= b'F' {
-                                    continue;
-                                }
-
-                                non_alnum += 1;
-                                break;
-                            }
-
-                            if non_alnum == 0 && digit_count != 0 {
-                                (111, 100, 80)
-                            } else {
-                                self.new_color
-                            }
-                        }
-                    };
-
-                    self.token_type = token_type;
+                    }
 
                     // flush token: set color
+                    self.colorize_token();
                     for mut io in self.token_io.iter_mut() {
                         io.style.color = self.new_color;
                     }
                     filter_out.append(&mut self.token_io);
-
-                    // prepare next token
-                    self.token_io.push(io.clone());
-
                     // reset state
                     self.utf8_token.clear();
                     self.new_color = TextStyle::default_color();
+
+                    // prepare next token
+                    self.prev_token_type = token_type;
+                    self.token_io.push(io.clone());
                 }
 
                 FilterIo {
@@ -357,9 +356,11 @@ impl ContentFilter<'_> for HighlightFilter {
                     ..
                 } => {
                     // flush pending token: set color
+                    self.colorize_token();
                     for mut io in self.token_io.iter_mut() {
                         io.style.color = self.new_color;
                     }
+
                     filter_out.append(&mut self.token_io);
 
                     // forward tag
@@ -380,6 +381,5 @@ impl ContentFilter<'_> for HighlightFilter {
             // The parsing is incomplete
             // panic!("");
         }
-
     }
 }
