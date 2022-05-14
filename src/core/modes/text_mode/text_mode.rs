@@ -2035,9 +2035,9 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
                             tm.select_point.push(Mark { offset });
 
                             // if on last line scroll down 1 line
-                            if y + 1 >= screen.height() {
+                            if y >= screen.height().saturating_sub(1) {
                                 tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
-                            } else if y == 0 {
+                            } else if y <= 1 {
                                 tm.pre_compose_action.push(Action::ScrollUp { n: 1 });
                             }
                         }
