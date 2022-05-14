@@ -16,6 +16,9 @@ use crate::core::EditorEnv;
 use crate::core::event::*;
 
 use crate::core::event::input_map::build_input_event_map;
+
+use crate::core::document::DocumentBuilder;
+
 use crate::core::view;
 use crate::core::view::ChildView;
 use crate::core::view::LayoutDirection;
@@ -30,7 +33,7 @@ static CORE_INPUT_MAP: &str = r#"
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-     { "in": [{ "key": "ctrl+p" } ],                         "action": "pop-up" }
+     { "in": [{ "key": "ctrl+p" } ],                         "action": "help-pop-up" }
 
     ]
   }
@@ -111,7 +114,7 @@ impl CoreMode {
             application_quit_abort_no,
         );
 
-        register_input_stage_action(&mut map, "pop-up", view_popup);
+        register_input_stage_action(&mut map, "help-pop-up", help_popup);
 
         register_input_stage_action(&mut map, "save-document", save_document); // core ?
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
@@ -1102,9 +1105,63 @@ pub fn destroy_view(
     destroy_view_hierarchy(editor, to_destroy_id);
 }
 
-use crate::core::document::DocumentBuilder;
+static HELP_MESSAGE: &str = r#"-*- Welcome to unlimitED! -*-
 
-pub fn view_popup(
+unlimitED! is an experimental text editor (running in the terminal).
+
+
+SYNOPSIS
+unlimited [options] [file ..]
+
+
+It comes with:
+
+  - basic UTF-8 support
+  - very large file support
+  - "infinite" undo/redo
+  - multi-cursors
+  - mouse selection (graphical terminal)
+
+[Quit]
+    Quit:           => ctrl+x ctrl+c
+
+    Quit (no save)  => ctrl+x ctrl+q
+
+    NB: quit will wait for large file(s) sync to storage.
+
+
+[Moves]
+    Left            =>
+    Right           =>
+    Up              =>
+    Down            =>
+
+
+[Edit]
+    ctrl+o          => Open file (TODO)
+
+    ctrl+u          => Undo
+    ctrl+r          => Redo
+
+[Selection/Copy/Paste]
+    with the keyboard:
+
+    with the mouse (X11 terminal):
+
+[Save]
+    ctrl+x ctrl+s   => Save
+                    synchronization of large file(s) is done in the background and does not block the ui.
+
+
+
+[Document Selection]
+
+
+
+NB: unlimitED! comes with ABSOLUTELY NO WARRANTY
+"#;
+
+pub fn help_popup(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
@@ -1128,45 +1185,19 @@ pub fn view_popup(
     }
 
     let command_doc = DocumentBuilder::new()
-        .document_name("pop-up")
+        .document_name("help-pop-up")
         .internal(true)
         //           .use_buffer_log(false)
         .finalize();
 
-    let text = format!(
-        "Pop-up: parent_width {} parent_height {}\n",
-        main_width, main_height,
-    );
     let pop_height = 25;
-    let text_width = text.len();
-    let pop_width = text_width;
-    let x = (main_width / 2).saturating_sub(text_width / 2);
+    let pop_width = main_width.saturating_sub(1);
+    let x = (main_width / 2).saturating_sub(pop_width / 2);
     let y = (main_height / 2).saturating_sub(pop_height / 2);
 
     {
         let mut d = command_doc.as_ref().unwrap().write();
-        d.append(text.as_bytes());
-
-        let text = format!("pop_width {} pop_height {}\n", x, pop_height);
-        d.append(text.as_bytes());
-
-        let text = format!("pop_x {} pop_y {}\n", x, y);
-        d.append(text.as_bytes());
-
-        let mut text: String = String::new();
-        for _ in 0..text_width {
-            text.push_str(&"-")
-        }
-        d.append(text.as_bytes());
-
-        let text = format!("This is a simple pop-up test\n\n\n\n\n");
-        d.append(text.as_bytes());
-
-        let mut text: String = String::new();
-        for _ in 0..text_width {
-            text.push_str(&"-")
-        }
-        d.append(text.as_bytes());
+        d.append(HELP_MESSAGE.as_bytes());
     }
 
     // create view
