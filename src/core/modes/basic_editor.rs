@@ -219,12 +219,13 @@ impl ContentFilter<'_> for BasicEditorTitle {
             doc_info.push_str("* ");
         } else {
             doc_info.push_str("  ");
+            //            doc_info.push_str(" ❰❱❮❯");
         }
         if d.is_syncing {
             doc_info.push_str("(sync)");
         }
 
-        doc_info.push_str(&format!(" size {:<12}", d.size()));
+        doc_info.push_str(&format!(" {} bytes", d.size()));
 
         self.title.push_str(&doc_info);
     }
@@ -239,8 +240,9 @@ impl ContentFilter<'_> for BasicEditorTitle {
         let color = TextStyle::title_color();
         let bg_color = TextStyle::title_bg_color();
 
-        let len = self.title.len();
-        for c in self.title.chars().take(self.width) {
+        let width = env.screen.width();
+        let mut count = 0;
+        for c in self.title.chars().take(width) {
             let mut cpi = CodepointInfo::new();
             cpi.displayed_cp = c;
             cpi.style.color = color;
@@ -249,24 +251,17 @@ impl ContentFilter<'_> for BasicEditorTitle {
             if !b {
                 break;
             }
+            count += 1;
         }
-
-        if len >= self.width {
-            env.quit = true;
-            return;
-        }
-        let remain = self.width - len;
 
         let _fill = ' ' as char;
-        for _i in 0..remain {
-            let mut cpi = CodepointInfo::new();
-            cpi.style.color = color;
-            cpi.style.bg_color = bg_color;
-
+        let mut cpi = CodepointInfo::new();
+        cpi.style.color = color;
+        cpi.style.bg_color = bg_color;
+        for _i in count..width {
             let (b, _) = env.screen.push(cpi.clone());
             if !b {
-                env.quit = true;
-                return;
+                break;
             }
         }
 
