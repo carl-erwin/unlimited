@@ -32,7 +32,8 @@ static FIND_TRIGGER_MAP: &str = r#"
 [
   {
     "events": [
-     { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" }
+     { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" },
+     { "in": [{ "key": "ctrl+r" } ],    "action": "find:start-reverse" }
     ]
   }
 ]"#;
@@ -45,6 +46,7 @@ static FIND_INTERACTIVE_MAP: &str = r#"
      { "in": [{ "key": "BackSpace" } ], "action": "find:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
      { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },
+     { "in": [{ "key": "ctrl+r" } ],    "action": "find:prev" },
      { "default": [],                   "action": "find:add-char" }
    ]
   }
@@ -142,6 +144,7 @@ impl<'a> Mode for FindMode {
 
 pub struct FindModeContext {
     pub active: bool,
+    pub reverse: bool,
     pub find_str: Vec<char>,
     pub match_start: Option<u64>,
     pub previous_encoded_str_len: usize,
@@ -152,6 +155,7 @@ impl FindModeContext {
         dbg_println!("FindMode");
         FindModeContext {
             active: false,
+            reverse: false,
             find_str: Vec::new(),
             match_start: None,
             previous_encoded_str_len: 0,
@@ -170,10 +174,12 @@ impl FindMode {
 
     pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
         register_input_stage_action(&mut map, "find:start", find_start);
+        register_input_stage_action(&mut map, "find:start-reverse", find_start_reverse);
         register_input_stage_action(&mut map, "find:stop", find_stop);
         register_input_stage_action(&mut map, "find:add-char", find_add_char);
         register_input_stage_action(&mut map, "find:del-char", find_del_char);
         register_input_stage_action(&mut map, "find:next", find_next);
+        register_input_stage_action(&mut map, "find:prev", find_prev);
     }
 }
 
@@ -228,6 +234,64 @@ pub fn find_start(
             let mut v = view.write();
             let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.active = true;
+            fm.reverse = false;
+            v.id
+        };
+
+        status_view.write().controller = Some(view::ControllerView {
+            id: vid,
+            mode_name: &"find-mode",
+        });
+    }
+
+    //
+    let doc = status_view.read().document().unwrap();
+    let mut doc = doc.write();
+
+    // clear status view
+    doc.delete_content(None);
+
+    // set status text
+    doc.append("Find: ".as_bytes());
+
+    // push new input map for y/n
+    let mut v = view.write();
+    // lock focus on v
+    // env.focus_locked_on = Some(v.id);
+
+    // TODO:
+    dbg_println!("configure find  {:?}", v.id);
+    v.input_ctx.stack_pos = None;
+    let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
+    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+    input_map_stack.push(("find-mode", input_map));
+    // TODO(ceg): add lock flag
+    // to not exec lower input level
+}
+
+pub fn find_start_reverse(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let status_vid = view::get_status_view(&editor, &env, view);
+
+    if status_vid.is_none() {
+        // TODO(ceg): log missing status mode
+        return;
+    }
+
+    let svid = status_vid.unwrap();
+
+    let status_view = editor.view_map.get(&svid).unwrap();
+
+    // start/resume ?
+    {
+        let vid = {
+            let mut v = view.write();
+            let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+            fm.active = true;
+            fm.reverse = true;
             v.id
         };
 
@@ -340,15 +404,20 @@ pub fn find_add_char(
         }
     };
 
-    {
+    let reverse = {
         let mut v = view.write();
         let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
         fm.find_str.append(&mut array);
-    }
+        fm.reverse
+    };
 
     display_find_string(&mut editor, &mut env, &view);
 
-    find_next(&mut editor, &mut env, view);
+    if reverse {
+        find_prev(&mut editor, &mut env, view);
+    } else {
+        find_next(&mut editor, &mut env, view);
+    }
 }
 
 pub fn find_del_char(
@@ -430,6 +499,78 @@ pub fn find_next(
             let doc = v.document().unwrap();
             let doc = doc.write();
             let offset = doc.find(&encoded_str, offset, None);
+            dbg_println!("FIND offset = {:?}", offset);
+            if let Some(offset) = offset {
+                {
+                    // save match start offset
+                    let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+                    fm.match_start = Some(offset);
+                    fm.previous_encoded_str_len = encoded_str.len();
+                }
+
+                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+                tm.select_point.clear();
+                tm.select_point.push(Mark { offset });
+                tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
+                tm.pre_compose_action
+                    .push(Action::CenterAroundMainMarkIfOffScreen);
+            }
+        }
+    }
+
+    display_find_string(&mut editor, &mut env, &view);
+}
+
+pub fn find_prev(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    {
+        let mut v = view.write();
+        let find_str = {
+            let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+            fm.find_str.clone()
+        };
+
+        let mut encoded_str = vec![];
+
+        {
+            let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+            let codec = tm.text_codec.as_ref();
+
+            for c in find_str.iter() {
+                let mut bin: [u8; 4] = [0; 4];
+                let nr = codec.encode(*c as u32, &mut bin);
+                for b in bin.iter().take(nr) {
+                    encoded_str.push(*b);
+                }
+            }
+        }
+
+        dbg_println!("FIND prev encoded_str = {:?}", encoded_str);
+
+        {
+            let offset = {
+                let mark_offset = {
+                    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                    tm.marks[tm.mark_index].offset
+                };
+
+                let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+                if let Some(match_start) = fm.match_start {
+                    match_start
+                } else {
+                    mark_offset
+                }
+            };
+
+            dbg_println!("FIND start @ offset = {:?}", offset);
+
+            let doc = v.document().unwrap();
+            let doc = doc.write();
+            let offset = doc.find_reverse(&encoded_str, offset, None);
             dbg_println!("FIND offset = {:?}", offset);
             if let Some(offset) = offset {
                 {

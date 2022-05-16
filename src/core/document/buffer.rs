@@ -217,6 +217,15 @@ impl<'a> Buffer<'a> {
         MappedFile::find(&self.data, &data, from_offset, to_offset)
     }
 
+    pub fn find_reverse(
+        &self,
+        data: &[u8],
+        from_offset: u64,
+        to_offset: Option<u64>,
+    ) -> Option<u64> {
+        MappedFile::find_reverse(&self.data, &data, from_offset, to_offset)
+    }
+
     /// can be used to know the number of blocks that compose the buffer,
     /// api to be used by indexer etc...
     pub fn nr_pages(&self) -> u64 {

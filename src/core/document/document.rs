@@ -648,6 +648,15 @@ impl<'a> Document<'a> {
         self.buffer.find(&data, from_offset, to_offset)
     }
 
+    pub fn find_reverse(
+        &self,
+        data: &[u8],
+        from_offset: u64,
+        to_offset: Option<u64>,
+    ) -> Option<u64> {
+        self.buffer.find_reverse(&data, from_offset, to_offset)
+    }
+
     // TODO(ceg): return an array of offsets ?
     pub fn apply_operations(&mut self, ops: &[BufferOperation]) {
         for op in ops {
