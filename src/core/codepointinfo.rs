@@ -43,9 +43,11 @@ impl TextStyle {
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
+        // (35, 35, 35) // black
+        // (0, 0, 48)
+        // (38, 41, 44)
         // (40, 44, 52) // soft grey
         (11, 16, 39) // deep blue
-                     // (35, 35, 35)    // black
     }
 
     pub fn title_color() -> (u8, u8, u8) {
@@ -58,20 +60,12 @@ impl TextStyle {
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
         let c = Self::default_bg_color();
-
-        let diff_r = 20 + 15;
-        let diff_g = 20 + 15;
-        let diff_b = 20 + 50;
-
-        (
-            c.0.saturating_add(diff_r),
-            c.1.saturating_add(diff_g),
-            c.2.saturating_add(diff_b),
-        )
+        let add = 20;
+        (c.0 + add, c.1 + add, c.2 + add)
     }
 
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
-        (0, 0, 0)
+        Self::default_selected_bg_color()
     }
 }
 
