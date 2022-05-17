@@ -989,7 +989,9 @@ fn update_byte_index_hierarchy(
         for (i, count) in byte_count.iter().enumerate() {
             match op {
                 UpdateHierarchyOp::Add => p_node.byte_count[i] += count,
-                UpdateHierarchyOp::Sub => p_node.byte_count[i] -= count,
+                UpdateHierarchyOp::Sub => {
+                    p_node.byte_count[i] = p_node.byte_count[i].saturating_sub(*count)
+                } // TODO(ceg): -=
             }
         }
         p_node.indexed = true;
