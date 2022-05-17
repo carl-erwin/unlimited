@@ -251,113 +251,21 @@ impl Mark {
         self
     }
 
-    /* TODO(ceg): this is pathologically slow with very long lines
-        to do it correctly
-        we musT
-        provide a (r)find byte api in doc/buffer ie:: start using the buffer's bytes population :-) it is its purpose
-
-        encode the newline pattern and look for it
-
-
-        TODO(ceg): save start offset
-        loop {
-        end_offset = self.offset
-        start_offset = rewind 256 * loop_count;
-        reverse find \n
-        end_offset = start_offset
-        if start_offset == 0 {
-            break;
-        }
-    }
-
-    */
     pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
 
-        let mut last_new_line_info: (char, u64, usize) = ('\0', 0, 0);
-        let mut end_offset = self.offset;
-
-        dbg_println!("MOVE TO START OF LINE :  end offset {}", end_offset);
-
-        let mut rewind_max = 256;
-
-        while end_offset > 0 {
-            let rewind = if end_offset > rewind_max {
-                rewind_max
-            } else {
-                end_offset
-            };
-
-            let start_offset = end_offset.saturating_sub(rewind);
-            let mut offset = start_offset;
-
-            // TODO(ceg): codec sync forward
-
-            // decode until end_offset
-            // let mut nl_count = 0;
-            let mut data: Vec<u8> = Vec::with_capacity(rewind as usize);
-            let nb_read = doc.read(offset, data.capacity(), &mut data);
-            // dbg_println!("MOVE TO START OF LINE :  @ {} read {} bytes, {:?}", offset, nb_read, data);
-            let mut pos: u64 = 0;
-            while pos < nb_read as u64 {
-                let ret = codec.decode(SyncDirection::Forward, &data, pos);
-                match ret.0 {
-                    '\n' => {
-                        // nl_count += 1;
-                        last_new_line_info = ret;
-                        last_new_line_info.1 = offset;
-                    }
-                    _ => {}
-                }
-                offset += ret.2 as u64;
-                pos += ret.2 as u64;
-                if offset >= end_offset {
-                    break;
-                }
-            }
-
-            if last_new_line_info.0 == '\n' {
-                end_offset = last_new_line_info.1 + last_new_line_info.2 as u64;
-                break;
-            }
-
-            end_offset = start_offset;
-            rewind_max += 1024 * 256;
-            if rewind_max > 1024 * 1024 * 4 {
-                rewind_max = 1024 * 1024 * 4;
-            }
-            dbg_println!(
-                "MOVE TO START OF LINE : end_offset {} rewind_max = {}",
-                end_offset,
-                rewind_max
-            );
-        }
-
-        dbg_println!(
-            "MOVE TO START OF LINE : diff {}",
-            self.offset.saturating_sub(end_offset)
-        );
-
-        self.offset = end_offset;
-
-        self
-    }
-
-    /*
-    pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
-        self.offset = if let Some(offset) = doc.reverse_find(&encode[..sz], self.offset, None) {
-            offset
+        self.offset = if let Some(offset) = doc.find_reverse(&encode[..sz], self.offset, None) {
+            offset + sz as u64
         } else {
-            doc.size() as u64
+            0
         };
 
         self
     }
-    */
 
     pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
