@@ -1352,7 +1352,7 @@ pub fn main_loop(
     // stop indexer(s)
     {
         for (_id, d) in editor.document_map.as_ref().read().iter() {
-            d.as_ref().write().abort_indexing = true;
+            d.write().abort_indexing = true;
         }
     }
 

@@ -334,7 +334,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIo>,
+        _filter_in: &[FilterIo],
         _filter_out: &mut Vec<FilterIo>,
     ) {
         let mode_ctx = view.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");

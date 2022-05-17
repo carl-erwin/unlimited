@@ -1338,7 +1338,7 @@ impl<'a> MappedFile<'a> {
         dbg_println!("CALL CLEANUP");
         {
             let rcfile = it_.get_file();
-            let mut file = rcfile.as_ref().write();
+            let mut file = rcfile.write();
             file.cleanup_events();
         }
 
@@ -1355,7 +1355,7 @@ impl<'a> MappedFile<'a> {
         // check iterator type
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
             MappedFileIterator::End(ref rcfile) => {
-                let mut file = rcfile.as_ref().write();
+                let mut file = rcfile.write();
                 let fd = if let Some(fd) = &file.fd {
                     Some(Arc::clone(fd))
                 } else {
@@ -1387,7 +1387,7 @@ impl<'a> MappedFile<'a> {
 
         if DEBUG {
             let rcfile = it_.get_file();
-            let file = rcfile.as_ref().write();
+            let file = rcfile.write();
 
             MappedFile::print_all_used_nodes(&file, "MAPPED FILE: BEFORE INSERT");
         }
@@ -1421,7 +1421,7 @@ impl<'a> MappedFile<'a> {
 
             // update parents
             let rcfile = it_.get_file();
-            let mut file = rcfile.as_ref().write();
+            let mut file = rcfile.write();
 
             MappedFile::update_hierarchy(
                 &mut file.pool,
@@ -1450,7 +1450,7 @@ impl<'a> MappedFile<'a> {
         }
 
         let rcfile = it_.get_file();
-        let mut file = rcfile.as_ref().write();
+        let mut file = rcfile.write();
 
         let base_offset = match node_to_split {
             Some(idx) => file.pool[idx as usize].storage_offset.unwrap_or(0),
@@ -1705,9 +1705,7 @@ impl<'a> MappedFile<'a> {
         let (mut file, start_idx, mut local_offset) = match &mut *it_ {
             MappedFileIterator::End(..) => return (0, events),
 
-            MappedFileIterator::Real(ref it) => {
-                (it.file.as_ref().write(), it.node_idx, it.local_offset)
-            }
+            MappedFileIterator::Real(ref it) => (it.file.write(), it.node_idx, it.local_offset),
         };
 
         dbg_println!("CALL CLEANUP");
@@ -2372,7 +2370,7 @@ impl<'a> MappedFileIterator<'a> {
             MappedFileIterator::Real(ref it) => {
                 let mut pos = it.local_offset;
                 let mut idx = it.node_idx;
-                let file = it.file.as_ref().read();
+                let file = it.file.read();
                 loop {
                     let node = &file.pool[idx];
                     if node.link.parent.is_none() {
@@ -2615,7 +2613,7 @@ mod tests {
         let mut it = MappedFile::iter_from(&file, offset);
         MappedFile::remove(&mut it, nr_remove);
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().size());
+        dbg_println!("-- file.size() {}", file.read().size());
         let _ = fs::remove_file("/tmp/playground_remove_test");
     }
 
@@ -2635,8 +2633,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().write().sub_page_size = 1024 * 128;
-        file.as_ref().write().sub_page_reserve = 1024 * 4;
+        file.write().sub_page_size = 1024 * 128;
+        file.write().sub_page_reserve = 1024 * 4;
 
         for i in 0..1_000_000 {
             {
@@ -2646,7 +2644,7 @@ mod tests {
             }
         }
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().size());
+        dbg_println!("-- file.size() {}", file.read().size());
         let _ = fs::remove_file("/tmp/playground_insert_test");
     }
 
@@ -2688,8 +2686,8 @@ mod tests {
             None => panic!("cannot map file"),
         };
 
-        file.as_ref().write().sub_page_size = 4096;
-        file.as_ref().write().sub_page_reserve = 10;
+        file.write().sub_page_size = 4096;
+        file.write().sub_page_reserve = 10;
 
         for i in 0..5 {
             dbg_println!("-- insert loop {}", i);
@@ -2703,10 +2701,9 @@ mod tests {
             }
         }
 
-        MappedFile::sync_to_storage(&mut file.as_ref().write(), &"/tmp/mapped_file.sync_test")
-            .unwrap();
+        MappedFile::sync_to_storage(&mut file.write(), &"/tmp/mapped_file.sync_test").unwrap();
 
-        dbg_println!("-- file.size() {}", file.as_ref().read().size());
+        dbg_println!("-- file.size() {}", file.read().size());
 
         let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
         let _ = fs::remove_file("/tmp/playground_insert_test");

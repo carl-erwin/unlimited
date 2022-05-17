@@ -167,10 +167,10 @@ impl HighlightFilter {
             | "#define" | "#pragma" => COLOR_RED,
 
             // some C keywords
-            "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do"
-            | "double" | "enum" | "extern" | "float" | "for" | "int" | "long" | "register"
-            | "short" | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef"
-            | "union" | "unsigned" | "void" | "volatile" | "while" | "inline" => (0, 128, 128),
+            "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double"
+            | "enum" | "extern" | "float" | "for" | "int" | "long" | "register" | "short"
+            | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef" | "union"
+            | "unsigned" | "void" | "volatile" | "while" | "inline" => (0, 128, 128),
 
             "if" | "then" | "else" => COLOR_BRACE,
 
@@ -298,12 +298,12 @@ impl ContentFilter<'_> for HighlightFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         if self.skip_filter {
             // return NOP hand let the caller skip swap
-            *filter_out = filter_in.clone();
+            *filter_out = filter_in.to_vec();
             return;
         }
 
@@ -327,13 +327,12 @@ impl ContentFilter<'_> for HighlightFilter {
                     // dbg_println!("parsing char : '{}'", c);
                     let token_type = get_token_type(c);
 
-                    if token_type != TokenType::Identifier && token_type != self.prev_token_type {
-                    } else {
-                        if self.prev_token_type == TokenType::Identifier {
-                            self.token_io.push(io.clone());
-                            self.prev_token_type = token_type;
-                            continue;
-                        }
+                    if token_type == TokenType::Identifier
+                        && self.prev_token_type == TokenType::Identifier
+                    {
+                        self.token_io.push(io.clone());
+                        self.prev_token_type = token_type;
+                        continue;
                     }
 
                     // flush token: set color

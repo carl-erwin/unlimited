@@ -36,7 +36,7 @@ impl ContentFilter<'_> for TextCodecFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         // ref ? in setup
@@ -397,7 +397,7 @@ impl ContentFilter<'_> for Utf8Filter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         mut filter_out: &mut Vec<FilterIo>,
     ) {
         // put in common

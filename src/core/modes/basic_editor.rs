@@ -234,7 +234,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIo>,
+        _filter_in: &[FilterIo],
         _filter_out: &mut Vec<FilterIo>,
     ) {
         let color = TextStyle::title_color();

@@ -316,10 +316,10 @@ pub fn goto_line_add_char(
                         shift: false,
                     },
             } => {
-                if *c >= '0' && *c <= '9' {
-                    if (goto_line_str_size == 0 && *c != '0') || goto_line_str_size > 0 {
-                        array.push(*c);
-                    }
+                if (*c >= '0' && *c <= '9')
+                    && ((goto_line_str_size == 0 && *c != '0') || goto_line_str_size > 0)
+                {
+                    array.push(*c);
                 }
             }
 
@@ -395,7 +395,7 @@ fn update_status_view(status_view: &mut View, gtm: &mut GotoLineModeContext) {
     doc.append(s.as_bytes());
 }
 
-fn clear_status_view(status_view: &mut View, fm: &mut GotoLineModeContext) {
+fn clear_status_view(status_view: &mut View, _fm: &mut GotoLineModeContext) {
     // clear status
     let doc = status_view.document().unwrap();
     let mut doc = doc.write();

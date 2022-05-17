@@ -200,7 +200,7 @@ fn update_status_view(status_view: &mut View, fm: &mut FindModeContext) {
     doc.append(d);
 }
 
-fn clear_status_view(status_view: &mut View, fm: &mut FindModeContext) {
+fn clear_status_view(status_view: &mut View, _fm: &mut FindModeContext) {
     // clear status
     let doc = status_view.document().unwrap();
     let mut doc = doc.write();

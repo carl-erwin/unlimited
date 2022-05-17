@@ -54,7 +54,7 @@ fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
     //    send_input_events(&v, &tx);
 
     loop {
-        get_input_events(&core_tx, &ui_tx).unwrap();
+        get_input_events(core_tx, ui_tx).unwrap();
     }
 }
 
@@ -83,7 +83,6 @@ pub fn main_loop(
 
     thread::spawn(move || {
         stdin_thread(&core_tx_clone, &ui_tx_clone);
-        return;
     });
 
     // ui ctx : TODO move to struct UiCtx
@@ -160,11 +159,10 @@ pub fn main_loop(
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
-                    if crate::core::bench_to_eof() {
-                        if (start - fps_t0).as_millis() >= 1000 {
-                            let screen = screen.read();
+                    if crate::core::bench_to_eof() && (start - fps_t0).as_millis() >= 1000 {
+                        let screen = screen.read();
 
-                            eprintln!(
+                        eprintln!(
                                 "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
                                 start.duration_since(startup).as_millis(),
                                 screen.first_offset,
@@ -174,10 +172,9 @@ pub fn main_loop(
                                 p_input
                             );
 
-                            fps = 0;
-                            draw_req = 0;
-                            fps_t0 = start;
-                        }
+                        fps = 0;
+                        draw_req = 0;
+                        fps_t0 = start;
                     }
 
                     let mut draw = false;
@@ -244,15 +241,11 @@ pub fn main_loop(
     2 : create editor internal result type Result<>
     3 : use idiomatic    func()? style
 */
-fn draw_view(
-    mut last_screen: &mut Screen,
-    mut screen: &mut Screen,
-    mut stdout: &mut std::io::StdoutLock,
-) {
+fn draw_view(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::StdoutLock) {
     if true {
-        let _ = draw_screen(&mut last_screen, &mut screen, &mut stdout);
+        let _ = draw_screen(last_screen, screen, stdout);
     } else {
-        let _ = draw_screen_dumb(&screen, &mut stdout);
+        let _ = draw_screen_dumb(screen, stdout);
     }
 }
 
@@ -285,8 +278,8 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
         // TODO(ceg): fill len.len()..screen.width()
         let line = screen.get_line(li).unwrap();
 
-        for c in 0..line.len() {
-            let cpi = &line[c].cpi;
+        for cell in line {
+            let cpi = cell.cpi;
 
             // dbg_println!("RENDER Y={} X={} : cpi {:?}", li, c, cpi);
             if cpi.skip_render {
@@ -300,20 +293,12 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
                 g: cpi.style.color.1,
                 b: cpi.style.color.2,
             };
-            if prev_fg.is_none() {
+            if prev_fg.is_none() || *prev_fg.as_ref().unwrap() != color {
                 ops.push(ScreenOp::SetFgColor(
                     cpi.style.color.0,
                     cpi.style.color.1,
                     cpi.style.color.2,
                 ));
-            } else {
-                if *prev_fg.as_ref().unwrap() != color {
-                    ops.push(ScreenOp::SetFgColor(
-                        cpi.style.color.0,
-                        cpi.style.color.1,
-                        cpi.style.color.2,
-                    ));
-                }
             }
             prev_fg = Some(color);
 
@@ -324,20 +309,12 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
                 b: cpi.style.bg_color.2,
             };
 
-            if prev_bg.is_none() {
+            if prev_bg.is_none() || *prev_bg.as_ref().unwrap() != bg_color {
                 ops.push(ScreenOp::SetBgColor(
                     cpi.style.bg_color.0,
                     cpi.style.bg_color.1,
                     cpi.style.bg_color.2,
                 ));
-            } else {
-                if *prev_bg.as_ref().unwrap() != bg_color {
-                    ops.push(ScreenOp::SetBgColor(
-                        cpi.style.bg_color.0,
-                        cpi.style.bg_color.1,
-                        cpi.style.bg_color.2,
-                    ));
-                }
             }
 
             prev_bg = Some(bg_color);
@@ -403,14 +380,14 @@ fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
 fn draw_screen(
     last_screen: &mut Screen,
     screen: &mut Screen,
-    mut stdout: &mut std::io::StdoutLock,
+    stdout: &mut std::io::StdoutLock,
 ) -> Result<()> {
-    let _screen_change = screen_changed(&last_screen, &screen);
-    let width_change = screen_width_change(&last_screen, &screen);
-    let height_change = screen_height_change(&last_screen, &screen);
+    let _screen_change = screen_changed(last_screen, screen);
+    let width_change = screen_width_change(last_screen, screen);
+    let height_change = screen_height_change(last_screen, screen);
 
     if width_change || height_change {
-        let _ = draw_screen_dumb(&screen, &mut stdout);
+        let _ = draw_screen_dumb(screen, stdout);
         return Ok(());
     }
 
@@ -503,21 +480,14 @@ fn draw_screen(
                 g: cpi.style.color.1,
                 b: cpi.style.color.2,
             };
-            if prev_fg.is_none() {
+            if prev_fg.is_none() || *prev_fg.as_ref().unwrap() != color {
                 ops.push(ScreenOp::SetFgColor(
                     cpi.style.color.0,
                     cpi.style.color.1,
                     cpi.style.color.2,
                 ));
-            } else {
-                if *prev_fg.as_ref().unwrap() != color {
-                    ops.push(ScreenOp::SetFgColor(
-                        cpi.style.color.0,
-                        cpi.style.color.1,
-                        cpi.style.color.2,
-                    ));
-                }
             }
+
             prev_fg = Some(color);
 
             // bg color
@@ -527,20 +497,12 @@ fn draw_screen(
                 b: cpi.style.bg_color.2,
             };
 
-            if prev_bg.is_none() {
+            if prev_bg.is_none() || *prev_bg.as_ref().unwrap() != bg_color {
                 ops.push(ScreenOp::SetBgColor(
                     cpi.style.bg_color.0,
                     cpi.style.bg_color.1,
                     cpi.style.bg_color.2,
                 ));
-            } else {
-                if *prev_bg.as_ref().unwrap() != bg_color {
-                    ops.push(ScreenOp::SetBgColor(
-                        cpi.style.bg_color.0,
-                        cpi.style.bg_color.1,
-                        cpi.style.bg_color.2,
-                    ));
-                }
             }
 
             prev_bg = Some(bg_color);

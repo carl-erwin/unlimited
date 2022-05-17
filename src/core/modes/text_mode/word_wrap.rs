@@ -25,7 +25,6 @@ use crate::core::Editor;
 
 use crate::core::view::View;
 
-use super::TextModeContext;
 use crate::core::codec::text::u32_to_char;
 
 use crate::core::codepointinfo::TextStyle;
@@ -156,7 +155,7 @@ impl ContentFilter<'_> for WordWrapFilter {
         &mut self,
         _editor: &Editor,
         env: &mut LayoutEnv,
-        view: &Rc<RwLock<View>>,
+        _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
     ) {
         dbg_println!(
@@ -172,13 +171,13 @@ impl ContentFilter<'_> for WordWrapFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         if self.max_column <= 2
         /* TODO(ceg) screen.max_char_width() */
         {
-            *filter_out = filter_in.clone();
+            *filter_out = filter_in.to_vec();
             return;
         }
 

@@ -76,17 +76,17 @@ impl ContentFilter<'_> for HighlightSelectionFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         if self.skip_filter {
-            *filter_out = filter_in.clone();
+            *filter_out = filter_in.to_vec();
             return;
         }
 
         let tm = view.mode_ctx::<TextModeContext>("text-mode");
         if tm.select_point.is_empty() {
-            *filter_out = filter_in.clone();
+            *filter_out = filter_in.to_vec();
             return;
         }
 

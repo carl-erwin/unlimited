@@ -98,6 +98,10 @@ pub struct Id(pub usize);
 // +------------------------------------------------------------------------------------------+
 
 // MOVE TO Layout code
+
+pub type Position = (usize, usize);
+pub type Dimension = (usize, usize);
+
 // store this in parent and reuse in resize
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum LayoutDirection {
@@ -205,6 +209,7 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
 
 static VIEW_ID: AtomicUsize = AtomicUsize::new(1);
 
+#[derive(Default)]
 pub struct InputContext {
     pub action_map: InputStageActionMap<'static>, // ref to current focused widget ?
     pub input_map: Rc<RefCell<Vec<(&'static str, InputEventMap)>>>, // mode name
@@ -274,6 +279,12 @@ pub struct ControllerView {
     pub id: Id,
     pub mode_name: &'static str,
 }
+
+pub type SubscriberInfo = (
+    Rc<RefCell<Box<dyn Mode>>>,
+    ViewEventSource,
+    ViewEventDestination,
+);
 
 /// The **View** is a way to present a given Document.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
@@ -354,18 +365,14 @@ pub struct View<'a> {
     pub filter_in: Rc<RefCell<Vec<FilterIo>>>,
     pub filter_out: Rc<RefCell<Vec<FilterIo>>>,
 
-    pub subscribers: Vec<(
-        Rc<RefCell<Box<dyn Mode>>>,
-        ViewEventSource,
-        ViewEventDestination,
-    )>,
+    pub subscribers: Vec<SubscriberInfo>,
 }
 
 /// Use this function if the mode needs to watch a given view
 ///
 pub fn register_view_subscriber(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     mode: Rc<RefCell<Box<dyn Mode>>>, // TODO: use type
     src: ViewEventSource,
     dst: ViewEventDestination,
@@ -378,8 +385,8 @@ pub fn register_view_subscriber(
     src_view.subscribers.push(ctx);
 
     mode.borrow().on_view_event(
-        &mut editor,
-        &mut env,
+        editor,
+        env,
         src,
         dst,
         &ViewEvent::Subscribe,
@@ -397,8 +404,8 @@ pub fn register_view_subscriber(
 // move subscriptions to editor , to avoid interior mut
 // editor.subscription[view.id] ?
 pub fn view_self_subscribe(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    _editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
     mode: Rc<RefCell<Box<dyn Mode>>>, // TODO: use type
     view: &mut View<'static>,
 ) -> Option<()> {
@@ -417,10 +424,10 @@ impl<'a> View<'a> {
 
     // Setup view modes. (respect vector order)
     fn setup_modes(
-        mut editor: &mut Editor<'static>,
-        mut env: &mut EditorEnv<'static>,
-        mut view: &mut View<'static>,
-        modes: &Vec<String>,
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+        modes: &[String],
     ) {
         // setup modes/input map/etc..
         for mode_name in modes.iter() {
@@ -448,8 +455,8 @@ impl<'a> View<'a> {
                 let ctx = m.alloc_ctx();
                 view.set_mode_ctx(m.name(), ctx);
                 dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
-                m.configure_view(editor, env, &mut view);
-                view_self_subscribe(&mut editor, &mut env, mode_rc.clone(), &mut view);
+                m.configure_view(editor, env, view);
+                view_self_subscribe(editor, env, mode_rc.clone(), view);
             }
         }
     }
@@ -459,15 +466,13 @@ impl<'a> View<'a> {
         editor: &mut Editor<'static>,
         env: &mut EditorEnv<'static>,
         parent_id: Option<Id>,
-        x: usize, // relative to parent, i32 allow negative moves?
-        y: usize, // relative to parent, i32 allow negative moves?
-        width: usize,
-        height: usize,
+        x_y: Position,
+        w_h: Dimension,
         document: Option<Arc<RwLock<Document<'static>>>>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
     ) -> View<'static> {
-        let screen = Arc::new(RwLock::new(Box::new(Screen::new(width, height))));
+        let screen = Arc::new(RwLock::new(Box::new(Screen::new(w_h.0, w_h.1))));
 
         let id = VIEW_ID.fetch_add(1, Ordering::SeqCst);
         let mode_ctx = HashMap::new();
@@ -494,10 +499,10 @@ impl<'a> View<'a> {
             modes: modes.clone(),     // use this to clone the view
             mode_ctx,
             //
-            x,
-            y,
-            width,
-            height,
+            x: x_y.0,
+            y: x_y.1,
+            width: w_h.0,
+            height: w_h.1,
             //
             layout_index: None,
             layout_direction: LayoutDirection::NotSet,
@@ -546,9 +551,7 @@ impl<'a> View<'a> {
             Some(box_any) => {
                 let any = box_any.as_mut();
                 match any.downcast_mut::<T>() {
-                    Some(m) => {
-                        return m;
-                    }
+                    Some(m) => m,
                     None => panic!("internal error: wrong type registered : mode name {}", name),
                 }
             }
@@ -562,9 +565,7 @@ impl<'a> View<'a> {
             Some(box_any) => {
                 let any = box_any.as_ref();
                 match any.downcast_ref::<T>() {
-                    Some(m) => {
-                        return m;
-                    }
+                    Some(m) => m,
                     None => panic!("internal error: wrong type registered"),
                 }
             }
@@ -608,7 +609,7 @@ pub fn get_status_view(
     None
 }
 
-///
+/// TODO(ceg): rename
 pub fn run_stage(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -625,11 +626,8 @@ pub fn run_stage(
         a.1(editor, env, view, pos, stage);
     }
 
-    match (pos, stage) {
-        (StagePosition::In, Stage::Compositing) => {
-            compute_view_layout(editor, env, &view); // can be merged with stage_actions ?
-        }
-        _ => {}
+    if let (StagePosition::In, Stage::Compositing) = (pos, stage) {
+        compute_view_layout(editor, env, view); // can be merged with stage_actions ?
     }
 }
 
@@ -653,7 +651,7 @@ pub fn compute_view_layout(
     run_compositing_stage_direct(
         editor,
         env,
-        &view,
+        view,
         start_offset,
         max_offset,
         &mut screen,

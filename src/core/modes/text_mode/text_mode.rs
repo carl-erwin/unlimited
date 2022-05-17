@@ -578,7 +578,7 @@ impl TextMode {
         TextMode {}
     }
 
-    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
+    pub fn register_input_stage_actions<'a>(map: &'a mut InputStageActionMap<'a>) {
         let v: Vec<(&str, InputStageFunction)> = vec![
             // navigation
             // marks
@@ -657,7 +657,7 @@ impl TextMode {
         ];
 
         for e in v {
-            register_input_stage_action(&mut map, e.0, e.1);
+            register_input_stage_action(map, e.0, e.1);
         }
     }
 }
@@ -859,8 +859,8 @@ pub fn run_text_mode_actions_vec(
 }
 
 fn run_text_mode_actions(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     pos: editor::StagePosition,
     stage: editor::Stage,
@@ -950,7 +950,7 @@ fn run_text_mode_actions(
         }
     };
 
-    run_text_mode_actions_vec(&mut editor, &mut env, &view, &actions);
+    run_text_mode_actions_vec(editor, env, view, &actions);
 
     // CEG: is this true after undo redo with multiple cursors ?
     // TODO(ceg): cut/paste
@@ -1009,15 +1009,15 @@ pub fn scroll_down(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<
 // TODO(ceg): rename into handle_input_events
 /// Insert an single element/array of unicode code points using hardcoded utf8 codec.<br/>
 pub fn insert_codepoint_array(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // InputEvent -> Vec<char>
     let array = {
         let v = view.read();
 
-        assert!(v.input_ctx.trigger.len() > 0);
+        assert!(!v.input_ctx.trigger.is_empty());
         let idx = v.input_ctx.trigger.len() - 1;
         match &v.input_ctx.trigger[idx] {
             InputEvent::KeyPress {
@@ -1071,12 +1071,7 @@ pub fn insert_codepoint_array(
 
     // TODO(ceg): find a way to remove this
     if save_marks {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![Action::DedupAndSaveMarks],
-        );
+        run_text_mode_actions_vec(editor, env, view, &vec![Action::DedupAndSaveMarks]);
     }
 
     // delete selection before insert
@@ -1164,8 +1159,8 @@ pub fn insert_codepoint_array(
 }
 
 pub fn remove_previous_codepoint(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // check previous action: if previous action was a mark move -> tag new positions
@@ -1177,12 +1172,7 @@ pub fn remove_previous_codepoint(
     };
 
     if save_marks {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![Action::DedupAndSaveMarks],
-        );
+        run_text_mode_actions_vec(editor, env, view, &vec![Action::DedupAndSaveMarks]);
     }
 
     if copy_maybe_remove_selection(editor, env, view, false, true) > 0 {
@@ -1254,8 +1244,8 @@ pub fn remove_previous_codepoint(
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
 pub fn undo(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // check previous action:
@@ -1269,12 +1259,7 @@ pub fn undo(
 
     // TODO(ceg): fin a way to remove this
     if save_marks {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![Action::DedupAndSaveMarks],
-        );
+        run_text_mode_actions_vec(editor, env, view, &vec![Action::DedupAndSaveMarks]);
     }
 
     let v = &mut view.write();
@@ -1519,7 +1504,7 @@ pub fn scroll_to_previous_screen(
     }
 
     // TODO(ceg): add hints to trigger mark moves
-    move_mark_to_screen_end(editor, env, &view);
+    move_mark_to_screen_end(editor, env, view);
 }
 
 pub fn scroll_to_next_screen(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
@@ -1577,7 +1562,7 @@ pub fn cut_to_end_of_line(
     let single_mark = tm.marks.len() == 1;
 
     // this will join line with multi-marks
-    let remove_eol = false && !single_mark; // && join_lines // TODO(ceg): use option join-cut-lines
+    let remove_eol = false; // !single_mark; // && join_lines // TODO(ceg): use option join-cut-lines
 
     // TODO(ceg): compute range, check overlaps
     // remove marks in other ranges
@@ -1811,7 +1796,7 @@ pub fn copy_maybe_remove_selection(
     remove: bool,
 ) -> usize {
     let symmetric = {
-        let v = &mut view.as_ref().clone().write();
+        let mut v = view.as_ref().clone().write();
         let _start_offset = v.start_offset;
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         let symmetric = tm.marks.len() == tm.select_point.len();
@@ -1854,7 +1839,7 @@ pub fn copy_maybe_remove_selection(
     // save marks: TODO(ceg): save marks before
     // cmp cur marks after and if changed save new marks
     {
-        let v = &mut view.as_ref().clone().write();
+        let mut v = view.write();
         let _tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     }
 
@@ -1878,7 +1863,7 @@ pub fn cut_selection(
     copy_maybe_remove_selection(editor, env, view, true, true);
 }
 
-pub fn button_press(_editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn button_press(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write();
 
     let (button, x, y) = match v.input_ctx.trigger[0] {

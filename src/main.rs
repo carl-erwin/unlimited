@@ -37,7 +37,7 @@ fn main() {
     let core_th = start_core_thread(config, core_tx.clone(), core_rx, ui_tx.clone());
 
     // run the ui loop in the main thread
-    ui::main_loop(ui_name.as_ref(), &ui_rx, &ui_tx, &core_tx);
+    ui::main_loop(&ui_name, &ui_rx, &ui_tx, &core_tx);
 
     // wait for core thread
     if let Some(core_handle) = core_th {

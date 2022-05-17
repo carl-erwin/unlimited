@@ -140,14 +140,11 @@ impl Screen {
                 continue;
             }
 
-            match (cur_offset, cell.cpi.offset) {
-                (Some(cur), Some(cpi_offset)) => {
-                    if cpi_offset < cur {
-                        panic!("cpi_offset {} < cur {}", cpi_offset, cur);
-                    }
-                    cur_offset = Some(cpi_offset);
+            if let (Some(cur), Some(cpi_offset)) = (cur_offset, cell.cpi.offset) {
+                if cpi_offset < cur {
+                    panic!("cpi_offset {} < cur {}", cpi_offset, cur);
                 }
-                _ => {}
+                cur_offset = Some(cpi_offset);
             }
         }
     }
@@ -343,38 +340,35 @@ impl Screen {
         if self.push_count == 0 {
             self.first_offset = cpi.offset.clone();
         } else {
-            let cpi_offset = cpi.offset.clone();
-            let last_offset = self.last_offset.clone();
+            let cpi_offset = cpi.offset;
+            let last_offset = self.last_offset;
 
-            match (cpi_offset, last_offset) {
-                (Some(cpi_offset), Some(last_offset)) => {
-                    // check invariants
-                    if true {
-                        if cpi_offset < last_offset {
-                            dbg_println!(
-                                "cpi {:?} , cpi_offset {:?} < last_offset {:?}",
-                                cpi,
-                                cpi_offset,
-                                last_offset
-                            );
+            if let (Some(cpi_offset), Some(last_offset)) = (cpi_offset, last_offset) {
+                // check invariants
+                if true {
+                    if cpi_offset < last_offset {
+                        dbg_println!(
+                            "cpi {:?} , cpi_offset {:?} < last_offset {:?}",
+                            cpi,
+                            cpi_offset,
+                            last_offset
+                        );
 
-                            panic!(); // allow unsorted offsets ?
-                        }
-                        if false {
-                            dbg_println!(
-                                "SAVE/UPDATE line[{}] end @ offset {} , index {}",
-                                self.current_line_index,
-                                cpi_offset,
-                                self.push_count
-                            );
-                        }
+                        panic!(); // allow unsorted offsets ?
                     }
-
-                    // save end line info
-                    self.line_offset.last_mut().unwrap().1 = cpi_offset;
-                    self.line_index.last_mut().unwrap().1 = self.push_count;
+                    if false {
+                        dbg_println!(
+                            "SAVE/UPDATE line[{}] end @ offset {} , index {}",
+                            self.current_line_index,
+                            cpi_offset,
+                            self.push_count
+                        );
+                    }
                 }
-                _ => {}
+
+                // save end line info
+                self.line_offset.last_mut().unwrap().1 = cpi_offset;
+                self.line_index.last_mut().unwrap().1 = self.push_count;
             }
         }
 
@@ -573,10 +567,7 @@ impl Screen {
 
         dbg_println!("find cpi by offset {}", offset);
         let (cpi, _, _) = self.find_cpi_by_offset(offset);
-        match cpi {
-            Some(_) => true,
-            _ => false,
-        }
+        cpi.is_some()
     }
 }
 

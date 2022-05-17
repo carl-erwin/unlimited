@@ -110,10 +110,10 @@ impl ContentFilter<'_> for TemplateComposeFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
-        *filter_out = filter_in.clone();
+        *filter_out = filter_in.to_vec();
     }
 
     fn finish(&mut self, _: &View, _: &mut LayoutEnv) {}

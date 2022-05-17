@@ -321,10 +321,8 @@ pub fn split_with_direction(
                 &mut editor,
                 &mut env,
                 Some(v.id),
-                x,
-                y,
-                width,
-                height,
+                (x, y),
+                (width, height),
                 doc[idx].clone(),
                 &modes[idx],
                 v.start_offset,
@@ -368,7 +366,7 @@ pub fn split_with_direction(
 
 pub fn layout_view_ids_with_direction(
     editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    _env: &mut EditorEnv<'static>,
     parent_id: view::Id,
     width: usize,
     height: usize,
@@ -558,11 +556,9 @@ pub fn split_view_with_direction(
     let mut new_parent = View::new(
         &mut editor,
         &mut env,
-        split_info.parent_id, // group leader's parent
-        split_info.x,         // relative to parent, i32 allow negative moves?
-        split_info.y,         // relative to parent, i32 allow negative moves?
-        split_info.width,
-        split_info.height,
+        split_info.parent_id,         // group leader's parent
+        (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
+        (split_info.width, split_info.height),
         None,
         &vec![], // TODO(ceg): add core mode fr save/quit/quit/abort/split{V,H}
         0,
@@ -635,10 +631,8 @@ pub fn split_view_with_direction(
             &mut editor,
             &mut env,
             Some(new_parent_id),
-            split_info.x, // relative to parent, i32 allow negative moves?
-            split_info.y, // relative to parent, i32 allow negative moves?
-            split_info.width,
-            split_info.height,
+            (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
+            (split_info.width, split_info.height),
             None,
             &splitter_mode,
             0,
@@ -658,10 +652,8 @@ pub fn split_view_with_direction(
             &mut editor,
             &mut env,
             Some(new_parent_id),
-            split_info.x, // relative to parent, i32 allow negative moves?
-            split_info.y, // relative to parent, i32 allow negative moves?
-            split_info.width,
-            split_info.height,
+            (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
+            (split_info.width, split_info.height),
             split_info.doc.clone(),
             &split_info.original_modes,
             0,
@@ -969,7 +961,7 @@ fn destroy_view_hierarchy(editor: &mut Editor<'static>, id: view::Id) {
             return;
         }
         let v = v.unwrap().clone();
-        let mut v = v.as_ref().write();
+        let mut v = v.write();
 
         for child in &mut v.children {
             ids.push(child.id);
@@ -986,7 +978,7 @@ fn destroy_view_hierarchy(editor: &mut Editor<'static>, id: view::Id) {
 
 pub fn destroy_view(
     editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let to_destroy_id = {
@@ -1036,7 +1028,7 @@ pub fn destroy_view(
             return;
         }
         let v_pp = v_pp.unwrap().clone();
-        let mut v_pp = v_pp.as_ref().write();
+        let mut v_pp = v_pp.write();
         if v_pp.destroyable == false {
             dbg_println!("-- DESTROY : TOP VIEW REACHED");
             return;
@@ -1051,7 +1043,7 @@ pub fn destroy_view(
             return;
         }
         let v_ppp = v_ppp.unwrap().clone();
-        let mut v_ppp = v_ppp.as_ref().write();
+        let mut v_ppp = v_ppp.write();
 
         let v_p_layout_index = v_p.layout_index;
         dbg_println!("DESTROY p_layout_index = {v_p_layout_index:?}");
@@ -1087,7 +1079,7 @@ pub fn destroy_view(
             return;
         }
         let to_keep = to_keep.unwrap().clone();
-        let mut to_keep = to_keep.as_ref().write();
+        let mut to_keep = to_keep.write();
         to_keep.layout_index = v_pp_layout_index;
         to_keep.parent_id = Some(ppp_id);
 
@@ -1205,10 +1197,8 @@ pub fn help_popup(
         &mut editor,
         &mut env,
         Some(main_vid),
-        x,
-        y,
-        pop_width,
-        pop_height,
+        (x, y),
+        (pop_width, pop_height),
         command_doc,
         &vec!["status-mode".to_owned()],
         0,

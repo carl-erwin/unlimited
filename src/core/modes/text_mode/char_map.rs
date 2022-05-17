@@ -55,7 +55,7 @@ impl ContentFilter<'_> for CharMapFilter {
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         for io in filter_in.iter() {

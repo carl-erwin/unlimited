@@ -374,7 +374,7 @@ fn move_on_screen_mark_to_previous_line(
     _env: &EditorEnv,
     v: &View,
     midx: usize,
-    marks: &mut Vec<Mark>,
+    marks: &mut [Mark],
 ) -> (u64, bool) {
     let mut mark_moved = false;
 
@@ -681,7 +681,7 @@ pub fn clone_and_move_mark_to_next_line(
             marks.len() - 1
         };
 
-        if true || !was_on_screen {
+        if !was_on_screen {
             tm.pre_compose_action.push(Action::CenterAroundMainMark);
         }
         return;
@@ -1082,7 +1082,7 @@ pub fn move_marks_to_next_line(
             let v = view.read();
             v.screen.clone()
         };
-        let mut screen = screen.as_ref().write();
+        let mut screen = screen.write();
 
         let mut mark = {
             let mut v = view.write();
@@ -1492,13 +1492,11 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
         m.move_to_token_start(&doc, codec);
 
         // main mark ?
-        if idx == midx {
-            if !screen.contains_offset(m.offset) {
-                // TODO(ceg): push to post action queue
-                // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
-                //
-                center = true;
-            }
+        if idx == midx && !screen.contains_offset(m.offset) {
+            // TODO(ceg): push to post action queue
+            // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+            //
+            center = true;
         }
     }
 

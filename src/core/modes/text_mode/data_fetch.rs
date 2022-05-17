@@ -88,7 +88,7 @@ impl ContentFilter<'_> for RawDataFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        _no_input: &Vec<FilterIo>,
+        _no_input: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
         // dbg_println!("DATA FETCH: run -----------------------");

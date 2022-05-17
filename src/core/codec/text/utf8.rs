@@ -62,23 +62,19 @@ pub fn is_codepoint_start(byte: u8) -> bool {
         return true;
     }
 
-    if byte >= 0xC2 && byte <= 0xDF {
+    if (0xC2..=0xDF).contains(&byte) {
         return true;
     }
 
-    if byte >= 0xC2 && byte <= 0xDF {
+    if (0xE0..=0xEC).contains(&byte) {
         return true;
     }
 
-    if byte >= 0xE0 && byte <= 0xEC {
+    if (0xED..=0xEF).contains(&byte) {
         return true;
     }
 
-    if byte >= 0xED && byte <= 0xEF {
-        return true;
-    }
-
-    if byte >= 0xF0 && byte <= 0xF4 {
+    if (0xF0..=0xF4).contains(&byte) {
         return true;
     }
 
@@ -89,7 +85,7 @@ pub fn is_codepoint_start(byte: u8) -> bool {
 // return 0 on error, or the number of written bytes
 // do encode_unchecked and remove test
 pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
-    if out.len() < 1 {
+    if out.is_empty() {
         return 0;
     }
 
@@ -115,7 +111,7 @@ pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
     if codepoint < 0xFFFF {
         out[0] = 0xE0 | ((codepoint >> 12) & 0x3F) as u8;
         out[1] = 0x80 | ((codepoint >> 6) & 0x3F) as u8;
-        out[2] = 0x80 | ((codepoint >> 0) & 0x3F) as u8;
+        out[2] = 0x80 | ((codepoint/* */) & 0x3F) as u8;
         return 3;
     }
 
@@ -127,7 +123,7 @@ pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
         out[0] = 0xF0 | ((codepoint >> 18) & 0x3F) as u8;
         out[1] = 0xE0 | ((codepoint >> 12) & 0x3F) as u8;
         out[2] = 0x80 | ((codepoint >> 6) & 0x3F) as u8;
-        out[3] = 0x80 | ((codepoint >> 0) & 0x3F) as u8;
+        out[3] = 0x80 | ((codepoint/* */) & 0x3F) as u8;
         return 4;
     }
 
@@ -194,7 +190,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
     ctx.current_offset = from_offset;
     for val in data.iter().skip(from_offset as usize) {
         utf8_decode_byte_checked(&mut ctx, *val, &mut v);
-        if v.len() > 0 {
+        if !v.is_empty() {
             // 1 is enough
             break;
         }
@@ -267,7 +263,7 @@ fn utf8_decode_byte_checked(
                 let io = (u32_to_char(ctx.codep), ctx.from_offset, ctx.cp_size);
                 out.push(io);
 
-                ctx.from_offset = ctx.from_offset + ctx.cp_size as u64;
+                ctx.from_offset += ctx.cp_size as u64;
 
                 // restart
                 ctx.codep = 0;
@@ -299,7 +295,7 @@ fn utf8_decode_byte_checked(
                 out.push(io);
 
                 // restart @ next byte
-                ctx.from_offset = ctx.from_offset + 1;
+                ctx.from_offset += 1;
 
                 // restart
                 ctx.codep = 0;
@@ -333,12 +329,12 @@ fn utf8_decode_byte_checked(
         }
     }
 
-    ctx.current_offset = ctx.current_offset + 1; // ext ?
+    ctx.current_offset += 1; // ext ?
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Utf8Codec {}
 
 impl Utf8Codec {
@@ -365,8 +361,7 @@ impl TextCodec for Utf8Codec {
         match direction {
             SyncDirection::Backward => {
                 let offset = get_previous_codepoint_start(data, data_offset);
-                let ret = get_codepoint(data, offset);
-                ret
+                get_codepoint(data, offset)
             }
 
             SyncDirection::Forward => get_codepoint(data, data_offset),

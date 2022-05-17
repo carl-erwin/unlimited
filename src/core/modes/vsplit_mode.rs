@@ -246,7 +246,7 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         &mut self,
         view: &View,
         env: &mut LayoutEnv,
-        _filter_in: &Vec<FilterIo>,
+        _filter_in: &[FilterIo],
         _filter_out: &mut Vec<FilterIo>,
     ) {
         let mod_ctx = view.mode_ctx::<VsplitModeContext>("vsplit-mode");

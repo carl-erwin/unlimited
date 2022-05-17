@@ -3,7 +3,7 @@ use super::TextCodec;
 
 pub fn encode(codepoint: u32, out: &mut [u8]) -> usize {
     // ResultEncode error
-    if out.len() < 1 {
+    if out.is_empty() {
         return 0;
     }
 
@@ -76,7 +76,7 @@ pub fn get_codepoint(data: &[u8], from_offset: u64) -> (char, u64, usize) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AsciiCodec {}
 
 impl AsciiCodec {
@@ -103,8 +103,7 @@ impl TextCodec for AsciiCodec {
         match direction {
             SyncDirection::Backward => {
                 let offset = get_previous_codepoint_start(data, data_offset);
-                let ret = get_codepoint(data, offset);
-                ret
+                get_codepoint(data, offset)
             }
 
             SyncDirection::Forward => get_codepoint(data, data_offset),
@@ -139,16 +138,16 @@ impl TextCodec for AsciiCodec {
                         return Some(i as u64);
                     }
                 }
-                return None;
+                None
             }
 
             SyncDirection::Forward => {
-                for i in data_offset..data_len {
-                    if self.is_sync(data[i]) {
+                for (i, b) in data.iter().enumerate().take(data_len).skip(data_offset) {
+                    if self.is_sync(*b) {
                         return Some(i as u64);
                     }
                 }
-                return None;
+                None
             }
         }
     }

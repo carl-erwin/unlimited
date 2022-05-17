@@ -35,9 +35,8 @@ use crate::core::event::Event;
 use crate::core::event::EventMessage;
 use crate::core::view::View;
 
-use crate::core::error::Error;
-
-type AppResult<T> = Result<T, Error>;
+//use crate::core::error::Error;
+//type UnlResult<T> = Result<T, Error>;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -216,7 +215,7 @@ NB: unlimitED! comes with ABSOLUTELY NO WARRANTY
 
 /// This function is the core of the editor.
 /// It should be ran in an other thread than the main one (which is kept for ui)
-pub fn run<'a>(
+pub fn run(
     config: Config,
     core_rx: &Receiver<EventMessage<'static>>,
     core_tx: &Sender<EventMessage<'static>>,
@@ -252,7 +251,7 @@ pub fn run<'a>(
 
     create_views(&mut editor, &mut env);
 
-    editor::main_loop(&mut editor, &mut env, &core_rx, &ui_tx);
+    editor::main_loop(&mut editor, &mut env, core_rx, ui_tx);
 
     // wait for worker thread
     if let Some(worker_handle) = worker_th {
@@ -475,7 +474,7 @@ fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.document_map.read().len();
 
-    let arg_info = build_file_options(&editor);
+    let arg_info = build_file_options(editor);
 
     dbg_println!("processing arg_info {:?}", arg_info);
 
@@ -500,7 +499,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
 
         if let Some(b) = b {
             let doc_id = document::Id(id);
-            b.as_ref().write().id = doc_id; // TODO(ceg): improve doc id generation
+            b.write().id = doc_id; // TODO(ceg): improve doc id generation
             editor.document_map.write().insert(doc_id, b);
             id += 1;
         }
@@ -543,7 +542,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         dbg_println!("setup mode[{}] document metadata", mode_name);
         let mut mode = mode.borrow_mut();
         let map = editor.document_map.clone();
-        let mut map = map.as_ref().write();
+        let mut map = map.write();
         for (_, doc) in map.iter_mut() {
             let mut doc = doc.write();
             mode.configure_document(editor, env, &mut doc);
@@ -553,7 +552,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     dbg_println!("id {}", id);
 }
 
-pub fn create_views(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
+pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let document_map = editor.document_map.clone();
     let document_map = document_map.read();
 
@@ -575,18 +574,7 @@ pub fn create_views(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'s
 
     // create views
     for doc in docs {
-        let view = View::new(
-            &mut editor,
-            &mut env,
-            None,
-            0,
-            0,
-            1,
-            1,
-            Some(doc),
-            &modes,
-            0,
-        );
+        let view = View::new(editor, env, None, (0, 0), (1, 1), Some(doc), &modes, 0);
         dbg_println!("create {:?}", view.id);
 
         // top level views

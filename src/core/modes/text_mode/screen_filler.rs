@@ -119,7 +119,7 @@ impl ContentFilter<'_> for ScreenFilter {
         &mut self,
         _view: &View,
         env: &mut LayoutEnv,
-        filter_in: &Vec<FilterIo>,
+        filter_in: &[FilterIo],
         _filter_out: &mut Vec<FilterIo>,
     ) {
         /*

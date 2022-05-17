@@ -1259,7 +1259,7 @@ pub fn get_document_byte_count_at_offset(
     let mut total_count = 0;
     let mut local_offset = offset;
 
-    let mut file = doc.buffer.data.as_ref().write();
+    let mut file = doc.buffer.data.write();
 
     let mut cur_index = file.root_index();
     while cur_index != None {
@@ -1313,7 +1313,7 @@ pub fn find_nth_byte_offset(doc: &Document, byte: u8, index: u64) -> Option<u64>
 
     let mut index = index;
 
-    let mut file = doc.buffer.data.as_ref().write();
+    let mut file = doc.buffer.data.write();
     let mut global_offset = 0;
 
     let mut cur_index = file.root_index();

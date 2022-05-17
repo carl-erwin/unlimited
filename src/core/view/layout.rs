@@ -62,19 +62,19 @@ pub trait ContentFilter<'a> {
     fn run_managed(
         &mut self,
         view: &Rc<RwLock<View>>,
-        mut env: &mut LayoutEnv,
-        input: &Vec<FilterIo>,
+        env: &mut LayoutEnv,
+        input: &[FilterIo],
         output: &mut Vec<FilterIo>,
     ) {
-        let mut view = view.read();
-        self.run(&mut view, &mut env, input, output);
+        let view = view.read();
+        self.run(&view, env, input, output);
     }
 
     fn run(
         &mut self,
         _view: &View,
         _env: &mut LayoutEnv,
-        _input: &Vec<FilterIo>,
+        _input: &[FilterIo],
         _output: &mut Vec<FilterIo>,
     ) {
         //*output = input.clone();
@@ -98,9 +98,9 @@ pub trait ScreenOverlayFilter<'a> {
         /* default implementation is empty*/
     }
 
-    fn run_managed(&mut self, view: &Rc<RwLock<View>>, mut env: &mut LayoutEnv) {
-        let mut view = view.read();
-        self.run(&mut view, &mut env);
+    fn run_managed(&mut self, view: &Rc<RwLock<View>>, env: &mut LayoutEnv) {
+        let view = view.read();
+        self.run(&view, env);
     }
 
     fn run(&mut self, _view: &View, _env: &mut LayoutEnv) {}
@@ -223,8 +223,8 @@ pub fn run_compositing_stage(
 }
 
 fn compose_children(
-    mut editor: &mut Editor<'static>,
-    mut editor_env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    editor_env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     _base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,   // default view.doc.size()   end  -> Option<u64>
@@ -283,8 +283,8 @@ fn compose_children(
                 dbg_println!("call mode {} on_view_event ", mode.borrow().name());
 
                 mode.borrow().on_view_event(
-                    &mut editor,
-                    &mut editor_env,
+                    editor,
+                    editor_env,
                     cb.1,
                     cb.2,
                     &ViewEvent::PreComposition,
@@ -395,13 +395,13 @@ fn compose_children(
         let (x, y) = (info.x, info.y);
         let (_w, _h) = (info.w, info.h);
 
-        if info.floating == false && sizes[idx] == 0 {
+        if info.floating && sizes[idx] == 0 {
             continue;
         }
 
         let vid = info.view_id;
 
-        let child_rc = editor.view_map.get(&vid).clone();
+        let child_rc = editor.view_map.get(&vid);
         let child_rc = child_rc.unwrap().clone();
 
         let start_offset = {
@@ -485,8 +485,8 @@ fn compose_children(
                     dbg_println!("call mode {} on_view_event ", mode.borrow().name());
 
                     mode.borrow().on_view_event(
-                        &mut editor,
-                        &mut editor_env,
+                        editor,
+                        editor_env,
                         cb.1,
                         cb.2,
                         &ViewEvent::PostComposition,
@@ -505,12 +505,12 @@ fn compose_children(
 // It will run the configured filters until the screen is filled or eof is reached.<br/>
 // the screen MUST be cleared first (for LayoutPass::ScreenContent,  LayoutPass::ScreenContentAndOverlay)
 pub fn run_compositing_stage_direct(
-    mut editor: &mut Editor<'static>,
-    mut editor_env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    editor_env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
     max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
-    mut screen: &mut Screen,
+    screen: &mut Screen,
     pass_mask: LayoutPass,
 ) {
     // check screen size
@@ -520,12 +520,12 @@ pub fn run_compositing_stage_direct(
 
     // (recursive) children compositing
     let draw = compose_children(
-        &mut editor,
-        &mut editor_env,
-        &view,
+        editor,
+        editor_env,
+        view,
         base_offset,
         max_offset,
-        &mut screen,
+        screen,
         pass_mask,
     );
     if draw {
@@ -556,11 +556,11 @@ pub fn run_compositing_stage_direct(
     let mut time_spent: Vec<u128> = vec![];
 
     if pass_mask == LayoutPass::ScreenContent || pass_mask == LayoutPass::ScreenContentAndOverlay {
-        run_content_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
+        run_content_filters(editor, &mut layout_env, &mut time_spent, view, None);
     }
 
     if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ScreenContentAndOverlay {
-        run_screen_overlay_filters(&editor, &mut layout_env, &mut time_spent, &view, None);
+        run_screen_overlay_filters(editor, &mut layout_env, &mut time_spent, view, None);
     }
 
     {
@@ -585,7 +585,7 @@ fn run_content_filters(
     };
     for f in filters.borrow_mut().iter_mut() {
         //dbg_println!("setup {}", f.name());
-        f.setup(&editor, &mut layout_env, &view, parent_view);
+        f.setup(editor, layout_env, view, parent_view);
     }
 
     let mut filters = filters.borrow_mut();
@@ -605,14 +605,14 @@ fn run_content_filters(
 
     let view = view.read();
     layout_env.quit = filters.is_empty();
-    while layout_env.quit == false {
+    while !layout_env.quit {
         loop_count += 1;
 
         for (idx, f) in filters.iter_mut().enumerate() {
             // always clear filter output
             filter_out.clear();
 
-            if !true {
+            if false {
                 dbg_println!(
                     "run {:32} : filter_in.len() {})\r",
                     f.name(),
@@ -621,7 +621,7 @@ fn run_content_filters(
             }
             let t0 = std::time::Instant::now();
 
-            f.run(&view, &mut layout_env, &filter_in, &mut filter_out);
+            f.run(&view, layout_env, &filter_in, &mut filter_out);
 
             let t1 = std::time::Instant::now();
 
@@ -660,7 +660,7 @@ fn run_content_filters(
 
     for (idx, f) in filters.iter_mut().enumerate() {
         let t0 = std::time::Instant::now();
-        f.finish(&view, &mut layout_env);
+        f.finish(&view, layout_env);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;
@@ -693,7 +693,7 @@ fn run_screen_overlay_filters(
     };
     for f in filters.borrow_mut().iter_mut() {
         //dbg_println!("setup {}", f.name());
-        f.setup(&editor, &mut layout_env, &view, parent_view);
+        f.setup(editor, layout_env, view, parent_view);
     }
 
     let mut filters = filters.borrow_mut();
@@ -709,7 +709,7 @@ fn run_screen_overlay_filters(
 
     for (idx, f) in filters.iter_mut().enumerate() {
         let t0 = std::time::Instant::now();
-        f.run(&view, &mut layout_env);
+        f.run(&view, layout_env);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;
@@ -717,7 +717,7 @@ fn run_screen_overlay_filters(
 
     for (idx, f) in filters.iter_mut().enumerate() {
         let t0 = std::time::Instant::now();
-        f.finish(&view, &mut layout_env);
+        f.finish(&view, layout_env);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;

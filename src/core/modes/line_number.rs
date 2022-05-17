@@ -68,8 +68,6 @@ use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
-use crate::core::view::view_self_subscribe;
-
 use crate::core::event::*;
 
 use lazy_static::lazy_static;
@@ -189,9 +187,9 @@ pub fn linenum_input_event(
                         alt: _,
                         shift: _,
                     },
-                x,
-                y,
-                button,
+                x: _,
+                y: _,
+                button: _,
             } => {
                 set_focus_on_vid(&mut editor, &mut env, mode_ctx.text_vid);
             }
@@ -205,15 +203,19 @@ pub fn linenum_input_event(
                         alt: _,
                         shift: _,
                     },
-                x,
-                y,
-                button,
+                x: _,
+                y: _,
+                button: _,
             } => {
                 set_focus_on_vid(&mut editor, &mut env, mode_ctx.text_vid);
             }
         },
 
-        Some(InputEvent::PointerMotion(PointerEvent { x, y, mods: _ })) => {}
+        Some(InputEvent::PointerMotion(PointerEvent {
+            x: _,
+            y: _,
+            mods: _,
+        })) => {}
 
         _ => {
             dbg_println!("LINENUM unhandled event {:?}", evt);
@@ -267,7 +269,7 @@ impl<'a> Mode for LineNumberMode {
             .entry(doc_id)
             .or_insert(RwLock::new(LineNumberDocumentMetaData::new()));
 
-        let meta = DOC_METADATA_MAP.as_ref().write();
+        let meta = DOC_METADATA_MAP.write();
         let meta = meta.get(&doc_id);
         let mut meta = meta.as_ref().unwrap().write();
 
@@ -282,9 +284,9 @@ impl<'a> Mode for LineNumberMode {
 
     fn configure_view(
         &mut self,
-        mut editor: &mut Editor<'static>,
-        mut env: &mut EditorEnv<'static>,
-        mut view: &mut View<'static>,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
     ) {
         // setup input map for core actions
         let input_map = build_input_event_map(LINENUM_INPUT_MAP).unwrap();
