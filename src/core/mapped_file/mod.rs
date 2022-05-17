@@ -239,7 +239,7 @@ impl Node {
         if let Some(ref page) = self.cow {
             let p = page.borrow().as_slice().unwrap();
             let n = std::cmp::min(out.len(), p.len());
-            assert!(n > 0);
+            //assert!(n >= 0);
             unsafe {
                 ptr::copy(p.as_ptr(), out.as_mut_ptr(), n);
             }
