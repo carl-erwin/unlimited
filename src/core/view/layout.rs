@@ -295,7 +295,7 @@ fn compose_children(
         }
     }
 
-    dbg_println!("COMPOSE checking {:?} floating children", view.id);
+    dbg_println!("COMPOSE checking {:?} non floating children", view.id);
 
     // non floating children
     // cache size ?
@@ -309,8 +309,6 @@ fn compose_children(
 
     #[derive(Debug)]
     struct ComposeInfo {
-        pub floating: bool,
-        pub parent_idx: usize,
         pub view_id: view::Id,
         pub x: usize,
         pub y: usize,
@@ -319,42 +317,42 @@ fn compose_children(
     }
 
     let mut compose_info = vec![];
-    // 1 - compute position and size
-    // 2 - compose based on sibling dependencies/priority
-    let mut x = 0;
-    let mut y = 0;
-    let children = view.children.clone();
-    for (idx, child) in children.iter().enumerate() {
-        let mut child_v = editor.view_map.get(&child.id).unwrap().write();
-        let (w, h) = if layout_dir_is_vertical {
-            (width, sizes[idx])
-        } else {
-            (sizes[idx], height)
-        };
+    // - compute position and size
+    // - compose based on sibling dependencies/priority ( non floating children)
+    {
+        let mut x = 0;
+        let mut y = 0;
+        let children = view.children.clone();
+        for (idx, child) in children.iter().enumerate() {
+            let mut child_v = editor.view_map.get(&child.id).unwrap().write();
+            let (w, h) = if layout_dir_is_vertical {
+                (width, sizes[idx])
+            } else {
+                (sizes[idx], height)
+            };
 
-        child_v.x = x;
-        child_v.y = y;
-        child_v.width = w;
-        child_v.height = h;
+            child_v.x = x;
+            child_v.y = y;
+            child_v.width = w;
+            child_v.height = h;
 
-        compose_info.push(ComposeInfo {
-            floating: false,
-            parent_idx: idx,
-            view_id: child.id,
-            x,
-            y,
-            w,
-            h,
-        }); // not sorted yet
+            compose_info.push(ComposeInfo {
+                view_id: child.id,
+                x,
+                y,
+                w,
+                h,
+            }); // not sorted yet
 
-        if layout_dir_is_vertical {
-            y += h;
-        } else {
-            x += w;
+            if layout_dir_is_vertical {
+                y += h;
+            } else {
+                x += w;
+            }
         }
     }
 
-    // sort views based on depth/priority
+    // - sort views based on depth/priority (children)
     compose_info.sort_by(|idxa, idxb| {
         let vida = idxa.view_id;
         let vidb = idxb.view_id;
@@ -368,9 +366,9 @@ fn compose_children(
         pb.cmp(&pa)
     });
 
-    // add floating children
+    // - add floating children (not yet sorted)
     let floating_children = view.floating_children.clone();
-    for (idx, child) in floating_children.iter().enumerate() {
+    for (_idx, child) in floating_children.iter().enumerate() {
         let child_v = editor.view_map.get(&child.id).unwrap().read();
 
         let x = child_v.x;
@@ -379,8 +377,6 @@ fn compose_children(
         let h = child_v.height;
 
         compose_info.push(ComposeInfo {
-            floating: true,
-            parent_idx: idx,
             view_id: child.id,
             x,
             y,
@@ -391,11 +387,10 @@ fn compose_children(
 
     //
     for info in &compose_info {
-        let idx = info.parent_idx;
         let (x, y) = (info.x, info.y);
-        let (_w, _h) = (info.w, info.h);
+        let (w, h) = (info.w, info.h);
 
-        if info.floating && sizes[idx] == 0 {
+        if w == 0 || h == 0 {
             continue;
         }
 
@@ -412,9 +407,6 @@ fn compose_children(
         //
         {
             let (w, h) = (info.w, info.h);
-
-            assert!(w > 0);
-            assert!(h > 0);
 
             // alloc new screen or clear ?
             let mut do_clear = true;
