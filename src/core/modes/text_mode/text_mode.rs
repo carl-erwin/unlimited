@@ -481,11 +481,14 @@ impl<'a> Mode for TextMode {
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
-        view.document
-            .as_ref()
-            .unwrap()
-            .write()
-            .tag(Instant::now(), 0, marks_offsets);
+        let selections_offsets: Vec<u64> = tm.select_point.iter().map(|m| m.offset).collect();
+
+        view.document.as_ref().unwrap().write().tag(
+            Instant::now(),
+            0,
+            marks_offsets,
+            selections_offsets,
+        );
 
         // Config input map
         dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
@@ -744,14 +747,23 @@ pub fn run_text_mode_actions_vec(
 
                 //
                 tm.marks.dedup();
+                tm.select_point.dedup();
+
                 let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+                let selections_offsets: Vec<u64> =
+                    tm.select_point.iter().map(|m| m.offset).collect();
                 dbg_println!("MARKS {:?}", marks_offsets);
 
                 //
                 let doc = v.document().unwrap();
                 let mut doc = doc.write();
                 let max_offset = doc.size() as u64;
-                doc.tag(env.current_time, max_offset, marks_offsets);
+                doc.tag(
+                    env.current_time,
+                    max_offset,
+                    marks_offsets,
+                    selections_offsets,
+                );
 
                 dbg_println!("MARK DedupAndSaveMarks doc revision {}", doc.nr_changes());
             }
@@ -762,13 +774,21 @@ pub fn run_text_mode_actions_vec(
 
                 //
                 let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
+                let selections_offsets: Vec<u64> =
+                    tm.select_point.iter().map(|m| m.offset).collect();
+
                 dbg_println!("MARKS {:?}", marks_offsets);
 
                 //
                 let doc = v.document().unwrap();
                 let mut doc = doc.write();
                 let max_offset = doc.size() as u64;
-                doc.tag(env.current_time, max_offset, marks_offsets);
+                doc.tag(
+                    env.current_time,
+                    max_offset,
+                    marks_offsets,
+                    selections_offsets,
+                );
 
                 dbg_println!("MARK SaveMarks doc revision {}", doc.nr_changes());
             }
@@ -776,7 +796,7 @@ pub fn run_text_mode_actions_vec(
             Action::CancelSelection => {
                 let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-                tm.select_point.clear();
+                // tm.select_point.clear();
             }
         }
     }
@@ -1270,14 +1290,20 @@ pub fn undo(
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
+    let select_point = &mut tm.select_point;
 
     doc.undo_until_tag();
 
-    if let Some(marks_offsets) = doc.get_tag_offsets() {
+    if let Some((marks_offsets, selections_offsets)) = doc.get_tag_offsets() {
         dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
             marks.push(Mark { offset });
+        }
+
+        select_point.clear();
+        for offset in selections_offsets {
+            select_point.push(Mark { offset });
         }
     } else {
         dbg_println!("TAG not found");
@@ -1287,8 +1313,6 @@ pub fn undo(
 
     tm.pre_compose_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
-
-    tm.pre_compose_action.push(Action::CancelSelection);
 
     tm.prev_action = ActionType::Undo;
 }
@@ -1303,6 +1327,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
+    let select_point = &mut tm.select_point;
 
     tm.mark_index = 0;
 
@@ -1320,12 +1345,18 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
         doc.buffer_log_pos()
     );
 
-    if let Some(marks_offsets) = doc.get_tag_offsets() {
-        dbg_println!("restore marks {:?}", marks_offsets);
+    if let Some((marks_offsets, selections_offsets)) = doc.get_tag_offsets() {
         dbg_println!("doc max size {:?}", doc.size());
+        dbg_println!("restore marks {:?}", marks_offsets);
+        dbg_println!("restore selections {:?}", selections_offsets);
         marks.clear();
         for offset in marks_offsets {
             marks.push(Mark { offset });
+        }
+
+        select_point.clear();
+        for offset in selections_offsets {
+            select_point.push(Mark { offset });
         }
     } else {
         dbg_println!("REDO: no marks ? doc size {:?}", doc.size());
@@ -1333,7 +1364,6 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
 
     tm.pre_compose_action
         .push(Action::CenterAroundMainMarkIfOffScreen);
-    tm.pre_compose_action.push(Action::CancelSelection);
 
     tm.prev_action = ActionType::Redo;
     /*
@@ -1694,6 +1724,8 @@ pub fn set_selection_points_at_marks(
             dbg_println!("{:?} set point @ offset {}", vid, m.offset);
             tm.select_point.push(m.clone());
         }
+
+        tm.pre_compose_action.push(Action::SaveMarks);
     }
 
     if sync

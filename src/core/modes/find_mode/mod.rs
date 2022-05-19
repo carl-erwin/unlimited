@@ -33,7 +33,7 @@ static FIND_TRIGGER_MAP: &str = r#"
   {
     "events": [
      { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" },
-     { "in": [{ "key": "ctrl+r" } ],    "action": "find:start-reverse" }
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ],    "action": "find:start-reverse" }
     ]
   }
 ]"#;

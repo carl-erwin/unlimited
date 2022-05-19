@@ -22,6 +22,7 @@ pub enum BufferOperationType {
     Tag {
         time: std::time::Instant,
         marks_offsets: Vec<u64>,
+        selections_offsets: Vec<u64>,
     },
 }
 
@@ -77,9 +78,14 @@ impl BufferOperation {
         let op_type = match &self.op_type {
             BufferOperationType::Insert => BufferOperationType::Remove,
             BufferOperationType::Remove => BufferOperationType::Insert,
-            BufferOperationType::Tag { marks_offsets, .. } => BufferOperationType::Tag {
+            BufferOperationType::Tag {
+                marks_offsets,
+                selections_offsets,
+                ..
+            } => BufferOperationType::Tag {
                 time: std::time::Instant::now(),
                 marks_offsets: marks_offsets.clone(),
+                selections_offsets: selections_offsets.clone(),
             },
         };
 

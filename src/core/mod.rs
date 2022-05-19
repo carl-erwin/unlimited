@@ -520,8 +520,8 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
                 let s = WELCOME_MESSAGE.as_bytes();
 
                 // move 1st tag to ctor/doc::new() ?
-                d.tag(env.current_time, 0, vec![0]); // TODO(ceg): rm this only if the buffer log is cleared
-                                                     //    create_views(&mut editor, &mut env);
+                d.tag(env.current_time, 0, vec![0], vec![]); // TODO(ceg): rm this only if the buffer log is cleared
+                                                             //    create_views(&mut editor, &mut env);
 
                 d.insert(0, s.len(), s);
 

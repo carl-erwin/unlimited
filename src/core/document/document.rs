@@ -468,7 +468,13 @@ impl<'a> Document<'a> {
         self.buffer_log.pos = 0;
     }
 
-    pub fn tag(&mut self, time: std::time::Instant, offset: u64, marks_offsets: Vec<u64>) -> bool {
+    pub fn tag(
+        &mut self,
+        time: std::time::Instant,
+        offset: u64,
+        marks_offsets: Vec<u64>,
+        selections_offsets: Vec<u64>,
+    ) -> bool {
         if !self.use_buffer_log {
             // return log disabled ?
             return false;
@@ -485,6 +491,7 @@ impl<'a> Document<'a> {
             BufferOperationType::Tag {
                 time,
                 marks_offsets,
+                selections_offsets,
             },
             None,
         );
@@ -493,7 +500,7 @@ impl<'a> Document<'a> {
         true
     }
 
-    pub fn get_tag_offsets(&mut self) -> Option<Vec<u64>> {
+    pub fn get_tag_offsets(&mut self) -> Option<(Vec<u64>, Vec<u64>)> {
         let dlen = self.buffer_log.data.len();
         if dlen == 0 {
             return None;
@@ -509,9 +516,11 @@ impl<'a> Document<'a> {
         let op = &self.buffer_log.data[pos];
         match op.op_type {
             BufferOperationType::Tag {
-                ref marks_offsets, ..
+                ref marks_offsets,
+                ref selections_offsets,
+                ..
             } => {
-                Some(marks_offsets.clone()) // TODO(ceg): Arc<Vec<u64>>
+                Some((marks_offsets.clone(), selections_offsets.clone())) // TODO(ceg): Arc<Vec<u64>>
             }
             _ => None,
         }

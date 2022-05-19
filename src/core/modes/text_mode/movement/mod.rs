@@ -633,80 +633,53 @@ pub fn clone_and_move_mark_to_next_line(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // refresh mark index
-    let mark_len = {
+    let (mark_len, save_mark) = {
         let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-        let mark_len = {
-            let marks = &mut tm.marks;
-            let midx = marks.len() - 1;
-            let offset = marks[midx].offset;
-            // duplicated last mark + select
-            marks.push(Mark { offset });
-            marks.len()
-        };
-
-        tm.mark_index = mark_len - 1;
-        mark_len
+        (tm.marks.len(), tm.marks.len() == 1)
     };
 
     // NB: borrows: will use rendering pipeline to compute the marks_offset
     let offsets = move_mark_to_next_line(editor, env, view, mark_len - 1); // TODO return offset (old, new)
     if offsets.is_none() {
-        dbg_println!(" cannot move mark to next line");
-
-        run_text_mode_actions_vec(editor, env, &view, &vec![Action::CheckMarks]);
+        run_text_mode_actions_vec(editor, env, &view, &vec![Action::CheckMarks]); // ? center ?
+        return;
+    }
+    let offsets = offsets.unwrap();
+    if offsets.0 == offsets.1 {
         return;
     }
 
-    let offsets = offsets.unwrap();
-
-    dbg_println!(" clone move down: offsets {:?}", offsets);
+    if save_mark {
+        run_text_mode_actions_vec(editor, env, view, &vec![Action::SaveMarks]);
+    }
 
     let mut v = view.write();
 
-    // no move ?
-    if offsets.0 == offsets.1 {
-        let was_on_screen = {
-            let screen = v.screen.clone();
-            let screen = screen.read();
-            screen.contains_offset(offsets.0)
-        };
-
-        // destroy duplicated mark
+    // fix previous offsets
+    {
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        tm.mark_index = {
+        let mark_len = {
             let marks = &mut tm.marks;
-            marks.pop();
-            marks.len() - 1
+            // duplicated last mark + select
+            marks.push(Mark { offset: offsets.1 });
+            marks.len()
         };
-
-        if !was_on_screen {
-            tm.pre_compose_action.push(Action::CenterAroundMainMark);
-        }
-        return;
+        tm.marks[mark_len - 2].offset = offsets.0;
+        tm.mark_index = mark_len - 1;
     }
 
-    dbg_println!(" clone move down: new_offset {}", offsets.1);
     // env.sort mark sync direction
     // update view.mark_index
-
     let (was_on_screen, is_on_screen) = {
         let screen = v.screen.read();
         let was_on_screen = screen.contains_offset(offsets.0);
         let is_on_screen = screen.contains_offset(offsets.1);
-        dbg_println!(
-            " was_on_screen {} , is_on_screen  {}",
-            was_on_screen,
-            is_on_screen
-        );
-
         (was_on_screen, is_on_screen)
     };
 
     {
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
         if was_on_screen && !is_on_screen {
             tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
         } else if !is_on_screen {
@@ -1195,6 +1168,12 @@ pub fn move_marks_to_next_line(
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                     tm.marks[0] = mark; // save update
                     dbg_println!("main mark updated (fast path) {:?}", tm.marks[0]);
+
+                    if !tm.select_point.is_empty() {
+                        tm.pre_compose_action.push(Action::DedupAndSaveMarks);
+                        // save last op
+                        tm.prev_action = ActionType::MarksMove;
+                    }
                 }
                 // do not update screen twice
                 env.skip_compositing = true;
@@ -1403,7 +1382,10 @@ pub fn move_marks_to_next_line(
                 tm.marks[idx].offset
             );
         };
-        tm.pre_compose_action.push(Action::CheckMarks);
+
+        if !tm.select_point.is_empty() {
+            tm.pre_compose_action.push(Action::DedupAndSaveMarks);
+        }
 
         // save last op
         tm.prev_action = ActionType::MarksMove;
@@ -1429,6 +1411,10 @@ pub fn clone_and_move_mark_to_previous_line(
             // no change
             return;
         }
+    }
+
+    if marks.len() == 1 {
+        run_text_mode_actions_vec(editor, env, view, &vec![Action::SaveMarks]);
     }
 
     let mut v = view.write();
