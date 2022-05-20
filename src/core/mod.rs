@@ -52,8 +52,10 @@ pub fn disable_dbg_println() {
     DBG_PRINTLN_FLAG.store(0, Ordering::Relaxed);
 }
 pub fn toggle_dbg_println() {
-    let v = DBG_PRINTLN_FLAG.load(Ordering::Relaxed);
-    DBG_PRINTLN_FLAG.store(!v, Ordering::Relaxed);
+    match DBG_PRINTLN_FLAG.load(Ordering::Relaxed) {
+        0 => enable_dbg_println(),
+        _ => disable_dbg_println(),
+    }
 }
 
 //

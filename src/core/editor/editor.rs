@@ -978,7 +978,7 @@ fn run_stage(
                                 Stage::Input,
                             );
 
-                            // view changed
+                            // view changed -> call compositing stage
                             let id = env.view_id;
                             run_stages(Stage::Compositing, &mut editor, &mut env, id);
                         }

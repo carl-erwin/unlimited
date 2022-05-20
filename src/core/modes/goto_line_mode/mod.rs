@@ -8,7 +8,7 @@ use super::Mode;
 
 use super::text_mode::TextModeContext;
 
-use super::text_mode::Action;
+use super::text_mode::PostInputAction;
 
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
@@ -283,7 +283,8 @@ pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: 
         tm.marks.push(Mark { offset });
         tm.mark_index = 0;
 
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
 }
 

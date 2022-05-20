@@ -1,3 +1,5 @@
+static USE_DARK_THEME: bool = true;
+
 /// TextStyle holds the displayed attributes flags.
 #[derive(Debug, Default, Hash, Clone, Copy, Eq, PartialEq)]
 pub struct TextStyle {
@@ -39,7 +41,11 @@ impl TextStyle {
 
         // (180, 180, 180)
 
-        (199, 199, 199)
+        if USE_DARK_THEME {
+            (199, 199, 199) // dark theme
+        } else {
+            (64, 64, 64) // light theme
+        }
     }
 
     pub fn default_bg_color() -> (u8, u8, u8) {
@@ -47,7 +53,12 @@ impl TextStyle {
         // (0, 0, 48)
         // (38, 41, 44)
         // (40, 44, 52) // soft grey
-        (11, 16, 39) // deep blue
+
+        if USE_DARK_THEME {
+            (11, 16, 39) // deep blue // dark theme
+        } else {
+            (241, 241, 241) // soft white // light theme
+        }
     }
 
     pub fn title_color() -> (u8, u8, u8) {
@@ -59,13 +70,61 @@ impl TextStyle {
     }
 
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
-        let c = Self::default_bg_color();
-        let add = 20;
-        (c.0 + add, c.1 + add, c.2 + add)
+        if USE_DARK_THEME {
+            // dark theme
+            let c = Self::default_bg_color();
+            let add = 20;
+            (
+                c.0.saturating_add(add),
+                c.1.saturating_add(add),
+                c.2.saturating_add(add),
+            )
+        } else {
+            // light theme
+            let c = Self::default_bg_color();
+            let add = 20;
+            return (
+                c.0.saturating_sub(add),
+                c.1.saturating_sub(add),
+                c.2.saturating_sub(add),
+            );
+        }
     }
 
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
         Self::default_selected_bg_color()
+    }
+
+    pub fn mark_style(color: Option<(u8, u8, u8)>) -> TextStyle {
+        let color = if let Some(c) = color {
+            c
+        } else {
+            Self::default_color()
+        };
+
+        if USE_DARK_THEME {
+            // dark theme
+            TextStyle {
+                is_blinking: false,
+                is_selected: false,
+                is_inverse: true, //
+                is_bold: false,
+                is_italic: false,
+                color,
+                bg_color: (45, 49, 54),
+            }
+        } else {
+            // light theme
+            TextStyle {
+                is_blinking: false,
+                is_selected: false,
+                is_inverse: false,
+                is_bold: false,
+                is_italic: false,
+                color,
+                bg_color: (95, 170, 198),
+            }
+        }
     }
 }
 

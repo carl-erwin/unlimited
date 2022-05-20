@@ -226,6 +226,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
         }
 
         doc_info.push_str(&format!(" {} bytes", d.size()));
+        doc_info.push_str(&format!(" (F1 for help)"));
 
         self.title.push_str(&doc_info);
     }

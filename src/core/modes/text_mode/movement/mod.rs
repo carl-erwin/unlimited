@@ -1,5 +1,7 @@
 use parking_lot::RwLock;
 use std::rc::Rc;
+use std::sync::Arc;
+
 //use std::time::Instant;
 
 use super::*;
@@ -84,7 +86,7 @@ pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
     tm.marks.clear();
     tm.marks.push(Mark { offset });
 
-    tm.pre_compose_action.push(Action::ResetMarks);
+    tm.pre_compose_action.push(PostInputAction::ResetMarks);
 }
 
 // TODO(ceg): maintain main mark Option<(x,y)>
@@ -123,18 +125,20 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     }
 
     if scroll_down > 0 {
-        tm.pre_compose_action.push(Action::ScrollUp { n: 1 });
+        tm.pre_compose_action
+            .push(PostInputAction::ScrollUp { n: 1 });
     }
 
-    tm.pre_compose_action.push(Action::CheckMarks);
+    tm.pre_compose_action.push(PostInputAction::CheckMarks);
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     if tm.center_on_mark_move {
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
 
-    tm.prev_action = ActionType::MarksMove;
+    tm.prev_action = TextModeAction::MarksMove;
 }
 
 pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
@@ -189,25 +193,25 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
         scroll_down = 1;
     }
 
-    // TODO(ceg):  tm.pre_compose_action.push(Action::SelectLastMark);
+    // TODO(ceg):  tm.pre_compose_action.push(PostInputAction::SelectLastMark);
     let nr_marks = tm.marks.len();
     tm.mark_index = nr_marks.saturating_sub(1); // TODO(ceg): dedup ?
 
     //      move this check at post render to reschedule render ?
     //      if v.center_on_mark_move {
-    //           tm.pre_compose_action.push(Action::CenterAroundMainMark);
+    //           tm.pre_compose_action.push(PostInputAction::CenterAroundMainMark);
     //      }
 
     if scroll_down > 0 {
         dbg_println!("schedule scroll down n = {}", scroll_down);
 
         tm.pre_compose_action
-            .push(Action::ScrollDown { n: scroll_down });
+            .push(PostInputAction::ScrollDown { n: scroll_down });
     }
 
-    tm.pre_compose_action.push(Action::CheckMarks);
+    tm.pre_compose_action.push(PostInputAction::CheckMarks);
 
-    tm.prev_action = ActionType::MarksMove;
+    tm.prev_action = TextModeAction::MarksMove;
 }
 
 pub fn move_marks_to_start_of_line(
@@ -238,10 +242,11 @@ pub fn move_marks_to_start_of_line(
     }
 
     if center {
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
-    tm.pre_compose_action.push(Action::CheckMarks);
-    tm.prev_action = ActionType::MarksMove;
+    tm.pre_compose_action.push(PostInputAction::CheckMarks);
+    tm.prev_action = TextModeAction::MarksMove;
 }
 
 pub fn move_marks_to_end_of_line(
@@ -273,11 +278,12 @@ pub fn move_marks_to_end_of_line(
     }
 
     if center {
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
 
-    tm.pre_compose_action.push(Action::CheckMarks);
-    tm.prev_action = ActionType::MarksMove;
+    tm.pre_compose_action.push(PostInputAction::CheckMarks);
+    tm.prev_action = TextModeAction::MarksMove;
 }
 
 /*
@@ -586,7 +592,7 @@ pub fn move_mark_to_end_of_file(
     marks.clear();
     marks.push(Mark { offset });
 
-    tm.pre_compose_action.push(Action::ScrollUp { n });
+    tm.pre_compose_action.push(PostInputAction::ScrollUp { n });
 }
 
 pub fn move_mark_to_start_of_file(
@@ -633,60 +639,70 @@ pub fn clone_and_move_mark_to_next_line(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // refresh mark index
-    let (mark_len, save_mark) = {
+    let (mut m, midx) = {
         let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        (tm.marks.len(), tm.marks.len() == 1)
+        let marks = &mut tm.marks;
+        (marks[marks.len() - 1], marks.len() - 1)
     };
 
-    // NB: borrows: will use rendering pipeline to compute the marks_offset
-    let offsets = move_mark_to_next_line(editor, env, view, mark_len - 1); // TODO return offset (old, new)
-    if offsets.is_none() {
-        run_text_mode_actions_vec(editor, env, &view, &vec![Action::CheckMarks]); // ? center ?
-        return;
-    }
-    let offsets = offsets.unwrap();
-    if offsets.0 == offsets.1 {
-        return;
-    }
+    // NB: move_mark_to_next_line: will use rendering pipeline and borrow view etc..
+    let (prev, next) = match move_mark_to_next_line(editor, env, view, &mut m) {
+        Some((prev, next)) if prev != next => (prev, next),
+        _ => return,
+    };
 
-    if save_mark {
-        run_text_mode_actions_vec(editor, env, view, &vec![Action::SaveMarks]);
+    {
+        let save = {
+            let mut v = view.write();
+            let doc = v.document().unwrap();
+            let doc = doc.read();
+            let last_pos = doc.buffer_log_pos() >= doc.buffer_log_count().saturating_sub(1);
+            let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+            !last_pos
+                || tm.prev_action == TextModeAction::MarksMove
+                || tm.prev_action == TextModeAction::DocumentModification
+        };
+
+        if save {
+            run_text_mode_actions_vec(
+                editor,
+                env,
+                view,
+                &vec![PostInputAction::SaveMarks {
+                    caller: &"clone_and_move_mark_to_next_line",
+                }],
+            );
+        }
+
+        let mut v = view.write();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        tm.marks.push(m);
+        tm.mark_index = midx + 1;
     }
 
     let mut v = view.write();
-
-    // fix previous offsets
-    {
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        let mark_len = {
-            let marks = &mut tm.marks;
-            // duplicated last mark + select
-            marks.push(Mark { offset: offsets.1 });
-            marks.len()
-        };
-        tm.marks[mark_len - 2].offset = offsets.0;
-        tm.mark_index = mark_len - 1;
-    }
 
     // env.sort mark sync direction
     // update view.mark_index
     let (was_on_screen, is_on_screen) = {
         let screen = v.screen.read();
-        let was_on_screen = screen.contains_offset(offsets.0);
-        let is_on_screen = screen.contains_offset(offsets.1);
-        (was_on_screen, is_on_screen)
+        (screen.contains_offset(prev), screen.contains_offset(next))
     };
 
     {
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         if was_on_screen && !is_on_screen {
-            tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
+            tm.pre_compose_action
+                .push(PostInputAction::ScrollDown { n: 1 });
         } else if !is_on_screen {
-            tm.pre_compose_action.push(Action::CenterAroundMainMark);
+            tm.pre_compose_action
+                .push(PostInputAction::CenterAroundMainMark);
         }
 
         // marks change
+        tm.prev_action = TextModeAction::CreateMarks;
         tm.mark_revision += 1;
     }
 }
@@ -745,7 +761,7 @@ pub fn move_marks_to_previous_line(
 
             // TODO(ceg): move this to pre/post render
             if idx == 0 && idx_max == 0 {
-                // tm.pre_compose_action.push(Action::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
+                // tm.pre_compose_action.push(PostInputAction::UpdateViewOnMainMarkMove { moveType: ToPreviousLine, before: prev_offset, after: new_offset });
                 let new_offset = marks[idx].offset;
 
                 if new_offset != prev_offset {
@@ -766,17 +782,17 @@ pub fn move_marks_to_previous_line(
         }
 
         // schedule actions
-        tm.pre_compose_action.push(Action::UpdateReadCache);
-        tm.pre_compose_action.push(Action::CheckMarks);
+        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
+        tm.pre_compose_action.push(PostInputAction::CheckMarks);
         // save last op
-        tm.prev_action = ActionType::MarksMove;
+        tm.prev_action = TextModeAction::MarksMove;
     }
 }
 
 pub fn move_on_screen_mark_to_next_line(
     m: &mut Mark,
     screen: &Screen,
-) -> (bool, Option<(u64, u64)>, Option<Action>) {
+) -> (bool, Option<(u64, u64)>, Option<PostInputAction>) {
     // TODO(ceg): add hints: check in screen range
     if !screen.contains_offset(m.offset) {
         return (false, None, None);
@@ -791,7 +807,7 @@ pub fn move_on_screen_mark_to_next_line(
     if new_y >= screen_height {
         // mark on last screen line cannot be updated
         assert_eq!(y, screen_height - 1);
-        return (false, None, Some(Action::ScrollDown { n: 1 }));
+        return (false, None, Some(PostInputAction::ScrollDown { n: 1 }));
     }
 
     // new_y < screen_height
@@ -848,7 +864,7 @@ pub fn move_on_screen_mark_to_next_line(
                 // ???? panic!
             }
         }
-        return (false, None, Some(Action::ScrollDown { n: 1 }));
+        return (false, None, Some(PostInputAction::ScrollDown { n: 1 }));
     }
 
     // ok
@@ -856,56 +872,58 @@ pub fn move_on_screen_mark_to_next_line(
 }
 
 // remove multiple borrows
-pub fn move_mark_to_next_line(
+pub fn move_mark_index_to_next_line(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     mark_idx: usize,
 ) -> Option<(u64, u64)> {
-    // TODO(ceg): m.on_buffer_end() ?
-
-    let max_offset = {
-        let v = view.read();
-        v.document().unwrap().read().size() as u64
+    let mut m = { view.read().mode_ctx::<TextModeContext>("text-mode").marks[mark_idx] };
+    let offsets = move_mark_to_next_line(editor, env, view, &mut m);
+    {
+        view.write()
+            .mode_ctx_mut::<TextModeContext>("text-mode")
+            .marks[mark_idx] = m;
     };
 
+    offsets
+}
+
+// remove multiple borrows
+pub fn move_mark_to_next_line(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+    mut m: &mut Mark,
+) -> Option<(u64, u64)> {
+    // TODO(ceg): m.on_buffer_end() ?
+
+    let max_offset = { view.read().document()?.read().size() as u64 };
+
     // off_screen ?
-    let mut m_offset;
-    let old_offset;
+    let (mut m_offset, old_offset) = (m.offset, m.offset);
+    if m.offset == max_offset {
+        return None;
+    }
 
     {
-        let (screen, mut m) = {
-            let v = view.read();
-            let screen = v.screen.clone();
-
-            let tm = v.mode_ctx::<TextModeContext>("text-mode");
-            let m = tm.marks[mark_idx].clone();
-            (screen, m)
-        };
-
-        m_offset = m.offset;
-        old_offset = m.offset;
-
-        if m.offset == max_offset {
-            return None;
-        }
+        let screen = { Arc::clone(&view.read().screen) };
 
         dbg_println!("TRYING TO MOVE TO NEXT LINE MARK offset {}", m.offset);
 
         let screen = screen.read();
         let (ok, offsets, action) = move_on_screen_mark_to_next_line(&mut m, &screen);
         {
-            let mut v = view.write();
-            let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-            tm.marks[mark_idx] = m;
             if let Some(action) = action {
                 // Add stage RenderStage :: PreRender PostRender
                 // will be removed when the "scroll" update is implemented
                 // ADD screen cache ?
                 // screen[first mark -> last mark ] ? Ram usage ?
                 // updated on resize -> slow
-                tm.pre_compose_action.push(action);
+                view.write()
+                    .mode_ctx_mut::<TextModeContext>("text-mode")
+                    .pre_compose_action
+                    .push(action);
             }
         }
 
@@ -934,7 +952,6 @@ pub fn move_mark_to_next_line(
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
 
-            let m = &tm.marks[mark_idx];
             let mut tmp = Mark::new(m.offset);
             tmp.move_to_start_of_line(&doc, codec);
             tmp.offset
@@ -952,30 +969,22 @@ pub fn move_mark_to_next_line(
         // TODO(ceg): return Vec<Box<screen>> ? update content
         // TODO(ceg): add perf view screen cache ? sorted by screens.start_offset
         // with same width/heigh as v.screen
-        let lines = {
-            get_lines_offsets_direct(
-                view,
-                editor,
-                env,
-                start_offset,
-                end_offset,
-                screen_width,
-                screen_height,
-            )
-        };
+        let lines = get_lines_offsets_direct(
+            view,
+            editor,
+            env,
+            start_offset,
+            end_offset,
+            screen_width,
+            screen_height,
+        );
 
         dbg_println!("GET {} lines ", lines.len());
 
         // find the cursor index
         let index = match lines.iter().position(|e| e.0 <= m_offset && m_offset < e.1) {
-            None => return None,
-            Some(i) => {
-                if i == lines.len() - 1 {
-                    return None;
-                } else {
-                    i
-                }
-            }
+            Some(i) if i != lines.len() - 1 => i,
+            _ => return None,
         };
 
         // compute column
@@ -1028,12 +1037,189 @@ pub fn move_mark_to_next_line(
     }
 
     {
-        let mut v = view.write();
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        tm.marks[mark_idx].offset = m_offset;
+        m.offset = m_offset;
     }
 
     Some((old_offset, m_offset))
+}
+
+fn move_onscreen_single_mark_to_next_line(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) -> bool {
+    // fast mode: 1 mark, on screen
+    // check main mark, TODO(ceg) proper function ?
+    // fast mode: 1 mark, on screen
+    // check main mark, TODO(ceg) proper function ?
+
+    let screen = {
+        let v = view.read();
+        v.screen.clone()
+    };
+    let mut screen = screen.write();
+
+    let mut mark = {
+        let mut v = view.write();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        // 1 mark ?
+        if tm.marks.len() != 1 {
+            return false;
+        }
+
+        tm.marks[0].clone()
+    };
+
+    if !screen.contains_offset(mark.offset) {
+        dbg_println!("main mark is offscreen");
+        return false;
+    }
+
+    dbg_println!("main mark is onscreen");
+    dbg_println!("screen.dimension = {:?}", screen.dimension());
+
+    let last_line = screen.get_last_used_line();
+    if last_line.is_none() {
+        dbg_println!("no last line");
+        panic!();
+    }
+    let last_line = last_line.unwrap();
+    if last_line.is_empty() {
+        panic!(""); // empty line
+    }
+
+    // Go to next screen ?
+    let cpi = &last_line[0].cpi; // will panic if invariant is broken
+    let last_line_first_offset = cpi.offset.unwrap(); // update next screen start offset
+    let has_eof = screen.has_eof();
+
+    dbg_println!("mark.offset = {}", mark.offset);
+    dbg_println!("last_line_first_offset {}", last_line_first_offset);
+    dbg_println!("has_eof = {}", has_eof);
+
+    if mark.offset < last_line_first_offset {
+        dbg_println!("mark is on screen (not on last line)");
+
+        let ret = move_on_screen_mark_to_next_line(&mut mark, &screen);
+        if !ret.0 {
+            dbg_println!(
+                " cannot update marks[{}], offset {} : {:?}",
+                0,
+                mark.offset,
+                ret.2
+            );
+
+            return false;
+        }
+
+        // update mark
+        let mut v = view.write();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        tm.marks[0].offset = ret.1.unwrap().1;
+        return true;
+    }
+
+    //
+    if mark.offset >= last_line_first_offset && !has_eof {
+        // must scroll 1 line
+        // NB: update the view's screen in place
+        // by running "correct" compose passes
+
+        //  use the first offset of the last line
+        //  as the starting offset of the next screen
+        dbg_println!("get line [1]");
+        let line = screen.get_line(1).unwrap();
+        let cpi = &line[0].cpi;
+        let new_start = cpi.offset.unwrap();
+
+        dbg_println!("line[1][0].cpi  = {:?}", cpi);
+
+        dbg_println!("new_start = {}", new_start);
+
+        let max_offset = screen.doc_max_offset;
+
+        // build screen content
+        screen.clear();
+        run_compositing_stage_direct(
+            editor,
+            env,
+            view,
+            new_start,
+            max_offset,
+            &mut screen,
+            LayoutPass::ScreenContent,
+        );
+
+        // NB: update view after scroll
+        {
+            let mut v = view.write();
+            v.start_offset = new_start;
+            if let Some(last_offset) = screen.last_offset {
+                v.end_offset = last_offset; // DO NOT REMOVE
+            }
+        }
+
+        // TODO(ceg) : sync_view_from_screen(screen)
+        /* replace pass_mask -> struct CompositingParameters {
+             base_offset
+             pass_mask
+             update_view,
+             layout_filters { vec, vec }
+            }
+
+            add a struct CompositingResults {
+                start, end, of screen
+            }
+
+            view.apply_compositing_result(res);
+        */
+
+        // TODO(ceg): that use/match the returned action
+        let ret = move_on_screen_mark_to_next_line(&mut mark, &screen);
+        if !ret.0 {
+            dbg_println!(
+                " cannot update marks[{}], offset {} : {:?}",
+                0,
+                mark.offset,
+                ret.2
+            );
+        }
+
+        // build screen overlay
+        {
+            {
+                let mut v = view.write();
+                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                tm.marks[0] = mark; // save update
+                dbg_println!("main mark updated (fast path) {:?}", tm.marks[0]);
+
+                if !tm.select_point.is_empty() {
+                    tm.pre_compose_action
+                        .push(PostInputAction::DeduplicateAndSaveMarks {
+                            caller: &"move_marks_to_next_line",
+                        });
+                    // save last op
+                    tm.prev_action = TextModeAction::MarksMove;
+                }
+            }
+            // do not update screen twice
+            env.skip_compositing = true;
+
+            run_compositing_stage_direct(
+                editor,
+                env,
+                view,
+                new_start,
+                max_offset,
+                &mut screen,
+                LayoutPass::ScreenOverlay,
+            );
+        }
+
+        return true;
+    }
+
+    false
 }
 
 /*
@@ -1048,196 +1234,32 @@ pub fn move_marks_to_next_line(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    // fast mode: 1 mark, on screen
-    // check main mark, TODO(ceg) proper function ?
-    loop {
-        let screen = {
-            let v = view.read();
-            v.screen.clone()
-        };
-        let mut screen = screen.write();
-
-        let mut mark = {
-            let mut v = view.write();
-            let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-            // 1 mark ?
-            if tm.marks.len() != 1 {
-                break;
-            }
-
-            tm.marks[0].clone()
-        };
-
-        if !screen.contains_offset(mark.offset) {
-            dbg_println!("main mark is offscreen");
-            break;
-        }
-
-        dbg_println!("main mark is onscreen");
-
-        dbg_println!("screen.dimension = {:?}", screen.dimension());
-
-        let last_line = screen.get_last_used_line();
-        if last_line.is_none() {
-            dbg_println!("no last line");
-            panic!();
-        }
-        let last_line = last_line.unwrap();
-        if last_line.is_empty() {
-            panic!(""); // empty line
-        }
-
-        // Go to next screen ?
-        let cpi = &last_line[0].cpi; // will panic if invariant
-        let last_line_first_offset = cpi.offset.unwrap(); // update next screen start offset
-        dbg_println!("last_line_first_offset {}", last_line_first_offset);
-
-        let has_eof = screen.has_eof();
-        dbg_println!("has_eof = {}", has_eof);
-
-        if mark.offset >= last_line_first_offset && !has_eof {
-            // must scroll 1 line
-            // NB: update the view's screen in place
-            // by running "correct" compose passes
-
-            //  use the first offset of the last line
-            //  as the starting offset of the next screen
-            dbg_println!("get line [1]");
-            let line = screen.get_line(1).unwrap();
-            let cpi = &line[0].cpi;
-            let new_start = cpi.offset.unwrap();
-
-            dbg_println!("line[1][0].cpi  = {:?}", cpi);
-
-            dbg_println!("new_start = {}", new_start);
-
-            let max_offset = screen.doc_max_offset;
-
-            // build screen content
-            screen.clear();
-            run_compositing_stage_direct(
-                editor,
-                env,
-                view,
-                new_start,
-                max_offset,
-                &mut screen,
-                LayoutPass::ScreenContent,
-            );
-
-            // NB: update view after scroll
-            {
-                let mut v = view.write();
-                v.start_offset = new_start;
-                if let Some(last_offset) = screen.last_offset {
-                    v.end_offset = last_offset; // DO NOT REMOVE
-                }
-            }
-
-            // TODO(ceg) : sync_view_from_screen(screen)
-            /* replace pass_mask -> struct CompositingParameters {
-                 base_offset
-                 pass_mask
-                 update_view,
-                 layout_filters { vec, vec }
-                }
-
-                add a struct CompositingResults {
-                    start, end, of screen
-                }
-
-                view.apply_compositing_result(res);
-            */
-
-            // TODO(ceg): that use/match the returned action
-            let ret = move_on_screen_mark_to_next_line(&mut mark, &screen);
-            if !ret.0 {
-                dbg_println!(
-                    " cannot update marks[{}], offset {} : {:?}",
-                    0,
-                    mark.offset,
-                    ret.2
-                );
-            }
-
-            // build screen overlay
-            {
-                {
-                    let mut v = view.write();
-                    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-                    tm.marks[0] = mark; // save update
-                    dbg_println!("main mark updated (fast path) {:?}", tm.marks[0]);
-
-                    if !tm.select_point.is_empty() {
-                        tm.pre_compose_action.push(Action::DedupAndSaveMarks);
-                        // save last op
-                        tm.prev_action = ActionType::MarksMove;
-                    }
-                }
-                // do not update screen twice
-                env.skip_compositing = true;
-
-                run_compositing_stage_direct(
-                    editor,
-                    env,
-                    view,
-                    new_start,
-                    max_offset,
-                    &mut screen,
-                    LayoutPass::ScreenOverlay,
-                );
-            }
-
-            return;
-        }
-        // stop
-        break;
+    if move_onscreen_single_mark_to_next_line(editor, env, view) {
+        return;
     }
 
-    dbg_println!("allocate tmp screen");
-
-    // allocate temporary screen
     let (mut screen, start_offset) = allocate_temporary_screen_and_start_offset(&view);
-    screen.is_off_screen = true;
     let mut m = Mark::new(start_offset);
-
-    // min offset, max index
     let (first_mark_offset, idx_max) = get_marks_min_offset_and_max_idx(&view);
-
     // set screen start
+    screen.is_off_screen = true;
     m.offset = std::cmp::min(m.offset, first_mark_offset);
 
     let max_offset = sync_mark(&view, &mut m); // codec in name ?
 
-    // copy all marks
+    // let mut marks = clone_marks(view);
     let mut marks = {
-        let mut v = view.write();
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let v = view.read();
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
         tm.marks.clone()
     };
 
-    // TODO(ceg): add eof in conditions
-    // find a way to transform while loops into iterator over screens
-    // document_walk ? ...
-    // ctx
-
     // update all marks
+    // screen fill + cb(editor, env, view, cb_ctx)
     {
-        let mut idx_index = 0;
-        while idx_index < idx_max {
-            dbg_println!(" idx_index {} < idx_max {}", idx_index, idx_max);
-
-            dbg_println!(
-                "looking for marks[idx_index].offset = {}",
-                marks[idx_index].offset
-            );
-
-            dbg_println!("compute layout from offset {}", m.offset);
-
-            // update screen with configured filters
+        let mut idx = 0;
+        while idx < idx_max {
             screen.clear();
-
             run_compositing_stage_direct(
                 editor,
                 env,
@@ -1245,111 +1267,47 @@ pub fn move_marks_to_next_line(
                 m.offset,
                 max_offset,
                 &mut screen,
-                LayoutPass::ScreenContentAndOverlay,
+                LayoutPass::ScreenContent,
             );
-
-            dbg_println!("\n\n\n---------");
-
-            dbg_println!("screen first offset {:?}", screen.first_offset);
-            dbg_println!("screen last offset {:?}", screen.last_offset);
-            dbg_println!("screen current_line_index {:?}", screen.current_line_index);
-
-            dbg_println!("max_offset {}", max_offset);
 
             if screen.push_count() == 0 {
-                // screen is empty
-                dbg_println!("screen.push_count() == 0");
                 return;
             }
-            assert_ne!(0, screen.push_count()); // at least EOF
-            dbg_println!("screen.push_count() == {}", screen.push_count());
-            // TODO(ceg): pass doc &doc to avoid double borrow
-            // env.doc ?
-            // env.view ? to avoid too many args
-
-            //
-            dbg_println!(
-                "get_last_used_line_index = {:?}",
-                screen.get_last_used_line_index()
-            );
             let last_line = screen.get_last_used_line();
             if last_line.is_none() {
-                dbg_println!("no last line");
                 panic!();
             }
             let last_line = last_line.unwrap();
-
             if last_line.is_empty() {
                 panic!(""); // empty line
             }
 
-            // go to next screen
-            // using the first offset of the last line
-            let cpi = &last_line[0].cpi;
-            let last_line_first_offset = cpi.offset.unwrap(); // update next screen start offset
-            dbg_println!("last_line_first_offset {}", last_line_first_offset);
-
-            // idx_index not on screen  ? ...
-            if !screen.contains_offset(marks[idx_index].offset) {
-                dbg_println!(
-                    "offset {} not found on screen go to next screen",
-                    marks[idx_index].offset
-                );
-
+            if !screen.contains_offset(marks[idx].offset) {
                 if screen.has_eof() {
-                    // EOF reached : stop
                     break;
                 }
-
-                // Go to next screen
-                // use first offset of "current" screen's last line
-                // as next screen start points
                 let cpi = &last_line[0].cpi;
                 m.offset = cpi.offset.unwrap(); // update next screen start offset
                 continue;
             }
 
-            dbg_println!("offset {} found on screen ", marks[idx_index].offset);
-
-            // idx_index is on screen
-            let mut idx_end = idx_index + 1;
             let next_screen_start_cpi = &last_line[0].cpi;
+            // idx is on screen
+            // find next onscreen index
+            let mut idx_end = idx + 1;
             while idx_end < idx_max {
-                dbg_println!(
-                    "check marks[{}].offset({}) >= next_screen_start_cpi({})",
-                    idx_end,
-                    marks[idx_end].offset,
-                    next_screen_start_cpi.offset.unwrap()
-                );
-
                 if marks[idx_end].offset >= next_screen_start_cpi.offset.unwrap() {
                     break;
                 }
                 idx_end += 1;
             }
 
-            dbg_println!("update marks[{}..{} / {}]", idx_index, idx_end, idx_max);
-
-            for i in idx_index..idx_end {
-                dbg_println!("update marks[{} / {}]", i, idx_max);
-
-                // TODO(ceg): that use/match the returned action
-                let ret = move_on_screen_mark_to_next_line(&mut marks[i], &screen);
-                if !ret.0 {
-                    dbg_println!(
-                        " cannot update marks[{}], offset {} : {:?}",
-                        i,
-                        marks[i].offset,
-                        ret.2
-                    );
-                }
+            for i in idx..idx_end {
+                move_on_screen_mark_to_next_line(&mut marks[i], &screen);
             }
 
-            idx_index = idx_end; // next mark index
-
-            let old_offset = m.offset;
+            idx = idx_end; // next mark index
             m.offset = next_screen_start_cpi.offset.unwrap(); // update next screen start
-            dbg_println!("update marks {} -> {}]", old_offset, m.offset);
         }
     }
 
@@ -1365,30 +1323,23 @@ pub fn move_marks_to_next_line(
         tm.marks = marks;
         let idx = tm.mark_index;
 
-        dbg_println!("checking main mark index {}", idx);
-
         if !screen.contains_offset(tm.marks[idx].offset) {
-            dbg_println!(
-                "tm.marks[idx].offset {} NOT FOUND scroll down n=1",
-                tm.marks[idx].offset
-            );
-
-            tm.pre_compose_action.push(Action::ScrollDown { n: 1 });
-            // TODO ?  tm.pre_compose_action.push(Action::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
-            // TODO ?  tm.pre_compose_action.push(Action::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
+            tm.pre_compose_action
+                .push(PostInputAction::ScrollDown { n: 1 });
+            // TODO ?  tm.pre_compose_action.push(PostInputAction::ScrollDownIfOffsetNotOnScreen { n: 1, offset: tm.marks[idx].offset });
+            // TODO ?  tm.pre_compose_action.push(PostInputAction::ScrollDownIfMainMarkOffScreen { n: 1, offset: tm.marks[idx].offset });
         } else {
-            dbg_println!(
-                "tm.marks[idx].offset {} FOUND on screen",
-                tm.marks[idx].offset
-            );
         };
 
         if !tm.select_point.is_empty() {
-            tm.pre_compose_action.push(Action::DedupAndSaveMarks);
+            tm.pre_compose_action
+                .push(PostInputAction::DeduplicateAndSaveMarks {
+                    caller: &"move_marks_to_next_line",
+                });
         }
 
         // save last op
-        tm.prev_action = ActionType::MarksMove;
+        tm.prev_action = TextModeAction::MarksMove;
     }
 }
 
@@ -1414,7 +1365,14 @@ pub fn clone_and_move_mark_to_previous_line(
     }
 
     if marks.len() == 1 {
-        run_text_mode_actions_vec(editor, env, view, &vec![Action::SaveMarks]);
+        run_text_mode_actions_vec(
+            editor,
+            env,
+            view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"clone_and_move_mark_to_previous_line",
+            }],
+        );
     }
 
     let mut v = view.write();
@@ -1442,18 +1400,21 @@ pub fn clone_and_move_mark_to_previous_line(
         let was_on_screen = screen.contains_offset(prev_off);
         let is_on_screen = screen.contains_offset(tm.marks[0].offset);
         if was_on_screen && !is_on_screen {
-            tm.pre_compose_action.push(Action::ScrollUp { n: 1 });
+            tm.pre_compose_action
+                .push(PostInputAction::ScrollUp { n: 1 });
         } else if !is_on_screen {
-            tm.pre_compose_action.push(Action::CenterAroundMainMark);
+            tm.pre_compose_action
+                .push(PostInputAction::CenterAroundMainMark);
         }
 
         // marks change
+        tm.prev_action = TextModeAction::CreateMarks;
         tm.mark_revision += 1;
     }
 }
 
 pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    // TODO(ceg): factorize macrk action
+    // TODO(ceg): factorize mark action
     // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
     //
 
@@ -1487,9 +1448,10 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     }
 
     if center {
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
-    tm.prev_action = ActionType::MarksMove;
+    tm.prev_action = TextModeAction::MarksMove;
 }
 
 pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
@@ -1520,8 +1482,9 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
     }
 
     if sync {
-        tm.pre_compose_action.push(Action::CenterAroundMainMark);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
     }
 
-    tm.prev_action = ActionType::MarksMove;
+    tm.prev_action = TextModeAction::MarksMove;
 }

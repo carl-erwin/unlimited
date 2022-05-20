@@ -33,7 +33,7 @@ static CORE_INPUT_MAP: &str = r#"
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-     { "in": [{ "key": "ctrl+p" } ],                         "action": "help-pop-up" }
+     { "in": [{ "key": "F1" } ],                             "action": "help-pop-up" }
 
     ]
   }
@@ -1097,60 +1097,33 @@ pub fn destroy_view(
     destroy_view_hierarchy(editor, to_destroy_id);
 }
 
-static HELP_MESSAGE: &str = r#"-*- Welcome to unlimitED! -*-
-
-unlimitED! is an experimental text editor (running in the terminal).
-
-
-SYNOPSIS
-unlimited [options] [file ..]
-
-
-It comes with:
-
-  - basic UTF-8 support
-  - very large file support
-  - "infinite" undo/redo
-  - multi-cursors
-  - mouse selection (graphical terminal)
-
-[Quit]
-    Quit:           => ctrl+x ctrl+c
-
-    Quit (no save)  => ctrl+x ctrl+q
-
-    NB: quit will wait for large file(s) sync to storage.
-
+static HELP_MESSAGE: &str = r#"[Quit]
+    Quit:                       => ctrl+x ctrl+c (wait for file(s) saving)
+    Quit (discard changes)      => ctrl+x ctrl+q
 
 [Moves]
-    Left            =>
-    Right           =>
-    Up              =>
-    Down            =>
-
+    Left                        => move cursor to previous character
+    Right                       => move cursor to next character
+    Up                          => move cursor to previous screen line
+    Down                        => move cursor to next screen line
 
 [Edit]
-    ctrl+o          => Open file (TODO)
-
-    ctrl+u          => Undo
-    ctrl+r          => Redo
+    ctrl+u                      => undo
+    ctrl+r                      => redo
 
 [Selection/Copy/Paste]
-    with the keyboard:
+    ctrl+space                  => start selection at cursor position
 
     with the mouse (X11 terminal):
 
+    left button pres and hold   => start selection on clicked area
+
 [Save]
-    ctrl+x ctrl+s   => Save
-                    synchronization of large file(s) is done in the background and does not block the ui.
-
-
+    ctrl+x ctrl+s               => save (done in the background)
 
 [Document Selection]
+    ctrl+o                      => Open file (TODO)
 
-
-
-NB: unlimitED! comes with ABSOLUTELY NO WARRANTY
 "#;
 
 pub fn help_popup(
@@ -1182,8 +1155,13 @@ pub fn help_popup(
         //           .use_buffer_log(false)
         .finalize();
 
-    let pop_height = 25;
-    let pop_width = main_width.saturating_sub(1);
+    let mut pop_width = 0;
+    for l in HELP_MESSAGE.lines() {
+        pop_width = std::cmp::max(pop_width, l.len());
+    }
+    pop_width += 1;
+
+    let pop_height = HELP_MESSAGE.lines().count();
     let x = (main_width / 2).saturating_sub(pop_width / 2);
     let y = (main_height / 2).saturating_sub(pop_height / 2);
 

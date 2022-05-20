@@ -31,6 +31,24 @@ impl BufferLog {
         Default::default()
     }
 
+    pub fn dump(&self) {
+        eprintln!("-- BufferLog::dump() {{\r");
+
+        for (idx, op) in self.data.iter().enumerate() {
+            eprintln!("dump buffer log [{}] = {:?}\r", idx, op);
+        }
+        eprintln!("dump buffer log pos = {}\r", self.pos);
+        eprintln!("}}\r");
+    }
+
+    pub fn dump_to_current_log_pos(&self) {
+        for (idx, op) in self.data.iter().enumerate().take(self.pos + 1) {
+            eprintln!("dump (..pos) buffer log [{}] = {:?}\r", idx, op);
+        }
+        eprintln!("dump (..pos) buffer log pos = {}", self.pos);
+        eprintln!("----------------------------------\r");
+    }
+
     pub fn add(
         &mut self,
         offset: u64,
@@ -43,7 +61,7 @@ impl BufferLog {
             offset,
         };
 
-        dbg_println!("bufferlog: add {:?}", op);
+        dbg_println!("buffer log: add {:?}", op);
 
         if let Some(v) = self.get_reverse_ops(self.pos) {
             self.data.extend(v);

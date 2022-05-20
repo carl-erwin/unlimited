@@ -339,7 +339,11 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
     ) {
         let mode_ctx = view.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
         let mut cpi = CodepointInfo::new();
+
         cpi.style.bg_color = (45, 49, 54);
+
+        cpi.style.bg_color = TextStyle::default_bg_color();
+
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
         loop {
@@ -358,12 +362,18 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
                 cpi.displayed_cp = ' ';
                 cpi.style.is_selected = true;
                 let add = 25;
-                cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
+                //                cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
+                cpi.style.bg_color = (45 - add, 49 - add, 54 - add);
+
+                cpi.style.bg_color = (188, 188, 188);
+
                 if mode_ctx.selected {
                     cpi.style.bg_color = TextStyle::default_color();
                 } else {
                     let add = 25;
-                    cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
+                    //                    cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
+                    cpi.style.bg_color = (45 - add, 49 - add, 54 - add);
+                    cpi.style.bg_color = (188, 188, 188);
                 }
             }
         }

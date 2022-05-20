@@ -463,6 +463,10 @@ impl<'a> Document<'a> {
         self.buffer_log.pos
     }
 
+    pub fn buffer_log_count(&self) -> usize {
+        self.buffer_log.data.len()
+    }
+
     pub fn buffer_log_reset(&mut self) {
         self.buffer_log.data.clear();
         self.buffer_log.pos = 0;
@@ -766,90 +770,75 @@ impl<'a> Document<'a> {
         self.apply_log_operation(&op)
     }
 
-    pub fn undo_until_tag(&mut self) -> Vec<BufferOperation> {
-        dbg_println!("redo_until_tag: log data {:?}", self.buffer_log.data);
+    pub fn is_buffer_log_op_tag(&self, index: usize) -> bool {
+        if index >= self.buffer_log.data.len() {
+            return false;
+        }
 
+        let op = &self.buffer_log.data[index];
+        match op.op_type {
+            BufferOperationType::Tag { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn undo_until_tag(&mut self) -> Vec<BufferOperation> {
         // read current log position
         let mut ops = Vec::new();
+
         loop {
             if self.buffer_log.pos == 0 {
-                dbg_println!("bufflog: undo self.buffer_log.pos == 0");
                 break;
             }
 
             self.buffer_log.pos -= 1;
             let pos = self.buffer_log.pos;
-
             // get inverted operation
             let op = &self.buffer_log.data[pos];
-            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
             match op.op_type {
                 BufferOperationType::Tag { .. } => {
-                    if pos == self.buffer_log.data.len() - 1 {
-                        // if on last op and last op is tag -> skip
-                        dbg_println!("ignore last tag");
-                        continue;
+                    // stop if no last tag
+                    if pos != self.buffer_log.data.len() - 1 {
+                        break;
                     }
-                    dbg_println!("found tag at pos {}", pos);
-
-                    break;
                 }
                 _ => {}
             }
 
-            // replay
+            // inverse replay
             let inverted_op = op.invert();
             self.apply_log_operation(&inverted_op);
-            //
             ops.push(inverted_op);
         }
-
-        dbg_println!(
-            "bufflog: undo until tag END : self.buffer_log.pos == {}",
-            self.buffer_log.pos
-        );
 
         ops
     }
 
     pub fn redo_until_tag(&mut self) -> Vec<BufferOperation> {
-        dbg_println!("redo_until_tag: log data {:?}", self.buffer_log.data);
-
         let mut ops = Vec::new();
 
-        loop {
-            // read current log position
-            if self.buffer_log.pos == self.buffer_log.data.len() {
-                dbg_println!("bufflog: no more op to redo");
-                break;
-            }
-            // skip tag ?
-            self.buffer_log.pos += 1;
-
-            if self.buffer_log.pos == self.buffer_log.data.len() {
-                break;
-            }
-
-            let pos = self.buffer_log.pos;
-            // replay previous op
-            let op = self.buffer_log.data[pos].clone();
-            dbg_println!("bufflog: op[{}] = {:?}", pos, op);
-            match op.op_type {
-                BufferOperationType::Tag { .. } => {
-                    dbg_println!("bufflog: redo_until_tag found tag at pos {}", pos);
-                    break;
-                }
-                _ => {}
-            }
-
-            self.apply_log_operation(&op);
-            ops.push(op);
+        if self.buffer_log.data.is_empty() {
+            return ops;
         }
 
-        dbg_println!(
-            "bufflog: redo until tag END : self.buffer_log.pos == {}",
-            self.buffer_log.pos
-        );
+        if self.buffer_log.pos >= self.buffer_log.data.len() - 1 {
+            return ops;
+        }
+        // skip current tag
+        if self.is_buffer_log_op_tag(self.buffer_log.pos) {
+            self.buffer_log.pos += 1;
+        }
+        // replay until tag
+        while !self.is_buffer_log_op_tag(self.buffer_log.pos) {
+            if self.buffer_log.pos >= self.buffer_log.data.len() - 1 {
+                break;
+            }
+            let op = self.buffer_log.data[self.buffer_log.pos].clone();
+            // actual replay
+            self.apply_log_operation(&op);
+            ops.push(op);
+            self.buffer_log.pos += 1;
+        }
 
         ops
     }
@@ -1392,11 +1381,12 @@ mod tests {
         use std::io::prelude::*;
         use std::os::unix::prelude::FileExt;
 
-        let filename = "/tmp/test-1g".to_owned();
+        let filename = "/tmp/unl-test-file".to_owned();
+        let _ = std::fs::remove_file(&filename);
         {
             println!("create file....");
             let mut file = std::fs::File::create(&filename).unwrap();
-            let size = 20 * 1024 * 1024 * 1024;
+            let size = 2 * 1024 * 1024 * 1024;
             let mut buf = Vec::with_capacity(size);
             //buf.resize(size, 0);
             unsafe {
@@ -1482,10 +1472,10 @@ mod tests {
             s.push_str("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
         }
 
-        const NB_INSERT: usize = 1000;
+        const NB_INSERT: usize = 100;
         let max = NB_INSERT;
 
-        for _ in 0..10 {
+        for _ in 0..5 {
             println!("start insert test");
 
             let mut off: u64 = 0;

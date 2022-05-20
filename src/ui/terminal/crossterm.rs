@@ -970,11 +970,9 @@ fn get_input_events(
         return Ok(());
     }
 
-    if accum.is_empty() {
-        return Ok(());
+    if !accum.is_empty() {
+        send_input_events(accum, tx, ui_tx);
     }
-
-    send_input_events(accum, tx, ui_tx);
 
     Ok(())
 }

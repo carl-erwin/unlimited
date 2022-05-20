@@ -8,7 +8,7 @@ use super::Mode;
 
 use super::text_mode::TextModeContext;
 
-use super::text_mode::Action;
+use super::text_mode::PostInputAction;
 
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
@@ -514,7 +514,7 @@ pub fn find_next(
                 tm.select_point.push(Mark { offset });
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
                 tm.pre_compose_action
-                    .push(Action::CenterAroundMainMarkIfOffScreen);
+                    .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
             }
         }
     }
@@ -586,7 +586,7 @@ pub fn find_prev(
                 tm.select_point.push(Mark { offset });
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
                 tm.pre_compose_action
-                    .push(Action::CenterAroundMainMarkIfOffScreen);
+                    .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
             }
         }
     }

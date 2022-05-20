@@ -80,6 +80,8 @@
 
        { "in": [{ "pointer-motion": "" }],                     "action": "text-mode:pointer-motion" },
 
+        { "in": [{ "key": "F9" } ],                             "action": "text-mode:print-buffer-log" },
+
        { "file selection": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },

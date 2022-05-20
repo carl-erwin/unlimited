@@ -105,7 +105,7 @@ pub fn refresh_screen_marks(
 
                 // check offset
                 if offset == marks[idx].offset {
-                    cpi.style.is_inverse = true;
+                    cpi.style = TextStyle::mark_style(Some(cpi.style.color));
 
                     // save line index
                     let mut save_line = true;
