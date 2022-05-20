@@ -466,6 +466,8 @@ impl<'a> Document<'a> {
     pub fn buffer_log_reset(&mut self) {
         self.buffer_log.data.clear();
         self.buffer_log.pos = 0;
+
+        dbg_println!("bufferlog: cleared");
     }
 
     pub fn tag(

@@ -1091,6 +1091,7 @@ pub fn insert_codepoint_array(
 
     // TODO(ceg): find a way to remove this
     if save_marks {
+        dbg_println!("save marks");
         run_text_mode_actions_vec(editor, env, view, &vec![Action::DedupAndSaveMarks]);
     }
 

@@ -341,13 +341,8 @@ fn eval_input_stack_level(
 
     while stack_index > 0 {
         stack_index -= 1;
-
-        dbg_println!("--------------------------------------------------------");
-        dbg_println!("checking stack_index = {}", stack_index);
-
         for ev_pos in trigger_pos..trigger_pos_max {
             let ev = &v.input_ctx.trigger[ev_pos];
-            dbg_println!("playing event[{}] = {:?}", ev_pos, ev);
             let mut out_node = None;
             let input_map = &v.input_ctx.input_map.borrow()[stack_index];
             action_name = eval_input_event(
@@ -357,55 +352,33 @@ fn eval_input_stack_level(
                 &mut in_node,
                 &mut out_node,
             );
-
+            // stop a first match
             if action_name.is_some() {
-                // stop a first match
-                dbg_println!("after play : found action {:?}", action_name);
                 break;
             }
-            dbg_println!("after play : in_node = {:?}", in_node);
-            dbg_println!("after play : out_node = {:?}", out_node);
-
-            if out_node.is_none() {
-                // no match
-                dbg_println!("no match");
-            }
-            dbg_println!("save out_node");
+            // no match
             *in_node = out_node;
         }
-
+        // found action
         if action_name.is_some() {
-            dbg_println!(
-                "found action {:?} at input stack level {}",
-                action_name,
-                stack_index
-            );
             break;
         }
 
         if in_node.is_some() {
-            dbg_println!("found sequence start at input stack index {}", stack_index);
             v.input_ctx.stack_pos = Some(stack_index);
             return None;
         }
-
-        dbg_println!("no action at input stack index {}", stack_index);
-
         // restart the whole sequence for next level
         if stack_index > 0 {
             trigger_pos = 0;
             *in_node = None;
-            dbg_println!("restart input at stack index {}", stack_index - 1);
+            continue;
+        }
+
+        if in_node.is_none() {
+            v.input_ctx.stack_pos = None;
         } else {
-            dbg_println!(
-                "no sequence found in stack  (default: {:?})",
-                default_action_mode
-            );
-            if in_node.is_none() {
-                v.input_ctx.stack_pos = None;
-            } else {
-                v.input_ctx.stack_pos = Some(stack_index);
-            }
+            v.input_ctx.stack_pos = Some(stack_index);
         }
     }
 

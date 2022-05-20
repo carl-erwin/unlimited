@@ -43,10 +43,9 @@ impl BufferLog {
             offset,
         };
 
-        if self.pos < self.data.len() {
-            // commit inverted operations
-            let pos = self.pos;
-            let v = self.get_reverse_ops(pos).unwrap();
+        dbg_println!("bufferlog: add {:?}", op);
+
+        if let Some(v) = self.get_reverse_ops(self.pos) {
             self.data.extend(v);
         }
 
@@ -59,17 +58,16 @@ impl BufferLog {
     fn get_reverse_ops(&mut self, from_pos: usize) -> Option<Vec<BufferOperation>> {
         let len = self.data.len();
         let capacity = len - from_pos;
+        if capacity == 0 {
+            return None;
+        }
+
         let mut v = Vec::with_capacity(capacity);
-
-        for i in 0..capacity {
-            v.push(self.data[len - i - 1].invert());
+        for op in self.data.iter().rev().take(capacity) {
+            v.push(op.invert());
         }
 
-        if !v.is_empty() {
-            Some(v)
-        } else {
-            None
-        }
+        Some(v)
     }
 }
 
