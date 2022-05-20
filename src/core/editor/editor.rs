@@ -329,41 +329,59 @@ pub fn send_draw_event(
 
 use crate::core::event::InputEventRule;
 
+//
+fn eval_stack_index(
+    v: &mut View,
+    stack_index: usize,
+    default_action_mode: DefaultActionMode,
+    trigger_pos: usize,
+    trigger_pos_max: usize,
+    mut in_node: &mut Option<Rc<InputEventRule>>,
+) -> Option<String> {
+    for ev_pos in trigger_pos..trigger_pos_max {
+        let ev = &v.input_ctx.trigger[ev_pos];
+        let mut out_node = None;
+        let input_map = &v.input_ctx.input_map.borrow()[stack_index];
+        let action_name = eval_input_event(
+            &ev,
+            &input_map.1,
+            default_action_mode,
+            &mut in_node,
+            &mut out_node,
+        );
+        // stop a first match
+        if let Some(action_name) = action_name {
+            return Some(action_name);
+        }
+        // no match
+        *in_node = out_node;
+    }
+    None
+}
+
 fn eval_input_stack_level(
     v: &mut View,
     default_action_mode: DefaultActionMode,
     mut trigger_pos: usize,
     trigger_pos_max: usize,
     mut stack_index: usize,
-    mut in_node: &mut Option<Rc<InputEventRule>>,
+    in_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
-    let mut action_name = None;
-
     while stack_index > 0 {
         stack_index -= 1;
-        for ev_pos in trigger_pos..trigger_pos_max {
-            let ev = &v.input_ctx.trigger[ev_pos];
-            let mut out_node = None;
-            let input_map = &v.input_ctx.input_map.borrow()[stack_index];
-            action_name = eval_input_event(
-                &ev,
-                &input_map.1,
-                default_action_mode,
-                &mut in_node,
-                &mut out_node,
-            );
-            // stop a first match
-            if action_name.is_some() {
-                break;
-            }
-            // no match
-            *in_node = out_node;
-        }
+        let action_name = eval_stack_index(
+            v,
+            stack_index,
+            default_action_mode,
+            trigger_pos,
+            trigger_pos_max,
+            in_node,
+        );
         // found action
         if action_name.is_some() {
-            break;
+            return action_name;
         }
-
+        //
         if in_node.is_some() {
             v.input_ctx.stack_pos = Some(stack_index);
             return None;
@@ -374,7 +392,7 @@ fn eval_input_stack_level(
             *in_node = None;
             continue;
         }
-
+        // last level
         if in_node.is_none() {
             v.input_ctx.stack_pos = None;
         } else {
@@ -382,7 +400,7 @@ fn eval_input_stack_level(
         }
     }
 
-    action_name
+    None
 }
 
 fn process_single_input_event<'a>(
