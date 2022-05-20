@@ -6,6 +6,7 @@ macro_rules! dbg_println {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
+            eprint!("{}:{} ", file!(), line!());
             eprintln!($($arg)*)
         }
     }};
@@ -19,6 +20,7 @@ macro_rules! dbg_print {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
+            eprint!("{}:{} ", file!(), line!());
             eprint!($($arg)*)
         }
     }};
