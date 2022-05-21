@@ -108,7 +108,7 @@ use crate::core::event::KeyModifiers;
 use crate::core::event::PointerEvent;
 
 //
-use crate::core::view::run_compositing_stage_direct;
+use crate::core::view::layout::run_compositing_stage_direct;
 use crate::core::view::LayoutPass;
 
 use crate::core::editor;
