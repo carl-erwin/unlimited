@@ -191,19 +191,18 @@ pub fn goto_line_start(
     let status_view = editor.view_map.get(&svid).unwrap();
 
     // start/resume ?
-    {
-        let vid = {
-            let mut v = view.write();
-            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
-            gtm.active = true;
-            v.id
-        };
+    let already_active = {
+        let mut v = view.write();
+        let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+        let already_active = gtm.active;
+        gtm.active = true;
 
         status_view.write().controller = Some(view::ControllerView {
-            id: vid,
+            id: v.id,
             mode_name: &"goto-line-mode",
         });
-    }
+        already_active
+    };
 
     //
     let doc = status_view.read().document().unwrap();
@@ -215,12 +214,14 @@ pub fn goto_line_start(
     // set status text
     doc.append("Goto: ".as_bytes());
 
-    // setup new input map
-    let mut v = view.write();
-    v.input_ctx.stack_pos = None;
-    let input_map = build_input_event_map(GOTO_LINE_INTERACTIVE_MAP).unwrap();
-    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-    input_map_stack.push(("goto-line-mode", input_map));
+    if !already_active {
+        // setup new input map
+        let mut v = view.write();
+        v.input_ctx.stack_pos = None;
+        let input_map = build_input_event_map(GOTO_LINE_INTERACTIVE_MAP).unwrap();
+        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.push(("goto-line-mode", input_map));
+    }
 }
 
 pub fn goto_line_stop(

@@ -229,20 +229,19 @@ pub fn find_start(
     let status_view = editor.view_map.get(&svid).unwrap();
 
     // start/resume ?
-    {
-        let vid = {
-            let mut v = view.write();
-            let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
-            fm.active = true;
-            fm.reverse = false;
-            v.id
-        };
+    let already_active = {
+        let mut v = view.write();
+        let fm = v.mode_ctx_mut::<FindModeContext>("find-mode");
+        let already_active = fm.active;
+        fm.active = true;
+        fm.reverse = false;
 
         status_view.write().controller = Some(view::ControllerView {
-            id: vid,
+            id: v.id,
             mode_name: &"find-mode",
         });
-    }
+        already_active
+    };
 
     //
     let doc = status_view.read().document().unwrap();
@@ -259,12 +258,15 @@ pub fn find_start(
     // lock focus on v
     // env.focus_locked_on = Some(v.id);
 
-    // TODO:
-    dbg_println!("configure find  {:?}", v.id);
-    v.input_ctx.stack_pos = None;
-    let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
-    let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-    input_map_stack.push(("find-mode", input_map));
+    // Do not input map push twice
+    if !already_active {
+        dbg_println!("configure find  {:?}", v.id);
+        v.input_ctx.stack_pos = None;
+        let input_map = build_input_event_map(FIND_INTERACTIVE_MAP).unwrap();
+        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
+        input_map_stack.push(("find-mode", input_map));
+    }
+
     // TODO(ceg): add lock flag
     // to not exec lower input level
 }
