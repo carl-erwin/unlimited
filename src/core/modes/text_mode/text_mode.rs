@@ -828,7 +828,7 @@ pub fn run_text_mode_actions_vec(
             PostInputAction::CancelSelection => {
                 let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-                // tm.select_point.clear();
+                tm.select_point.clear();
             }
         }
     }
@@ -1901,8 +1901,8 @@ pub fn copy_maybe_remove_selection_non_symmetric(
 }
 
 pub fn copy_maybe_remove_selection(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     copy: bool,
     remove: bool,
