@@ -1131,17 +1131,16 @@ pub fn help_popup(
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
 ) {
-    let main_vid = view::Id(1);
-
-    let (main_width, main_height) = {
-        let main = editor.view_map.get(&main_vid).unwrap().read();
+    let root_vid = editor.root_views[env.root_view_index];
+    let (root_width, root_height) = {
+        let main = editor.view_map.get(&root_vid).unwrap().read();
         (main.width, main.height)
     };
 
     // destroy previous
     {
         if let Some(info) = {
-            let mut main = editor.view_map.get(&main_vid).unwrap().write();
+            let mut main = editor.view_map.get(&root_vid).unwrap().write();
             main.floating_children.pop()
         } {
             editor.view_map.remove(&info.id);
@@ -1162,8 +1161,8 @@ pub fn help_popup(
     pop_width += 1;
 
     let pop_height = HELP_MESSAGE.lines().count();
-    let x = (main_width / 2).saturating_sub(pop_width / 2);
-    let y = (main_height / 2).saturating_sub(pop_height / 2);
+    let x = (root_width / 2).saturating_sub(pop_width / 2);
+    let y = (root_height / 2).saturating_sub(pop_height / 2);
 
     {
         let mut d = command_doc.as_ref().unwrap().write();
@@ -1174,7 +1173,7 @@ pub fn help_popup(
     let p_view = View::new(
         &mut editor,
         &mut env,
-        Some(main_vid),
+        Some(root_vid),
         (x, y),
         (pop_width, pop_height),
         command_doc,
@@ -1183,7 +1182,7 @@ pub fn help_popup(
     );
 
     {
-        let mut main = editor.view_map.get(&main_vid).unwrap().write();
+        let mut main = editor.view_map.get(&root_vid).unwrap().write();
 
         main.floating_children.push(ChildView {
             id: p_view.id,
