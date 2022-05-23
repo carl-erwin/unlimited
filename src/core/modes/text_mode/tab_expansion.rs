@@ -20,7 +20,10 @@ impl TabFilter {
         TabFilter {
             prev_cp: '\u{0}',
             column_count: 0,
-            tab_color: (242, 71, 132), // purple-like
+            // tab_color: (242, 71, 132), // pink-like
+            // tab_color: (40, 23, 51) // purple-like
+            // tab_color: (59, 34, 76)
+            tab_color: (128, 75, 165),
         }
     }
 }
@@ -40,7 +43,7 @@ impl ContentFilter<'_> for TabFilter {
         self.prev_cp = '\u{0}';
         self.column_count = 0;
         if env.graphic_display {
-            self.tab_color = (242, 71, 132); // purple-like
+            // self.tab_color = (242, 71, 132); // purple-like
         } else {
             self.tab_color = (128, 0, 128); // magenta
         }
