@@ -12,6 +12,7 @@ use crate::core::modes::core_mode::split_with_direction;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
+use crate::core::view;
 use crate::core::view::ContentFilter;
 
 use crate::core::view::FilterIo;
@@ -192,7 +193,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        editor: &Editor,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -227,6 +228,12 @@ impl ContentFilter<'_> for BasicEditorTitle {
 
         doc_info.push_str(&format!(" {} bytes", d.size()));
         doc_info.push_str(&format!(" (F1 for help)"));
+
+        if env.focus_vid != view::Id(0) {
+            if let Some(v) = editor.view_map.get(&env.focus_vid) {
+                doc_info.push_str(&format!(" (focus vid: {:?})", env.focus_vid));
+            }
+        }
 
         self.title.push_str(&doc_info);
     }

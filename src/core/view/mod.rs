@@ -307,7 +307,9 @@ pub struct View<'a> {
     pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
     pub status_view_id: Option<Id>, // TODO(ceg): remove this ?  or per view see env.status_view_id
 
-    pub controller: Option<ControllerView>, // this view is controlled by an other View's mode
+    pub controller: Option<ControllerView>, // REMOVE this
+
+    pub controlled_view: Option<Id>,
 
     /*
       any view that can display some text,
@@ -444,9 +446,8 @@ impl<'a> View<'a> {
 
             // TODO(ceg): add doc
             let action_map = m.build_action_map();
-            for (name, cb) in action_map {
-                view.input_ctx.action_map.insert(name.clone(), cb);
-            }
+
+            view.register_action_map(action_map);
 
             // create per view mode context
             // allocate per view ModeCtx shared between the stages
@@ -457,6 +458,13 @@ impl<'a> View<'a> {
                 m.configure_view(editor, env, view);
                 view_self_subscribe(editor, env, mode_rc.clone(), view);
             }
+        }
+    }
+
+    // no conflict checks
+    pub fn register_action_map(&mut self, action_map: InputStageActionMap<'static>) {
+        for (name, cb) in action_map {
+            self.input_ctx.action_map.insert(name.clone(), cb);
         }
     }
 
@@ -487,6 +495,7 @@ impl<'a> View<'a> {
             focus_to: None,
             status_view_id: None,
             controller: None,
+            controlled_view: None,
             id: Id(id),
             document,
             screen,

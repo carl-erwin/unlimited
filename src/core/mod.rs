@@ -497,6 +497,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             .document_name(&arg.path)
             .file_name(&arg.path)
             .internal(false)
+            .use_buffer_log(true)
             .finalize();
 
         if let Some(b) = b {
@@ -515,6 +516,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         let b = DocumentBuilder::new()
             .document_name("untitled-1")
             .internal(false)
+            .use_buffer_log(true)
             .finalize();
         if let Some(b) = b {
             {

@@ -255,8 +255,6 @@ pub fn find_start(
 
     // push new input map for y/n
     let mut v = view.write();
-    // lock focus on v
-    // env.focus_locked_on = Some(v.id);
 
     // Do not input map push twice
     if !already_active {

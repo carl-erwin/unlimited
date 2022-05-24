@@ -62,6 +62,7 @@ use crate::core::view;
 // ctrl+:  -> minor mode to read repeat count
 // esc -> reset repeat count
 // kbr macro recording
+#[derive(Debug)]
 pub struct EditorEnv<'a> {
     phantom: PhantomData<&'a u8>,
 
@@ -96,8 +97,10 @@ pub struct EditorEnv<'a> {
 
     //
     pub prev_vid: view::Id,
-    pub view_id: view::Id,
-    pub active_view: view::Id,
+    pub root_view_id: view::Id,
+    //
+    pub active_view: Option<view::Id>,
+
     pub hover_on: view::Id,
     pub last_selected: view::Id,
 
@@ -142,11 +145,11 @@ impl<'a> EditorEnv<'a> {
             diff_y: 0,
             //max
             root_view_index: 0,
-            prev_vid: view::Id(1), // NB
-            view_id: view::Id(1),  // NB
+            prev_vid: view::Id(1),     // NB
+            root_view_id: view::Id(1), // NB
             center_offset: None,
             skip_compositing: false,
-            active_view: view::Id(0),
+            active_view: None,
             hover_on: view::Id(0),
             last_selected: view::Id(0),
             focus_locked_on: None,

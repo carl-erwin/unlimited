@@ -12,6 +12,7 @@ pub use document::DocumentEventCb;
 
 pub use document::build_index;
 pub use document::find_nth_byte_offset;
+pub use document::get_document_byte_count;
 pub use document::get_document_byte_count_at_offset;
 
 pub use document::get_node_data;

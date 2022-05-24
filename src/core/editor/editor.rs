@@ -264,9 +264,9 @@ pub fn register_input_stage_action(
 }
 
 pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
-    dbg_println!("checking view dimension {:?}", env.view_id);
+    dbg_println!("checking view dimension {:?}", env.root_view_id);
 
-    let view = editor.view_map.get(&env.view_id);
+    let view = editor.view_map.get(&env.root_view_id);
     let view = view.unwrap();
     let view = view.as_ref();
     let mut view = view.write();
@@ -293,7 +293,7 @@ pub fn update_view_and_send_draw_event(
     // check size
     check_view_dimension(editor, env);
 
-    let view_id = env.view_id;
+    let view_id = env.root_view_id;
     run_stages(Stage::Compositing, &mut editor, &mut env, view_id);
     run_stages(Stage::UpdateUi, &mut editor, &mut env, view_id);
 
@@ -479,15 +479,15 @@ fn process_single_input_event<'a>(
             dbg_println!("save node {:?}", in_node);
         }
 
-        dbg_println!(
-            "1st pass action_name '{:?}' in_node {:?}",
-            action_name,
-            in_node
-        );
+        if action_name.is_some() {
+            dbg_println!("1st pass action_name '{:?}'", action_name);
+        } else {
+            dbg_println!("1st pass previous node {:?}", in_node);
+        }
 
         // 2nd  pass with default/fallback action enabled
         let action_name2 = if action_name.is_none() && in_node.is_none() {
-            dbg_println!("try default rules/ replay all triggers");
+            dbg_println!("try default rules/replay all triggers");
             v.input_ctx.stack_pos = None;
 
             let name = eval_input_stack_level(
@@ -504,7 +504,11 @@ fn process_single_input_event<'a>(
                 dbg_println!("save node {:?}", in_node);
             }
 
-            dbg_println!("2nd pass action_name '{:?}' in_node {:?}", name, in_node);
+            if name.is_some() {
+                dbg_println!("2st pass action_name '{:?}'", name);
+            } else {
+                dbg_println!("2st pass previous node {:?}", in_node);
+            }
 
             name
         } else {
@@ -541,7 +545,7 @@ fn process_single_input_event<'a>(
 
         let action_fn = v.input_ctx.action_map.get(&action_name).clone();
         if action_fn.is_none() {
-            dbg_println!("not function pointer found for action : {}", action_name);
+            dbg_println!("no function pointer found for action : {}", action_name);
             v.input_ctx.trigger.clear();
             v.input_ctx.current_node = None;
             v.input_ctx.stack_pos = None;
@@ -579,7 +583,7 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     // TODO(ceg): receive FPS from ui in Event ?
     if (p_rdr <= 60) || p_input <= 60 {
         // hit
-        let view = editor.view_map.get(&env.view_id).unwrap().clone();
+        let view = editor.view_map.get(&env.root_view_id).unwrap().clone();
         send_draw_event(&mut editor, &mut env, ui_tx, &view);
         env.last_rdr_event = Instant::now();
     }
@@ -593,7 +597,7 @@ fn get_focused_vid(
     let vid = vid;
     let view = editor.view_map.get(&vid);
     if view.is_none() {
-        return env.view_id;
+        return env.root_view_id;
     }
 
     let view = view.unwrap().clone();
@@ -641,7 +645,7 @@ pub fn set_active_view(
     // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
-    let prev_vid = env.active_view;
+    let prev_vid = env.active_view.unwrap_or(view::Id(0));
     if prev_vid == vid {
         return;
     }
@@ -651,16 +655,29 @@ pub fn set_active_view(
     dbg_println!("focus changed {:?} -> {:?}", prev_vid, vid);
 
     let mut parent_id = view.parent_id;
+
+    dbg_println!("focus changed parent_id {:?}", parent_id);
+
+    if let Some(ctrl) = &view.controller {
+        env.active_view = Some(ctrl.id);
+        return;
+    }
+
+    env.active_view = Some(vid);
+
     loop {
         if let Some(pid) = parent_id {
+            dbg_println!("focus changed : checking parent {:?}", pid);
+
             if let Some(pview) = editor.view_map.get(&pid) {
                 let mut pview = pview.write();
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
 
-                env.active_view = vid; // Option ?
                 dbg_println!("set_active_view next parent_id {:?}", parent_id);
             } else {
+                dbg_println!("focus changed : no parent found stop");
+
                 break;
             }
         } else {
@@ -832,7 +849,7 @@ fn clip_coordinates_and_get_vid(
     vid: view::Id,
 ) -> (view::Id, InputEvent) {
     let mut ev = ev.clone();
-    dbg_println!("CLIPPING ev in: {:?}", ev);
+    dbg_println!("CLIPPING input event: {:?}", ev);
 
     let vid = match &mut ev {
         InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
@@ -852,10 +869,11 @@ fn clip_coordinates_and_get_vid(
         InputEvent::WheelDown { x, y, .. } => {
             clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
         }
+        InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
     };
 
-    dbg_println!("CLIPPING ev out: {:?}", ev);
+    dbg_println!("CLIPPING ev out: {:?}, vid {:?}", ev, vid);
 
     (vid, ev)
 }
@@ -956,10 +974,10 @@ fn run_stage(
 
                     env.process_input_end = Instant::now();
 
-                    if env.view_id != env.prev_vid {
+                    if env.root_view_id != env.prev_vid {
                         env.event_processed = true;
 
-                        dbg_println!("view change {:?} ->  {:?}", env.prev_vid, env.view_id);
+                        dbg_println!("view change {:?} ->  {:?}", env.prev_vid, env.root_view_id);
 
                         check_view_dimension(editor, env);
                         {
@@ -969,7 +987,7 @@ fn run_stage(
                             }
 
                             // prepare next view input
-                            let view = editor.view_map.get(&env.view_id).unwrap().clone();
+                            let view = editor.view_map.get(&env.root_view_id).unwrap().clone();
                             view::run_stage(
                                 &mut editor,
                                 &mut env,
@@ -979,7 +997,7 @@ fn run_stage(
                             );
 
                             // view changed -> call compositing stage
-                            let id = env.view_id;
+                            let id = env.root_view_id;
                             run_stages(Stage::Compositing, &mut editor, &mut env, id);
                         }
                     }
@@ -1036,15 +1054,27 @@ fn run_stage(
     }
 }
 
+/*
+  TODO(ceg): filter event type
+
+    find view under pointer -> pointed_view_id
+    cmp with active_view:
+
+
+*/
 fn setup_focus_and_event(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     ev: &InputEvent,
     compose: &mut bool,
 ) -> view::Id {
-    let root_vid = env.view_id;
+    let root_vid = env.root_view_id;
+
     let vid = get_focused_vid(&mut editor, &mut env, root_vid);
+
     dbg_println!(">> setup_focus_and_event FOCUS on {:?}", vid);
+
+    dbg_println!(">> setup_focus_and_event ACTIVE VIEW {:?}", env.active_view);
 
     if root_vid != vid {
         // only set, not cleared
@@ -1052,7 +1082,7 @@ fn setup_focus_and_event(
     };
 
     let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
-    // - - TODO(ceg): if button press only: env.active_view = Option<vid> ? -
+
     set_focus_on_vid(&mut editor, &mut env, vid);
 
     env.current_input_event = ev;
@@ -1231,27 +1261,58 @@ fn run_input_stage(
         }
 
         // select view that will receive the event
+        dbg_println!(
+            "CEG : before setup_focus_and_event -> active_view  env {:?}",
+            env.active_view
+        );
+
+        let prev_active_view = env.active_view;
+
         let hover_vid = env.hover_on;
         let last_selected = env.last_selected;
 
-        let id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
-        check_hover_change(&mut editor, &mut env, hover_vid, id);
+        let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
+        dbg_println!("setup_focus_and_event ->  Id {:?}", target_id);
+
+        dbg_println!("CEG : after setup_focus_and_event ->  env {:?}", env);
+
+        check_hover_change(&mut editor, &mut env, hover_vid, target_id);
 
         let new_clicked = env.last_selected;
         check_selection_change(&mut editor, &mut env, last_selected, new_clicked);
 
-        run_stages(Stage::Input, &mut editor, &mut env, id);
+        dbg_println!("hover_vid {:?}", hover_vid);
+        dbg_println!("new_clicked {:?}", new_clicked);
+
+        run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
         // if !env.skip_compositing
         {
-            run_stages(Stage::Compositing, &mut editor, &mut env, id);
+            run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
         }
-        // flush_ui_event(editor, env, &ui_tx);
-        //run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
+
+        // update active view
+        if let Some(prev_active_view) = prev_active_view {
+            if prev_active_view != target_id {
+                let vid = match &ev {
+                    InputEvent::PointerMotion(event::PointerEvent { .. }) => prev_active_view,
+                    InputEvent::WheelUp { .. } => prev_active_view,
+                    InputEvent::WheelDown { .. } => prev_active_view,
+                    InputEvent::KeyPress { .. } => prev_active_view,
+                    _ => env.active_view.unwrap_or(target_id),
+                };
+                set_focus_on_vid(&mut editor, &mut env, vid);
+            }
+        } else {
+            set_focus_on_vid(&mut editor, &mut env, target_id);
+        }
     }
 
+    // flush_ui_event(editor, env, &ui_tx);
+    //run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
+
     // POST ?
-    let id = env.view_id;
+    let id = env.root_view_id;
     run_stage(Post, Stage::Input, &mut editor, &mut env, id);
 
     if recompose {
@@ -1271,10 +1332,12 @@ fn process_input_events(
 
     env.time_spent = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
+    dbg_println!("CEG START run_input_stage");
     let mut stage = run_input_stage(&mut editor, &mut env, &events);
+    dbg_println!("CEG STOP run_input_stage");
 
     while stage != Stage::Input {
-        let id = env.view_id;
+        let id = env.root_view_id;
         stage = run_stages(stage, &mut editor, &mut env, id);
     }
 
@@ -1309,8 +1372,8 @@ pub fn main_loop(
     }
 
     while !env.quit {
-        if let Ok(evt) = core_rx.recv() {
-            match evt.event {
+        if let Ok(msg) = core_rx.recv() {
+            match msg.event {
                 Event::UpdateView { width, height } => {
                     env.width = width;
                     env.height = height;

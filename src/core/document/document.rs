@@ -34,6 +34,7 @@ pub struct Id(pub usize);
 #[derive(Debug)]
 pub struct DocumentBuilder {
     internal: bool,
+    use_buffer_log: bool,
     document_name: String,
     file_name: String,
     mode: OpenMode,
@@ -64,6 +65,7 @@ impl DocumentBuilder {
     pub fn new() -> Self {
         Self {
             internal: false,
+            use_buffer_log: false,
             document_name: String::new(),
             file_name: String::new(),
             mode: OpenMode::ReadOnly,
@@ -73,6 +75,12 @@ impl DocumentBuilder {
     ///
     pub fn internal(&mut self, flag: bool) -> &mut Self {
         self.internal = flag;
+        self
+    }
+
+    ///
+    pub fn use_buffer_log(&mut self, flag: bool) -> &mut Self {
+        self.use_buffer_log = flag;
         self
     }
 
@@ -96,7 +104,12 @@ impl DocumentBuilder {
 
     ///
     pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'static>>>> {
-        Document::new(&self.document_name, &self.file_name, self.mode.clone())
+        Document::new(
+            &self.document_name,
+            &self.file_name,
+            self.mode.clone(),
+            self.use_buffer_log,
+        )
     }
 }
 
@@ -240,6 +253,7 @@ impl<'a> Document<'a> {
         document_name: &String,
         file_name: &String,
         mode: OpenMode,
+        use_buffer_log: bool,
     ) -> Option<Arc<RwLock<Document<'static>>>> {
         dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
 
@@ -264,7 +278,7 @@ impl<'a> Document<'a> {
             buffer: buffer.unwrap(),
             cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
-            use_buffer_log: true,
+            use_buffer_log,
             abort_indexing: false,
             indexed: false,
             changed,
@@ -1297,6 +1311,15 @@ pub fn get_document_byte_count_at_offset(
     }
 
     (0, None)
+}
+
+pub fn get_document_byte_count(doc: &Document, byte_index: usize) -> Option<u64> {
+    assert!(byte_index < 256);
+    let file = doc.buffer.data.read();
+    match file.root_index() {
+        Some(idx) => Some(file.pool[idx].byte_count[byte_index]),
+        _ => None,
+    }
 }
 
 //
