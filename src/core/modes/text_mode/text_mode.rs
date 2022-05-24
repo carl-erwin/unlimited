@@ -2273,6 +2273,8 @@ pub fn get_lines_offsets_direct(
             must_panic = true;
         }
 
+        dbg_println!(" get_lines_offsets_direct Loop count {}", count);
+
         if count > count_limit {
             dbg_println!(
                 "REMAIN to render : end_offset {} - tmp.offset {}= {}",
@@ -2379,7 +2381,8 @@ pub fn scroll_view_down(
     nb_lines: usize,
 ) {
     let mut view_start_offset = None;
-    {
+
+    let (max_offset, offscreen, h) = {
         let v = view.read();
 
         dbg_println!("SCROLL DOWN VID = {:?}", v.id);
@@ -2401,21 +2404,28 @@ pub fn scroll_view_down(
             return;
         }
 
+        let offscreen = nb_lines >= v.screen.read().height();
         let h = v.screen.read().height();
-        if nb_lines >= v.screen.read().height() {
+
+        (max_offset, offscreen, h)
+    };
+
+    if offscreen {
+        {
+            let v = view.read();
             dbg_println!("SCROLLDOWN {} > view.H {}:  TRY OFFSCREEN", nb_lines, h);
-
-            // slower : call layout builder to build  nb_lines - screen.height()
-            let off = scroll_down_view_off_screen(&view, editor, env, max_offset, nb_lines);
-            {
-                view.write().start_offset = off;
-            }
-
-            return;
         }
+        // slower : call layout builder to build  nb_lines - screen.height()
+        let off = scroll_down_view_off_screen(&view, editor, env, max_offset, nb_lines);
+        view.write().start_offset = off;
+        dbg_println!("SCROLLDOWN {} > view.H {}: RETURN ", nb_lines, h);
+        return;
+    }
 
+    {
         dbg_println!("SCROLLDOWN {} <= view.H {}:  TRY ONSCREEN", nb_lines, h);
 
+        let v = view.read();
         for idx in 0..=(h - nb_lines) {
             // just read the current screen
             if let Some(l) = v.screen.write().get_line(nb_lines + idx) {
@@ -2445,15 +2455,18 @@ fn scroll_down_view_off_screen(
 ) -> u64 {
     // will be slower than just reading the current screen
 
-    let v = view.read();
-    let screen_width = v.screen.read().width();
-    let screen_height = v.screen.read().height() + 32;
+    let (start_offset, end_offset, screen_width, screen_height) = {
+        let v = view.read();
+        let screen_width = v.screen.read().width();
+        let screen_height = v.screen.read().height() + 32;
 
-    let start_offset = v.start_offset;
-    let end_offset = ::std::cmp::min(
-        v.start_offset + (4 * nb_lines * screen_width) as u64,
-        max_offset,
-    );
+        let start_offset = v.start_offset;
+        let end_offset = ::std::cmp::min(
+            v.start_offset + (4 * nb_lines * screen_width) as u64,
+            max_offset,
+        );
+        (start_offset, end_offset, screen_width, screen_height)
+    };
 
     // will call all layout filters
     let lines = crate::core::modes::text_mode::get_lines_offsets_direct(

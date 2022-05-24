@@ -1055,9 +1055,14 @@ fn move_onscreen_single_mark_to_next_line(
 
     let screen = {
         let v = view.read();
+
         v.screen.clone()
     };
     let mut screen = screen.write();
+    if screen.height() <= 1 {
+        // cannot compute next line
+        return false;
+    }
 
     let mut mark = {
         let mut v = view.write();
@@ -1127,6 +1132,7 @@ fn move_onscreen_single_mark_to_next_line(
 
         //  use the first offset of the last line
         //  as the starting offset of the next screen
+        dbg_println!("screen dimension {:?}", screen.dimension());
         dbg_println!("get line [1]");
         let line = screen.get_line(1).unwrap();
         let cpi = &line[0].cpi;
