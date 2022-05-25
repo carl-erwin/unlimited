@@ -53,6 +53,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::document;
+use crate::core::document::get_document_byte_count;
 use crate::core::document::get_document_byte_count_at_offset;
 use crate::core::document::Document;
 use crate::core::document::DocumentEvent;
@@ -347,8 +348,8 @@ impl<'a> Mode for LineNumberMode {
                     // '@offset '
                     1 + num_digit(max_offset) + 1
                 } else {
-                    let ret = get_document_byte_count_at_offset(&doc, '\n' as usize, max_offset);
-                    let n = num_digit(ret.0 + 1); // nb line = line count + 1
+                    let ret = get_document_byte_count(&doc, '\n' as usize).unwrap_or(0);
+                    let n = num_digit(ret + 1); // nb line = line count + 1
 
                     // 'xxxx '
                     n + 1
