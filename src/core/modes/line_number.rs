@@ -332,11 +332,12 @@ impl<'a> Mode for LineNumberMode {
             }
 
             ViewEvent::PreComposition => {
-                if src_view.id != dst.id {
+                if src_view.id == dst.id {
                     return;
                 }
 
                 let text_view = src_view;
+                let linenum_view = editor.view_map.get(&dst.id).unwrap().read();
 
                 // TODO(ceg): resize line-number view
                 let doc = text_view.document();
@@ -354,7 +355,7 @@ impl<'a> Mode for LineNumberMode {
                 };
 
                 if let Some(p_view) = parent {
-                    p_view.children[text_view.layout_index.unwrap()].layout_op =
+                    p_view.children[linenum_view.layout_index.unwrap()].layout_op =
                         LayoutOperation::Fixed {
                             size: width as usize,
                         };
