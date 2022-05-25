@@ -51,6 +51,7 @@ pub struct VscrollbarModeContext {
     pub scroll_start: usize,
     pub scroll_end: usize,
     pub selected: bool,
+    pub pointer_over: bool,
     pub t: std::time::Instant,
 }
 
@@ -74,6 +75,7 @@ impl<'a> Mode for VscrollbarMode {
             scroll_start: 0,
             scroll_end: 0,
             selected: false,
+            pointer_over: false,
             t: std::time::Instant::now(),
         };
         Box::new(ctx)
@@ -157,6 +159,18 @@ impl<'a> Mode for VscrollbarMode {
 
                 dbg_println!("SCROLLBAR: mode_ctx.percent {}", mode_ctx.percent);
                 dbg_println!("SCROLLBAR: mode_ctx.percent_end {}", mode_ctx.percent_end);
+            }
+
+            ViewEvent::Enter => {
+                let mut mode_ctx =
+                    src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                mode_ctx.pointer_over = true;
+            }
+
+            ViewEvent::Leave => {
+                let mut mode_ctx =
+                    src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                mode_ctx.pointer_over = false;
             }
 
             _ => {}
@@ -340,9 +354,14 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         let mode_ctx = view.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
         let mut cpi = CodepointInfo::new();
 
-        cpi.style.bg_color = (45, 49, 54);
+        //        cpi.style.bg_color = (45, 49, 54);
+        //        cpi.style.color = (192,0,0);
 
-        cpi.style.bg_color = TextStyle::default_bg_color();
+        //        cpi.style.bg_color = TextStyle::default_bg_color();
+
+        // TextStyle::scrollbar_non_selected_color();
+        // TextStyle::scrollbar_selected_color();
+        // TextStyle::scrollbar_hover_color();
 
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
@@ -353,6 +372,15 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
             }
         }
 
+        // by default the scrollbar is fill with invisible ' ' and default fg/bg color
+        // fill whole scrollbar bg
+        // let h = env.screen.height();
+        // for i in 0..h {
+        //     if let Some(cpi) = env.screen.get_cpinfo_mut(0, i) {
+        //         cpi.displayed_cp = ' ';
+        //     }
+        // }
+
         dbg_println!("SCROLLBAR height {}", env.screen.height());
         dbg_println!("SCROLLBAR start {}", mode_ctx.scroll_start);
         dbg_println!("SCROLLBAR end {}", mode_ctx.scroll_end);
@@ -360,20 +388,17 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         for i in mode_ctx.scroll_start..mode_ctx.scroll_end {
             if let Some(cpi) = env.screen.get_cpinfo_mut(0, i) {
                 cpi.displayed_cp = ' ';
-                cpi.style.is_selected = true;
-                let add = 25;
-                //                cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
-                cpi.style.bg_color = (45 - add, 49 - add, 54 - add);
-
-                cpi.style.bg_color = (188, 188, 188);
 
                 if mode_ctx.selected {
-                    cpi.style.bg_color = TextStyle::default_color();
+                    cpi.style.bg_color = (34,167,242);
                 } else {
-                    let add = 25;
-                    //                    cpi.style.bg_color = (45 + add, 49 + add, 54 + add);
-                    cpi.style.bg_color = (45 - add, 49 - add, 54 - add);
-                    cpi.style.bg_color = (188, 188, 188);
+                    if mode_ctx.pointer_over {
+                        cpi.style.bg_color = (0,119,184);
+
+                    } else {
+                        cpi.style.bg_color = (51, 60, 98);
+                        cpi.style.bg_color = (31, 36, 59);
+                    }
                 }
             }
         }
