@@ -390,13 +390,11 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
                 cpi.displayed_cp = ' ';
 
                 if mode_ctx.selected {
-                    cpi.style.bg_color = (34,167,242);
+                    cpi.style.bg_color = (34, 167, 242);
                 } else {
                     if mode_ctx.pointer_over {
-                        cpi.style.bg_color = (0,119,184);
-
+                        cpi.style.bg_color = (0, 119, 184);
                     } else {
-                        cpi.style.bg_color = (51, 60, 98);
                         cpi.style.bg_color = (31, 36, 59);
                     }
                 }

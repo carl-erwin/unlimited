@@ -72,27 +72,21 @@ impl TextStyle {
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
         if USE_DARK_THEME {
             // dark theme
-            let c = Self::default_bg_color();
-            let add = 20;
-            (
-                c.0.saturating_add(add),
-                c.1.saturating_add(add),
-                c.2.saturating_add(add),
-            )
+            (51, 56, 79)
         } else {
             // light theme
             let c = Self::default_bg_color();
-            let add = 20;
+            let sub = 20;
             return (
-                c.0.saturating_sub(add),
-                c.1.saturating_sub(add),
-                c.2.saturating_sub(add),
+                c.0.saturating_sub(sub),
+                c.1.saturating_sub(sub),
+                c.2.saturating_sub(sub),
             );
         }
     }
 
     pub fn default_mark_line_bg_color() -> (u8, u8, u8) {
-        Self::default_selected_bg_color()
+        (31, 36, 59)
     }
 
     pub fn mark_style(color: Option<(u8, u8, u8)>) -> TextStyle {
