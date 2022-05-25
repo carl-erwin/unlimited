@@ -10,10 +10,7 @@ pub mod text_mode_codec;
 pub mod unicode_to_text;
 pub mod word_wrap;
 //
-pub mod doc_modification;
 pub mod movement;
-pub mod search;
-pub mod selection;
 
 pub mod show_trailing_spaces;
 
