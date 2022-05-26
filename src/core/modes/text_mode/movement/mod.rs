@@ -322,11 +322,6 @@ pub fn scroll_screen_up(
         // if we are in the middle of a utf8 sequence we move max 4 bytes until a starting point is reached
         // for idx in 0..4 { if codec.is_sync(new_start) { break; } start_offset += codec.encode_min_size() }
 
-        if offset - start_offset <= width as u64 {
-            // document first start
-            return 0;
-        }
-
         let _tmp = Mark::new(start_offset);
 
         let lines = {
@@ -363,14 +358,18 @@ pub fn scroll_screen_up(
             continue;
         }
 
-        // find "offset" line index
-        let index = if line_index < lines.len() {
-            lines.len() - line_index
-        } else {
-            0
-        };
+        // lines[] contains start_offset (and maybe more)
+        let mut index = lines.len().saturating_sub(1);
+        while index > 0 {
+            if lines[index].0 <= offset {
+                // found current screen first line index
+                break;
+            }
+            index -= 1;
+        }
 
-        let line_start_off = lines[index].0;
+        let next_start_index = index.saturating_sub(line_index);
+        let line_start_off = lines[next_start_index].0;
         return line_start_off; // return  (lines, index, start,end) ?
     }
 }
