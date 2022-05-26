@@ -2273,7 +2273,11 @@ pub fn get_lines_offsets_direct(
             must_panic = true;
         }
 
-        dbg_println!(" get_lines_offsets_direct Loop count {}", count);
+        dbg_println!(
+            " get_lines_offsets_direct Loop count {} / count limit {}",
+            count,
+            count_limit
+        );
 
         if count > count_limit {
             dbg_println!(
@@ -2303,12 +2307,14 @@ pub fn get_lines_offsets_direct(
                     screen_width,
                     screen_height
                 );
-
+            /*
+             // waning large prints
             dbg_print!(
                 "lines {:?} + screen.line_offset {:?} = ",
                 lines,
                 screen.line_offset
             );
+            */
         }
 
         lines.append(&mut screen.line_offset.clone()); // move ?
