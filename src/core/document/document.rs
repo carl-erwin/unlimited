@@ -695,7 +695,9 @@ impl<'a> Document<'a> {
 
     fn apply_log_operation(&mut self, op: &BufferOperation) -> Option<u64> {
         // apply op
-        dbg_println!("apply log op {:?}", op);
+
+        dbg_println!("apply_log_operation");
+        op.dump();
 
         let mark_offset = match op.op_type {
             BufferOperationType::Insert => {

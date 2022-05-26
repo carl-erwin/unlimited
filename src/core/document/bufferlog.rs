@@ -15,6 +15,21 @@ pub struct BufferOperation {
     pub offset: u64,
 }
 
+impl BufferOperation {
+    pub fn dump(&self) {
+        dbg_println!("BufferOperation: op_type {:?}", self.op_type);
+        if self.data.is_some() {
+            dbg_println!(
+                "BufferOperation: data.len {:?}",
+                self.data.as_ref().unwrap().len()
+            );
+        } else {
+            dbg_println!("BufferOperation: data = None");
+        }
+        dbg_println!("BufferOperation: offset {:?}", self.offset);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BufferOperationType {
     Insert,
@@ -32,21 +47,22 @@ impl BufferLog {
     }
 
     pub fn dump(&self) {
-        eprintln!("-- BufferLog::dump() {{\r");
+        dbg_println!("-- BufferLog::dump() {{\r");
 
         for (idx, op) in self.data.iter().enumerate() {
-            eprintln!("dump buffer log [{}] = {:?}\r", idx, op);
+            dbg_println!("dump buffer log [{}] = \r", idx);
+            op.dump();
         }
-        eprintln!("dump buffer log pos = {}\r", self.pos);
-        eprintln!("}}\r");
+        dbg_println!("dump buffer log pos = {}\r", self.pos);
+        dbg_println!("}}\r");
     }
 
     pub fn dump_to_current_log_pos(&self) {
         for (idx, op) in self.data.iter().enumerate().take(self.pos + 1) {
-            eprintln!("dump (..pos) buffer log [{}] = {:?}\r", idx, op);
+            dbg_println!("dump (..pos) buffer log [{}] = {:?}\r", idx, op);
         }
-        eprintln!("dump (..pos) buffer log pos = {}", self.pos);
-        eprintln!("----------------------------------\r");
+        dbg_println!("dump (..pos) buffer log pos = {}", self.pos);
+        dbg_println!("----------------------------------\r");
     }
 
     pub fn add(
@@ -61,7 +77,7 @@ impl BufferLog {
             offset,
         };
 
-        dbg_println!("buffer log: add {:?}", op);
+        op.dump();
 
         if let Some(v) = self.get_reverse_ops(self.pos) {
             self.data.extend(v);
