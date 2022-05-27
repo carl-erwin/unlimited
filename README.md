@@ -1,8 +1,6 @@
-unlimitED!
-
-
-**unlimitED!** is an experimental editor, and an excuse to learn the **Rust** language.<br/>
-
+**unlimitED!** is an experimental editor, and an excuse to learn the [**Rust**](https://www.rust-lang.org) language.<br/>
+<br/>
+**Warning: It is in the alpha stage and not suited for daily work.**
 
 ---
 
@@ -11,12 +9,16 @@ unlimitED!
 - [x] basic utf-8 support
 - [x] unlimited undo/redo
 - [x] large file support
+- [x] simple search
+- [x] goto line
+- [x] highlight keywords (hack, this is not syntax highlighting)
+- [x] mouse selection
 
 ---
 
 ### Compiling
 
-Minimum requirement : rust edition 2018 (https://www.rust-lang.org)
+Minimum requirement : [**Rust**](https://www.rust-lang.org) edition 2018
 
 ```
 git clone https://github.com/carl-erwin/unlimited
@@ -52,7 +54,7 @@ Ultimately remove all limitations found in common editors.
  - [ ] handle directories
  - [ ] handle very-long lines
  - [ ] provide a C API to handle basic primitives
- - [ ] an interactive "mode configurator" to customize a view
+ - [ ] an interactive "configurator" mode to customize a view
 
 ---
 
