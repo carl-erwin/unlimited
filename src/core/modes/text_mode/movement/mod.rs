@@ -303,7 +303,7 @@ pub fn scroll_screen_up(
     offset: u64,
     line_index: usize,
 ) -> u64 {
-    let mut rewind = 8 * 1024;
+    let mut rewind = 0;
     let mut loop_count = 0;
     loop {
         loop_count += 1;
@@ -314,6 +314,9 @@ pub fn scroll_screen_up(
             let screen = v.screen.clone();
             let screen = screen.read();
             let (width, height) = screen.dimension();
+
+            rewind += (width * height * 4) as u64;
+
             let start_offset = offset.saturating_sub(rewind);
             (start_offset, width, height)
         };
@@ -323,6 +326,11 @@ pub fn scroll_screen_up(
         // for idx in 0..4 { if codec.is_sync(new_start) { break; } start_offset += codec.encode_min_size() }
 
         let _tmp = Mark::new(start_offset);
+
+        dbg_println!(
+            "   get line index --------- offset - start_offset = {}",
+            offset - start_offset
+        );
 
         let lines = {
             crate::core::modes::text_mode::get_lines_offsets_direct(

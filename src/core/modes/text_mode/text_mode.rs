@@ -2342,7 +2342,7 @@ pub fn get_lines_offsets_direct(
             return lines;
         }
 
-        // the next screen start is the offset past le last line last offset
+        // the next screen start is the offset past the last line last offset
         let l = screen.get_last_used_line().unwrap();
         tmp.offset = 1 + l[l.len() - 1].cpi.offset.unwrap();
 
