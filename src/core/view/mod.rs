@@ -635,11 +635,11 @@ pub fn run_stage(
     }
 
     if let (StagePosition::In, Stage::Compositing) = (pos, stage) {
-        compute_view_layout(editor, env, view); // can be merged with stage_actions ?
+        compute_root_view_layout(editor, env, view); // can be merged with stage_actions ?
     }
 }
 
-pub fn compute_view_layout(
+pub fn compute_root_view_layout(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
