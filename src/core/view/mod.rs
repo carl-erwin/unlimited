@@ -242,7 +242,8 @@ pub struct ViewEventDestination {
 #[derive(Debug, Clone, Copy)]
 pub enum ViewEvent {
     Subscribe,
-    PreComposition,
+    PreLayoutSizing,
+    PreComposition, // same as PostLayoutSizing,
     PostComposition,
     OffsetsChange { start_offset: u64, end_offset: u64 }, // ContentChanged
     Enter,
