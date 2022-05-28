@@ -4,6 +4,8 @@
 
 ---
 
+![Alt text](/res/img/unlimited-screenshot.png "screenshot")
+
 ### Features
 
 - [x] basic utf-8 support
