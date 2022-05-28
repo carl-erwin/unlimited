@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::rc::Rc;
 
 use super::Mode;
 
@@ -149,7 +150,7 @@ impl<'a> Mode for SimpleViewMode {
         register_view_subscriber(
             editor,
             env,
-            vscrollbar_mode.clone(),
+            Rc::clone(&vscrollbar_mode),
             text_view_src, // publisher
             scrollbar_dst, // subscriber
         );
@@ -163,7 +164,7 @@ impl<'a> Mode for SimpleViewMode {
         register_view_subscriber(
             editor,
             env,
-            line_number_mode.clone(),
+            Rc::clone(&line_number_mode),
             text_view_src,   // publisher
             line_number_dst, // subscriber
         );
