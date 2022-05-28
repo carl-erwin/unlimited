@@ -1357,13 +1357,13 @@ pub fn find_nth_byte_offset(doc: &Document, byte: u8, index: u64) -> Option<u64>
                 if *b == byte {
                     index -= 1;
                     if index == 0 {
-                        break;
-                    };
+                        return Some(global_offset);
+                    }
                 }
                 global_offset += 1;
             }
 
-            return Some(global_offset);
+            return None;
         }
 
         let count = file.pool[idx].byte_count[byte as usize];
