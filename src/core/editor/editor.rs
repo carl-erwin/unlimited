@@ -149,7 +149,7 @@ pub type RenderStageFunction = fn(
     editor: &mut Editor,
     env: &mut EditorEnv,
     view: &View,
-    env: &mut LayoutEnv,
+    layout_env: &mut LayoutEnv,
     input: &Vec<FilterIo>,
     output: &mut Vec<FilterIo>,
 );

@@ -275,8 +275,8 @@ pub fn save_document(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &
 }
 
 // NB:
-//     a  Vertical split   <-> LayoutDirection::Horizontal <-> Left-To-Right
-//     an Horizontal split <-> LayoutDirection::Vertical   <-> Top-To-Bottom
+//     a Vertical split   <-> LayoutDirection::Horizontal <-> Left-To-Right
+//     a Horizontal split <-> LayoutDirection::Vertical   <-> Top-To-Bottom
 pub fn split_with_direction(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,

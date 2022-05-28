@@ -1045,7 +1045,7 @@ pub fn get_node_data(file: &mut MappedFile, idx: Option<NodeIndex>) -> Vec<u8> {
     data
 }
 
-// call this on new done
+// call this on new node
 pub fn build_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
     if idx.is_none() {
         return;
@@ -1087,7 +1087,7 @@ pub fn build_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) 
     update_byte_index_hierarchy(&mut file, Some(idx), UpdateHierarchyOp::Add);
 }
 
-// call this on new done
+// call this on new node
 pub fn remove_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
     if idx.is_none() {
         return;
@@ -1107,7 +1107,7 @@ pub fn remove_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>)
     node.indexed = false;
 }
 
-// call this on new done
+// call this on new node
 pub fn update_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) {
     if idx.is_none() {
         return;
