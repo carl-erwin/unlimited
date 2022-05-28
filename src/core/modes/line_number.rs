@@ -332,7 +332,7 @@ impl<'a> Mode for LineNumberMode {
                 mode_ctx.linenum_vid = dst.id;
             }
 
-            ViewEvent::PreComposition => {
+            ViewEvent::PreLayoutSizing => {
                 if src_view.id == dst.id {
                     return;
                 }
