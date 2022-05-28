@@ -222,6 +222,55 @@ pub fn run_compositing_stage(
     }
 }
 
+fn notify_children(
+    editor: &mut Editor<'static>,
+    editor_env: &mut EditorEnv<'static>,
+    parent_view: &mut View<'static>,
+    all_children: &[view::ChildView],
+    event: ViewEvent,
+) {
+    for child in all_children.iter() {
+        dbg_println!(" notify {:?}", child);
+
+        let child_view_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
+        let subscribers = {
+            let child_v = child_view_rc.read();
+            child_v.subscribers.clone()
+        };
+
+        let mut child_v = child_view_rc.write();
+
+        // NB: notify subscribers just before composition
+        // use View::compose_priority to order notifications
+        // NOTE(ceg): currently we do not have event filters
+
+        for cb in subscribers.iter() {
+            let mode = cb.0.as_ref();
+
+            if cb.1.id == cb.2.id {
+                // ignore self registration
+                continue;
+            }
+
+            dbg_println!(
+                "call mode {} on_view_event : {:?}",
+                mode.borrow().name(),
+                event
+            );
+
+            mode.borrow().on_view_event(
+                editor,
+                editor_env,
+                cb.1,
+                cb.2,
+                &event,
+                &mut child_v,
+                Some(parent_view),
+            );
+        }
+    }
+}
+
 fn compose_children(
     editor: &mut Editor<'static>,
     editor_env: &mut EditorEnv<'static>,
@@ -254,46 +303,15 @@ fn compose_children(
     let mut floating_children = view.floating_children.clone();
     all_children.append(&mut floating_children);
 
-    dbg_println!("COMPOSE checking {:?} children", view.id);
-
-    for child in all_children.iter() {
-        dbg_println!(" check CHILD  {:?}", child);
-
-        let child_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
-        let subscribers = {
-            let child_v = child_rc.read();
-            child_v.subscribers.clone()
-        };
-
-        let mut child_v = child_rc.write();
-
-        //
-        // NB: notify subscribers just before composition
-        // use View::compose_priority to order notifications
-        // NOTE(ceg): currently we do not have event filters
-        if !screen.is_off_screen {
-            for cb in subscribers.iter() {
-                let mode = cb.0.as_ref();
-
-                if cb.1.id == cb.2.id {
-                    // ignore self registration
-                    continue;
-                }
-
-                dbg_println!("call mode {} on_view_event ", mode.borrow().name());
-
-                mode.borrow().on_view_event(
-                    editor,
-                    editor_env,
-                    cb.1,
-                    cb.2,
-                    &ViewEvent::PreComposition,
-                    &mut child_v,
-                    Some(&mut view),
-                );
-            }
-        }
-    }
+    // - notify modes via ViewEvent::PreLayoutSizing
+    //- modes can resize the view, change layout
+    notify_children(
+        editor,
+        editor_env,
+        &mut view,
+        &all_children,
+        ViewEvent::PreLayoutSizing,
+    );
 
     dbg_println!("COMPOSE checking {:?} non floating children", view.id);
 
@@ -317,8 +335,8 @@ fn compose_children(
     }
 
     let mut compose_info = vec![];
-    // - compute position and size
-    // - compose based on sibling dependencies/priority ( non floating children)
+
+    // - compute child local position and size
     {
         let mut x = 0;
         let mut y = 0;
@@ -352,6 +370,7 @@ fn compose_children(
         }
     }
 
+    // - we will compose based on sibling dependencies/priority ( non floating children)
     // - sort views based on depth/priority (children)
     compose_info.sort_by(|idxa, idxb| {
         let vida = idxa.view_id;
@@ -385,7 +404,16 @@ fn compose_children(
         }); // just append no sort
     }
 
-    //
+    // - notify modes via ViewEvent::PreComposition event
+    notify_children(
+        editor,
+        editor_env,
+        &mut view,
+        &all_children,
+        ViewEvent::PreComposition,
+    );
+
+    // - call run_compositing_stage_direct for each child
     for info in &compose_info {
         let (x, y) = (info.x, info.y);
         let (w, h) = (info.w, info.h);
@@ -396,22 +424,21 @@ fn compose_children(
 
         let vid = info.view_id;
 
-        let child_rc = editor.view_map.get(&vid);
-        let child_rc = child_rc.unwrap().clone();
+        let child_view_rc = editor.view_map.get(&vid);
+        let child_view_rc = child_view_rc.unwrap().clone();
 
         let start_offset = {
-            let child_v = child_rc.write();
+            let child_v = child_view_rc.write();
             child_v.start_offset
         };
 
-        //
         {
             let (w, h) = (info.w, info.h);
 
             // alloc new screen or clear ?
             let mut do_clear = true;
             let child_screen = {
-                let mut child_v = child_rc.write();
+                let mut child_v = child_view_rc.write();
                 let dim = {
                     let screen = child_v.screen.read();
                     screen.dimension()
@@ -435,7 +462,7 @@ fn compose_children(
             run_compositing_stage_direct(
                 editor,
                 editor_env,
-                &child_rc,
+                &child_view_rc,
                 start_offset,
                 max_offset,
                 &mut child_screen,
@@ -443,13 +470,12 @@ fn compose_children(
             );
         }
 
-        //
         {
+            // copy child to (parent's) output screen
             let subscribers = {
-                let mut child_v = child_rc.write();
+                let mut child_v = child_view_rc.write();
                 let last_offset = {
                     let child_screen = child_v.screen.as_ref().read();
-                    // composition: copy child to (parent's) output screen
                     screen.copy_screen_at_xy(&child_screen, x, y);
                     child_screen.last_offset
                 };
@@ -464,7 +490,7 @@ fn compose_children(
             //
             // NOTE(ceg): currently we do not have event filters
             if !screen.is_off_screen {
-                let mut child_v = child_rc.write();
+                let mut child_v = child_view_rc.write();
 
                 for cb in subscribers.iter() {
                     let mode = cb.0.as_ref();
