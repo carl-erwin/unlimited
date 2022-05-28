@@ -1172,7 +1172,7 @@ impl<'a> MappedFile<'a> {
         }
 
         dbg_println!("find_reverse --------------");
-
+        dbg_println!("find_reverse min_offset {}", min_offset);
         // TODO(ceg): rd.len() < data.len()
         let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
         loop {
@@ -1181,11 +1181,13 @@ impl<'a> MappedFile<'a> {
                 break;
             }
 
-            dbg_println!("find_reverse: remain {}", remain);
-
             rd_buff.clear();
 
+            dbg_println!("find_reverse: rd_buff.capacity() {}", rd_buff.capacity());
+            dbg_println!("find_reverse: remain {}", remain);
+
             let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
+
             let base_offset = from_offset.saturating_sub(rd_size as u64);
 
             dbg_println!("find_reverse: rd_size {}", rd_size);
@@ -1193,7 +1195,16 @@ impl<'a> MappedFile<'a> {
             dbg_println!("find_reverse: from_offset {}", from_offset);
 
             let mut it = MappedFile::iter_from(&file, base_offset);
-            let _ = MappedFile::read(&mut it, rd_size, &mut rd_buff); // TODO(ceg) io error
+
+            dbg_println!(
+                "find_reverse: try to read {} bytes from base_offset {}",
+                rd_size,
+                base_offset
+            );
+
+            let nread = MappedFile::read(&mut it, rd_size, &mut rd_buff); // TODO(ceg) io error
+
+            dbg_println!("find_reverse: nread  {}", nread);
 
             dbg_println!("find_reverse: rd_buff.len() {}", rd_buff.len());
 

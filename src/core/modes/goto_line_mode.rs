@@ -54,7 +54,6 @@ static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str = r#"
      { "default": [],                   "action": "goto-line-controller:add-char" }
    ]
   }
-
 ]"#;
 
 impl<'a> Mode for GotoLineMode {
@@ -90,7 +89,7 @@ impl<'a> Mode for GotoLineMode {
         }
 
         // add controller
-        create_goto_line_controler_view(editor, env, view);
+        create_goto_line_controller_view(editor, env, view);
     }
 }
 
@@ -139,40 +138,34 @@ pub fn goto_line_start(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    {
-        let status_vid = view::get_status_view(&editor, &env, view);
-
-        if status_vid.is_none() {
-            // TODO(ceg): log missing status mode
-            return;
-        }
-
-        // start/resume ?
-        {
-            let mut v = view.write();
-            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
-            gtm.active = true;
-
-            // attach to status view
-            let controller = editor.view_map.get(&gtm.controller_view_id).unwrap();
-            controller.write().parent_id = Some(status_vid.unwrap());
-
-            v.controller = Some(ControllerView {
-                id: gtm.controller_view_id,
-                mode_name: &"goto-line-mode",
-            })
-        }
-        {
-            let mut v = view.write();
-            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
-            gtm.active = true;
-
-            // set input focus to
-            set_focus_on_vid(&mut editor, &mut env, gtm.controller_view_id);
-        }
+    let status_vid = view::get_status_view(&editor, &env, view);
+    if status_vid.is_none() {
+        // TODO(ceg): log missing status mode / panic!("")
+        return;
     }
 
+    // start/resume ?
+    let controller_id = {
+        let mut v = view.write();
+        let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+        gtm.active = true;
+
+        let id = gtm.controller_view_id;
+
+        // attach to status view
+        let controller = editor.view_map.get(&id).unwrap();
+        controller.write().parent_id = Some(status_vid.unwrap());
+
+        v.controller = Some(ControllerView {
+            id: gtm.controller_view_id,
+            mode_name: &"goto-line-mode",
+        });
+
+        id
+    };
+
     goto_line_show_controller_view(editor, env, view);
+    set_focus_on_vid(&mut editor, &mut env, controller_id);
 }
 
 pub fn goto_line_stop(
@@ -205,44 +198,7 @@ pub fn goto_line_stop(
     }
 }
 
-pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: u64) {
-    let doc = view.read().document().unwrap();
-    let doc = doc.read();
-
-    let max_offset = doc.size();
-
-    let mut v = view.write();
-
-    let offset = if target_line <= 1 {
-        0
-    } else {
-        let line_number = target_line.saturating_sub(1);
-        if let Some(offset) = find_nth_byte_offset(&doc, '\n' as u8, line_number) {
-            offset + 1
-        } else {
-            max_offset as u64
-        }
-    };
-
-    {
-        // if offscreen // user option goto-line-mode:always-center-around-line = true ?
-
-        if !v.screen.read().contains_offset(offset) {
-            v.start_offset = offset;
-        }
-
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-        tm.marks.clear();
-        tm.marks.push(Mark { offset });
-        tm.mark_index = 0;
-
-        tm.pre_compose_action
-            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
-    }
-}
-
-fn create_goto_line_controler_view(
+fn create_goto_line_controller_view(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &mut View,
@@ -529,5 +485,41 @@ pub fn goto_line_controller_stop(
 
         // set input focus to
         set_focus_on_vid(editor, env, text_view_id);
+    }
+}
+
+pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: u64) {
+    let doc = view.read().document().unwrap();
+    let doc = doc.read();
+
+    let max_offset = doc.size();
+
+    let mut v = view.write();
+
+    let offset = if target_line <= 1 {
+        0
+    } else {
+        let line_number = target_line.saturating_sub(1);
+        if let Some(offset) = find_nth_byte_offset(&doc, '\n' as u8, line_number) {
+            offset + 1
+        } else {
+            max_offset as u64
+        }
+    };
+
+    {
+        // if offscreen // user option goto-line-mode:always-center-around-line = true ?
+        if !v.screen.read().contains_offset(offset) {
+            v.start_offset = offset;
+        }
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        tm.marks.clear();
+        tm.marks.push(Mark { offset });
+        tm.mark_index = 0;
+
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
     }
 }
