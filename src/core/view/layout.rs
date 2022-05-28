@@ -349,6 +349,12 @@ fn compose_children(
                 (sizes[idx], height)
             };
 
+            // update global position
+            if let (Some(g_x), Some(g_y)) = (view.global_x, view.global_y) {
+                child_v.global_x = Some(g_x + x);
+                child_v.global_y = Some(g_y + y);
+            };
+
             child_v.x = x;
             child_v.y = y;
             child_v.width = w;

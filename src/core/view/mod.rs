@@ -340,9 +340,13 @@ pub struct View<'a> {
     pub input_ctx: InputContext,
 
     // layout
-    //
+    // position in root view
+    pub global_x: Option<usize>,
+    pub global_y: Option<usize>,
+    // position in parent
     pub x: usize,
     pub y: usize,
+    // dimension in parent
     pub width: usize,
     pub height: usize,
 
@@ -508,6 +512,8 @@ impl<'a> View<'a> {
             modes: modes.clone(),     // use this to clone the view
             mode_ctx,
             //
+            global_x: None,
+            global_y: None,
             x: x_y.0,
             y: x_y.1,
             width: w_h.0,
@@ -646,7 +652,12 @@ pub fn compute_root_view_layout(
     view: &Rc<RwLock<View<'static>>>,
 ) -> Option<()> {
     let (dimension, start_offset, max_offset) = {
-        let v = view.read();
+        let mut v = view.write();
+
+        // root view always at (0, 0)
+        v.global_x = Some(0);
+        v.global_y = Some(0);
+
         let doc = v.document()?;
         let max_offset = { doc.read().size() as u64 };
         let dimension = v.screen.read().dimension();
