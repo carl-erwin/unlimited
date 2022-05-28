@@ -1607,4 +1607,73 @@ mod tests {
             println!("doc.size = {}", doc.size());
         }
     }
+
+    #[test]
+    fn test_doc_save() {
+        use super::*;
+
+        use std::fs;
+        use std::fs::File;
+
+        let max_size = 4096 * 2;
+
+        for test_size in 0..=max_size {
+            println!("checking test_size {}", test_size);
+
+            let max_insert_size = 256;
+            for insert_size in 0..=max_insert_size {
+                println!("checking insert_size {}", insert_size);
+
+                let max_insert_offset = std::cmp::min::<u64>(500, max_insert_size as u64);
+
+                for insert_offset in 0..=max_insert_offset {
+                    let filename = "/tmp/playground_save_test";
+                    let _ = fs::remove_file(filename);
+                    let filename = filename.to_owned();
+                    let mut file = File::create(&filename).unwrap();
+
+                    // fill file
+                    let mut slc = Vec::with_capacity(test_size);
+                    for _ in 0..test_size {
+                        slc.push(b'x');
+                    }
+
+                    // write to disk
+                    file.write_all(&slc).unwrap();
+                    file.sync_all().unwrap();
+                    drop(slc);
+
+                    let doc = DocumentBuilder::new()
+                        .file_name(&filename)
+                        .document_name("untitled-1")
+                        .internal(false)
+                        .finalize();
+
+                    let expected_size = {
+                        let mut data = vec![];
+                        for _ in 0..insert_size {
+                            data.push(b'x');
+                        }
+
+                        let mut doc = doc.as_ref().unwrap().write();
+                        let doc_size = doc.size();
+
+                        doc.insert(insert_offset, data.len(), data.as_ref());
+                        doc_size + data.len()
+                    };
+
+                    let doc = doc.as_ref().unwrap();
+                    sync_to_storage(&doc);
+
+                    // check on disk size
+                    match std::fs::metadata(filename) {
+                        Err(e) => panic!("{}", e.to_string()),
+                        Ok(m) => {
+                            assert_eq!(m.len(), expected_size as u64);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
