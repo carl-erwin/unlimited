@@ -198,7 +198,7 @@ impl Node {
             let n = std::cmp::min(size, p.len() - pos);
             assert!(n > 0);
             unsafe {
-                ptr::copy(p.as_ptr(), out.as_mut_ptr(), n);
+                ptr::copy(p.as_ptr().offset(pos as isize), out.as_mut_ptr(), n);
             }
             return Some(n);
         }
