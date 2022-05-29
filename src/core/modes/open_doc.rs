@@ -9,12 +9,20 @@ use std::rc::Rc;
 
 use super::Mode;
 
+use super::text_mode::TextModeContext;
+
+use super::text_mode::PostInputAction;
+
+use crate::core::document::get_document_byte_count;
+
+use crate::core::document::DocumentBuilder;
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
+use crate::core::editor::set_focus_on_vid;
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
-
-use crate::core::editor::set_focus_on_vid;
 
 use crate::core::event::*;
 
@@ -24,14 +32,11 @@ use crate::core::view;
 use crate::core::view::ChildView;
 use crate::core::view::View;
 
-use crate::core::view::LayoutOperation;
-use crate::core::view::ViewEvent;
-use crate::core::view::ViewEventDestination;
-use crate::core::view::ViewEventSource;
-
 use crate::core::view::ControllerView;
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutOperation;
 
-use crate::core::document::DocumentBuilder;
+use crate::core::editor;
 
 static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
@@ -42,12 +47,13 @@ static OPEN_DOC_TRIGGER_MAP: &str = r#"
   }
 ]"#;
 
-static OPEN_DOC_INTERACTIVE_MAP: &str = r#"
+static OPEN_DOC_CONTROLLER_MAP: &str = r#"
 [
   {
     "events": [
      { "in": [{ "key": "Escape" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "\n" } ],        "action": "open-doc:stop" },
+     { "in": [{ "key": "ctrl+g" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
      { "default": [],                   "action": "open-doc:add-char" }
@@ -75,94 +81,67 @@ impl<'a> Mode for OpenDocMode {
 
     fn configure_view(
         &mut self,
-        _editor: &mut Editor<'static>,
-        _env: &mut EditorEnv<'static>,
+        editor: &mut Editor<'static>,
+        env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
         dbg_println!("configure find  {:?}", view.id);
 
         // setup input map for core actions
-        let input_map = build_input_event_map(OPEN_DOC_TRIGGER_MAP).unwrap();
-        let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push((self.name(), input_map));
-    }
-
-    fn on_view_event(
-        &self,
-        editor: &mut Editor<'static>,
-        env: &mut EditorEnv<'static>,
-        _src: ViewEventSource,
-        _dst: ViewEventDestination,
-        event: &ViewEvent,
-        src_view: &mut View<'static>,
-        _parent: Option<&mut View<'static>>,
-    ) {
-        if env.status_view_id.is_none() {
-            dbg_println!("open-doc-mode env.status_view_id.is_none()");
-            return;
+        {
+            let input_map = build_input_event_map(OPEN_DOC_TRIGGER_MAP).unwrap();
+            let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push((self.name(), input_map));
         }
 
-        let src_view_id = src_view.id;
-        let svid = env.status_view_id.clone().unwrap();
-        dbg_println!("open-doc-mode svid = {:?}", svid);
-        match event {
-            &ViewEvent::ViewDeselected => {
-                let mut odm = src_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-                dbg_println!("open-doc-mode odm.active = {}", odm.active);
-                if odm.active {
-                    let status_view = editor.view_map.get(&svid).unwrap();
-                    let mut status_view = status_view.write();
-                    match &mut status_view.controller {
-                        Some(ControllerView { id, mode_name }) => {
-                            if *id == src_view_id && *mode_name == "open-doc-mode" {
-                                clear_status_view(&mut status_view, &mut odm);
-                            }
-                        }
+        // add controller view
+        create_open_doc_controller_view(editor, env, view);
 
-                        _ => {}
-                    }
-                }
-            }
-
-            &ViewEvent::ViewSelected => {
-                let src_view_id = src_view.id;
-                let mut odm = src_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-                dbg_println!("open-doc-mode odm.active = {}", odm.active);
-                if odm.active {
-                    let status_view = editor.view_map.get(&svid).unwrap();
-                    let mut status_view = status_view.write();
-
-                    status_view.controller = Some(view::ControllerView {
-                        id: src_view_id,
-                        mode_name: &"open-doc-mode",
-                    });
-                    update_status_view(&mut status_view, &mut odm);
-                }
-            }
-
-            _ => {}
-        }
+        // add completion view
+        create_open_doc_completion_view(editor, env, view);
     }
 }
 
 pub struct OpenDocModeContext {
+    pub revision: usize,
+    pub controller_view_id: view::Id,
+    pub open_doc_completion_vid: view::Id,
     pub active: bool,
     pub open_doc_str: Vec<char>,
     pub completion_str: String,
     pub current_dir: String,
     pub current_entry: String,
+    pub completion_list: Vec<String>,
+    pub completion_index: usize,
 }
 
 impl OpenDocModeContext {
     pub fn new() -> Self {
         dbg_println!("OpenDocModeContext");
         OpenDocModeContext {
+            revision: 0,
+            controller_view_id: view::Id(0),
+            open_doc_completion_vid: view::Id(0),
             active: false,
             open_doc_str: Vec::new(),
             completion_str: String::new(),
             current_dir: String::new(),
             current_entry: String::new(),
+            completion_list: vec![],
+            completion_index: 0,
         }
+    }
+    pub fn reset(&mut self) -> &mut Self {
+        self.revision = 0;
+        self.active = false;
+        self.open_doc_str.clear();
+        self.completion_str.clear();
+        self.current_dir.clear();
+        self.current_entry.clear();
+        self.completion_list = vec![];
+        self.completion_index = 0;
+
+        self
     }
 }
 pub struct OpenDocMode {
@@ -177,9 +156,6 @@ impl OpenDocMode {
 
     pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
         register_input_stage_action(&mut map, "open-doc:start", open_doc_start);
-        register_input_stage_action(&mut map, "open-doc:stop", open_doc_stop);
-        register_input_stage_action(&mut map, "open-doc:add-char", open_doc_add_char);
-        register_input_stage_action(&mut map, "open-doc:del-char", open_doc_del_char);
     }
 }
 
@@ -190,103 +166,213 @@ pub fn open_doc_start(
 ) {
     {
         let status_vid = view::get_status_view(&editor, &env, view);
-
         if status_vid.is_none() {
             // TODO(ceg): log missing status mode
             return;
         }
 
-        let svid = status_vid.unwrap();
-
-        let status_view = editor.view_map.get(&svid).unwrap();
-
         // start/resume ?
-        let already_active = {
+        let controller_id = {
             let mut v = view.write();
             let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-            let already_active = odm.active;
             odm.active = true;
 
-            status_view.write().controller = Some(view::ControllerView {
-                id: v.id,
+            let id = odm.controller_view_id;
+
+            // attach to status view
+            let controller = editor.view_map.get(&id).unwrap();
+            controller.write().parent_id = Some(status_vid.unwrap());
+
+            v.controller = Some(ControllerView {
+                id: odm.controller_view_id,
                 mode_name: &"open-doc-mode",
             });
-            already_active
+
+            id
         };
 
-        //
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
-
-        // clear status view
-        doc.delete_content(None);
-
-        // setup working directory
-        {
-            let mut v = view.write();
-            let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-
-            if odm.open_doc_str.is_empty() {
-                let path = env::current_dir().unwrap();
-                let s = path.to_str().unwrap();
-                let s = s.to_owned();
-                for c in s.chars() {
-                    odm.open_doc_str.push(c);
-                }
-                odm.open_doc_str.push('/');
-            }
-        }
-
-        if !already_active {
-            // setup new input map
-            let mut v = view.write();
-            v.input_ctx.stack_pos = None;
-            let input_map = build_input_event_map(OPEN_DOC_INTERACTIVE_MAP).unwrap();
-            let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-            input_map_stack.push(("open-doc-mode", input_map));
-        }
+        open_doc_show_controller_view(editor, env, view);
+        set_focus_on_vid(editor, env, controller_id);
     }
-
-    display_open_doc_string(editor, env, &view);
 }
 
-pub fn open_doc_stop(
+pub fn open_doc_controller_stop(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    // destroy previous popup
-    destroy_completion_popup(editor, env, view);
-
-    //
     {
-        let v = view.write();
-        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.pop();
+        let status_vid = env.status_view_id.unwrap();
+        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+        status_view.layout_direction = LayoutDirection::Horizontal;
+        status_view.children.pop(); // discard child
+    }
+    {
+        let root_vid = env.root_view_id;
+        let mut root_view = editor.view_map.get(&root_vid).unwrap().write();
+        root_view.floating_children.pop(); // discard child
     }
 
-    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_vid = view::get_status_view(&editor, &env, view);
-    if let Some(status_vid) = status_vid {
-        let status_view = editor.view_map.get(&status_vid).unwrap();
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
-        // clear buffer
-        let sz = doc.size();
-        doc.remove(0, sz, None);
-
+    let v = view.read();
+    if let Some(text_view_id) = v.controlled_view {
         {
-            let mut v = view.write();
-            let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            text_view.controller = None;
 
-            // odm.reset();
-            odm.open_doc_str.clear();
-            odm.active = false;
+            let otm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+            otm.reset();
+
+            //
+            let doc = v.document().unwrap();
+            let mut doc = doc.write();
+            doc.delete_content(None);
         }
+
+        // set input focus to
+        set_focus_on_vid(editor, env, text_view_id);
     }
 }
 
-pub fn open_doc_add_char(
+fn create_open_doc_controller_view(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &mut View,
+) {
+    // get status vid -> status_vid
+
+    // (w,h) = status_vid.dimension()
+    let (x, y) = (0, 0);
+    let (w, h) = (1, 1);
+
+    let doc = DocumentBuilder::new()
+        .document_name("goto-controller")
+        .internal(true)
+        .use_buffer_log(false)
+        .finalize();
+
+    // create view at mode creation
+    let mut controller_view = View::new(
+        &mut editor,
+        &mut env,
+        None,
+        (x, y),
+        (w, h),
+        doc,
+        &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
+        0,
+    );
+
+    controller_view.ignore_focus = false;
+
+    controller_view.controlled_view = Some(view.id);
+
+    // set controller target as view.id
+    let mut odm = view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+    odm.controller_view_id = controller_view.id;
+
+    dbg_println!("odm.controller_view_id = {:?}", odm.controller_view_id);
+
+    // setup new input map
+    {
+        controller_view.input_ctx.stack_pos = None;
+
+        {
+            let event_map = build_input_event_map(OPEN_DOC_CONTROLLER_MAP).unwrap();
+            let mut input_map_stack = controller_view.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push(("open-doc-controller", event_map));
+        }
+
+        let mut action_map = InputStageActionMap::new();
+
+        register_input_stage_action(&mut action_map, "open-doc:stop", open_doc_controller_stop);
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:add-char",
+            open_doc_controller_add_char,
+        );
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:del-char",
+            open_doc_controller_del_char,
+        );
+
+        controller_view.register_action_map(action_map);
+    }
+
+    editor.add_view(controller_view.id, controller_view);
+}
+
+fn open_doc_show_controller_view(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    text_view: &Rc<RwLock<View<'static>>>,
+) {
+    let ctrl_vid = {
+        let status_vid = env.status_view_id.unwrap();
+
+        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+        status_view.layout_direction = LayoutDirection::Horizontal;
+
+        let mut text_view = text_view.write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+        let ctrl_vid = odm.controller_view_id;
+        status_view.children.pop(); // replace previous child
+        status_view.children.push(ChildView {
+            id: ctrl_vid,
+            layout_op: LayoutOperation::Percent { p: 100.0 },
+        });
+
+        ctrl_vid
+    };
+
+    //
+    let controller_view = get_view_by_id(editor, ctrl_vid);
+    let mut controller_view = controller_view.write();
+
+    let mut text_view = text_view.write();
+    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
+}
+
+fn open_doc_display_path(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    controller_view: &mut View<'static>,
+    text_view: &mut View<'static>,
+) {
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+    let doc = controller_view.document().clone();
+    let mut doc = doc.as_ref().unwrap().write();
+
+    doc.delete_content(None);
+    doc.append("Open: ".as_bytes());
+
+    // setup working directory
+    {
+        if odm.open_doc_str.is_empty() {
+            let path = env::current_dir().unwrap();
+            let s = path.to_str().unwrap();
+            let s = s.to_owned();
+            for c in s.chars() {
+                odm.open_doc_str.push(c);
+            }
+            odm.open_doc_str.push('/');
+        }
+
+        let s: String = odm.open_doc_str.iter().collect();
+        doc.append(s.as_bytes());
+    }
+}
+
+fn create_open_doc_completion_view(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &mut View,
+) {
+}
+
+pub fn open_doc_controller_add_char(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
@@ -332,71 +418,41 @@ pub fn open_doc_add_char(
 
     if do_completion {
         open_doc_do_completion(editor, env, view);
-    } else {
-        let mut v = view.write();
-        let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-        odm.open_doc_str.append(&mut array);
-        dbg_println!("open file : {:?}", odm.open_doc_str);
     }
 
-    display_open_doc_string(&mut editor, &mut env, &view);
+    let mut controller_view = view.write();
+    let text_view_vid = controller_view.controlled_view.unwrap();
+    let text_view = editor.view_map.get(&text_view_vid).unwrap().clone();
+    let mut text_view = text_view.write();
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+    odm.open_doc_str.append(&mut array);
+    dbg_println!("open file : {:?}", odm.open_doc_str);
+
+    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
 }
 
-pub fn open_doc_del_char(
+pub fn open_doc_controller_del_char(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let mut v = view.write();
-        let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+        let v = view.read();
+        let text_view_vid = v.controlled_view.unwrap();
+        let mut text_view = editor.view_map.get(&text_view_vid).unwrap().write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
         if odm.open_doc_str.is_empty() {
             return;
         }
         odm.open_doc_str.pop();
     }
 
-    display_open_doc_string(&mut editor, &mut env, &view);
-}
+    let mut controller_view = view.write();
+    let text_view_vid = controller_view.controlled_view.unwrap();
+    let text_view = editor.view_map.get(&text_view_vid).unwrap().clone();
+    let mut text_view = text_view.write();
 
-fn clear_status_view(status_view: &mut View, _fm: &mut OpenDocModeContext) {
-    // clear status
-    let doc = status_view.document().unwrap();
-    let mut doc = doc.write();
-    // clear buffer. doc.erase_all();
-    doc.delete_content(None);
-}
-
-pub fn display_open_doc_string(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View<'static>>>,
-) {
-    //
-    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_vid = view::get_status_view(&editor, &env, view);
-
-    if let Some(status_vid) = status_vid {
-        let mut v = view.write();
-        let mut odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-
-        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
-        update_status_view(&mut status_view, &mut odm);
-    }
-}
-
-fn update_status_view(status_view: &mut View, odm: &mut OpenDocModeContext) {
-    let doc = status_view.document().unwrap();
-    let mut doc = doc.write();
-
-    doc.delete_content(None);
-    doc.append("Open: ".as_bytes());
-
-    if !odm.open_doc_str.is_empty() {
-        let s: String = odm.open_doc_str.iter().collect();
-        let d = &s.as_bytes();
-        doc.append(d);
-    }
+    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
 }
 
 pub fn open_doc_do_completion(
@@ -405,8 +461,10 @@ pub fn open_doc_do_completion(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let show = {
-        let mut v = view.write();
-        let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+        let v = view.read();
+        let text_view_vid = v.controlled_view.unwrap();
+        let mut text_view = editor.view_map.get(&text_view_vid).unwrap().write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
         dbg_println!("open file : do completion");
 
@@ -421,8 +479,8 @@ pub fn open_doc_do_completion(
             Ok(path) => {
                 for e in path {
                     let s = format!("{}\n", e.unwrap().path().display());
+                    odm.completion_list.push(s.clone());
                     odm.completion_str.push_str(&s);
-
                     dbg_println!("open file: dir entry : '{}'", s);
                 }
             }
@@ -451,14 +509,14 @@ pub fn open_doc_do_completion(
 
         set_focus_on_vid(editor, env, id);
     } else {
-        destroy_completion_popup(editor, env, view);
+        // hide_completion_popup(editor, env, view);
     }
 }
 
 fn show_completion_popup(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    text_view: &Rc<RwLock<View<'static>>>,
+    control_view: &Rc<RwLock<View<'static>>>,
 ) {
     let parent_id = env.root_view_id;
 
@@ -469,18 +527,25 @@ fn show_completion_popup(
         .finalize();
 
     {
-        let s = text_view
-            .read()
+        let v = control_view.read();
+        let text_view_vid = v.controlled_view.unwrap();
+        let text_view = editor.view_map.get(&text_view_vid).unwrap().read();
+        let list = text_view
             .mode_ctx::<OpenDocModeContext>("open-doc-mode")
-            .completion_str
+            .completion_list
             .clone();
 
         let mut d = command_doc.as_ref().unwrap().write();
-        d.append(s.as_bytes());
+
+        for s in &list {
+            d.append(s.as_bytes());
+        }
     }
 
     let (st_gx, st_gy, st_w, st_h) = {
-        let status_vid = view::get_status_view(&editor, &env, text_view);
+        let text_view_vid = control_view.read().controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_vid);
+        let status_vid = view::get_status_view(&editor, &env, &text_view);
         if let Some(status_vid) = status_vid {
             let status_view = editor.view_map.get(&status_vid).unwrap().read();
             (
@@ -521,7 +586,7 @@ fn show_completion_popup(
         0,
     );
 
-    popup_view.ignore_focus = false;
+    popup_view.ignore_focus = true;
 
     {
         let mut parent_view = editor.view_map.get(&parent_id).unwrap().write();
@@ -532,19 +597,4 @@ fn show_completion_popup(
     }
 
     editor.add_view(popup_view.id, popup_view);
-}
-
-fn destroy_completion_popup(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
-    _view: &Rc<RwLock<View<'static>>>,
-) {
-    // destroy previous popup
-    let parent_id = env.root_view_id;
-    if let Some(info) = {
-        let mut p_view = editor.view_map.get(&parent_id).unwrap().write();
-        p_view.floating_children.pop()
-    } {
-        editor.view_map.remove(&info.id);
-    }
 }

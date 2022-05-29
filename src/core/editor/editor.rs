@@ -252,6 +252,11 @@ impl<'a> Editor<'a> {
     }
 }
 
+// move to editor::
+pub fn get_view_by_id(editor: &mut Editor<'static>, vid: view::Id) -> Rc<RwLock<View<'static>>> {
+    editor.view_map.get(&vid).unwrap().clone()
+}
+
 //////////////////////////////////////////////
 
 // TODO(ceg): handle conflicting bindings
