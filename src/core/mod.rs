@@ -583,7 +583,7 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
 
         // top level views
         editor.root_views.push(view.id);
-        editor.add_view(view.id, Rc::new(RwLock::new(view)));
+        editor.add_view(view.id, view);
     }
 
     // index documents

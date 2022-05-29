@@ -247,8 +247,8 @@ impl<'a> Editor<'a> {
     }
 
     // insert view into editor global map, no checks
-    pub fn add_view(&mut self, id: view::Id, view: Rc<RwLock<View<'a>>>) {
-        self.view_map.insert(id, Rc::clone(&view)); // move to View::new ?
+    pub fn add_view(&mut self, id: view::Id, view: View<'a>) {
+        self.view_map.insert(id, Rc::new(RwLock::new(view))); // move to View::new ?
     }
 }
 

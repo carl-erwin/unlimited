@@ -273,7 +273,7 @@ fn create_goto_line_controller_view(
         controller_view.register_action_map(action_map);
     }
 
-    editor.add_view(controller_view.id, Rc::new(RwLock::new(controller_view)));
+    editor.add_view(controller_view.id, controller_view);
 }
 
 fn goto_line_show_controller_view(

@@ -605,7 +605,7 @@ pub fn split_view_with_direction(
     new_parent.layout_index = split_info.layout_index;
     let new_parent_id = new_parent.id;
     // insert new_parent into editor global map
-    editor.add_view(new_parent_id, Rc::new(RwLock::new(new_parent)));
+    editor.add_view(new_parent_id, new_parent);
 
     dbg_println!("new parent = {:?}", new_parent_id);
 
@@ -639,7 +639,7 @@ pub fn split_view_with_direction(
         );
 
         let splitter_id = splitter.id;
-        editor.add_view(splitter_id, Rc::new(RwLock::new(splitter)));
+        editor.add_view(splitter_id, splitter);
 
         dbg_println!("splitter_id = {:?}", splitter_id);
 
@@ -659,7 +659,7 @@ pub fn split_view_with_direction(
             0,
         );
         let view_clone_id = view_clone.id;
-        editor.add_view(view_clone_id, Rc::new(RwLock::new(view_clone)));
+        editor.add_view(view_clone_id, view_clone);
 
         dbg_println!("view_clone_id = {:?}", view_clone_id);
 
@@ -1190,7 +1190,7 @@ pub fn help_popup(
         });
     }
 
-    editor.add_view(p_view.id, Rc::new(RwLock::new(p_view)));
+    editor.add_view(p_view.id, p_view);
 
     /*
     TODO(ceg): update view x, y

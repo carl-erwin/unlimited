@@ -531,7 +531,7 @@ fn show_completion_popup(
         });
     }
 
-    editor.add_view(popup_view.id, Rc::new(RwLock::new(popup_view)));
+    editor.add_view(popup_view.id, popup_view);
 }
 
 fn destroy_completion_popup(
