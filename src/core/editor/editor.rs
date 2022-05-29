@@ -1090,7 +1090,7 @@ fn setup_focus_and_event(
     vid
 }
 
-fn check_hover_change(
+fn check_pointer_over_change(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     prev_vid: view::Id,
@@ -1100,7 +1100,7 @@ fn check_hover_change(
         return;
     }
 
-    dbg_println!("hover changed {:?} -> {:?}", prev_vid, new_vid);
+    dbg_println!("pointer_over changed {:?} -> {:?}", prev_vid, new_vid);
 
     {
         if let Some(prev_v) = editor.view_map.get(&prev_vid) {
@@ -1153,7 +1153,7 @@ fn check_hover_change(
         }
     }
 
-    env.hover_on = new_vid;
+    env.pointer_over_on = new_vid;
 }
 
 fn check_selection_change(
@@ -1268,7 +1268,7 @@ fn run_input_stage(
 
         let prev_active_view = env.active_view;
 
-        let hover_vid = env.hover_on;
+        let pointer_over_vid = env.pointer_over_on;
         let last_selected = env.last_selected;
 
         let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
@@ -1276,12 +1276,12 @@ fn run_input_stage(
 
         dbg_println!("CEG : after setup_focus_and_event ->  env {:?}", env);
 
-        check_hover_change(&mut editor, &mut env, hover_vid, target_id);
+        check_pointer_over_change(&mut editor, &mut env, pointer_over_vid, target_id);
 
         let new_clicked = env.last_selected;
         check_selection_change(&mut editor, &mut env, last_selected, new_clicked);
 
-        dbg_println!("hover_vid {:?}", hover_vid);
+        dbg_println!("pointer_over_vid {:?}", pointer_over_vid);
         dbg_println!("new_clicked {:?}", new_clicked);
 
         run_stages(Stage::Input, &mut editor, &mut env, target_id);

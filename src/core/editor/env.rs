@@ -101,7 +101,7 @@ pub struct EditorEnv<'a> {
     //
     pub active_view: Option<view::Id>,
 
-    pub hover_on: view::Id,
+    pub pointer_over_on: view::Id,
     pub last_selected: view::Id,
 
     pub focus_locked_on: Option<view::Id>,
@@ -150,7 +150,7 @@ impl<'a> EditorEnv<'a> {
             center_offset: None,
             skip_compositing: false,
             active_view: None,
-            hover_on: view::Id(0),
+            pointer_over_on: view::Id(0),
             last_selected: view::Id(0),
             focus_locked_on: None,
             status_view_id: None,

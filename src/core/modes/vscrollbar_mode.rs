@@ -361,7 +361,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
 
         // TextStyle::scrollbar_non_selected_color();
         // TextStyle::scrollbar_selected_color();
-        // TextStyle::scrollbar_hover_color();
+        // TextStyle::scrollbar_pointer_over_color();
 
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
