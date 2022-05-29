@@ -14,6 +14,8 @@ use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
+use crate::core::editor::set_focus_on_vid;
+
 use crate::core::event::*;
 
 use crate::core::event::input_map::build_input_event_map;
@@ -438,6 +440,16 @@ pub fn open_doc_do_completion(
     dbg_println!("show = {}", show);
     if show {
         show_completion_popup(editor, env, view);
+
+        // set input focus to
+        // destroy previous popup
+        let id = {
+            let parent_id = env.root_view_id;
+            let p_view = editor.view_map.get(&parent_id).unwrap().read();
+            p_view.floating_children[0].id
+        };
+
+        set_focus_on_vid(editor, env, id);
     } else {
         destroy_completion_popup(editor, env, view);
     }
@@ -446,7 +458,7 @@ pub fn open_doc_do_completion(
 fn show_completion_popup(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    text_view: &Rc<RwLock<View>>,
+    text_view: &Rc<RwLock<View<'static>>>,
 ) {
     let parent_id = env.root_view_id;
 
@@ -467,25 +479,49 @@ fn show_completion_popup(
         d.append(s.as_bytes());
     }
 
+    let (st_gx, st_gy, st_w, st_h) = {
+        let status_vid = view::get_status_view(&editor, &env, text_view);
+        if let Some(status_vid) = status_vid {
+            let status_view = editor.view_map.get(&status_vid).unwrap().read();
+            (
+                status_view.global_x.unwrap(),
+                status_view.global_y.unwrap(),
+                status_view.width,
+                status_view.height,
+            )
+        } else {
+            return;
+        }
+    };
+
     // TODO: get view global coordinates, update on  resize
     let (x, y, pop_width, pop_height) = {
         let parent_view = editor.view_map.get(&parent_id).unwrap().read();
         let dim = parent_view.dimension();
 
-        (8, 2, dim.0.saturating_sub(16), dim.1.saturating_sub(4))
+        let w = dim.0;
+        let h = std::cmp::min(8, dim.1 / 2);
+        let x = st_gx;
+        let y = st_gy.saturating_sub(h);
+        (x, y, w, h)
     };
 
+    ////////////////////////////
+    let modes = vec!["text-mode".to_owned()];
+
     // create view
-    let popup_view = View::new(
+    let mut popup_view = View::new(
         &mut editor,
         &mut env,
         Some(parent_id),
         (x, y),
         (pop_width, pop_height),
         command_doc,
-        &vec!["status-mode".to_owned()],
+        &modes,
         0,
     );
+
+    popup_view.ignore_focus = false;
 
     {
         let mut parent_view = editor.view_map.get(&parent_id).unwrap().write();
