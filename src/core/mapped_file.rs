@@ -1122,20 +1122,20 @@ impl<'a> MappedFile<'a> {
         let mut remain = max_offset - from_offset;
 
         // TODO(ceg): rd.len() < data.len()
-        let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
+        let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
 
         while remain > 0 {
-            rd_buff.clear();
+            chunk.clear();
 
-            let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
-            let n_read = MappedFile::read(&mut it, rd_size, &mut rd_buff);
+            let rd_size = std::cmp::min(chunk.capacity(), remain as usize);
+            let n_read = MappedFile::read(&mut it, rd_size, &mut chunk);
             if n_read == 0 {
                 // end of range
                 break;
             }
 
             // look in block
-            let found = MappedFile::find_in_vec(&rd_buff, &data);
+            let found = MappedFile::find_in_vec(&chunk, &data);
             if let Some(found) = found {
                 return Some(cur_offset + found as u64);
             }
@@ -1148,104 +1148,62 @@ impl<'a> MappedFile<'a> {
         None
     }
 
+    fn find_reverse_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
+        'outer: for (d_pos, b) in v.iter().enumerate().rev() {
+            if *b == data[0] && d_pos + data.len() < v.len() {
+                // let matching = v.iter().skip(d_pos).zip(data).filter(|&(a, b)| a == b).count();
+                // if matching == data.len() {
+                //     return Some(d_pos);
+                // }
+
+                for i in 0..data.len() {
+                    if data[i] != v[d_pos + i] {
+                        continue 'outer;
+                    }
+                }
+                return Some(d_pos);
+            }
+        }
+        None
+    }
+
     pub fn find_reverse(
         file: &FileHandle<'a>,
         data: &[u8],
-        from_offset: u64,
+        mut from_offset: u64,
         to_offset: Option<u64>,
     ) -> Option<u64> {
-        if data.is_empty() {
+        if data.is_empty() || from_offset == 0 {
             return None;
         }
 
-        if from_offset == 0 {
+        let min_offset = to_offset.unwrap_or(0);
+        if min_offset >= from_offset {
             return None;
         }
 
-        let mut from_offset = from_offset;
-        let mut min_offset = 0;
-        if let Some(to_offset) = to_offset {
-            if to_offset >= from_offset {
-                return None;
-            }
-            min_offset = to_offset;
-        }
-
-        dbg_println!("find_reverse --------------");
-        dbg_println!("find_reverse min_offset {}", min_offset);
-        // TODO(ceg): rd.len() < data.len()
-        let mut rd_buff: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
+        let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
         loop {
             let remain = from_offset.saturating_sub(min_offset);
             if remain == 0 {
                 break;
             }
 
-            rd_buff.clear();
-
-            dbg_println!("find_reverse: rd_buff.capacity() {}", rd_buff.capacity());
-            dbg_println!("find_reverse: remain {}", remain);
-
-            let rd_size = std::cmp::min(rd_buff.capacity(), remain as usize);
-
+            chunk.clear();
+            let rd_size = std::cmp::min(chunk.capacity() + data.len(), remain as usize);
             let base_offset = from_offset.saturating_sub(rd_size as u64);
 
-            dbg_println!("find_reverse: rd_size {}", rd_size);
-            dbg_println!("find_reverse: base_offset {}", base_offset);
-            dbg_println!("find_reverse: from_offset {}", from_offset);
-
             let mut it = MappedFile::iter_from(&file, base_offset);
+            let _n_read = MappedFile::read(&mut it, rd_size, &mut chunk); // TODO(ceg) io error
 
-            dbg_println!(
-                "find_reverse: try to read {} bytes from base_offset {}",
-                rd_size,
-                base_offset
-            );
-
-            let nread = MappedFile::read(&mut it, rd_size, &mut rd_buff); // TODO(ceg) io error
-
-            dbg_println!("find_reverse: nread  {}", nread);
-
-            dbg_println!("find_reverse: rd_buff.len() {}", rd_buff.len());
-
-            let mut first_byte_offset = None;
-            for (idx, b) in rd_buff.iter().rev().enumerate() {
-                if *b == data[0] {
-                    dbg_println!("find_reverse: found 1st byte at rev index {}", idx);
-
-                    let off = from_offset.saturating_sub((idx + 1) as u64);
-                    first_byte_offset = Some(off);
-                    let mut complete = true;
-                    let start_index = rd_buff.len() - (idx + 1);
-                    dbg_println!("find_reverse: start_index {}", start_index);
-                    for i in 0..data.len() {
-                        dbg_println!(
-                            "find_reverse: cmp  {} <-> {}",
-                            data[i],
-                            rd_buff[start_index + i]
-                        );
-                        if data[i] != rd_buff[start_index + i] {
-                            complete = false;
-                            break;
-                        }
-                    }
-                    dbg_println!("find_reverse: complete {}", complete);
-                    if complete {
-                        let found_off = off;
-                        dbg_println!("find_reverse: found_offset {}", found_off);
-                        return Some(found_off);
-                    }
-                }
-            }
-
-            if let Some(start) = first_byte_offset {
-                from_offset = start.saturating_sub(1);
+            let index = MappedFile::find_reverse_in_vec(&chunk, &data);
+            if let Some(index) = index {
+                return Some(base_offset + index as u64);
             } else {
                 from_offset = base_offset.saturating_sub(1);
             }
         }
 
-        dbg_println!("find_reverse: QUIT");
         None
     }
 
@@ -2498,7 +2456,6 @@ impl<'a> Iterator for MappedFileIterator<'a> {
 }
 
 /// tests
-
 #[cfg(test)]
 mod tests {
 
