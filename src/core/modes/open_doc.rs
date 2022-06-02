@@ -9,12 +9,6 @@ use std::rc::Rc;
 
 use super::Mode;
 
-use super::text_mode::TextModeContext;
-
-use super::text_mode::PostInputAction;
-
-use crate::core::document::get_document_byte_count;
-
 use crate::core::document::DocumentBuilder;
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
@@ -35,8 +29,6 @@ use crate::core::view::View;
 use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
-
-use crate::core::editor;
 
 static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
@@ -304,8 +296,8 @@ fn create_open_doc_controller_view(
 }
 
 fn open_doc_show_controller_view(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
 ) {
     let ctrl_vid = {
@@ -336,8 +328,8 @@ fn open_doc_show_controller_view(
 }
 
 fn open_doc_display_path(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    _editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
     controller_view: &mut View<'static>,
     text_view: &mut View<'static>,
 ) {
@@ -366,15 +358,15 @@ fn open_doc_display_path(
 }
 
 fn create_open_doc_completion_view(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
-    view: &mut View,
+    _editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    _view: &mut View,
 ) {
 }
 
 pub fn open_doc_controller_add_char(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let mut array = vec![];
@@ -432,8 +424,8 @@ pub fn open_doc_controller_add_char(
 }
 
 pub fn open_doc_controller_del_char(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
@@ -542,7 +534,7 @@ fn show_completion_popup(
         }
     }
 
-    let (st_gx, st_gy, st_w, st_h) = {
+    let (st_gx, st_gy, _st_w, _st_h) = {
         let text_view_vid = control_view.read().controlled_view.unwrap();
         let text_view = get_view_by_id(editor, text_view_vid);
         let status_vid = view::get_status_view(&editor, &env, &text_view);

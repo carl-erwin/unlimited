@@ -8,8 +8,6 @@ use super::Mode;
 
 use super::text_mode::TextModeContext;
 
-use super::text_mode::PostInputAction;
-
 use crate::core::document::DocumentBuilder;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_vid;
@@ -278,8 +276,8 @@ fn create_find_controller_view(
 }
 
 fn find_show_controller_view(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
 ) {
     let status_vid = env.status_view_id.unwrap();

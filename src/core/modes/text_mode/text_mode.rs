@@ -2418,7 +2418,7 @@ pub fn scroll_view_down(
 
     if offscreen {
         {
-            let v = view.read();
+            let _v = view.read();
             dbg_println!("SCROLLDOWN {} > view.H {}:  TRY OFFSCREEN", nb_lines, h);
         }
         // slower : call layout builder to build  nb_lines - screen.height()

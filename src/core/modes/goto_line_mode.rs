@@ -277,8 +277,8 @@ fn create_goto_line_controller_view(
 }
 
 fn goto_line_show_controller_view(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
 ) {
     let status_vid = env.status_view_id.unwrap();
@@ -298,8 +298,8 @@ fn goto_line_show_controller_view(
 }
 
 pub fn goto_line_controller_add_char(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let mut array = vec![];
@@ -401,7 +401,7 @@ pub fn goto_line_controller_add_char(
 // refactor add+del (Some(array))
 pub fn goto_line_controller_del_char(
     editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // compute target line number

@@ -7,7 +7,7 @@ use std::sync::mpsc::Sender;
 use std::thread;
 
 use parking_lot::RwLock;
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 use regex::Regex;

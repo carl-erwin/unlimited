@@ -230,7 +230,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
         doc_info.push_str(&format!(" (F1 for help)"));
 
         if env.focus_vid != view::Id(0) {
-            if let Some(v) = editor.view_map.get(&env.focus_vid) {
+            if let Some(_v) = editor.view_map.get(&env.focus_vid) {
                 doc_info.push_str(&format!(" (focus vid: {:?})", env.focus_vid));
             }
         }
