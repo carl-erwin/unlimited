@@ -1184,6 +1184,8 @@ pub fn help_popup(
     {
         let mut main = editor.view_map.get(&root_vid).unwrap().write();
 
+        assert_ne!(p_view.id, view::Id(0));
+
         main.floating_children.push(ChildView {
             id: p_view.id,
             layout_op: LayoutOperation::Floating,

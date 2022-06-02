@@ -94,6 +94,7 @@ impl<'a> Mode for OpenDocMode {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OpenDocModeContext {
     pub revision: usize,
     pub controller_view_id: view::Id,
@@ -355,13 +356,42 @@ fn open_doc_display_path(
         let s: String = odm.open_doc_str.iter().collect();
         doc.append(s.as_bytes());
     }
+
+    dbg_println!("open_doc_display_path end");
 }
 
 fn create_open_doc_completion_view(
-    _editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
-    _view: &mut View,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    text_view: &mut View,
 ) {
+    let parent_id = env.root_view_id;
+
+    dbg_print!("create_open_doc_completion_view");
+
+    let command_doc = DocumentBuilder::new()
+        .document_name("completion-pop-up")
+        .internal(true)
+        .use_buffer_log(false)
+        .finalize();
+
+    let modes = vec!["text-mode".to_owned()]; // todo: menu-list
+    let mut popup_view = View::new(
+        &mut editor,
+        &mut env,
+        Some(parent_id),
+        (0, 0),
+        (1, 1),
+        command_doc,
+        &modes,
+        0,
+    );
+    popup_view.ignore_focus = true;
+
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+    odm.open_doc_completion_vid = popup_view.id;
+
+    editor.add_view(popup_view.id, popup_view);
 }
 
 pub fn open_doc_controller_add_char(
@@ -470,10 +500,10 @@ pub fn open_doc_do_completion(
         match fs::read_dir(path) {
             Ok(path) => {
                 for e in path {
+                    dbg_println!("open file: dir entry : '{:?}'", e);
                     let s = format!("{}\n", e.unwrap().path().display());
                     odm.completion_list.push(s.clone());
                     odm.completion_str.push_str(&s);
-                    dbg_println!("open file: dir entry : '{}'", s);
                 }
             }
             _ => {
@@ -489,104 +519,75 @@ pub fn open_doc_do_completion(
     };
     dbg_println!("show = {}", show);
     if show {
-        show_completion_popup(editor, env, view);
-
-        // set input focus to
-        // destroy previous popup
-        let id = {
-            let parent_id = env.root_view_id;
-            let p_view = editor.view_map.get(&parent_id).unwrap().read();
-            p_view.floating_children[0].id
-        };
-
-        set_focus_on_vid(editor, env, id);
+        if let Some(id) = show_completion_popup(editor, env, view) {
+            set_focus_on_vid(editor, env, id);
+        }
     } else {
         // hide_completion_popup(editor, env, view);
     }
 }
 
 fn show_completion_popup(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
-    control_view: &Rc<RwLock<View<'static>>>,
-) {
-    let parent_id = env.root_view_id;
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    controller_view: &Rc<RwLock<View<'static>>>,
+) -> Option<view::Id> {
+    // fill completion buffer
+    let text_view_id = controller_view.read().controlled_view.unwrap();
+    let text_view = get_view_by_id(editor, text_view_id);
+    let text_view = text_view.read();
+    let odm = text_view.mode_ctx::<OpenDocModeContext>("open-doc-mode");
 
-    let command_doc = DocumentBuilder::new()
-        .document_name("completion-pop-up")
-        .internal(true)
-        .use_buffer_log(false)
-        .finalize();
+    let completion_view = get_view_by_id(editor, odm.open_doc_completion_vid);
+    let mut completion_view = completion_view.write();
 
-    {
-        let v = control_view.read();
-        let text_view_vid = v.controlled_view.unwrap();
-        let text_view = editor.view_map.get(&text_view_vid).unwrap().read();
-        let list = text_view
-            .mode_ctx::<OpenDocModeContext>("open-doc-mode")
-            .completion_list
-            .clone();
-
-        let mut d = command_doc.as_ref().unwrap().write();
-
-        for s in &list {
-            d.append(s.as_bytes());
-        }
+    let list = odm.completion_list.clone();
+    let doc = completion_view.document().unwrap();
+    let mut doc = doc.write();
+    for s in &list {
+        doc.append(s.as_bytes());
     }
 
-    let (st_gx, st_gy, _st_w, _st_h) = {
-        let text_view_vid = control_view.read().controlled_view.unwrap();
+    // update position size
+    let (st_gx, st_gy, st_w, st_h) = {
+        let text_view_vid = controller_view.read().controlled_view.unwrap();
         let text_view = get_view_by_id(editor, text_view_vid);
-        let status_vid = view::get_status_view(&editor, &env, &text_view);
-        if let Some(status_vid) = status_vid {
-            let status_view = editor.view_map.get(&status_vid).unwrap().read();
-            (
-                status_view.global_x.unwrap(),
-                status_view.global_y.unwrap(),
-                status_view.width,
-                status_view.height,
-            )
-        } else {
-            return;
-        }
+
+        let status_vid = view::get_status_view(&editor, &env, &text_view).unwrap();
+        let status_view = editor.view_map.get(&status_vid).unwrap().read();
+        (
+            status_view.global_x.unwrap(),
+            status_view.global_y.unwrap(),
+            status_view.width,
+            status_view.height,
+        )
     };
 
     // TODO: get view global coordinates, update on  resize
+    let parent_id = env.root_view_id;
     let (x, y, pop_width, pop_height) = {
         let parent_view = editor.view_map.get(&parent_id).unwrap().read();
         let dim = parent_view.dimension();
-
-        let w = dim.0;
+        let w = st_w;
         let h = std::cmp::min(8, dim.1 / 2);
         let x = st_gx;
         let y = st_gy.saturating_sub(h);
         (x, y, w, h)
     };
 
-    ////////////////////////////
-    let modes = vec!["text-mode".to_owned()];
+    completion_view.x = x;
+    completion_view.y = y;
+    completion_view.width = pop_width;
+    completion_view.height = pop_height;
 
-    // create view
-    let mut popup_view = View::new(
-        &mut editor,
-        &mut env,
-        Some(parent_id),
-        (x, y),
-        (pop_width, pop_height),
-        command_doc,
-        &modes,
-        0,
-    );
-
-    popup_view.ignore_focus = true;
-
-    {
-        let mut parent_view = editor.view_map.get(&parent_id).unwrap().write();
-        parent_view.floating_children.push(ChildView {
-            id: popup_view.id,
+    let mut p_view = editor.view_map.get(&parent_id).unwrap().write();
+    p_view.floating_children.pop();
+    if p_view.floating_children.is_empty() {
+        p_view.floating_children.push(ChildView {
+            id: completion_view.id,
             layout_op: LayoutOperation::Floating,
-        });
+        })
     }
 
-    editor.add_view(popup_view.id, popup_view);
+    Some(completion_view.id)
 }
