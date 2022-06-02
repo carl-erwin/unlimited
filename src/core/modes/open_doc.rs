@@ -30,6 +30,9 @@ use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 
+use crate::core::modes::text_mode::center_around_mark;
+use crate::core::modes::text_mode::TextModeContext;
+
 static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
   {
@@ -48,6 +51,9 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
      { "in": [{ "key": "ctrl+g" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
+     { "in": [{ "key": "Up" } ],        "action": "open-doc:select-prev-completion" },
+     { "in": [{ "key": "Down" } ],      "action": "open-doc:select-next-completion" },
+     { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
      { "default": [],                   "action": "open-doc:add-char" }
    ]
   }
@@ -101,7 +107,6 @@ pub struct OpenDocModeContext {
     pub open_doc_completion_vid: view::Id,
     pub active: bool,
     pub open_doc_str: Vec<char>,
-    pub completion_str: String,
     pub current_dir: String,
     pub current_entry: String,
     pub completion_list: Vec<String>,
@@ -117,7 +122,6 @@ impl OpenDocModeContext {
             open_doc_completion_vid: view::Id(0),
             active: false,
             open_doc_str: Vec::new(),
-            completion_str: String::new(),
             current_dir: String::new(),
             current_entry: String::new(),
             completion_list: vec![],
@@ -128,7 +132,6 @@ impl OpenDocModeContext {
         self.revision = 0;
         self.active = false;
         self.open_doc_str.clear();
-        self.completion_str.clear();
         self.current_dir.clear();
         self.current_entry.clear();
         self.completion_list = vec![];
@@ -290,6 +293,22 @@ fn create_open_doc_controller_view(
             open_doc_controller_del_char,
         );
 
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:select-next-completion",
+            open_doc_controller_select_next_completion,
+        );
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:select-prev-completion",
+            open_doc_controller_select_prev_completion,
+        );
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:apply-current-completion",
+            open_doc_controller_apply_current_completion,
+        );
+
         controller_view.register_action_map(action_map);
     }
 
@@ -448,6 +467,17 @@ pub fn open_doc_controller_add_char(
     let mut text_view = text_view.write();
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
     odm.open_doc_str.append(&mut array);
+    odm.completion_index = 0;
+    {
+        let completion_view = get_view_by_id(editor, odm.open_doc_completion_vid);
+        {
+            let mut completion_view = completion_view.write();
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
+        }
+        center_around_mark(editor, env, &completion_view);
+    }
+
     dbg_println!("open file : {:?}", odm.open_doc_str);
 
     open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
@@ -458,7 +488,7 @@ pub fn open_doc_controller_del_char(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    {
+    let open_doc_completion_vid = {
         let v = view.read();
         let text_view_vid = v.controlled_view.unwrap();
         let mut text_view = editor.view_map.get(&text_view_vid).unwrap().write();
@@ -466,13 +496,27 @@ pub fn open_doc_controller_del_char(
         if odm.open_doc_str.is_empty() {
             return;
         }
+        odm.completion_index = 0;
         odm.open_doc_str.pop();
-    }
+        odm.open_doc_completion_vid
+    };
 
     let mut controller_view = view.write();
     let text_view_vid = controller_view.controlled_view.unwrap();
     let text_view = editor.view_map.get(&text_view_vid).unwrap().clone();
     let mut text_view = text_view.write();
+
+    {
+        let completion_view = get_view_by_id(editor, open_doc_completion_vid);
+        {
+            let mut completion_view = completion_view.write();
+
+            // inc
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
+        }
+        center_around_mark(editor, env, &completion_view);
+    }
 
     open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
 }
@@ -496,26 +540,28 @@ pub fn open_doc_do_completion(
 
         // path.exist ?
         // if dir and no / at end push '/'
-        odm.completion_str.clear();
+        odm.completion_list.clear();
+        odm.completion_index = 0; // if no changes nothing refresh base on meta ?
         match fs::read_dir(path) {
             Ok(path) => {
                 for e in path {
                     dbg_println!("open file: dir entry : '{:?}'", e);
                     let s = format!("{}\n", e.unwrap().path().display());
+                    dbg_println!("append string '{}'", s);
                     odm.completion_list.push(s.clone());
-                    odm.completion_str.push_str(&s);
                 }
             }
             _ => {
                 /* wrong/incomplete */
                 let s = format!("cannot read {}\n", s);
-                odm.completion_str.push_str(&s);
-
+                odm.completion_list.push(s.clone());
                 dbg_println!("open file: cannot complete {:?}", s);
             }
         }
 
-        !odm.completion_str.is_empty()
+        odm.completion_list.sort(); // list.sort_unstable_by(|a, b| (b.0).cmp(&a.0));
+
+        !odm.completion_list.is_empty()
     };
     dbg_println!("show = {}", show);
     if show {
@@ -541,10 +587,12 @@ fn show_completion_popup(
     let completion_view = get_view_by_id(editor, odm.open_doc_completion_vid);
     let mut completion_view = completion_view.write();
 
-    let list = odm.completion_list.clone();
+    let list = &odm.completion_list;
     let doc = completion_view.document().unwrap();
     let mut doc = doc.write();
-    for s in &list {
+    doc.delete_content(None);
+
+    for s in list {
         doc.append(s.as_bytes());
     }
 
@@ -590,4 +638,80 @@ fn show_completion_popup(
     }
 
     Some(completion_view.id)
+}
+
+// TODO: move mode context to Arc ?
+pub fn open_doc_controller_select_next_completion(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let v = view.read();
+    let text_view_vid = v.controlled_view.unwrap();
+    let text_view = get_view_by_id(editor, text_view_vid);
+    let mut text_view = text_view.write();
+
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+    let completion_view = get_view_by_id(editor, odm.open_doc_completion_vid);
+    {
+        let mut completion_view = completion_view.write();
+
+        // inc
+        odm.completion_index += 1;
+        odm.completion_index = std::cmp::min(
+            odm.completion_index,
+            odm.completion_list.len().saturating_sub(1),
+        );
+
+        let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        let mut offset = 0;
+        for i in 0..odm.completion_index {
+            let s = &odm.completion_list[i];
+            offset += s.len();
+        }
+        tm.marks[0].offset = offset as u64;
+    }
+
+    center_around_mark(editor, env, &completion_view);
+}
+
+pub fn open_doc_controller_select_prev_completion(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let v = view.read();
+    let text_view_vid = v.controlled_view.unwrap();
+    let text_view = get_view_by_id(editor, text_view_vid);
+    let mut text_view = text_view.write();
+
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+    let completion_view = get_view_by_id(editor, odm.open_doc_completion_vid);
+    {
+        let mut completion_view = completion_view.write();
+
+        // dec
+        odm.completion_index = odm.completion_index.saturating_sub(1);
+        let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        let mut offset = 0;
+        for i in 0..odm.completion_index {
+            let s = &odm.completion_list[i];
+            offset += s.len();
+        }
+
+        tm.marks[0].offset = offset as u64;
+    }
+
+    center_around_mark(editor, env, &completion_view);
+}
+
+pub fn open_doc_controller_apply_current_completion(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
 }
