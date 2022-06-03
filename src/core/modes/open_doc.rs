@@ -52,9 +52,15 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
      { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
      { "in": [{ "key": "Up" } ],        "action": "open-doc:select-prev-completion" },
+     { "in": [{ "key": "ctrl+k" } ],    "action": "open-doc:select-prev-completion" },
      { "in": [{ "key": "Down" } ],      "action": "open-doc:select-next-completion" },
-     { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+j" } ],    "action": "open-doc:select-next-completion" },
      { "in": [{ "key": "Left" } ],      "action": "open-doc:discard-prompt-suffix" },
+     { "in": [{ "key": "ctrl+h" } ],    "action": "open-doc:discard-prompt-suffix" },
+     { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+l" } ],    "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "Home" } ],      "action": "open-doc:select-first-completion" },
+     { "in": [{ "key": "End" } ],       "action": "open-doc:select-last-completion" },
      { "default": [],                   "action": "open-doc:add-char" }
    ]
   }
@@ -108,8 +114,6 @@ pub struct OpenDocModeContext {
     pub completion_view_id: view::Id,
     pub active: bool,
     pub prompt: Vec<char>,
-    pub current_dir: String,
-    pub current_entry: String,
     pub completion_list: Vec<String>,
     pub completion_index: usize,
 }
@@ -123,8 +127,6 @@ impl OpenDocModeContext {
             completion_view_id: view::Id(0),
             active: false,
             prompt: Vec::new(),
-            current_dir: String::new(),
-            current_entry: String::new(),
             completion_list: vec![],
             completion_index: 0,
         }
@@ -133,8 +135,6 @@ impl OpenDocModeContext {
         self.revision = 0;
         self.active = false;
         self.prompt.clear();
-        self.current_dir.clear();
-        self.current_entry.clear();
         self.completion_list = vec![];
         self.completion_index = 0;
 
@@ -165,19 +165,21 @@ pub fn open_doc_start(
         let status_view_id = view::get_status_view(&editor, &env, view);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
+            dbg_println!("status view is missing");
             return;
         }
 
         // start/resume ?
-        let controller_id = {
+
+        let controller_view_id = {
             let mut v = view.write();
             let odm = v.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
             odm.active = true;
 
-            let id = odm.controller_view_id;
+            let controller_view_id = odm.controller_view_id;
 
             // attach to status view
-            let controller = editor.view_map.get(&id).unwrap();
+            let controller = editor.view_map.get(&controller_view_id).unwrap();
             controller.write().parent_id = Some(status_view_id.unwrap());
 
             v.controller = Some(ControllerView {
@@ -185,11 +187,16 @@ pub fn open_doc_start(
                 mode_name: &"open-doc-mode",
             });
 
-            id
+            controller_view_id
         };
 
         open_doc_show_controller_view(editor, env, view);
-        set_focus_on_view_id(editor, env, controller_id);
+        set_focus_on_view_id(editor, env, controller_view_id);
+
+        {
+            let controller_view = get_view_by_id(editor, controller_view_id);
+            open_doc_do_completion(editor, env, &controller_view, false);
+        }
     }
 }
 
@@ -307,6 +314,18 @@ fn create_open_doc_controller_view(
             open_doc_controller_apply_current_completion,
         );
 
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:discard-prompt-suffix",
+            open_doc_controller_discard_prompt_suffix,
+        );
+
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:select-first-completion",
+            open_doc_controller_select_first_completion,
+        );
+
         controller_view.register_action_map(action_map);
     }
 
@@ -336,16 +355,14 @@ fn open_doc_show_controller_view(
 
         ctrl_view_id
     };
-
     //
     let controller_view = get_view_by_id(editor, ctrl_view_id);
     let mut controller_view = controller_view.write();
-
     let mut text_view = text_view.write();
-    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
+    open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
 }
 
-fn open_doc_display_path(
+fn open_doc_display_prompt(
     _editor: &mut Editor<'static>,
     _env: &mut EditorEnv<'static>,
     controller_view: &mut View<'static>,
@@ -367,14 +384,14 @@ fn open_doc_display_path(
             for c in s.chars() {
                 odm.prompt.push(c);
             }
-            odm.prompt.push('/');
+            odm.prompt.push(std::path::MAIN_SEPARATOR);
         }
 
         let s: String = odm.prompt.iter().collect();
         doc.append(s.as_bytes());
     }
 
-    dbg_println!("open_doc_display_path end");
+    dbg_println!("open_doc_display_prompt end");
 }
 
 fn create_open_doc_completion_view(
@@ -418,8 +435,9 @@ pub fn open_doc_controller_add_char(
 ) {
     let mut array = vec![];
 
+    let mut auto_complete = false;
+
     // filter input event
-    let mut do_completion = false;
     {
         let v = view.read();
 
@@ -438,10 +456,17 @@ pub fn open_doc_controller_add_char(
                         shift: false,
                     },
             } => {
-                if *c == '\t' {
-                    do_completion = true;
-                } else {
+                // do not allow tabs ?
+
+                if *c == '\n' {
+                    panic!();
+                }
+
+                if *c != '\t' {
                     array.push(*c);
+                } else {
+                    auto_complete = true;
+                    // TODO: if all with same suffix append suffix
                 }
             }
 
@@ -450,35 +475,42 @@ pub fn open_doc_controller_add_char(
             }
         }
 
-        if array.is_empty() && !do_completion {
+        if array.is_empty() && !auto_complete {
             return;
         }
     }
 
-    if do_completion {
-        open_doc_do_completion(editor, env, view);
-    }
+    let completion_view_id = {
+        let v = view.read();
+        let text_view_view_id = v.controlled_view.unwrap();
+        let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+        odm.prompt.append(&mut array);
+        odm.completion_index = 0;
+        odm.completion_view_id
+    };
 
-    let mut controller_view = view.write();
-    let text_view_view_id = controller_view.controlled_view.unwrap();
-    let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
-    let mut text_view = text_view.write();
-    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-    odm.prompt.append(&mut array);
-    odm.completion_index = 0;
     {
-        let completion_view = get_view_by_id(editor, odm.completion_view_id);
-        {
-            let mut completion_view = completion_view.write();
-            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
-            tm.marks[0].offset = 0;
-        }
-        center_around_mark_if_offscreen(editor, env, &completion_view);
+        open_doc_do_completion(editor, env, view, auto_complete);
     }
 
-    dbg_println!("open file : {:?}", odm.prompt);
+    {
+        let mut controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
+        let mut text_view = text_view.write();
 
-    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
+        {
+            let completion_view = get_view_by_id(editor, completion_view_id);
+            {
+                let mut completion_view = completion_view.write();
+                let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+                tm.marks[0].offset = 0;
+            }
+            center_around_mark_if_offscreen(editor, env, &completion_view);
+        }
+        open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+    }
 }
 
 pub fn open_doc_controller_del_char(
@@ -491,13 +523,17 @@ pub fn open_doc_controller_del_char(
         let text_view_view_id = v.controlled_view.unwrap();
         let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-        if odm.prompt.is_empty() {
+        if odm.prompt.len() <= 1 {
             return;
         }
         odm.completion_index = 0;
         odm.prompt.pop();
         odm.completion_view_id
     };
+
+    {
+        open_doc_do_completion(editor, env, view, false);
+    }
 
     let mut controller_view = view.write();
     let text_view_view_id = controller_view.controlled_view.unwrap();
@@ -508,66 +544,107 @@ pub fn open_doc_controller_del_char(
         let completion_view = get_view_by_id(editor, completion_view_id);
         {
             let mut completion_view = completion_view.write();
-
-            // inc
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.marks[0].offset = 0;
         }
         center_around_mark_if_offscreen(editor, env, &completion_view);
     }
 
-    open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
+    open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
 }
 
 pub fn open_doc_do_completion(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
+    auto_complete: bool,
 ) {
-    let show = {
+    dbg_println!("open file : do completion");
+
+    {
         let v = view.read();
         let text_view_view_id = v.controlled_view.unwrap();
         let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
-        dbg_println!("open file : do completion");
+        // clear completion list/index
+        odm.completion_list.clear();
+        odm.completion_index = 0;
 
         let s: String = odm.prompt.iter().collect();
-        let path = PathBuf::from(s.clone());
-        dbg_println!("open file : current directory is '{}'", path.display());
+        let (prefix, suffix) = if let Some(last_sep) = s.rfind(std::path::MAIN_SEPARATOR) {
+            s.split_at(last_sep + 1)
+        } else {
+            (s.as_str(), "")
+        };
 
-        // path.exist ?
-        // if dir and no / at end push '/'
-        odm.completion_list.clear();
-        odm.completion_index = 0; // if no changes nothing refresh base on meta ?
-        match fs::read_dir(path) {
+        dbg_println!(
+            "open file : do completion: prefix {}, suffix '{}'",
+            prefix,
+            suffix
+        );
+
+        dbg_println!("open file : do completion: prompt '{}'", s);
+
+        let path = PathBuf::from(prefix.clone());
+        dbg_println!("do completion: for '{:?}'", path);
+        match fs::read_dir(&path) {
             Ok(path) => {
                 for e in path {
-                    dbg_println!("open file: dir entry : '{:?}'", e);
-                    let s = format!("{}\n", e.unwrap().path().display());
-                    dbg_println!("append string '{}'", s);
+                    dbg_println!("do completion: parent_path entry : '{:?}'", e);
+                    let cur_path = PathBuf::from(e.as_ref().unwrap().path());
+
+                    if let Some(suffix2) = cur_path.iter().last() {
+                        let match_suffix = suffix2.to_str().unwrap().starts_with(&suffix);
+                        if match_suffix {
+                            dbg_println!("do completion: found possible completion '{:?}'", e);
+
+                            let mut s = e.unwrap().path().to_str().unwrap().to_owned();
+
+                            // if dir add std::path::MAIN_SEPARATOR
+                            match fs::metadata(&s) {
+                                Ok(metadata) => {
+                                    if metadata.is_dir() {
+                                        s.push(std::path::MAIN_SEPARATOR);
+                                    }
+                                }
+                                _ => {}
+                            }
+
+                            s.push('\n');
+                            odm.completion_list.push(s);
+                        }
+                    }
+                }
+
+                if odm.completion_list.is_empty() {
+                    let s = format!("cannot complete '{}'\n", s);
                     odm.completion_list.push(s.clone());
                 }
             }
             _ => {
-                /* wrong/incomplete */
-                let s = format!("cannot read {}\n", s);
+                dbg_println!("open file: cannot read {:?}", s);
+                let s = format!("cannot read '{}'\n", s);
                 odm.completion_list.push(s.clone());
-                dbg_println!("open file: cannot complete {:?}", s);
             }
         }
 
-        odm.completion_list.sort(); // list.sort_unstable_by(|a, b| (b.0).cmp(&a.0));
+        // auto complete ?
+        if odm.completion_list.len() == 1 && auto_complete {
+            let len = odm.completion_list[0].len().saturating_sub(1);
 
+            odm.prompt = odm.completion_list[0]
+                .chars()
+                .take(len)
+                .collect::<Vec<char>>();
+        }
+
+        odm.completion_list.sort(); // list.sort_unstable_by(|a, b| (b.0).cmp(&a.0));
         !odm.completion_list.is_empty()
     };
-    dbg_println!("show = {}", show);
-    if show {
-        if let Some(id) = show_completion_popup(editor, env, view) {
-            set_focus_on_view_id(editor, env, id);
-        }
-    } else {
-        // hide_completion_popup(editor, env, view);
+
+    if let Some(_id) = show_completion_popup(editor, env, view) {
+        // set_focus_on_view_id(editor, env, id);
     }
 }
 
@@ -595,7 +672,7 @@ fn show_completion_popup(
     }
 
     // update position size
-    let (st_gx, st_gy, st_w, st_h) = {
+    let (st_gx, st_gy, st_w, _st_h) = {
         let text_view_view_id = controller_view.read().controlled_view.unwrap();
         let text_view = get_view_by_id(editor, text_view_view_id);
 
@@ -615,7 +692,8 @@ fn show_completion_popup(
         let parent_view = editor.view_map.get(&parent_id).unwrap().read();
         let dim = parent_view.dimension();
         let w = st_w;
-        let h = std::cmp::min(list.len() + 1, dim.1 / 2);
+        //        let h = std::cmp::min(list.len(), dim.1 / 2);
+        let h = dim.1.saturating_sub(_st_h); // / 3 + dim.1 / 3;
         let x = st_gx;
         let y = st_gy.saturating_sub(h);
         (x, y, w, h)
@@ -656,10 +734,7 @@ pub fn open_doc_controller_select_next_completion(
         let mut completion_view = completion_view.write();
 
         // inc
-        odm.completion_index = std::cmp::min(
-            odm.completion_index + 1,
-            odm.completion_list.len().saturating_sub(1),
-        );
+        odm.completion_index = (odm.completion_index + 1) % odm.completion_list.len();
 
         let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -691,7 +766,13 @@ pub fn open_doc_controller_select_prev_completion(
         let mut completion_view = completion_view.write();
 
         // dec
+        odm.completion_index = if odm.completion_index == 0 {
+            odm.completion_list.len()
+        } else {
+            odm.completion_index
+        };
         odm.completion_index = odm.completion_index.saturating_sub(1);
+
         let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
         let mut offset = 0;
@@ -711,4 +792,154 @@ pub fn open_doc_controller_apply_current_completion(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
+    let completion_view_id = {
+        let controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+        if odm.completion_list.is_empty() {
+            return;
+        }
+
+        let completion_view = get_view_by_id(editor, odm.completion_view_id);
+        {
+            let mut completion_view = completion_view.write();
+
+            {
+                let doc = completion_view.document().unwrap();
+                let mut doc = doc.write();
+                doc.delete_content(None);
+            }
+
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
+
+            let s = &odm.completion_list[odm.completion_index];
+            let len = s.len().saturating_sub(1); // remove last '\n'
+            let new_prompt = s.chars().take(len).collect::<Vec<char>>();
+
+            odm.revision = 0;
+            odm.completion_list = vec![];
+            odm.completion_index = 0;
+            odm.prompt = new_prompt;
+
+            odm.completion_view_id
+        }
+    };
+
+    open_doc_do_completion(editor, env, view, false);
+
+    {
+        let mut controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
+        let mut text_view = text_view.write();
+
+        {
+            let completion_view = get_view_by_id(editor, completion_view_id);
+            {
+                let mut completion_view = completion_view.write();
+                let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+                tm.marks[0].offset = 0;
+            }
+            center_around_mark_if_offscreen(editor, env, &completion_view);
+        }
+        open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+    }
+}
+
+pub fn open_doc_controller_discard_prompt_suffix(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    {
+        let controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+        let completion_view = get_view_by_id(editor, odm.completion_view_id);
+        {
+            let mut completion_view = completion_view.write();
+
+            {
+                let doc = completion_view.document().unwrap();
+                let mut doc = doc.write();
+                doc.delete_content(None);
+            }
+
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
+
+            odm.revision = 0;
+            odm.completion_list = vec![];
+
+            let s: String = odm.prompt.iter().collect();
+            dbg_println!("do completion split prompt: {}", s);
+
+            let (prefix, suffix) = if let Some(last_sep) = s.rfind(std::path::MAIN_SEPARATOR) {
+                s.split_at(last_sep + 1)
+            } else {
+                (s.as_str(), "")
+            };
+
+            dbg_println!("do completion prefix: {}", prefix);
+            dbg_println!("do completion suffix: {}", suffix);
+
+            odm.prompt = prefix.to_owned().chars().collect();
+            if suffix.is_empty() && odm.prompt.len() > 1 {
+                odm.prompt.pop();
+            }
+        }
+    }
+
+    open_doc_do_completion(editor, env, view, false);
+
+    {
+        let mut controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+        open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+    }
+}
+
+pub fn open_doc_controller_select_first_completion(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    {
+        let controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+        let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+        if odm.completion_list.is_empty() {
+            return;
+        }
+
+        let completion_view = get_view_by_id(editor, odm.completion_view_id);
+        {
+            let mut completion_view = completion_view.write();
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
+            odm.completion_index = 0;
+        }
+    }
+
+    open_doc_do_completion(editor, env, view, false);
+
+    {
+        let mut controller_view = view.write();
+        let text_view_view_id = controller_view.controlled_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+        open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+    }
 }
