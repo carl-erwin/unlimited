@@ -30,7 +30,7 @@ use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 
-use crate::core::modes::text_mode::center_around_mark;
+use crate::core::modes::text_mode::center_around_mark_if_offscreen;
 use crate::core::modes::text_mode::TextModeContext;
 
 static OPEN_DOC_TRIGGER_MAP: &str = r#"
@@ -473,7 +473,7 @@ pub fn open_doc_controller_add_char(
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.marks[0].offset = 0;
         }
-        center_around_mark(editor, env, &completion_view);
+        center_around_mark_if_offscreen(editor, env, &completion_view);
     }
 
     dbg_println!("open file : {:?}", odm.prompt);
@@ -513,7 +513,7 @@ pub fn open_doc_controller_del_char(
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.marks[0].offset = 0;
         }
-        center_around_mark(editor, env, &completion_view);
+        center_around_mark_if_offscreen(editor, env, &completion_view);
     }
 
     open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
@@ -671,7 +671,7 @@ pub fn open_doc_controller_select_next_completion(
         tm.marks[0].offset = offset as u64;
     }
 
-    center_around_mark(editor, env, &completion_view);
+    center_around_mark_if_offscreen(editor, env, &completion_view);
 }
 
 pub fn open_doc_controller_select_prev_completion(
@@ -703,7 +703,7 @@ pub fn open_doc_controller_select_prev_completion(
         tm.marks[0].offset = offset as u64;
     }
 
-    center_around_mark(editor, env, &completion_view);
+    center_around_mark_if_offscreen(editor, env, &completion_view);
 }
 
 pub fn open_doc_controller_apply_current_completion(
