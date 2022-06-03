@@ -105,9 +105,9 @@ impl<'a> Mode for OpenDocMode {
 pub struct OpenDocModeContext {
     pub revision: usize,
     pub controller_view_id: view::Id,
-    pub open_doc_completion_view_id: view::Id,
+    pub completion_view_id: view::Id,
     pub active: bool,
-    pub open_doc_str: Vec<char>,
+    pub prompt: Vec<char>,
     pub current_dir: String,
     pub current_entry: String,
     pub completion_list: Vec<String>,
@@ -120,9 +120,9 @@ impl OpenDocModeContext {
         OpenDocModeContext {
             revision: 0,
             controller_view_id: view::Id(0),
-            open_doc_completion_view_id: view::Id(0),
+            completion_view_id: view::Id(0),
             active: false,
-            open_doc_str: Vec::new(),
+            prompt: Vec::new(),
             current_dir: String::new(),
             current_entry: String::new(),
             completion_list: vec![],
@@ -132,7 +132,7 @@ impl OpenDocModeContext {
     pub fn reset(&mut self) -> &mut Self {
         self.revision = 0;
         self.active = false;
-        self.open_doc_str.clear();
+        self.prompt.clear();
         self.current_dir.clear();
         self.current_entry.clear();
         self.completion_list = vec![];
@@ -360,17 +360,17 @@ fn open_doc_display_path(
 
     // setup working directory
     {
-        if odm.open_doc_str.is_empty() {
+        if odm.prompt.is_empty() {
             let path = env::current_dir().unwrap();
             let s = path.to_str().unwrap();
             let s = s.to_owned();
             for c in s.chars() {
-                odm.open_doc_str.push(c);
+                odm.prompt.push(c);
             }
-            odm.open_doc_str.push('/');
+            odm.prompt.push('/');
         }
 
-        let s: String = odm.open_doc_str.iter().collect();
+        let s: String = odm.prompt.iter().collect();
         doc.append(s.as_bytes());
     }
 
@@ -406,7 +406,7 @@ fn create_open_doc_completion_view(
     popup_view.ignore_focus = true;
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-    odm.open_doc_completion_view_id = popup_view.id;
+    odm.completion_view_id = popup_view.id;
 
     editor.add_view(popup_view.id, popup_view);
 }
@@ -464,10 +464,10 @@ pub fn open_doc_controller_add_char(
     let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
     let mut text_view = text_view.write();
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-    odm.open_doc_str.append(&mut array);
+    odm.prompt.append(&mut array);
     odm.completion_index = 0;
     {
-        let completion_view = get_view_by_id(editor, odm.open_doc_completion_view_id);
+        let completion_view = get_view_by_id(editor, odm.completion_view_id);
         {
             let mut completion_view = completion_view.write();
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -476,7 +476,7 @@ pub fn open_doc_controller_add_char(
         center_around_mark(editor, env, &completion_view);
     }
 
-    dbg_println!("open file : {:?}", odm.open_doc_str);
+    dbg_println!("open file : {:?}", odm.prompt);
 
     open_doc_display_path(editor, env, &mut controller_view, &mut text_view);
 }
@@ -486,17 +486,17 @@ pub fn open_doc_controller_del_char(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let open_doc_completion_view_id = {
+    let completion_view_id = {
         let v = view.read();
         let text_view_view_id = v.controlled_view.unwrap();
         let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-        if odm.open_doc_str.is_empty() {
+        if odm.prompt.is_empty() {
             return;
         }
         odm.completion_index = 0;
-        odm.open_doc_str.pop();
-        odm.open_doc_completion_view_id
+        odm.prompt.pop();
+        odm.completion_view_id
     };
 
     let mut controller_view = view.write();
@@ -505,7 +505,7 @@ pub fn open_doc_controller_del_char(
     let mut text_view = text_view.write();
 
     {
-        let completion_view = get_view_by_id(editor, open_doc_completion_view_id);
+        let completion_view = get_view_by_id(editor, completion_view_id);
         {
             let mut completion_view = completion_view.write();
 
@@ -532,7 +532,7 @@ pub fn open_doc_do_completion(
 
         dbg_println!("open file : do completion");
 
-        let s: String = odm.open_doc_str.iter().collect();
+        let s: String = odm.prompt.iter().collect();
         let path = PathBuf::from(s.clone());
         dbg_println!("open file : current directory is '{}'", path.display());
 
@@ -582,7 +582,7 @@ fn show_completion_popup(
     let text_view = text_view.read();
     let odm = text_view.mode_ctx::<OpenDocModeContext>("open-doc-mode");
 
-    let completion_view = get_view_by_id(editor, odm.open_doc_completion_view_id);
+    let completion_view = get_view_by_id(editor, odm.completion_view_id);
     let mut completion_view = completion_view.write();
 
     let list = &odm.completion_list;
@@ -651,7 +651,7 @@ pub fn open_doc_controller_select_next_completion(
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
-    let completion_view = get_view_by_id(editor, odm.open_doc_completion_view_id);
+    let completion_view = get_view_by_id(editor, odm.completion_view_id);
     {
         let mut completion_view = completion_view.write();
 
@@ -686,7 +686,7 @@ pub fn open_doc_controller_select_prev_completion(
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
-    let completion_view = get_view_by_id(editor, odm.open_doc_completion_view_id);
+    let completion_view = get_view_by_id(editor, odm.completion_view_id);
     {
         let mut completion_view = completion_view.write();
 
