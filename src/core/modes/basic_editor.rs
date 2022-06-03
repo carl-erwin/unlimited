@@ -134,8 +134,8 @@ impl<'a> Mode for BasicEditorMode {
         view.destroyable = false; // root view
 
         // set focus on text view : TODO(ceg): title mode + configure
-        let title_vid = view.children[0].id;
-        let v = editor.view_map.get(&title_vid).unwrap();
+        let title_view_id = view.children[0].id;
+        let v = editor.view_map.get(&title_view_id).unwrap();
         v.write()
             .compose_content_filters
             .borrow_mut()
@@ -151,7 +151,7 @@ impl<'a> Mode for BasicEditorMode {
         let status_view_idx = view.children.len() - 1;
         let status_view_id = view.children[status_view_idx].id;
 
-        // set status_vid
+        // set status_view_id
         view.status_view_id = Some(status_view_id);
         env.status_view_id = Some(status_view_id);
     }
@@ -229,9 +229,9 @@ impl ContentFilter<'_> for BasicEditorTitle {
         doc_info.push_str(&format!(" {} bytes", d.size()));
         doc_info.push_str(&format!(" (F1 for help)"));
 
-        if env.focus_vid != view::Id(0) {
-            if let Some(_v) = editor.view_map.get(&env.focus_vid) {
-                doc_info.push_str(&format!(" (focus vid: {:?})", env.focus_vid));
+        if env.focus_view_id != view::Id(0) {
+            if let Some(_v) = editor.view_map.get(&env.focus_view_id) {
+                doc_info.push_str(&format!(" (focus vid: {:?})", env.focus_view_id));
             }
         }
 

@@ -292,12 +292,12 @@ pub type SubscriberInfo = (
 // TODO editor.env.current.view_id = view.id
 // can zoom ?
 //
-// TODO(ceg): add view.subscribe_to_vid
-// TODO(ceg): add view.publish_to_vid
+// TODO(ceg): add view.subscribe_to_view_id
+// TODO(ceg): add view.publish_to_view_id
 //
 // follow mode fills
-// TODO(ceg): add view.prev_content_vid
-// TODO(ceg): add view.next_content_vid
+// TODO(ceg): add view.prev_content_view_id
+// TODO(ceg): add view.next_content_view_id
 pub struct View<'a> {
     pub id: Id,
     pub destroyable: bool,

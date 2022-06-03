@@ -8,7 +8,7 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::editor::register_input_stage_action;
-use crate::core::editor::set_focus_on_vid;
+use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::input_map::build_input_event_map;
 
@@ -43,7 +43,7 @@ pub struct VscrollbarMode {
     // add common fields
 }
 pub struct VscrollbarModeContext {
-    pub target_vid: view::Id,
+    pub target_view_id: view::Id,
 
     pub percent: f64,
     pub percent_end: f64,
@@ -68,7 +68,7 @@ impl<'a> Mode for VscrollbarMode {
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc vscrollbar-mode ctx");
         let ctx = VscrollbarModeContext {
-            target_vid: view::Id(0),
+            target_view_id: view::Id(0),
             percent: 0.0,
             percent_end: 0.0,
             scroll_start: 0,
@@ -124,7 +124,7 @@ impl<'a> Mode for VscrollbarMode {
 
                 let mut dst = editor.view_map.get(&dst.id).unwrap().write();
                 let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
-                mode_ctx.target_vid = src.id;
+                mode_ctx.target_view_id = src.id;
             }
 
             ViewEvent::PreComposition => {
@@ -220,7 +220,7 @@ pub fn vscrollbar_input_event(
                     let mut mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                     if y >= mode_ctx.scroll_start && y < mode_ctx.scroll_end {
                         mode_ctx.selected = true;
-                        env.focus_locked_on = Some(v.id);
+                        env.focus_locked_on_view_id = Some(v.id);
                     }
 
                     return;
@@ -245,35 +245,35 @@ pub fn vscrollbar_input_event(
                 if *button == 0 {
                     let mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                     mode_ctx.selected = false;
-                    env.focus_locked_on = None;
+                    env.focus_locked_on_view_id = None;
 
                     // explicit focus on target view
-                    set_focus_on_vid(&mut editor, &mut env, mode_ctx.target_vid);
+                    set_focus_on_view_id(&mut editor, &mut env, mode_ctx.target_view_id);
                 }
             }
         },
 
         Some(InputEvent::PointerMotion(PointerEvent { x, y, mods: _ })) => {
             dbg_println!("VSCROLLBAR CLIPPING x {} y {}", x, y);
-            let target_vid = {
+            let target_view_id = {
                 let mode_ctx = v.mode_ctx::<VscrollbarModeContext>("vscrollbar-mode");
 
                 // explicit focus on target view
-                // set_focus_on_vid(&mut editor, &mut env, mode_ctx.target_vid);
+                // set_focus_on_view_id(&mut editor, &mut env, mode_ctx.target_view_id);
 
                 if !mode_ctx.selected {
                     return;
                 }
 
-                if mode_ctx.target_vid == view::Id(0) {
+                if mode_ctx.target_view_id == view::Id(0) {
                     return;
                 }
 
-                mode_ctx.target_vid
+                mode_ctx.target_view_id
             };
 
             let dim = v.screen.read().dimension();
-            let mut dst = editor.view_map.get(&target_vid).unwrap().write();
+            let mut dst = editor.view_map.get(&target_view_id).unwrap().write();
 
             let doc_size = {
                 let doc = dst.document.as_ref().unwrap();

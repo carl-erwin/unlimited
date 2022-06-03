@@ -10,7 +10,7 @@ use super::text_mode::TextModeContext;
 
 use crate::core::document::DocumentBuilder;
 use crate::core::editor::register_input_stage_action;
-use crate::core::editor::set_focus_on_vid;
+use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
@@ -144,8 +144,8 @@ pub fn find_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_vid = view::get_status_view(&editor, &env, view);
-    if status_vid.is_none() {
+    let status_view_id = view::get_status_view(&editor, &env, view);
+    if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
     }
@@ -160,7 +160,7 @@ pub fn find_start(
 
         // attach to status view
         let controller = editor.view_map.get(&id).unwrap();
-        controller.write().parent_id = Some(status_vid.unwrap());
+        controller.write().parent_id = Some(status_view_id.unwrap());
         v.controller = Some(ControllerView {
             id,
             mode_name: &"find-mode",
@@ -170,7 +170,7 @@ pub fn find_start(
     };
 
     find_show_controller_view(editor, env, view);
-    set_focus_on_vid(editor, env, controller_id);
+    set_focus_on_view_id(editor, env, controller_id);
 }
 
 pub fn find_controller_stop(
@@ -179,8 +179,8 @@ pub fn find_controller_stop(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_vid = env.status_view_id.unwrap();
-        let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+        let status_view_id = env.status_view_id.unwrap();
+        let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
         status_view.layout_direction = LayoutDirection::Horizontal;
         // if last == expected id
         status_view.children.pop(); // replace previous Child
@@ -203,7 +203,7 @@ pub fn find_controller_stop(
         }
 
         // set input focus to
-        set_focus_on_vid(editor, env, text_view_id);
+        set_focus_on_view_id(editor, env, text_view_id);
     }
 }
 
@@ -212,9 +212,9 @@ fn create_find_controller_view(
     mut env: &mut EditorEnv<'static>,
     view: &mut View,
 ) {
-    // get status vid -> status_vid
+    // get status vid -> status_view_id
 
-    // (w,h) = status_vid.dimension()
+    // (w,h) = status_view_id.dimension()
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
@@ -280,9 +280,9 @@ fn find_show_controller_view(
     env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_vid = env.status_view_id.unwrap();
+    let status_view_id = env.status_view_id.unwrap();
 
-    let mut status_view = editor.view_map.get(&status_vid).unwrap().write();
+    let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
 
     status_view.layout_direction = LayoutDirection::Horizontal;
 
@@ -630,14 +630,14 @@ pub fn find_start_reverse(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_vid = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(&editor, &env, view);
 
-    if status_vid.is_none() {
+    if status_view_id.is_none() {
         // TODO(ceg): log missing status mode
         return;
     }
 
-    let svid = status_vid.unwrap();
+    let svid = status_view_id.unwrap();
 
     let status_view = editor.view_map.get(&svid).unwrap();
 
@@ -670,7 +670,7 @@ pub fn find_start_reverse(
     // push new input map for y/n
     let mut v = view.write();
     // lock focus on v
-    // env.focus_locked_on = Some(v.id);
+    // env.focus_locked_on_view_id = Some(v.id);
 
     // TODO:
     dbg_println!("configure find  {:?}", v.id);

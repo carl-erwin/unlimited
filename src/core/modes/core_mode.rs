@@ -152,12 +152,12 @@ pub fn application_quit_abort_setup(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_vid = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(&editor, &env, view);
 
     dbg_println!("DOC CHANGED !\n");
-    dbg_println!("STATUS VID = {:?}", status_vid);
+    dbg_println!("STATUS VID = {:?}", status_view_id);
 
-    if let Some(svid) = status_vid {
+    if let Some(svid) = status_view_id {
         let status_view = editor.view_map.get(&svid).unwrap();
         //
         let doc = status_view.read().document().unwrap();
@@ -174,7 +174,7 @@ pub fn application_quit_abort_setup(
         {
             let mut v = view.write();
             // lock focus on v
-            // env.focus_locked_on = Some(v.id);
+            // env.focus_locked_on_view_id = Some(v.id);
 
             dbg_println!("configure quit-abort  {:?}", v.id);
             v.input_ctx.stack_pos = None;
@@ -207,13 +207,13 @@ pub fn application_quit_abort_no(
         let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
         input_map_stack.pop();
         // unlock focus
-        // env.focus_locked_on = None;
+        // env.focus_locked_on_view_id = None;
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_vid = view::get_status_view(&editor, &env, view);
-    if let Some(status_vid) = status_vid {
-        let status_view = editor.view_map.get(&status_vid).unwrap();
+    let status_view_id = view::get_status_view(&editor, &env, view);
+    if let Some(status_view_id) = status_view_id {
+        let status_view = editor.view_map.get(&status_view_id).unwrap();
         let doc = status_view.read().document().unwrap();
         let mut doc = doc.write();
         // clear buffer
@@ -1131,16 +1131,16 @@ pub fn help_popup(
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
 ) {
-    let root_vid = editor.root_views[env.root_view_index];
+    let root_view_id = editor.root_views[env.root_view_index];
     let (root_width, root_height) = {
-        let main = editor.view_map.get(&root_vid).unwrap().read();
+        let main = editor.view_map.get(&root_view_id).unwrap().read();
         (main.width, main.height)
     };
 
     // destroy previous
     {
         if let Some(info) = {
-            let mut main = editor.view_map.get(&root_vid).unwrap().write();
+            let mut main = editor.view_map.get(&root_view_id).unwrap().write();
             main.floating_children.pop()
         } {
             editor.view_map.remove(&info.id);
@@ -1173,7 +1173,7 @@ pub fn help_popup(
     let p_view = View::new(
         &mut editor,
         &mut env,
-        Some(root_vid),
+        Some(root_view_id),
         (x, y),
         (pop_width, pop_height),
         command_doc,
@@ -1182,7 +1182,7 @@ pub fn help_popup(
     );
 
     {
-        let mut main = editor.view_map.get(&root_vid).unwrap().write();
+        let mut main = editor.view_map.get(&root_view_id).unwrap().write();
 
         assert_ne!(p_view.id, view::Id(0));
 

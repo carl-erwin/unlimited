@@ -114,7 +114,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
                 if *button == 0 {
                     let mod_ctx = v.mode_ctx_mut::<VsplitModeContext>("vsplit-mode");
                     mod_ctx.selected = true;
-                    env.focus_locked_on = Some(v.id);
+                    env.focus_locked_on_view_id = Some(v.id);
                     return;
                 }
             }
@@ -137,7 +137,7 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
                 if *button == 0 {
                     let mod_ctx = v.mode_ctx_mut::<VsplitModeContext>("vsplit-mode");
                     mod_ctx.selected = false;
-                    env.focus_locked_on = None;
+                    env.focus_locked_on_view_id = None;
                 }
             }
         },
@@ -170,15 +170,15 @@ pub fn vsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
 
         let max_size = pv.screen.read().width();
 
-        let sibling_vid = pv.children[lidx].id;
-        let sbv = editor.view_map.get(&sibling_vid).unwrap();
+        let sibling_view_id = pv.children[lidx].id;
+        let sbv = editor.view_map.get(&sibling_view_id).unwrap();
         let sbv = sbv.read();
         let cur_size = sbv.screen.read().width();
 
         dbg_println!(
             "VSPLIT LIDX to resize = {}, sibling_ {:?}",
             lidx,
-            sibling_vid
+            sibling_view_id
         );
         dbg_println!("VSPLIT p.children {:?}", pv.children);
         dbg_println!("VSPLIT env.diff_x = {}", env.diff_x);
@@ -252,7 +252,7 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         let mod_ctx = view.mode_ctx::<VsplitModeContext>("vsplit-mode");
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        if env.focus_vid == view.id && mod_ctx.selected {
+        if env.focus_view_id == view.id && mod_ctx.selected {
             cpi.style.bg_color = (113, 114, 123);
         }
         cpi.cp = '│';

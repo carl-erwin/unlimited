@@ -595,7 +595,7 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     }
 }
 
-fn get_focused_vid(
+fn get_focused_view_id(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     vid: view::Id,
@@ -616,14 +616,14 @@ fn get_focused_vid(
         return vid;
     }
 
-    if let Some(focused_vid) = v.focus_to {
-        return get_focused_vid(&mut editor, &mut env, focused_vid);
+    if let Some(focused_view_id) = v.focus_to {
+        return get_focused_view_id(&mut editor, &mut env, focused_view_id);
     }
 
     vid
 }
 
-pub fn set_focus_on_vid(
+pub fn set_focus_on_view_id(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     vid: view::Id,
@@ -651,14 +651,14 @@ pub fn set_active_view(
     // TODO(ceg): propagate focus up to root
     let vid = view.id;
 
-    let prev_vid = env.active_view.unwrap_or(view::Id(0));
-    if prev_vid == vid {
+    let prev_view_id = env.active_view.unwrap_or(view::Id(0));
+    if prev_view_id == vid {
         return;
     }
 
     dbg_println!("set_active_view ---------");
     dbg_println!("set_active_view update vid {:?}", vid);
-    dbg_println!("focus changed {:?} -> {:?}", prev_vid, vid);
+    dbg_println!("focus changed {:?} -> {:?}", prev_view_id, vid);
 
     let mut parent_id = view.parent_id;
 
@@ -698,12 +698,12 @@ pub fn set_active_view(
 fn clip_locked_coordinates_xy(
     _editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
-    _root_vid: view::Id,
-    _vid: view::Id,
+    _root_view_id: view::Id,
+    _view_id: view::Id,
     x: &mut i32,
     y: &mut i32,
 ) -> view::Id {
-    let id = env.focus_locked_on.unwrap();
+    let id = env.focus_locked_on_view_id.unwrap();
 
     dbg_println!(
         "CLIPPING LOCKED  {:?} ----------------------------------BEGIN",
@@ -744,15 +744,22 @@ fn clip_locked_coordinates_xy(
 fn clip_coordinates_xy(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    root_vid: view::Id,
+    root_view_id: view::Id,
     vid: view::Id,
     mut x: &mut i32,
     mut y: &mut i32,
 ) -> view::Id {
-    let mut id = root_vid;
+    let mut id = root_view_id;
 
-    if env.focus_locked_on.is_some() {
-        return clip_locked_coordinates_xy(&mut editor, &mut env, root_vid, vid, &mut x, &mut y);
+    if env.focus_locked_on_view_id.is_some() {
+        return clip_locked_coordinates_xy(
+            &mut editor,
+            &mut env,
+            root_view_id,
+            vid,
+            &mut x,
+            &mut y,
+        );
     }
 
     let root_x = *x;
@@ -847,11 +854,11 @@ fn clip_coordinates_xy(
     } // 'outer
 }
 
-fn clip_coordinates_and_get_vid(
+fn clip_coordinates_and_get_view_id(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     ev: &InputEvent,
-    root_vid: view::Id,
+    root_view_id: view::Id,
     vid: view::Id,
 ) -> (view::Id, InputEvent) {
     let mut ev = ev.clone();
@@ -859,21 +866,21 @@ fn clip_coordinates_and_get_vid(
 
     let vid = match &mut ev {
         InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
-            let vid = clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y);
-            env.last_selected = vid;
+            let vid = clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y);
+            env.last_selected_view_id = vid;
             vid
         }
         InputEvent::ButtonRelease(event::ButtonEvent { x, y, .. }) => {
-            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
         }
         InputEvent::PointerMotion(event::PointerEvent { x, y, .. }) => {
-            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
         }
         InputEvent::WheelUp { x, y, .. } => {
-            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
         }
         InputEvent::WheelDown { x, y, .. } => {
-            clip_coordinates_xy(&mut editor, &mut env, root_vid, vid, x, y)
+            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
         }
         InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
@@ -980,15 +987,19 @@ fn run_stage(
 
                     env.process_input_end = Instant::now();
 
-                    if env.root_view_id != env.prev_vid {
+                    if env.root_view_id != env.prev_view_id {
                         env.event_processed = true;
 
-                        dbg_println!("view change {:?} ->  {:?}", env.prev_vid, env.root_view_id);
+                        dbg_println!(
+                            "view change {:?} ->  {:?}",
+                            env.prev_view_id,
+                            env.root_view_id
+                        );
 
                         check_view_dimension(editor, env);
                         {
                             // NB: resize previous view's screen to lower memory usage
-                            if let Some(view) = editor.view_map.get(&env.prev_vid) {
+                            if let Some(view) = editor.view_map.get(&env.prev_view_id) {
                                 view.write().screen.write().resize(1, 1);
                             }
 
@@ -1074,42 +1085,46 @@ fn setup_focus_and_event(
     ev: &InputEvent,
     compose: &mut bool,
 ) -> view::Id {
-    let root_vid = env.root_view_id;
+    let root_view_id = env.root_view_id;
 
-    let vid = get_focused_vid(&mut editor, &mut env, root_vid);
+    let vid = get_focused_view_id(&mut editor, &mut env, root_view_id);
 
     dbg_println!(">> setup_focus_and_event FOCUS on {:?}", vid);
 
     dbg_println!(">> setup_focus_and_event ACTIVE VIEW {:?}", env.active_view);
 
-    if root_vid != vid {
+    if root_view_id != vid {
         // only set, not cleared
         *compose = true;
     };
 
-    let (vid, ev) = clip_coordinates_and_get_vid(&mut editor, &mut env, ev, root_vid, vid);
+    let (vid, ev) = clip_coordinates_and_get_view_id(&mut editor, &mut env, ev, root_view_id, vid);
 
-    set_focus_on_vid(&mut editor, &mut env, vid);
+    set_focus_on_view_id(&mut editor, &mut env, vid);
 
     env.current_input_event = ev;
-    env.prev_vid = root_vid;
+    env.prev_view_id = root_view_id;
     vid
 }
 
 fn check_pointer_over_change(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    prev_vid: view::Id,
-    new_vid: view::Id,
+    prev_view_id: view::Id,
+    new_view_id: view::Id,
 ) {
-    if prev_vid == new_vid {
+    if prev_view_id == new_view_id {
         return;
     }
 
-    dbg_println!("pointer_over changed {:?} -> {:?}", prev_vid, new_vid);
+    dbg_println!(
+        "pointer_over changed {:?} -> {:?}",
+        prev_view_id,
+        new_view_id
+    );
 
     {
-        if let Some(prev_v) = editor.view_map.get(&prev_vid) {
+        if let Some(prev_v) = editor.view_map.get(&prev_view_id) {
             let prev_v = prev_v.clone();
 
             let mut prev_v = prev_v.write();
@@ -1118,15 +1133,15 @@ fn check_pointer_over_change(
             for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
-                if cb.1.id != prev_vid || cb.2.id != prev_vid {
+                if cb.1.id != prev_view_id || cb.2.id != prev_view_id {
                     continue;
                 }
 
                 mode.borrow().on_view_event(
                     &mut editor,
                     &mut env,
-                    ViewEventSource { id: prev_vid },
-                    ViewEventDestination { id: prev_vid },
+                    ViewEventSource { id: prev_view_id },
+                    ViewEventDestination { id: prev_view_id },
                     &ViewEvent::Leave,
                     &mut prev_v,
                     None,
@@ -1134,7 +1149,7 @@ fn check_pointer_over_change(
             }
         }
 
-        if let Some(new_v) = editor.view_map.get(&new_vid) {
+        if let Some(new_v) = editor.view_map.get(&new_view_id) {
             let new_v = new_v.clone();
             let mut new_v = new_v.write();
             let subscribers = { new_v.subscribers.clone() };
@@ -1142,15 +1157,15 @@ fn check_pointer_over_change(
             for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
-                if cb.1.id != new_vid || cb.2.id != new_vid {
+                if cb.1.id != new_view_id || cb.2.id != new_view_id {
                     continue;
                 }
 
                 mode.borrow().on_view_event(
                     &mut editor,
                     &mut env,
-                    ViewEventSource { id: new_vid },
-                    ViewEventDestination { id: new_vid },
+                    ViewEventSource { id: new_view_id },
+                    ViewEventDestination { id: new_view_id },
                     &ViewEvent::Enter,
                     &mut new_v,
                     None,
@@ -1159,33 +1174,33 @@ fn check_pointer_over_change(
         }
     }
 
-    env.pointer_over_on = new_vid;
+    env.pointer_over_view_id = new_view_id;
 }
 
 fn check_selection_change(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    prev_vid: view::Id,
-    new_vid: view::Id,
+    prev_view_id: view::Id,
+    new_view_id: view::Id,
 ) {
-    if prev_vid == new_vid {
+    if prev_view_id == new_view_id {
         return;
     }
 
     {
-        if let Some(new_v) = editor.view_map.get(&new_vid) {
+        if let Some(new_v) = editor.view_map.get(&new_view_id) {
             let new_v = new_v.clone();
             let mut new_v = new_v.write();
 
             // TODO(ceg): use event mask
             if new_v.ignore_focus {
                 dbg_println!("clicked changed ignored");
-                env.last_selected = prev_vid;
+                env.last_selected_view_id = prev_view_id;
                 return;
             }
 
             // notify prev
-            if let Some(prev_v) = editor.view_map.get(&prev_vid) {
+            if let Some(prev_v) = editor.view_map.get(&prev_view_id) {
                 let prev_v = prev_v.clone();
                 let mut prev_v = prev_v.write();
 
@@ -1193,15 +1208,15 @@ fn check_selection_change(
                 for cb in subscribers {
                     let mode = cb.0.as_ref();
 
-                    if cb.1.id != prev_vid || cb.2.id != prev_vid {
+                    if cb.1.id != prev_view_id || cb.2.id != prev_view_id {
                         continue;
                     }
 
                     mode.borrow().on_view_event(
                         &mut editor,
                         &mut env,
-                        ViewEventSource { id: prev_vid },
-                        ViewEventDestination { id: prev_vid },
+                        ViewEventSource { id: prev_view_id },
+                        ViewEventDestination { id: prev_view_id },
                         &ViewEvent::ViewDeselected,
                         &mut prev_v,
                         None,
@@ -1209,7 +1224,7 @@ fn check_selection_change(
                 }
             }
 
-            dbg_println!("clicked changed {:?} -> {:?}", prev_vid, new_vid);
+            dbg_println!("clicked changed {:?} -> {:?}", prev_view_id, new_view_id);
 
             // notify new
             let subscribers = new_v.subscribers.clone();
@@ -1217,15 +1232,15 @@ fn check_selection_change(
             for cb in subscribers.iter() {
                 let mode = cb.0.as_ref();
 
-                if cb.1.id != new_vid || cb.2.id != new_vid {
+                if cb.1.id != new_view_id || cb.2.id != new_view_id {
                     continue;
                 }
 
                 mode.borrow().on_view_event(
                     &mut editor,
                     &mut env,
-                    ViewEventSource { id: new_vid },
-                    ViewEventDestination { id: new_vid },
+                    ViewEventSource { id: new_view_id },
+                    ViewEventDestination { id: new_view_id },
                     &ViewEvent::ViewSelected,
                     &mut new_v,
                     None,
@@ -1234,7 +1249,7 @@ fn check_selection_change(
         }
     }
 
-    env.last_selected = new_vid;
+    env.last_selected_view_id = new_view_id;
 }
 
 // Loop over all input events
@@ -1274,20 +1289,20 @@ fn run_input_stage(
 
         let prev_active_view = env.active_view;
 
-        let pointer_over_vid = env.pointer_over_on;
-        let last_selected = env.last_selected;
+        let pointer_over_view_id = env.pointer_over_view_id;
+        let last_selected_view_id = env.last_selected_view_id;
 
         let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         dbg_println!("setup_focus_and_event ->  Id {:?}", target_id);
 
         dbg_println!("CEG : after setup_focus_and_event ->  env {:?}", env);
 
-        check_pointer_over_change(&mut editor, &mut env, pointer_over_vid, target_id);
+        check_pointer_over_change(&mut editor, &mut env, pointer_over_view_id, target_id);
 
-        let new_clicked = env.last_selected;
-        check_selection_change(&mut editor, &mut env, last_selected, new_clicked);
+        let new_clicked = env.last_selected_view_id;
+        check_selection_change(&mut editor, &mut env, last_selected_view_id, new_clicked);
 
-        dbg_println!("pointer_over_vid {:?}", pointer_over_vid);
+        dbg_println!("pointer_over_view_id {:?}", pointer_over_view_id);
         dbg_println!("new_clicked {:?}", new_clicked);
 
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
@@ -1307,10 +1322,10 @@ fn run_input_stage(
                     InputEvent::KeyPress { .. } => prev_active_view,
                     _ => env.active_view.unwrap_or(target_id),
                 };
-                set_focus_on_vid(&mut editor, &mut env, vid);
+                set_focus_on_view_id(&mut editor, &mut env, vid);
             }
         } else {
-            set_focus_on_vid(&mut editor, &mut env, target_id);
+            set_focus_on_view_id(&mut editor, &mut env, target_id);
         }
     }
 

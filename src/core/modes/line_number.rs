@@ -45,7 +45,7 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 
 use crate::core::editor::register_input_stage_action;
-use crate::core::editor::set_focus_on_vid;
+use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::input_map::build_input_event_map;
 
@@ -176,7 +176,7 @@ pub fn linenum_input_event(
 
     // explicit focus on text view
     let mode_ctx = v.mode_ctx::<LineNumberModeContext>("line-number-mode");
-    env.focus_locked_on = None;
+    env.focus_locked_on_view_id = None;
 
     let evt = v.input_ctx.trigger.last();
     match evt {
@@ -192,7 +192,7 @@ pub fn linenum_input_event(
                 y: _,
                 button: _,
             } => {
-                set_focus_on_vid(&mut editor, &mut env, mode_ctx.text_vid);
+                set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
             }
         },
 
@@ -208,7 +208,7 @@ pub fn linenum_input_event(
                 y: _,
                 button: _,
             } => {
-                set_focus_on_vid(&mut editor, &mut env, mode_ctx.text_vid);
+                set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
             }
         },
 
@@ -227,8 +227,8 @@ pub fn linenum_input_event(
 
 pub struct LineNumberModeContext {
     // add per view fields
-    linenum_vid: view::Id,
-    text_vid: view::Id,
+    linenum_view_id: view::Id,
+    text_view_id: view::Id,
 }
 
 struct LineNumberModeDocEventHandler {
@@ -249,8 +249,8 @@ impl<'a> Mode for LineNumberMode {
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc line-number-mode ctx");
         let ctx = LineNumberModeContext {
-            linenum_vid: view::Id(0),
-            text_vid: view::Id(0),
+            linenum_view_id: view::Id(0),
+            text_view_id: view::Id(0),
         };
         Box::new(ctx)
     }
@@ -328,8 +328,8 @@ impl<'a> Mode for LineNumberMode {
                 let mut mode_ctx =
                     linenum_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
 
-                mode_ctx.text_vid = src.id;
-                mode_ctx.linenum_vid = dst.id;
+                mode_ctx.text_view_id = src.id;
+                mode_ctx.linenum_view_id = dst.id;
             }
 
             ViewEvent::PreLayoutSizing => {
@@ -438,8 +438,8 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
     ) {
         let view = view.read();
         let mode_ctx = view.mode_ctx::<LineNumberModeContext>("line-number-mode");
-        let text_vid = mode_ctx.text_vid;
-        let src = editor.view_map.get(&text_vid).unwrap().read();
+        let text_view_id = mode_ctx.text_view_id;
+        let src = editor.view_map.get(&text_view_id).unwrap().read();
         self.line_offsets = src.screen.read().line_offset.clone();
 
         self.line_number.clear();
