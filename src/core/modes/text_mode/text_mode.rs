@@ -2215,6 +2215,30 @@ pub fn center_around_mark(
     center_view_around_offset(view, editor, env, offset);
 }
 
+pub fn center_around_mark_if_offscreen(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let center = {
+        let v = &mut view.write();
+
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+        let mid = tm.mark_index;
+        let marks = &tm.marks;
+        if marks.len() > 0 {
+            let offset = marks[mid].offset;
+            let screen = v.screen.read();
+            !screen.contains_offset(offset)
+        } else {
+            false
+        }
+    };
+    if center {
+        center_around_mark(editor, env, &view);
+    }
+}
+
 pub fn center_around_offset(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
