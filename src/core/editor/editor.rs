@@ -168,6 +168,7 @@ pub struct Editor<'a> {
     pub root_views: Vec<view::Id>,
     pub view_map: HashMap<view::Id, Rc<RwLock<View<'a>>>>,
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
+    pub dir_modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub core_tx: Sender<EventMessage<'a>>,
     pub ui_tx: Sender<EventMessage<'a>>,
     pub worker_tx: Sender<EventMessage<'a>>,
@@ -190,6 +191,7 @@ impl<'a> Editor<'a> {
             root_views: vec![],
             view_map: HashMap::new(),
             modes: Rc::new(RefCell::new(HashMap::new())),
+            dir_modes: Rc::new(RefCell::new(HashMap::new())),
             ui_tx,
             core_tx,
             worker_tx,
@@ -228,6 +230,13 @@ impl<'a> Editor<'a> {
     }
 
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
+        let name = mode.name();
+        self.modes
+            .borrow_mut()
+            .insert(name.to_owned(), Rc::new(RefCell::new(mode)));
+    }
+
+    pub fn register_directory_mode<'e>(&mut self, mode: Box<dyn Mode>) {
         let name = mode.name();
         self.modes
             .borrow_mut()

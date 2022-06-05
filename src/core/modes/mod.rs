@@ -2,6 +2,9 @@ use std::any::Any;
 
 pub mod basic_editor;
 pub mod core_mode;
+pub mod dir_fetch;
+pub mod dir_mode;
+
 pub mod find_mode;
 pub mod goto_line_mode;
 pub mod hsplit_mode;
@@ -31,6 +34,8 @@ pub use status_mode::StatusMode;
 pub use text_mode::TextMode;
 pub use vscrollbar_mode::VscrollbarMode;
 pub use vsplit_mode::VsplitMode;
+
+pub use dir_mode::DirMode;
 
 use crate::core::buffer::Buffer;
 

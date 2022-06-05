@@ -381,7 +381,7 @@ impl ArgInfo {
     }
 }
 
-fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
+fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
     let re_line_col = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
@@ -478,7 +478,7 @@ fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.buffer_map.read().len();
 
-    let arg_info = build_file_options(editor);
+    let arg_info = build_buffer_options(editor);
 
     dbg_println!("processing arg_info {:?}", arg_info);
 
@@ -486,16 +486,24 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         dbg_println!("processing arg {:?}", arg);
 
         // check file type
-        if let Ok(metadata) = fs::metadata(&arg.path) {
+        let kind = if let Ok(metadata) = fs::metadata(&arg.path) {
             let file_type = metadata.file_type();
 
             // ignore directories for now
             if file_type.is_dir() {
+                BufferKind::Directory
+            } else if file_type.is_file() {
+                BufferKind::File
+            } else {
+                // display error
                 continue;
             }
-        }
+        } else {
+            // display error
+            continue;
+        };
 
-        let b = BufferBuilder::new(BufferKind::File)
+        let b = BufferBuilder::new(kind)
             .buffer_name(&arg.path)
             .file_name(&arg.path)
             .internal(false)
@@ -516,9 +524,10 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         // edit.get_untitled_count() -> 1
 
         let b = BufferBuilder::new(BufferKind::File)
-            .buffer_name("untitled-1")
+            .buffer_name("welcome")
             .internal(false)
             .use_buffer_log(true)
+            // .read_only(true) // TODO
             .finalize();
         if let Some(b) = b {
             {
@@ -527,8 +536,6 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
 
                 // move 1st tag to ctor/buffer::new() ?
                 d.tag(env.current_time, 0, vec![0], vec![]); // TODO(ceg): rm this only if the buffer log is cleared
-                                                             //    create_views(&mut editor, &mut env);
-
                 d.insert(0, s.len(), s);
 
                 // do not allow to go back to empty buffer
@@ -573,13 +580,16 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
         }
     }
 
-    let modes = match std::env::var("SINGLE_VIEW") {
-        Ok(_) => vec!["simple-view".to_owned()],
-        _ => vec!["basic-editor".to_owned()],
-    };
-
     // create views
     for buffer in buffers {
+        let modes = match buffer.as_ref().read().kind {
+            BufferKind::File => match std::env::var("SINGLE_VIEW") {
+                Ok(_) => vec!["simple-view".to_owned()],
+                _ => vec!["basic-editor".to_owned()],
+            },
+            BufferKind::Directory => vec!["core-mode".to_owned(), "dir-mode".to_owned()],
+        };
+
         let view = View::new(editor, env, None, (0, 0), (1, 1), Some(buffer), &modes, 0);
         dbg_println!("create {:?}", view.id);
 
@@ -620,6 +630,8 @@ use crate::core::modes::LineNumberMode;
 
 use crate::core::modes::OpenDocMode;
 
+use crate::core::modes::DirMode;
+
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
     editor.register_mode(Box::new(CoreMode::new()));
@@ -640,4 +652,6 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(GotoLineMode::new()));
 
     editor.register_mode(Box::new(OpenDocMode::new()));
+
+    editor.register_directory_mode(Box::new(DirMode::new()));
 }

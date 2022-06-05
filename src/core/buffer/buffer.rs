@@ -268,10 +268,16 @@ impl<'a> Buffer<'a> {
     ) -> Option<Arc<RwLock<Buffer<'static>>>> {
         dbg_println!("try open {} {} {:?}", buffer_name, file_name, mode);
 
-        let inner = if file_name.is_empty() {
-            InnerBuffer::empty(mode.clone())
-        } else {
-            InnerBuffer::new(&file_name, mode.clone())
+        let inner = match kind {
+            BufferKind::File => {
+                if file_name.is_empty() {
+                    InnerBuffer::empty(mode.clone())
+                } else {
+                    InnerBuffer::new(&file_name, mode.clone())
+                }
+            }
+
+            BufferKind::Directory => InnerBuffer::empty(mode.clone()),
         };
 
         let mut changed = false;
