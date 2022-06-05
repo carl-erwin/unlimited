@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::core::document::Buffer;
+use crate::core::buffer::Buffer;
 
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
@@ -40,13 +40,13 @@ pub struct Id(pub usize);
 //
 // reorg
 // buffer
-// doc list
-// doc -> [list of view]
+// buffer list
+// buffer -> [list of view]
 // view -> main mode + list of sub mode  (recursive) ?
-// notify all view when doc change
+// notify all view when buffer change
 //
-// any view(doc)
-// we should be able to view a document with different views
+// any view(buffer)
+// we should be able to view a buffer with different views
 
 // TODO(ceg): "virtual" scene graph
 // add recursive View definition:
@@ -199,7 +199,7 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
 // post()
 
 // TODO(ceg): add ?
-//        doc,
+//        buffer,
 //        view
 
 // TODO(ceg):
@@ -253,12 +253,12 @@ pub enum ViewEvent {
 }
 
 // marks | selections Refresh_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
-// cb signature  fn cb_on_document_event(editor, env, BufferEventSource { doc_id }, doc_event)
+// cb signature  fn cb_on_buffer_event(editor, env, BufferEventSource { buffer_id }, buffer_event)
 
 // register siblings view
 // text <--> scrollbar
 // cb signature  fn cb_on_view_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
-// cb signature  fn cb_on_document_event(editor, env, BufferEventSource { doc_id }, doc_event)
+// cb signature  fn cb_on_buffer_event(editor, env, BufferEventSource { buffer_id }, buffer_event)
 
 //  enum ViewEvent {
 //    ViewOffsetsChange { start_offset, end_offset }
@@ -314,17 +314,17 @@ pub struct View<'a> {
 
     /*
       any view that can display some text,
-      TODO(ceg): use special document for this
+      TODO(ceg): use special buffer for this
       split text-mode into
       text-display-mode: scrolling ops etc
       text-edit-mode   : marks , selection etc...
       if edit is on display marks
-      disable buffer log for this special document
+      disable buffer log for this special buffer
 
       maybe allow to change compose filter of status_view_id ?
       for custom status display ?
     */
-    pub document: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
+    pub buffer: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
 
     pub modes: Vec<String>,
 
@@ -424,8 +424,8 @@ pub fn view_self_subscribe(
 }
 
 impl<'a> View<'a> {
-    pub fn document(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
-        self.document.clone()
+    pub fn buffer(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
+        self.buffer.clone()
     }
 
     // Setup view modes. (respect vector order)
@@ -480,7 +480,7 @@ impl<'a> View<'a> {
         parent_id: Option<Id>,
         x_y: Position,
         w_h: Dimension,
-        document: Option<Arc<RwLock<Buffer<'static>>>>,
+        buffer: Option<Arc<RwLock<Buffer<'static>>>>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
     ) -> View<'static> {
@@ -502,7 +502,7 @@ impl<'a> View<'a> {
             controller: None,
             controlled_view: None,
             id: Id(id),
-            document,
+            buffer,
             screen,
             //
             input_ctx,
@@ -591,7 +591,7 @@ impl<'a> View<'a> {
 
     pub fn check_invariants(&self) {
         self.screen.read().check_invariants();
-        let _max_offset = self.document().unwrap().read().size();
+        let _max_offset = self.buffer().unwrap().read().size();
         // TODO(ceg): mode check invariants
     }
 } // impl View
@@ -658,8 +658,8 @@ pub fn compute_root_view_layout(
         v.global_x = Some(0);
         v.global_y = Some(0);
 
-        let doc = v.document()?;
-        let max_offset = { doc.read().size() as u64 };
+        let buffer = v.buffer()?;
+        let max_offset = { buffer.read().size() as u64 };
         let dimension = v.screen.read().dimension();
         let start_offset = v.start_offset;
         (dimension, start_offset, max_offset)

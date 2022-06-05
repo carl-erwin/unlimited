@@ -87,8 +87,8 @@ pub fn template_input_action_fn1(
     view: &Rc<RwLock<View>>,
 ) {
     let v = view.read();
-    let doc = v.document().unwrap();
-    let _doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let _buffer = buffer.read();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

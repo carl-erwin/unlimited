@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::Mode;
 
-use crate::core::document::Buffer;
+use crate::core::buffer::Buffer;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
@@ -17,7 +17,7 @@ use crate::core::event::*;
 
 use crate::core::event::input_map::build_input_event_map;
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 
 use crate::core::view;
 use crate::core::view::ChildView;
@@ -30,7 +30,7 @@ static CORE_INPUT_MAP: &str = r#"
   {
     "events": [
      { "in": [{ "key": "F4"     }],                          "action": "toggle-debug-print" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-document" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-buffer" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
      { "in": [{ "key": "F1" } ],                             "action": "help-pop-up" }
@@ -116,7 +116,7 @@ impl CoreMode {
 
         register_input_stage_action(&mut map, "help-pop-up", help_popup);
 
-        register_input_stage_action(&mut map, "save-document", save_document); // core ?
+        register_input_stage_action(&mut map, "save-buffer", save_buffer); // core ?
         register_input_stage_action(&mut map, "split-vertically", split_vertically);
         register_input_stage_action(&mut map, "split-horizontally", split_horizontally);
         register_input_stage_action(&mut map, "destroy-view", destroy_view);
@@ -135,12 +135,12 @@ pub fn application_quit(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // TODO(ceg): change this
-    // editor.changed_doc : HashSet<document::Id>
-    // if editor.change_docs.len() != 0
+    // editor.changed_buffer : HashSet<buffer::Id>
+    // if editor.change_buffers.len() != 0
 
-    let doc = { view.read().document().unwrap() };
-    let doc = doc.read();
-    if !doc.changed {
+    let buffer = { view.read().buffer().unwrap() };
+    let buffer = buffer.read();
+    if !buffer.changed {
         env.quit = true;
     } else {
         application_quit_abort_setup(&mut editor, &mut env, &view);
@@ -160,15 +160,15 @@ pub fn application_quit_abort_setup(
     if let Some(svid) = status_view_id {
         let status_view = editor.view_map.get(&svid).unwrap();
         //
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
+        let buffer = status_view.read().buffer().unwrap();
+        let mut buffer = buffer.write();
         // clear doc
-        let sz = doc.size();
-        doc.remove(0, sz, None);
+        let sz = buffer.size();
+        buffer.remove(0, sz, None);
         // set status text
-        let text = "Modified documents exist. Really quit? y/n";
+        let text = "Modified buffers exist. Really quit? y/n";
         let bytes = text.as_bytes();
-        doc.insert(0, bytes.len(), &bytes);
+        buffer.insert(0, bytes.len(), &bytes);
 
         // push new input map for y/n
         {
@@ -214,11 +214,11 @@ pub fn application_quit_abort_no(
     let status_view_id = view::get_status_view(&editor, &env, view);
     if let Some(status_view_id) = status_view_id {
         let status_view = editor.view_map.get(&status_view_id).unwrap();
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
+        let buffer = status_view.read().buffer().unwrap();
+        let mut buffer = buffer.write();
         // clear buffer
-        let sz = doc.size();
-        doc.remove(0, sz, None);
+        let sz = buffer.size();
+        buffer.remove(0, sz, None);
     }
 }
 
@@ -226,48 +226,48 @@ pub fn toggle_dgb_print(_editor: &mut Editor, _env: &mut EditorEnv, _view: &Rc<R
     crate::core::toggle_dbg_println();
 }
 
-pub fn save_document(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn save_buffer(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = view.write();
 
-    let doc_id = {
-        let doc = v.document().unwrap();
+    let buffer_id = {
+        let buffer = v.buffer().unwrap();
         {
             // - needed ? already syncing ? -
-            let doc = doc.read();
-            if !doc.changed || doc.is_syncing {
-                // TODO(ceg): ensure all other places are checking this flag, all doc....write()
+            let buffer = buffer.read();
+            if !buffer.changed || buffer.is_syncing {
+                // TODO(ceg): ensure all other places are checking this flag, all buffer....write()
                 // better, some permissions mechanism ?
-                // doc.access_permissions = r-
-                // doc.access_permissions = -w
-                // doc.access_permissions = rw
+                // buffer.access_permissions = r-
+                // buffer.access_permissions = -w
+                // buffer.access_permissions = rw
                 return;
             }
         }
 
         // - set sync flag -
         {
-            let mut doc = doc.write();
-            let doc_id = doc.id;
-            doc.is_syncing = true;
-            doc_id
+            let mut buffer = buffer.write();
+            let buffer_id = buffer.id;
+            buffer.is_syncing = true;
+            buffer_id
         }
     };
 
     // - send sync job to worker -
     //
-    // NB: We must take the doc clone from Editor not View
+    // NB: We must take the buffer clone from Editor not View
     // because lifetime(editor) >= lifetime(view)
-    // ( view.doc is a clone from editor.document_map ),
+    // ( view.doc is a clone from editor.buffer_map ),
     // doing this let us avoid the use manual lifetime annotations ('static)
     // and errors like "data from `view` flows into `editor`"
-    let document_map = editor.document_map.clone();
-    let document_map = document_map.read();
+    let buffer_map = editor.buffer_map.clone();
+    let buffer_map = buffer_map.read();
 
-    if let Some(doc) = document_map.get(&doc_id) {
+    if let Some(buffer) = buffer_map.get(&buffer_id) {
         let msg = EventMessage {
             seq: 0,
             event: Event::SyncTask {
-                doc: Arc::clone(doc),
+                buffer: Arc::clone(buffer),
             },
         };
         editor.worker_tx.send(msg).unwrap_or(());
@@ -285,7 +285,7 @@ pub fn split_with_direction(
     height: usize,
     dir: view::LayoutDirection,
     layout_ops: &Vec<LayoutOperation>,
-    doc: &Vec<Option<Arc<RwLock<Buffer<'static>>>>>,
+    buffer: &Vec<Option<Arc<RwLock<Buffer<'static>>>>>,
     modes: &Vec<Vec<String>>,
 ) {
     v.layout_direction = dir;
@@ -323,7 +323,7 @@ pub fn split_with_direction(
                 Some(v.id),
                 (x, y),
                 (width, height),
-                doc[idx].clone(),
+                buffer[idx].clone(),
                 &modes[idx],
                 v.start_offset,
             ),
@@ -504,7 +504,7 @@ struct SplitInfo {
     y: usize,
     width: usize,
     height: usize,
-    doc: Option<Arc<RwLock<Buffer<'static>>>>,
+    buffer: Option<Arc<RwLock<Buffer<'static>>>>,
     original_modes: Vec<String>,
     layout_index: Option<usize>,
 }
@@ -529,7 +529,7 @@ fn build_split_info(view: &Rc<RwLock<View<'static>>>, dir: view::LayoutDirection
         y: v.y,
         width,
         height,
-        doc: v.document().clone(),
+        buffer: v.buffer().clone(),
         original_modes: v.modes.clone(),
         layout_index: v.layout_index,
     }
@@ -654,7 +654,7 @@ pub fn split_view_with_direction(
             Some(new_parent_id),
             (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
             (split_info.width, split_info.height),
-            split_info.doc.clone(),
+            split_info.buffer.clone(),
             &split_info.original_modes,
             0,
         );
@@ -1148,8 +1148,8 @@ pub fn help_popup(
         }
     }
 
-    let command_doc = BufferBuilder::new()
-        .document_name("help-pop-up")
+    let command_buffer = BufferBuilder::new()
+        .buffer_name("help-pop-up")
         .internal(true)
         //           .use_buffer_log(false)
         .finalize();
@@ -1165,7 +1165,7 @@ pub fn help_popup(
     let y = (root_height / 2).saturating_sub(pop_height / 2);
 
     {
-        let mut d = command_doc.as_ref().unwrap().write();
+        let mut d = command_buffer.as_ref().unwrap().write();
         d.append(HELP_MESSAGE.as_bytes());
     }
 
@@ -1176,7 +1176,7 @@ pub fn help_popup(
         Some(root_view_id),
         (x, y),
         (pop_width, pop_height),
-        command_doc,
+        command_buffer,
         &vec!["status-mode".to_owned()],
         0,
     );

@@ -40,7 +40,7 @@ pub struct LayoutEnv<'a> {
 }
 
 // TODO(ceg): add ?
-//        doc,
+//        buffer,
 //        view
 //
 //  input_mime_type() -> &str "" | ""
@@ -202,7 +202,7 @@ pub fn run_compositing_stage(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
-    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
+    max_offset: u64,  // default view.buffer.size()   end  -> Option<u64>
     screen: &mut Screen,
     pass_mask: LayoutPass,
 ) {
@@ -276,7 +276,7 @@ fn compose_children(
     editor_env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     _base_offset: u64, // default view.start_offset start -> Option<u64>
-    max_offset: u64,   // default view.doc.size()   end  -> Option<u64>
+    max_offset: u64,   // default view.buffer.size()   end  -> Option<u64>
     screen: &mut Screen,
     pass_mask: LayoutPass,
 ) -> bool {
@@ -533,7 +533,7 @@ pub fn run_compositing_stage_direct(
     editor_env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
     base_offset: u64, // default view.start_offset start -> Option<u64>
-    max_offset: u64,  // default view.doc.size()   end  -> Option<u64>
+    max_offset: u64,  // default view.buffer.size()   end  -> Option<u64>
     screen: &mut Screen,
     pass_mask: LayoutPass,
 ) {

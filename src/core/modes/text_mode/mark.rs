@@ -1,5 +1,5 @@
 //
-use crate::core::document::Buffer;
+use crate::core::buffer::Buffer;
 
 use crate::core::codec::text::SyncDirection;
 use crate::core::codec::text::TextCodec;
@@ -22,17 +22,17 @@ fn is_blank(cp: char) -> bool {
 
 // TODO(ceg): codec...
 pub fn read_char_forward(
-    doc: &Buffer,
+    buffer: &Buffer,
     from_offset: u64,
     codec: &dyn TextCodec,
 ) -> (char, u64, usize) {
-    if from_offset == doc.size() as u64 {
+    if from_offset == buffer.size() as u64 {
         // return None;
         return (b'\0' as char, 0, 0);
     }
 
     let mut data = Vec::with_capacity(4);
-    let sz = doc.read(from_offset, data.capacity(), &mut data); // TODO(ceg): decode up to capacity ?
+    let sz = buffer.read(from_offset, data.capacity(), &mut data); // TODO(ceg): decode up to capacity ?
 
     if DEBUG {
         dbg_println!(
@@ -48,7 +48,7 @@ pub fn read_char_forward(
 
 // TODO(ceg): codec..., remove temporary vec -> slice
 pub fn read_char_backward(
-    doc: &Buffer,
+    buffer: &Buffer,
     from_offset: u64,
     codec: &dyn TextCodec,
 ) -> (char, u64, usize) {
@@ -71,7 +71,7 @@ pub fn read_char_backward(
 
     // fill buf
     let mut data = Vec::with_capacity(4);
-    let rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+    let rd = buffer.read(rewind_offset, data.capacity(), &mut data) as u64;
 
     if DEBUG {
         dbg_println!("mark :: read_char_backward rd {} data {:?}", rd, data);
@@ -92,7 +92,7 @@ pub fn read_char_backward(
 pub fn read_char(
     _direction: SyncDirection,
     codec: &dyn TextCodec,
-    doc: &Buffer,
+    buffer: &Buffer,
     from_offset: u64,
 ) -> (char, u64, usize) {
     if from_offset == 0 {
@@ -106,7 +106,7 @@ pub fn read_char(
 
     // fill buf
     let mut data = Vec::with_capacity(4);
-    let _rd = doc.read(rewind_offset, data.capacity(), &mut data) as u64;
+    let _rd = buffer.read(rewind_offset, data.capacity(), &mut data) as u64;
     //
     let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
 
@@ -116,13 +116,13 @@ pub fn read_char(
 
 pub fn decode_until_offset_or_char(
     mark: &mut Mark,
-    doc: &Buffer,
+    buffer: &Buffer,
     codec: &dyn TextCodec,
     limit: u64,
     c: Option<char>,
     build_data: bool,
 ) -> Option<Vec<(u64, char, usize)>> {
-    let max_offset = std::cmp::min(doc.size() as u64, limit);
+    let max_offset = std::cmp::min(buffer.size() as u64, limit);
 
     let mut prev_offset = mark.offset;
 
@@ -133,21 +133,21 @@ pub fn decode_until_offset_or_char(
     // must limit alloc size
     let cache_size = std::cmp::min(1024 * 1024 * 2, limit - prev_offset);
     let mut codepoints = vec![];
-    let mut rd_cache = doc.build_cache(prev_offset, prev_offset + cache_size);
+    let mut rd_cache = buffer.build_cache(prev_offset, prev_offset + cache_size);
 
     loop {
         // TODO(ceg): avoid this, use single read before loop
         // and pass &buff[pos..pos+4] for decode
         // pos += size
         let mut data = Vec::with_capacity(4);
-        //doc.read(prev_offset, data.capacity(), &mut data);
+        //buffer.read(prev_offset, data.capacity(), &mut data);
 
         // update cache
         if !rd_cache.contains(prev_offset, prev_offset + data.len() as u64) {
-            rd_cache = doc.build_cache(prev_offset, prev_offset + cache_size);
+            rd_cache = buffer.build_cache(prev_offset, prev_offset + cache_size);
         }
 
-        doc.read_cached(prev_offset, data.capacity(), &mut data, &rd_cache);
+        buffer.read_cached(prev_offset, data.capacity(), &mut data, &rd_cache);
 
         let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
         if prev_offset >= max_offset {
@@ -183,12 +183,12 @@ pub fn decode_until_offset_or_char(
 
 pub fn decode_until_end_of_line_or_offset(
     mark: &mut Mark,
-    doc: &Buffer,
+    buffer: &Buffer,
     codec: &dyn TextCodec,
     limit: u64,
     build_data: bool,
 ) -> Option<Vec<(u64, char, usize)>> {
-    decode_until_offset_or_char(mark, doc, codec, limit, Some('\n'), build_data)
+    decode_until_offset_or_char(mark, buffer, codec, limit, Some('\n'), build_data)
 }
 
 impl Mark {
@@ -226,10 +226,10 @@ impl Mark {
         Mark { offset }
     }
 
-    pub fn move_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        if self.offset < doc.size() as u64 {
+    pub fn move_forward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        if self.offset < buffer.size() as u64 {
             // TODO(ceg): if '\r\n' must move + 1 in codec
-            let (_, _, size) = read_char_forward(&doc, self.offset, codec);
+            let (_, _, size) = read_char_forward(&buffer, self.offset, codec);
             self.offset += size as u64;
         }
 
@@ -237,8 +237,8 @@ impl Mark {
     }
 
     // TODO(ceg): check multi-byte utf8 sequence
-    pub fn move_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        let (c, offset, size) = read_char_backward(&doc, self.offset, codec);
+    pub fn move_backward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        let (c, offset, size) = read_char_backward(&buffer, self.offset, codec);
         dbg_println!(
             "move_backward : char = '{:?}', self.offset({}) = offset({}), size({})",
             c,
@@ -251,14 +251,14 @@ impl Mark {
         self
     }
 
-    pub fn move_to_start_of_line(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_start_of_line(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
 
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
-        self.offset = if let Some(offset) = doc.find_reverse(&encode[..sz], self.offset, None) {
+        self.offset = if let Some(offset) = buffer.find_reverse(&encode[..sz], self.offset, None) {
             offset + sz as u64
         } else {
             0
@@ -267,33 +267,33 @@ impl Mark {
         self
     }
 
-    pub fn move_to_end_of_line(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_end_of_line(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
-        self.offset = if let Some(offset) = doc.find(&encode[..sz], self.offset, None) {
+        self.offset = if let Some(offset) = buffer.find(&encode[..sz], self.offset, None) {
             offset
         } else {
-            doc.size() as u64
+            buffer.size() as u64
         };
 
         self
     }
 
-    pub fn at_end_of_buffer(&self, doc: &Buffer) -> bool {
+    pub fn at_end_of_buffer(&self, buffer: &Buffer) -> bool {
         // TODO(ceg): end_of_buffer().or_return()
-        self.offset == doc.size() as u64
+        self.offset == buffer.size() as u64
     }
 
-    // skip_class(&mut self, direction, fn class_match, doc, codec)
+    // skip_class(&mut self, direction, fn class_match, buffer, codec)
     // class_match(char) -> bool
-    pub fn skip_blanks_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_blanks_backward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let mut prev_offset = self.offset;
-        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+        let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
 
         // skip_backward blanks
         if is_blank(cp) {
             while prev_offset > 0 {
-                let ret = read_char_backward(&doc, prev_offset, codec);
+                let ret = read_char_backward(&buffer, prev_offset, codec);
                 prev_offset -= ret.2 as u64;
                 if !is_blank(ret.0) {
                     break;
@@ -305,13 +305,17 @@ impl Mark {
         self
     }
 
-    pub fn skip_non_blanks_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_non_blanks_backward(
+        &mut self,
+        buffer: &Buffer,
+        codec: &dyn TextCodec,
+    ) -> &mut Mark {
         let mut prev_offset = self.offset;
-        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+        let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
 
         if !is_blank(cp) {
             while prev_offset > 0 {
-                let ret = read_char_backward(&doc, prev_offset, codec);
+                let ret = read_char_backward(&buffer, prev_offset, codec);
                 if is_blank(ret.0) {
                     prev_offset = ret.1;
                     break;
@@ -324,35 +328,35 @@ impl Mark {
         self
     }
 
-    pub fn move_to_token_start(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_token_start(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
 
-        let (cp, _, _) = read_char_forward(&doc, self.offset, codec);
+        let (cp, _, _) = read_char_forward(&buffer, self.offset, codec);
         if !is_blank(cp) {
-            self.skip_non_blanks_backward(doc, codec);
+            self.skip_non_blanks_backward(buffer, codec);
         }
 
-        self.skip_blanks_backward(doc, codec);
-        self.skip_non_blanks_backward(doc, codec);
-        let (cp, _, _) = read_char_forward(&doc, self.offset, codec);
+        self.skip_blanks_backward(buffer, codec);
+        self.skip_non_blanks_backward(buffer, codec);
+        let (cp, _, _) = read_char_forward(&buffer, self.offset, codec);
         if is_blank(cp) {
-            self.move_forward(doc, codec);
+            self.move_forward(buffer, codec);
         }
 
         self
     }
 
-    pub fn skip_blanks_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        let max_offset = doc.size() as u64;
+    pub fn skip_blanks_forward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        let max_offset = buffer.size() as u64;
         let mut prev_offset = self.offset;
-        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+        let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
 
         // skip blanks
         if is_blank(cp) {
             while prev_offset < max_offset {
-                let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
+                let (cp, _, size) = read_char_forward(&buffer, prev_offset, codec);
                 if !is_blank(cp) {
                     break;
                 }
@@ -364,14 +368,14 @@ impl Mark {
         self
     }
 
-    pub fn skip_non_blanks_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        let max_offset = doc.size() as u64;
+    pub fn skip_non_blanks_forward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        let max_offset = buffer.size() as u64;
         let mut prev_offset = self.offset;
-        let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
+        let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
 
         if !is_blank(cp) {
             while prev_offset < max_offset {
-                let (cp, _, size) = read_char_forward(&doc, prev_offset, codec);
+                let (cp, _, size) = read_char_forward(&buffer, prev_offset, codec);
                 if is_blank(cp) {
                     break;
                 }
@@ -383,22 +387,22 @@ impl Mark {
         self
     }
 
-    pub fn move_to_token_end(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        if self.at_end_of_buffer(doc) {
+    pub fn move_to_token_end(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        if self.at_end_of_buffer(buffer) {
             return self;
         }
         // skip blanks
-        self.skip_blanks_forward(doc, codec);
-        self.skip_non_blanks_forward(doc, codec);
+        self.skip_blanks_forward(buffer, codec);
+        self.skip_non_blanks_forward(buffer, codec);
         self
     }
 }
 
 #[test]
 fn test_marks() {
+    use crate::core::buffer::BufferBuilder;
+    use crate::core::buffer::OpenMode;
     use crate::core::codec::text::utf8::Utf8Codec;
-    use crate::core::document::BufferBuilder;
-    use crate::core::document::OpenMode;
 
     // TODO(ceg): move to utf8 tests
     // add more tests move etc
@@ -409,14 +413,14 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
 
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
 
         let data = vec![0xe2, 0x82, 0xac, 0xe2, 0x82, 0xac];
         bb.insert(0, 6, &data);
@@ -437,13 +441,13 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
         let data = vec![0x82, 0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -462,13 +466,13 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
         let data = vec![0xac, 0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
 
@@ -488,13 +492,13 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
         let data = vec![0xe2, 0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -513,13 +517,13 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
         let data = vec![0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];
@@ -538,13 +542,13 @@ fn test_marks() {
 
     {
         let mut builder = BufferBuilder::new();
-        let doc = builder
-            .document_name("test-1")
+        let buffer = builder
+            .buffer_name("test-1")
             .internal(false)
             .mode(OpenMode::ReadWrite)
             .finalize()
             .unwrap();
-        let mut bb = doc.write();
+        let mut bb = buffer.write();
         let data = vec![0x82, 0x61];
         bb.insert(0, data.len(), &data);
         let mut rdata = vec![];

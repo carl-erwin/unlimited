@@ -35,17 +35,17 @@ pub struct Id(pub usize);
 pub struct BufferBuilder {
     internal: bool,
     use_buffer_log: bool,
-    document_name: String,
+    buffer_name: String,
     file_name: String,
     mode: OpenMode,
 }
 
 #[derive(Debug)]
 struct BufferMappedFileEventHandler<'a> {
-    _doc: Weak<RwLock<Buffer<'a>>>,
+    _buffer: Weak<RwLock<Buffer<'a>>>,
 }
 
-fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> BufferEvent {
+fn mapped_file_event_to_buffer_event(evt: &MappedFileEvent) -> BufferEvent {
     match evt {
         MappedFileEvent::NodeChanged { node_index } => BufferEvent::BufferNodeChanged {
             node_index: *node_index,
@@ -66,7 +66,7 @@ impl BufferBuilder {
         Self {
             internal: false,
             use_buffer_log: false,
-            document_name: String::new(),
+            buffer_name: String::new(),
             file_name: String::new(),
             mode: OpenMode::ReadOnly,
         }
@@ -85,8 +85,8 @@ impl BufferBuilder {
     }
 
     ///
-    pub fn document_name(&mut self, name: &str) -> &mut Self {
-        self.document_name = name.to_string();
+    pub fn buffer_name(&mut self, name: &str) -> &mut Self {
+        self.buffer_name = name.to_string();
         self
     }
 
@@ -105,7 +105,7 @@ impl BufferBuilder {
     ///
     pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
         Buffer::new(
-            &self.document_name,
+            &self.buffer_name,
             &self.file_name,
             self.mode.clone(),
             self.use_buffer_log,
@@ -148,14 +148,14 @@ impl BufferReadCache {
         offset: u64,
         nr_bytes: usize,
         data: &mut Vec<u8>,
-        doc_revision: usize,
+        buffer_revision: usize,
     ) -> Option<usize> {
         if !crate::core::use_read_cache() {
             return None;
         }
 
         // no cache sync yet
-        if self.revision != doc_revision {
+        if self.revision != buffer_revision {
             return None;
         }
 
@@ -181,7 +181,7 @@ impl BufferReadCache {
 }
 
 pub trait BufferEventCb {
-    fn cb(&mut self, doc: &Buffer, event: &BufferEvent);
+    fn cb(&mut self, buffer: &Buffer, event: &BufferEvent);
 }
 
 #[derive(Debug, Clone)]
@@ -197,7 +197,7 @@ pub enum BufferEvent {
     BufferNodeIndexed { node_index: usize },
 }
 
-fn document_event_to_string(evt: &BufferEvent) -> String {
+fn buffer_event_to_string(evt: &BufferEvent) -> String {
     match evt {
         BufferEvent::BufferAdded => "Added".to_owned(),
         BufferEvent::BufferOpened => "Opened".to_owned(),
@@ -244,18 +244,18 @@ impl<'a> fmt::Debug for Buffer<'a> {
     }
 }
 
-// NB: doc MUST be wrapped in Arc<RwLock<XXX>>
+// NB: buffer MUST be wrapped in Arc<RwLock<XXX>>
 unsafe impl<'a> Send for Buffer<'a> {}
 unsafe impl<'a> Sync for Buffer<'a> {}
 
 impl<'a> Buffer<'a> {
     pub fn new(
-        document_name: &String,
+        buffer_name: &String,
         file_name: &String,
         mode: OpenMode,
         use_buffer_log: bool,
     ) -> Option<Arc<RwLock<Buffer<'static>>>> {
-        dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
+        dbg_println!("try open {} {} {:?}", buffer_name, file_name, mode);
 
         let inner = if file_name.is_empty() {
             InnerBuffer::empty(mode.clone())
@@ -267,14 +267,14 @@ impl<'a> Buffer<'a> {
         // fallback
         let inner = if inner.is_none() {
             changed = true;
-            InnerBuffer::empty_with_name(&document_name, mode.clone())
+            InnerBuffer::empty_with_name(&buffer_name, mode.clone())
         } else {
             inner
         };
 
-        let doc = Buffer {
+        let buffer = Buffer {
             id: Id(0),
-            name: document_name.clone(),
+            name: buffer_name.clone(),
             inner: inner.unwrap(),
             cache: BufferReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
@@ -287,7 +287,7 @@ impl<'a> Buffer<'a> {
             subscribers: vec![],
         };
 
-        Some(Arc::new(RwLock::new(doc)))
+        Some(Arc::new(RwLock::new(buffer)))
     }
 
     pub fn set_cache(&mut self, start: u64, end: u64) {
@@ -355,7 +355,7 @@ impl<'a> Buffer<'a> {
     pub fn notify(&self, evt: &BufferEvent) {
         dbg_println!(
             "notify {:?}, nb subscribers {}",
-            document_event_to_string(&evt),
+            buffer_event_to_string(&evt),
             self.subscribers.len()
         );
         for s in self.subscribers.iter() {
@@ -364,25 +364,25 @@ impl<'a> Buffer<'a> {
     }
 
     pub fn build_node_byte_count(&self, node_index: usize) {
-        // let node_info = doc.get_node_info(node_index);
+        // let node_info = buffer.get_node_info(node_index);
         let mut file = self.inner.data.write();
         build_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn remove_node_byte_count(&self, node_index: usize) {
-        // let node_info = doc.get_node_info(node_index);
+        // let node_info = buffer.get_node_info(node_index);
         let mut file = self.inner.data.write();
         remove_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn update_node_byte_count(&self, node_index: usize) {
-        // let node_info = doc.get_node_info(node_index);
+        // let node_info = buffer.get_node_info(node_index);
         let mut file = self.inner.data.write();
         update_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn show_root_node_bytes_stats(&self) {
-        // let node_info = doc.get_node_info(node_index);
+        // let node_info = buffer.get_node_info(node_index);
         let file = self.inner.data.read();
         if let Some(idx) = file.root_index() {
             let node = &file.pool[idx];
@@ -413,9 +413,9 @@ impl<'a> Buffer<'a> {
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
         // return self.inner.read(offset, nr_bytes, data);
 
-        let doc_rev = self.nr_changes();
+        let buffer_rev = self.nr_changes();
 
-        if let Some(size) = self.cache.read(offset, nr_bytes, data, doc_rev) {
+        if let Some(size) = self.cache.read(offset, nr_bytes, data, buffer_rev) {
             //dbg_println!("DATA IN CACHE offset {} size {}", offset, nr_bytes);
 
             // cache validation checks
@@ -448,9 +448,9 @@ impl<'a> Buffer<'a> {
         data: &mut Vec<u8>,
         cache: &BufferReadCache,
     ) -> usize {
-        let doc_rev = self.nr_changes();
+        let buffer_rev = self.nr_changes();
 
-        if let Some(size) = cache.read(offset, nr_bytes, data, doc_rev) {
+        if let Some(size) = cache.read(offset, nr_bytes, data, buffer_rev) {
             //dbg_println!("DATA IN CACHE offset {} size {}", offset, nr_bytes);
 
             // cache validation checks
@@ -502,7 +502,7 @@ impl<'a> Buffer<'a> {
             // return;
         }
 
-        //dbg_println!("// doc.tag(..) offsets = {:?}", marks_offset);
+        //dbg_println!("// buffer.tag(..) offsets = {:?}", marks_offset);
         self.buffer_log.add(
             offset,
             BufferOperationType::Tag {
@@ -604,7 +604,7 @@ impl<'a> Buffer<'a> {
         self.update_hierarchy_from_events(&events);
 
         for ev in &events {
-            let ev = mapped_file_event_to_document_event(&ev);
+            let ev = mapped_file_event_to_buffer_event(&ev);
             self.notify(&ev);
         }
 
@@ -656,7 +656,7 @@ impl<'a> Buffer<'a> {
         self.update_hierarchy_from_events(&events);
 
         for ev in &events {
-            let ev = mapped_file_event_to_document_event(&ev);
+            let ev = mapped_file_event_to_buffer_event(&ev);
             self.notify(&ev);
         }
 
@@ -708,7 +708,7 @@ impl<'a> Buffer<'a> {
                     self.update_hierarchy_from_events(&events);
 
                     for ev in &events {
-                        let ev = mapped_file_event_to_document_event(&ev);
+                        let ev = mapped_file_event_to_buffer_event(&ev);
                         self.notify(&ev);
                     }
 
@@ -732,7 +732,7 @@ impl<'a> Buffer<'a> {
                     self.update_hierarchy_from_events(&events);
 
                     for ev in &events {
-                        let ev = mapped_file_event_to_document_event(&ev);
+                        let ev = mapped_file_event_to_buffer_event(&ev);
                         self.notify(&ev);
                     }
 
@@ -861,25 +861,25 @@ impl<'a> Buffer<'a> {
 use std::path::Path;
 
 // TODO(ceg): handle errors
-pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
+pub fn sync_to_storage(buffer: &Arc<RwLock<Buffer>>) {
     // read/copy
     let mut fd = {
-        let doc = doc.read();
+        let buffer = buffer.read();
 
-        if doc.file_name().is_empty() {
+        if buffer.file_name().is_empty() {
             // TODO(ceg): save as pop up/notification
             dbg_println!("cannot dsave  target filename is empty");
             return;
         }
 
-        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move to global config
+        let tmp_file_name = format!("{}{}", buffer.file_name(), ".update"); // TODO(ceg): move to global config
 
         let path = Path::new(&tmp_file_name);
         if let Result::Err(_) = std::fs::remove_file(path) {}
 
         let fd = File::create(path);
         if fd.is_err() {
-            dbg_println!("cannot save {}", doc.file_name());
+            dbg_println!("cannot save {}", buffer.file_name());
             return;
         }
         fd.unwrap()
@@ -888,17 +888,17 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
     dbg_println!("SYNC: fd = {:?}", fd);
 
     let mut idx = {
-        let doc = doc.read();
-        let file = doc.inner.data.read();
+        let buffer = buffer.read();
+        let file = buffer.inner.data.read();
         let (node_index, _, _) = file.find_node_by_offset(0);
         node_index
     };
 
     while idx != None {
-        // do not hold the doc.lock more
+        // do not hold the buffer.lock more
         {
-            let doc = doc.read();
-            let file = doc.inner.data.read();
+            let buffer = buffer.read();
+            let file = buffer.inner.data.read();
             let node = &file.pool[idx.unwrap()];
 
             let mut data = Vec::with_capacity(node.size as usize);
@@ -916,11 +916,11 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
             if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
                 let nw = fd.write(&data).unwrap();
                 if nw != data.len() {
-                    dbg_println!("cannot save {}", doc.file_name());
+                    dbg_println!("cannot save {}", buffer.file_name());
                     panic!("");
                     // return false;
                 }
-                // dbg_println!("sync doc('{}') node {}", doc.file_name(), idx.unwrap());
+                // dbg_println!("sync doc('{}') node {}", buffer.file_name(), idx.unwrap());
             } else {
                 panic!("direct copy failed");
             }
@@ -940,30 +940,30 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
     {
         use std::os::unix::fs::PermissionsExt;
 
-        let mut doc = doc.write();
+        let mut buffer = buffer.write();
 
         // TODO(ceg): use mapped file fd, will panic if file is removed
-        let perms = match doc.metadata() {
+        let perms = match buffer.metadata() {
             Ok(metadata) => metadata.permissions(),
             Err(_) => std::fs::Permissions::from_mode(0o600),
         };
 
-        let tmp_file_name = format!("{}{}", doc.file_name(), ".update"); // TODO(ceg): move '.update' to global config
+        let tmp_file_name = format!("{}{}", buffer.file_name(), ".update"); // TODO(ceg): move '.update' to global config
 
         {
             // TODO(ceg): large file warning in save ? disable backup ?
-            let _tmp_backup_name = format!("{}{}", doc.file_name(), "~");
+            let _tmp_backup_name = format!("{}{}", buffer.file_name(), "~");
             // TODO(ceg): move '~' to global config
-            // let _ = ::std::fs::rename(&doc.file_name(), &tmp_backup_name);
+            // let _ = ::std::fs::rename(&buffer.file_name(), &tmp_backup_name);
         }
 
-        let _ = ::std::fs::rename(&tmp_file_name, &doc.file_name());
+        let _ = ::std::fs::rename(&tmp_file_name, &buffer.file_name());
 
         // reopen file
-        let new_fd = File::open(&doc.file_name()).unwrap();
+        let new_fd = File::open(&buffer.file_name()).unwrap();
 
         // TODO(ceg): handle skip with ReadOnly
-        let mapped_file = doc.inner.data.clone();
+        let mapped_file = buffer.inner.data.clone();
         let mut mapped_file = mapped_file.write();
         crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
             &mut mapped_file,
@@ -972,10 +972,10 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
 
         // TODO(ceg): check result, handle io results properly
         // set buffer status to : permission denied etc
-        let _ = ::std::fs::set_permissions(&doc.file_name(), perms);
+        let _ = ::std::fs::set_permissions(&buffer.file_name(), perms);
 
-        doc.changed = false;
-        doc.is_syncing = false;
+        buffer.changed = false;
+        buffer.is_syncing = false;
     }
 }
 
@@ -1122,15 +1122,15 @@ pub fn update_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>)
 }
 
 // TODO(ceg): split code to provide index_single_node(nid)
-pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
+pub fn build_index(buffer: &Arc<RwLock<Buffer>>) {
     let mut idx = {
-        let doc = doc.read();
+        let buffer = buffer.read();
         {
-            if doc.indexed {
+            if buffer.indexed {
                 return;
             }
 
-            let file = doc.inner.data.read();
+            let file = buffer.inner.data.read();
             let (node_index, _, _) = file.find_node_by_offset(0);
             node_index
         }
@@ -1142,12 +1142,12 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
     while idx != None {
         // read node bytes
         {
-            let doc = doc.read();
-            if doc.abort_indexing {
+            let buffer = buffer.read();
+            if buffer.abort_indexing {
                 break;
             }
 
-            let file = doc.inner.data.read();
+            let file = buffer.inner.data.read();
             let node = &file.pool[idx.unwrap()];
             if node.indexed {
                 idx = node.link.next;
@@ -1169,7 +1169,7 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
             if let Some(_n) = node.do_direct_copy(&orig_fd, &mut data) {
                 dbg_println!(
                     "build index doc('{}') node {} size {}",
-                    doc.file_name(),
+                    buffer.file_name(),
                     idx.unwrap(),
                     data.len(),
                 );
@@ -1196,8 +1196,8 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
 
         // update node info (idx)
         {
-            let doc = doc.read();
-            let mut file = doc.inner.data.write();
+            let buffer = buffer.read();
+            let mut file = buffer.inner.data.write();
 
             let node_index = idx.unwrap();
 
@@ -1214,8 +1214,8 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
 
         // notify subscribers
         if idx.is_some() {
-            let doc = doc.read();
-            doc.notify(&BufferEvent::BufferNodeIndexed {
+            let buffer = buffer.read();
+            buffer.notify(&BufferEvent::BufferNodeIndexed {
                 node_index: idx.unwrap(),
             });
         }
@@ -1227,26 +1227,26 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
     {
         // set index status flags
         {
-            let mut doc = doc.write();
-            if !doc.abort_indexing {
-                doc.indexed = true;
+            let mut buffer = buffer.write();
+            if !buffer.abort_indexing {
+                buffer.indexed = true;
             }
 
             // display root node info
-            let file = doc.inner.data.read();
+            let file = buffer.inner.data.read();
             if let Some(root_index) = file.root_index() {
                 let node = &file.pool[root_index];
                 dbg_println!(
                     "{} : Number of lines {}",
-                    doc.file_name(),
+                    buffer.file_name(),
                     node.byte_count[b'\n' as usize]
                 );
             }
         }
 
-        let doc = doc.read();
-        if doc.indexed {
-            doc.notify(&BufferEvent::BufferFullyIndexed {});
+        let buffer = buffer.read();
+        if buffer.indexed {
+            buffer.notify(&BufferEvent::BufferFullyIndexed {});
         }
     }
 }
@@ -1264,8 +1264,8 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
 //
 //
 // return (line_count, offset's node_index)
-pub fn get_document_byte_count_at_offset(
-    doc: &Buffer,
+pub fn get_buffer_byte_count_at_offset(
+    buffer: &Buffer,
     byte_index: usize,
     offset: u64,
 ) -> (u64, Option<usize>) {
@@ -1274,7 +1274,7 @@ pub fn get_document_byte_count_at_offset(
     let mut total_count = 0;
     let mut local_offset = offset;
 
-    let mut file = doc.inner.data.write();
+    let mut file = buffer.inner.data.write();
 
     let mut cur_index = file.root_index();
     while cur_index != None {
@@ -1312,9 +1312,9 @@ pub fn get_document_byte_count_at_offset(
     (0, None)
 }
 
-pub fn get_document_byte_count(doc: &Buffer, byte_index: usize) -> Option<u64> {
+pub fn get_buffer_byte_count(buffer: &Buffer, byte_index: usize) -> Option<u64> {
     assert!(byte_index < 256);
-    let file = doc.inner.data.read();
+    let file = buffer.inner.data.read();
     match file.root_index() {
         Some(idx) => Some(file.pool[idx].byte_count[byte_index]),
         _ => None,
@@ -1332,12 +1332,12 @@ pub fn get_document_byte_count(doc: &Buffer, byte_index: usize) -> Option<u64> {
 //  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
 //                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
 //
-pub fn find_nth_byte_offset(doc: &Buffer, byte: u8, index: u64) -> Option<u64> {
+pub fn find_nth_byte_offset(buffer: &Buffer, byte: u8, index: u64) -> Option<u64> {
     assert!(index > 0);
 
     let mut index = index;
 
-    let mut file = doc.inner.data.write();
+    let mut file = buffer.inner.data.write();
     let mut global_offset = 0;
 
     let mut cur_index = file.root_index();
@@ -1399,7 +1399,7 @@ mod tests {
     use rand::Rng;
 
     #[test]
-    fn doc_read() {
+    fn buffer_read() {
         use std::io::prelude::*;
         use std::os::unix::prelude::FileExt;
 
@@ -1420,30 +1420,30 @@ mod tests {
 
         println!("read file....");
 
-        let doc = BufferBuilder::new()
-            .document_name("untitled-1")
+        let buffer = BufferBuilder::new()
+            .buffer_name("untitled-1")
             .file_name(&filename)
             .internal(false)
             .finalize();
 
-        build_index(doc.as_ref().unwrap());
+        build_index(buffer.as_ref().unwrap());
 
         let file = std::fs::File::open(&filename).unwrap();
-        let doc = doc.as_ref().unwrap().write();
-        let doc_size = doc.size() as u64;
+        let buffer = buffer.as_ref().unwrap().write();
+        let buffer_size = buffer.size() as u64;
         let step = 1024 * 1024;
         let t0_read = std::time::Instant::now();
         let mut prev_time = 0;
 
         let mut data: Vec<u8> = Vec::with_capacity(step);
-        for offset in (0..doc_size).into_iter().step_by(step) {
+        for offset in (0..buffer_size).into_iter().step_by(step) {
             if !true {
                 unsafe {
                     data.set_len(step);
                 } // faster in debug build
 
                 //                data.clear();
-                doc.read(offset, step, &mut data);
+                buffer.read(offset, step, &mut data);
             } else {
                 unsafe {
                     data.set_len(step);
@@ -1480,12 +1480,12 @@ mod tests {
 
     #[test]
     fn undo_redo() {
-        let doc = BufferBuilder::new()
-            .document_name("untitled-1")
+        let buffer = BufferBuilder::new()
+            .buffer_name("untitled-1")
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write();
+        let mut buffer = buffer.as_ref().unwrap().write();
 
         const STR_LEN: usize = 1000;
 
@@ -1505,47 +1505,47 @@ mod tests {
             for i in 0..max {
                 println!("insert ({}/{}) -------", i + 1, max);
 
-                let off_update = doc.insert(off, s.len(), s.as_ref());
+                let off_update = buffer.insert(off, s.len(), s.as_ref());
                 off += off_update as u64;
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             println!("start undo test");
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
-                doc.undo();
+                buffer.undo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             println!("start redo test");
 
             for i in 0..max {
                 println!("redo ({}/{}) -------", i + 1, max);
-                doc.redo();
+                buffer.redo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             println!("start undo test (2nd pass)");
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
-                doc.undo();
+                buffer.undo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
         }
     }
 
     #[test]
-    fn doc_random_size_inserts() {
-        let doc = BufferBuilder::new()
-            .document_name("untitled-1")
+    fn buffer_random_size_inserts() {
+        let buffer = BufferBuilder::new()
+            .buffer_name("untitled-1")
             .internal(false)
             .finalize();
 
-        let mut doc = doc.as_ref().unwrap().write();
+        let mut buffer = buffer.as_ref().unwrap().write();
 
         const NB_STR: usize = 10000;
 
@@ -1571,42 +1571,42 @@ mod tests {
 
                 let random_size: usize = rng.gen_range(0, s.len());
                 println!("random insert size = {}", random_size);
-                let off_update = doc.insert(off, random_size, s.as_ref());
+                let off_update = buffer.insert(off, random_size, s.as_ref());
                 off += off_update as u64;
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
 
-                doc.undo();
+                buffer.undo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             println!("start redo test");
 
             for i in 0..max {
                 println!("redo ({}/{}) -------", i + 1, max);
 
-                doc.redo();
+                buffer.redo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
 
             for i in 0..max {
                 println!("undo ({}/{}) -------", i + 1, max);
 
-                doc.undo();
+                buffer.undo();
             }
 
-            println!("doc.size = {}", doc.size());
+            println!("buffer.size = {}", buffer.size());
         }
     }
 
     #[test]
-    fn test_doc_save() {
+    fn test_buffer_save() {
         use super::*;
 
         use std::fs;
@@ -1640,9 +1640,9 @@ mod tests {
                     file.sync_all().unwrap();
                     drop(slc);
 
-                    let doc = BufferBuilder::new()
+                    let buffer = BufferBuilder::new()
                         .file_name(&filename)
-                        .document_name("untitled-1")
+                        .buffer_name("untitled-1")
                         .internal(false)
                         .finalize();
 
@@ -1652,15 +1652,15 @@ mod tests {
                             data.push(b'x');
                         }
 
-                        let mut doc = doc.as_ref().unwrap().write();
-                        let doc_size = doc.size();
+                        let mut buffer = buffer.as_ref().unwrap().write();
+                        let buffer_size = buffer.size();
 
-                        doc.insert(insert_offset, data.len(), data.as_ref());
-                        doc_size + data.len()
+                        buffer.insert(insert_offset, data.len(), data.as_ref());
+                        buffer_size + data.len()
                     };
 
-                    let doc = doc.as_ref().unwrap();
-                    sync_to_storage(&doc);
+                    let buffer = buffer.as_ref().unwrap();
+                    sync_to_storage(&buffer);
 
                     // check on disk size
                     match std::fs::metadata(filename) {

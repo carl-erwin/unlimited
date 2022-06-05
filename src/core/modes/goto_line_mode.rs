@@ -10,9 +10,9 @@ use super::text_mode::TextModeContext;
 
 use super::text_mode::PostInputAction;
 
-use crate::core::document::get_document_byte_count;
+use crate::core::buffer::get_buffer_byte_count;
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
@@ -32,7 +32,7 @@ use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutOperation;
 
-use crate::core::document::find_nth_byte_offset;
+use crate::core::buffer::find_nth_byte_offset;
 
 static GOTO_LINE_TRIGGER_MAP: &str = r#"
 [
@@ -183,11 +183,11 @@ pub fn goto_line_stop(
     let status_view_id = view::get_status_view(&editor, &env, view);
     if let Some(status_view_id) = status_view_id {
         let status_view = editor.view_map.get(&status_view_id).unwrap();
-        let doc = status_view.read().document().unwrap();
-        let mut doc = doc.write();
+        let buffer = status_view.read().buffer().unwrap();
+        let mut buffer = buffer.write();
         // clear buffer
-        let sz = doc.size();
-        doc.remove(0, sz, None);
+        let sz = buffer.size();
+        buffer.remove(0, sz, None);
 
         {
             let mut v = view.write();
@@ -209,14 +209,14 @@ fn create_goto_line_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let doc = BufferBuilder::new()
-        .document_name("goto-controller")
+    let buffer = BufferBuilder::new()
+        .buffer_name("goto-controller")
         .internal(true)
         .use_buffer_log(false)
         .finalize();
 
     {
-        doc.as_ref().unwrap().write().append("Goto: ".as_bytes());
+        buffer.as_ref().unwrap().write().append("Goto: ".as_bytes());
     }
 
     // create view at mode creation
@@ -226,7 +226,7 @@ fn create_goto_line_controller_view(
         None,
         (x, y),
         (w, h),
-        doc,
+        buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
     );
@@ -355,10 +355,10 @@ pub fn goto_line_controller_add_char(
         if let Some(text_view_id) = v.controlled_view {
             let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
 
-            let doc = text_view.document().unwrap();
+            let buffer = text_view.buffer().unwrap();
 
             // do this at start and store in gtm
-            let nb_lines = get_document_byte_count(&doc.read(), '\n' as usize).unwrap_or(0);
+            let nb_lines = get_buffer_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
 
             let gtm = text_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
             if gtm.eof {
@@ -376,13 +376,13 @@ pub fn goto_line_controller_add_char(
             dbg_println!("goto line target {}", n);
 
             // render line number
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
-            doc.delete_content(None);
-            doc.append("Goto: ".as_bytes());
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
+            buffer.delete_content(None);
+            buffer.append("Goto: ".as_bytes());
 
             let s: String = gtm.goto_line_str.iter().collect();
-            doc.append(s.as_bytes());
+            buffer.append(s.as_bytes());
             gtm.eof = n > nb_lines;
             std::cmp::min(n, nb_lines + 1)
         } else {
@@ -410,10 +410,10 @@ pub fn goto_line_controller_del_char(
         if let Some(text_view_id) = v.controlled_view {
             let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
 
-            let doc = text_view.document().unwrap();
+            let buffer = text_view.buffer().unwrap();
 
             // do this at start and store in gtm
-            let nb_lines = get_document_byte_count(&doc.read(), '\n' as usize).unwrap_or(0);
+            let nb_lines = get_buffer_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
 
             let gtm = text_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
 
@@ -430,13 +430,13 @@ pub fn goto_line_controller_del_char(
             dbg_println!("goto line target {}", n);
 
             // render line number
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
-            doc.delete_content(None);
-            doc.append("Goto: ".as_bytes());
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
+            buffer.delete_content(None);
+            buffer.append("Goto: ".as_bytes());
 
             let s: String = gtm.goto_line_str.iter().collect();
-            doc.append(s.as_bytes());
+            buffer.append(s.as_bytes());
             if n > nb_lines {
                 return;
             }
@@ -477,10 +477,10 @@ pub fn goto_line_controller_stop(
             gtm.reset();
 
             //
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
-            doc.delete_content(None);
-            doc.append("Goto: ".as_bytes());
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
+            buffer.delete_content(None);
+            buffer.append("Goto: ".as_bytes());
         }
 
         // set input focus to
@@ -489,10 +489,10 @@ pub fn goto_line_controller_stop(
 }
 
 pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: u64) {
-    let doc = view.read().document().unwrap();
-    let doc = doc.read();
+    let buffer = view.read().buffer().unwrap();
+    let buffer = buffer.read();
 
-    let max_offset = doc.size();
+    let max_offset = buffer.size();
 
     let mut v = view.write();
 
@@ -500,7 +500,7 @@ pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: 
         0
     } else {
         let line_number = target_line.saturating_sub(1);
-        if let Some(offset) = find_nth_byte_offset(&doc, '\n' as u8, line_number) {
+        if let Some(offset) = find_nth_byte_offset(&buffer, '\n' as u8, line_number) {
             offset + 1
         } else {
             max_offset as u64

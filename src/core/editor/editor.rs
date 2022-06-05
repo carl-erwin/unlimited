@@ -66,7 +66,7 @@ use crate::core::view::ViewEventSource;
     @offset file
   }
 
-    document_list: Vec<
+    buffer_list: Vec<
         struct BufferInfo {
             FileType: { directory(full_path), regular(full_path), internal("*debug-message*), char_device(full_path), block_device(full_path) }
             basename,: String,
@@ -83,7 +83,7 @@ use crate::core::view::ViewEventSource;
 
     ioctl mode for block devices ?
 
-    document_index: HashMap<String, document::Id>,  document::Id is the position in document_list
+    buffer_index: HashMap<String, buffer::Id>,  buffer::Id is the position in buffer_list
 */
 // local
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -160,13 +160,13 @@ pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 //
 use crate::core::config::Config;
 
-use crate::core::document;
-use crate::core::document::Buffer;
-use crate::core::document::BufferBuilder;
+use crate::core::buffer;
+use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferBuilder;
 
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Buffer<'static>>>>>>,
+    pub buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'static>>>>>>,
     pub root_views: Vec<view::Id>,
     pub view_map: HashMap<view::Id, Rc<RwLock<View<'a>>>>,
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
@@ -188,7 +188,7 @@ impl<'a> Editor<'a> {
     ) -> Editor<'a> {
         Editor {
             config,
-            document_map: Arc::new(RwLock::new(HashMap::new())),
+            buffer_map: Arc::new(RwLock::new(HashMap::new())),
             root_views: vec![],
             view_map: HashMap::new(),
             modes: Rc::new(RefCell::new(HashMap::new())),
@@ -206,26 +206,26 @@ impl<'a> Editor<'a> {
     ///
     pub fn setup_default_buffers(&mut self) {
         let mut builder = BufferBuilder::new();
-        builder.document_name("debug-message").internal(true);
+        builder.buffer_name("debug-message").internal(true);
 
         let b = builder.finalize();
 
-        let document_map = self.document_map.clone();
-        let mut document_map = document_map.write();
+        let buffer_map = self.buffer_map.clone();
+        let mut buffer_map = buffer_map.write();
 
         if let Some(b) = b {
-            let id = document_map.len();
-            document_map.insert(document::Id(id), b);
+            let id = buffer_map.len();
+            buffer_map.insert(buffer::Id(id), b);
         }
 
         let mut builder = BufferBuilder::new();
-        builder.document_name("scratch").internal(true);
+        builder.buffer_name("scratch").internal(true);
 
         let b = builder.finalize();
 
         if let Some(b) = b {
-            let id = document_map.len();
-            document_map.insert(document::Id(id), b);
+            let id = buffer_map.len();
+            buffer_map.insert(buffer::Id(id), b);
         }
     }
 
@@ -1426,7 +1426,7 @@ pub fn main_loop(
 
     // stop indexer(s)
     {
-        for (_id, d) in editor.document_map.as_ref().read().iter() {
+        for (_id, d) in editor.buffer_map.as_ref().read().iter() {
             d.write().abort_indexing = true;
         }
     }

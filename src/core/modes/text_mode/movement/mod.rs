@@ -56,8 +56,8 @@ fn get_marks_min_offset_and_max_idx(view: &Rc<RwLock<View>>) -> (u64, usize) {
 // use byte_index
 fn sync_mark(view: &Rc<RwLock<View>>, m: &mut Mark) -> u64 {
     let v = view.read();
-    let doc = v.document().unwrap();
-    let doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
 
     // ctx
     let tm = v.mode_ctx::<TextModeContext>("text-mode");
@@ -65,14 +65,14 @@ fn sync_mark(view: &Rc<RwLock<View>>, m: &mut Mark) -> u64 {
     let _codec = tm.text_codec.as_ref();
 
     // get "real" line start
-    // m.move_to_start_of_line(&doc, codec);
+    // m.move_to_start_of_line(&buffer, codec);
 
-    let doc_size = doc.size() as u64;
-    if doc_size > 0 {
-        assert!(m.offset <= doc_size); // == EOF
+    let buffer_size = buffer.size() as u64;
+    if buffer_size > 0 {
+        assert!(m.offset <= buffer_size); // == EOF
     }
 
-    doc_size
+    buffer_size
 }
 
 //
@@ -95,8 +95,8 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
 
     let start_offset = v.start_offset;
 
-    let doc = v.document().unwrap();
-    let mut doc = doc.write();
+    let buffer = v.buffer().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -113,7 +113,7 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     let min = tm.marks[0].offset;
     let max = tm.marks[nr_marks - 1].offset;
 
-    doc.set_cache(min, max);
+    buffer.set_cache(min, max);
 
     let mut scroll_down = 0;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
@@ -121,7 +121,7 @@ pub fn move_marks_backward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
             scroll_down = 1;
         }
 
-        m.move_backward(&doc, codec);
+        m.move_backward(&buffer, codec);
     }
 
     if scroll_down > 0 {
@@ -150,10 +150,10 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     let end_offset = v.end_offset;
 
     //
-    let doc = v.document().unwrap();
-    let mut doc = doc.write();
+    let buffer = v.buffer().unwrap();
+    let mut buffer = buffer.write();
 
-    dbg_println!("doc.size() {}", doc.size());
+    dbg_println!("buffer.size() {}", buffer.size());
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let nr_marks = tm.marks.len();
@@ -161,11 +161,11 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
         return;
     }
 
-    // set read cache between first and last mark (TODO: remove this, move cache updates to doc.read() + with size)
+    // set read cache between first and last mark (TODO: remove this, move cache updates to buffer.read() + with size)
     let midx = tm.mark_index;
     let min = tm.marks[0].offset;
     let max = tm.marks[nr_marks - 1].offset;
-    doc.set_cache(min, max);
+    buffer.set_cache(min, max);
 
     //
     let prev_main_mark = tm.marks[midx];
@@ -173,7 +173,7 @@ pub fn move_marks_forward(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<
     /* TODO(ceg): check error */
     let codec = tm.text_codec.as_ref();
     for m in tm.marks.iter_mut() {
-        m.move_forward(&doc, codec);
+        m.move_forward(&buffer, codec);
     }
 
     // mark move off_screen ? scroll down 1 line
@@ -224,8 +224,8 @@ pub fn move_marks_to_start_of_line(
     let screen = v.screen.clone();
     let screen = screen.read();
 
-    let doc = v.document().unwrap();
-    let doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -234,7 +234,7 @@ pub fn move_marks_to_start_of_line(
 
     let mut center = false;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
-        m.move_to_start_of_line(&doc, codec);
+        m.move_to_start_of_line(&buffer, codec);
 
         if idx == midx && !screen.contains_offset(m.offset) {
             center = true;
@@ -259,8 +259,8 @@ pub fn move_marks_to_end_of_line(
     let screen = v.screen.clone();
     let screen = screen.read();
 
-    let doc = v.document().unwrap();
-    let doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -270,7 +270,7 @@ pub fn move_marks_to_end_of_line(
 
     let mut center = false;
     for (idx, m) in tm.marks.iter_mut().enumerate() {
-        m.move_to_end_of_line(&doc, codec);
+        m.move_to_end_of_line(&buffer, codec);
 
         if idx == midx && !screen.contains_offset(m.offset) {
             center = true;
@@ -475,9 +475,9 @@ pub fn move_mark_to_previous_line(
             let screen = screen.read();
             let (width, height) = screen.dimension();
 
-            let doc = v.document().unwrap();
-            let doc = doc.read();
-            let doc_size = doc.size() as u64;
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
+            let buffer_size = buffer.size() as u64;
 
             // rewind at least "1 full line" bytes
             let max_encode_size = 4;
@@ -493,7 +493,7 @@ pub fn move_mark_to_previous_line(
                 return;
             }
 
-            let end_offset = std::cmp::min(doc_size, m_offset + rewind);
+            let end_offset = std::cmp::min(buffer_size, m_offset + rewind);
 
             dbg_println!(
                 "MARK next position is offscreen ---------------- end offset = {}",
@@ -506,7 +506,7 @@ pub fn move_mark_to_previous_line(
         };
 
         //let end_offset = m_offset + width as u64 * 4;
-        //let end_offset = std::cmp::min(end_offset, doc_size);
+        //let end_offset = std::cmp::min(end_offset, buffer_size);
         //let end_offset = m_offset + width as u64 * 4;
 
         // TODO(ceg): return last screen, ie screen that contains
@@ -584,9 +584,9 @@ pub fn move_mark_to_end_of_file(
     let mut v = view.write();
 
     let offset = {
-        let doc = v.document().unwrap();
-        let doc = doc.read();
-        doc.size() as u64
+        let buffer = v.buffer().unwrap();
+        let buffer = buffer.read();
+        buffer.size() as u64
     };
     v.start_offset = offset;
 
@@ -662,9 +662,9 @@ pub fn clone_and_move_mark_to_next_line(
     {
         let save = {
             let mut v = view.write();
-            let doc = v.document().unwrap();
-            let doc = doc.read();
-            let last_pos = doc.buffer_log_pos() >= doc.buffer_log_count().saturating_sub(1);
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
+            let last_pos = buffer.buffer_log_pos() >= buffer.buffer_log_count().saturating_sub(1);
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
             !last_pos
@@ -849,12 +849,12 @@ pub fn move_on_screen_mark_to_next_line(
     /*
      TODO(ceg):
      Our current data model does not support virtual characters.
-     ie: if a filter fills the screen with meta info (not document's real data)
+     ie: if a filter fills the screen with meta info (not buffer's real data)
      The offset mechanism is broken
       ex: if a filter expands a cp on multiple lines
 
      To fix this, the "injected" metadata span must be stored elsewhere.
-     (internal, doc_id, offset, size)
+     (internal, buffer_id, offset, size)
     */
     if old_offset == m.offset {
         if let Some(l) = screen.get_used_line(new_y + 1) {
@@ -905,7 +905,7 @@ pub fn move_mark_to_next_line(
 ) -> Option<(u64, u64)> {
     // TODO(ceg): m.on_buffer_end() ?
 
-    let max_offset = { view.read().document()?.read().size() as u64 };
+    let max_offset = { view.read().buffer()?.read().size() as u64 };
 
     // off_screen ?
     let (mut m_offset, old_offset) = (m.offset, m.offset);
@@ -953,14 +953,14 @@ pub fn move_mark_to_next_line(
         // get start_of_line(m.offset) -> u64
         let start_offset = {
             let v = &view.read();
-            let doc = v.document().unwrap();
-            let doc = doc.read();
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
 
             let mut tmp = Mark::new(m.offset);
-            tmp.move_to_start_of_line(&doc, codec);
+            tmp.move_to_start_of_line(&buffer, codec);
             tmp.offset
         };
 
@@ -997,14 +997,14 @@ pub fn move_mark_to_next_line(
         // compute column
         let new_x = {
             let v = &view.read();
-            let doc = v.document().unwrap();
-            let doc = doc.read();
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
 
             let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
             let codec = tm.text_codec.as_ref();
 
-            // TODO(ceg): use codec.read(doc, n=width) until e.offset is reached
+            // TODO(ceg): use codec.read(buffer, n=width) until e.offset is reached
             let mut s = Mark::new(lines[index].0);
             let e = Mark::new(lines[index].1);
             let mut count = 0;
@@ -1013,7 +1013,7 @@ pub fn move_mark_to_next_line(
                     break;
                 }
 
-                s.move_forward(&doc, codec);
+                s.move_forward(&buffer, codec);
                 count += 1;
             }
             count
@@ -1027,16 +1027,16 @@ pub fn move_mark_to_next_line(
         let mut tmp_mark = Mark::new(line_start_off);
 
         let v = &view.read();
-        let doc = v.document().unwrap();
-        let doc = doc.read();
+        let buffer = v.buffer().unwrap();
+        let buffer = buffer.read();
 
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
-        // TODO(ceg): codec.skip_n(doc, 0..new_x)
+        // TODO(ceg): codec.skip_n(buffer, 0..new_x)
         for _ in 0..new_x {
-            tmp_mark.move_forward(&doc, codec); // TODO(ceg): pass n as arg
+            tmp_mark.move_forward(&buffer, codec); // TODO(ceg): pass n as arg
         }
 
         tmp_mark.offset = std::cmp::min(tmp_mark.offset, line_end_off);
@@ -1149,7 +1149,7 @@ fn move_onscreen_single_mark_to_next_line(
 
         dbg_println!("new_start = {}", new_start);
 
-        let max_offset = screen.doc_max_offset;
+        let max_offset = screen.buffer_max_offset;
 
         // build screen content
         screen.clear();
@@ -1428,7 +1428,7 @@ pub fn clone_and_move_mark_to_previous_line(
 
 pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     // TODO(ceg): factorize mark action
-    // mark.apply(fn); where fn=m.move_to_token_end(&doc, codec);
+    // mark.apply(fn); where fn=m.move_to_token_end(&buffer, codec);
     //
 
     let mut center = false;
@@ -1437,8 +1437,8 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     let screen = v.screen.clone();
     let screen = screen.read();
 
-    let doc = v.document().unwrap();
-    let doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1449,7 +1449,7 @@ pub fn move_to_token_start(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc
     let marks = &mut tm.marks;
 
     for (idx, m) in marks.iter_mut().enumerate() {
-        m.move_to_token_start(&doc, codec);
+        m.move_to_token_start(&buffer, codec);
 
         // main mark ?
         if idx == midx && !screen.contains_offset(m.offset) {
@@ -1474,8 +1474,8 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
     let screen = v.screen.clone();
     let screen = screen.read();
 
-    let doc = v.document().unwrap();
-    let doc = doc.read();
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let codec = tm.text_codec.as_ref();
@@ -1483,7 +1483,7 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
     let marks = &mut tm.marks;
 
     for m in marks.iter_mut() {
-        m.move_to_token_end(&doc, codec);
+        m.move_to_token_end(&buffer, codec);
 
         // main mark ?
         if !screen.contains_offset(m.offset) {

@@ -134,12 +134,12 @@ impl<'a> Mode for VscrollbarMode {
                 let mut dst = editor.view_map.get(&dst.id).unwrap().write();
                 let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
 
-                let doc = src.document.as_ref().unwrap();
-                let doc = doc.read();
-                let doc_size = doc.size();
+                let buffer = src.buffer.as_ref().unwrap();
+                let buffer = buffer.read();
+                let buffer_size = buffer.size();
 
-                let off = src.start_offset as f64 / doc_size as f64;
-                let off2 = src.end_offset as f64 / doc_size as f64;
+                let off = src.start_offset as f64 / buffer_size as f64;
+                let off2 = src.end_offset as f64 / buffer_size as f64;
 
                 mode_ctx.percent = off * 100.0;
                 mode_ctx.percent_end = off2 * 100.0;
@@ -275,10 +275,10 @@ pub fn vscrollbar_input_event(
             let dim = v.screen.read().dimension();
             let mut dst = editor.view_map.get(&target_view_id).unwrap().write();
 
-            let doc_size = {
-                let doc = dst.document.as_ref().unwrap();
-                let doc = doc.read();
-                std::cmp::max(1, doc.size()) // avoid div by zero
+            let buffer_size = {
+                let buffer = dst.buffer.as_ref().unwrap();
+                let buffer = buffer.read();
+                std::cmp::max(1, buffer.size()) // avoid div by zero
             };
 
             let y = std::cmp::max(0, *y) as usize; //  coordinates can be negative
@@ -302,7 +302,7 @@ pub fn vscrollbar_input_event(
 
             // set target's offset
             // the scrollbar dimension are recomputed in on_view_event
-            let offset = (doc_size as f64 * percent) as u64;
+            let offset = (buffer_size as f64 * percent) as u64;
             dst.start_offset = offset;
 
             // TODO(ceg): push action

@@ -67,8 +67,8 @@ pub struct Screen {
     /// placeholder to record the offset of the last pushed CodepointInfo (used by View)
     pub last_offset: Option<u64>,
 
-    /// placeholder to record the maximum offset of the document (eof)
-    pub doc_max_offset: u64,
+    /// placeholder to record the maximum offset of the buffer (eof)
+    pub buffer_max_offset: u64,
 
     pub line_offset: Vec<(u64, u64)>,
     pub line_index: Vec<(usize, usize)>,
@@ -100,7 +100,7 @@ impl Screen {
             push_capacity,
             first_offset: None,
             last_offset: None,
-            doc_max_offset: 0,
+            buffer_max_offset: 0,
             line_offset: Vec::with_capacity(height),
             line_index: Vec::with_capacity(height),
         }
@@ -191,7 +191,7 @@ impl Screen {
         self.push_count = 0;
         self.first_offset = None;
         self.last_offset = None;
-        self.doc_max_offset = 0;
+        self.buffer_max_offset = 0;
 
         self.line_offset.clear();
         self.line_index.clear();
@@ -430,7 +430,7 @@ impl Screen {
 
         self.first_offset = None;
         self.last_offset = None;
-        self.doc_max_offset = 0; // TODO(ceg): Option<u64>
+        self.buffer_max_offset = 0; // TODO(ceg): Option<u64>
 
         self.line_offset.clear();
         self.line_index.clear();

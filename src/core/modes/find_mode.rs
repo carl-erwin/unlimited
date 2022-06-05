@@ -8,7 +8,7 @@ use super::Mode;
 
 use super::text_mode::TextModeContext;
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
@@ -196,10 +196,10 @@ pub fn find_controller_stop(
             fm.reset();
 
             //
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
-            doc.delete_content(None);
-            doc.append("Find: ".as_bytes());
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
+            buffer.delete_content(None);
+            buffer.append("Find: ".as_bytes());
         }
 
         // set input focus to
@@ -218,14 +218,14 @@ fn create_find_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let doc = BufferBuilder::new()
-        .document_name("find-controller")
+    let buffer = BufferBuilder::new()
+        .buffer_name("find-controller")
         .internal(true)
         .use_buffer_log(false)
         .finalize();
 
     {
-        doc.as_ref().unwrap().write().append("Find: ".as_bytes());
+        buffer.as_ref().unwrap().write().append("Find: ".as_bytes());
     }
 
     // create view at mode creation
@@ -235,7 +235,7 @@ fn create_find_controller_view(
         None,
         (x, y),
         (w, h),
-        doc,
+        buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): find-controller
         0,
     );
@@ -458,9 +458,9 @@ pub fn find_controller_next(
             let text_view_id = v.controlled_view.as_ref().unwrap();
             let mut text_view = editor.view_map.get(text_view_id).unwrap().write();
 
-            let doc = text_view.document().unwrap();
-            let doc = doc.write();
-            let offset = doc.find(&encoded_str, offset, None);
+            let buffer = text_view.buffer().unwrap();
+            let buffer = buffer.write();
+            let offset = buffer.find(&encoded_str, offset, None);
             dbg_println!("FIND offset = {:?}", offset);
             if let Some(offset) = offset {
                 {
@@ -562,10 +562,10 @@ pub fn find_controller_prev(
 
             let text_view_id = v.controlled_view.as_ref().unwrap();
             let mut text_view = editor.view_map.get(text_view_id).unwrap().write();
-            let doc = text_view.document().unwrap();
-            let doc = doc.write();
+            let buffer = text_view.buffer().unwrap();
+            let buffer = buffer.write();
 
-            let offset = doc.find_reverse(&encoded_str, offset, None);
+            let offset = buffer.find_reverse(&encoded_str, offset, None);
             dbg_println!("FIND PREV offset = {:?}", offset);
             if let Some(offset) = offset {
                 {
@@ -612,13 +612,13 @@ pub fn display_find_string(
         let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
 
         // build find string
-        let doc = v.document().unwrap();
-        let mut doc = doc.write();
-        doc.delete_content(None);
-        doc.append("Find: ".as_bytes());
+        let buffer = v.buffer().unwrap();
+        let mut buffer = buffer.write();
+        buffer.delete_content(None);
+        buffer.append("Find: ".as_bytes());
 
         let s: String = fm.find_str.iter().collect();
-        doc.append(s.as_bytes());
+        buffer.append(s.as_bytes());
     } else {
         // panic! ?
         return;
@@ -658,14 +658,14 @@ pub fn find_start_reverse(
     }
 
     //
-    let doc = status_view.read().document().unwrap();
-    let mut doc = doc.write();
+    let buffer = status_view.read().buffer().unwrap();
+    let mut buffer = buffer.write();
 
     // clear status view
-    doc.delete_content(None);
+    buffer.delete_content(None);
 
     // set status text
-    doc.append("Find: ".as_bytes());
+    buffer.append("Find: ".as_bytes());
 
     // push new input map for y/n
     let mut v = view.write();

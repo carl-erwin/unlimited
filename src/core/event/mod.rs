@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::vec::Vec;
 
-use crate::core::document;
-use crate::core::document::Buffer;
+use crate::core::buffer;
+use crate::core::buffer::Buffer;
 use crate::core::screen::Screen;
 
 //
@@ -92,14 +92,14 @@ pub enum Event<'a> {
     },
 
     /// Sent core -> worker thread.
-    /// Saving the document's data is done in parallel in a thread.
-    /// The user can still browse the document.
+    /// Saving the buffer's data is done in parallel in a thread.
+    /// The user can still browse the buffer.
     SyncTask {
-        doc: Arc<RwLock<Buffer<'a>>>,
+        buffer: Arc<RwLock<Buffer<'a>>>,
     },
     // test
     IndexTask {
-        document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Buffer<'a>>>>>>,
+        buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'a>>>>>>,
     },
 
     ApplicationQuit,

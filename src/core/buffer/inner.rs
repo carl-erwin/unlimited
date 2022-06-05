@@ -40,7 +40,7 @@ impl<'a> InnerBuffer<'a> {
     /// this function allocate a buffer
     /// if file_name is null the content will be stored in heap
     /// if file_name is non null the the content will be read from the file
-    /// if document_name is null , file_name will be used to give a name to the buffer
+    /// if buffer_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successful open operation
     pub fn new(file_name: &str, mode: OpenMode) -> Option<InnerBuffer<'a>> {

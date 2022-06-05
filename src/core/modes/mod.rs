@@ -32,7 +32,7 @@ pub use text_mode::TextMode;
 pub use vscrollbar_mode::VscrollbarMode;
 pub use vsplit_mode::VsplitMode;
 
-use crate::core::document::Buffer;
+use crate::core::buffer::Buffer;
 
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
@@ -48,13 +48,13 @@ pub trait Mode {
     /// TODO(ceg): find a better way to get back mode ctx
     fn alloc_ctx(&self) -> Box<dyn Any>;
 
-    /// This function MUST be called once per document
-    /// It is used to allocate document's mode context/metadata
-    fn configure_document(
+    /// This function MUST be called once per buffer
+    /// It is used to allocate buffer's mode context/metadata
+    fn configure_buffer(
         &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
-        _doc: &mut Buffer<'static>,
+        _buffer: &mut Buffer<'static>,
     ) {
     }
 

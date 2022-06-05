@@ -17,7 +17,7 @@
     goto-line
     goto-offset
 
-  document modifications:
+  buffer modifications:
    insert/remove
    copy
    cut
@@ -40,7 +40,7 @@
 
     VIEW(1)    VIEW(2)
 
-       TEXT-MODE(doc) -> doc.get_mode_shared_data("tex-mode")  -> dyn ?
+       TEXT-MODE(buffer) -> buffer.get_mode_shared_data("tex-mode")  -> dyn ?
            SHARED   should shared marks/sel between view / change cursor's shape when not focused
 
        TEXT-MODE(view) -> view.get_mode_private_data("tex-mode") -> dyn ?
@@ -49,10 +49,10 @@
         we could do better: instead of storing data in doc
         store them in text-mode global struct/mutex etc..
 
-        tm.get_doc_data(doc_id)  -> Option<>    destroy when doc is destroyed ? ...
+        tm.get_buffer_data(buffer_id)  -> Option<>    destroy when buffer is destroyed ? ...
         tm.get_view_data(view_id)  -> Option<>  destroy when view is destroyed ...
 
-        in real world we have doc_ids + copy, no pointers
+        in real world we have buffer_ids + copy, no pointers
 
         struct TextModeBufferData { ...
           marks
@@ -98,8 +98,8 @@ use crate::core::codec::text::utf8;
 use crate::core::codec::text::SyncDirection; // TODO(ceg): remove
 use crate::core::codec::text::TextCodec;
 
-use crate::core::document::BufferOperation;
-use crate::core::document::BufferOperationType;
+use crate::core::buffer::BufferOperation;
+use crate::core::buffer::BufferOperationType;
 
 use crate::core::event::ButtonEvent;
 use crate::core::event::InputEvent;
@@ -185,7 +185,7 @@ struct ScreenOverlayFilterInfo<'a> {
 
 /// CopyData is used to implement the selection/cut/paste buffer
 pub enum CopyData {
-    BufferLogIndex(usize), // the data is in the document buffer log index see BufferLog
+    BufferLogIndex(usize), // the data is in the buffer buffer log index see BufferLog
     InnerBuffer(Vec<u8>),  // a standalone copy
 }
 
@@ -485,7 +485,7 @@ impl<'a> Mode for TextMode {
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();
         let selections_offsets: Vec<u64> = tm.select_point.iter().map(|m| m.offset).collect();
 
-        view.document.as_ref().unwrap().write().tag(
+        view.buffer.as_ref().unwrap().write().tag(
             Instant::now(),
             0,
             marks_offsets,
@@ -772,17 +772,17 @@ pub fn run_text_mode_actions_vec(
                 );
 
                 //
-                let doc = v.document().unwrap();
-                let mut doc = doc.write();
-                let max_offset = doc.size() as u64;
+                let buffer = v.buffer().unwrap();
+                let mut buffer = buffer.write();
+                let max_offset = buffer.size() as u64;
 
-                let n = doc.buffer_log_count();
+                let n = buffer.buffer_log_count();
                 dbg_println!(
-                    "save MARKS PostInputAction::DeduplicateAndSaveMarks doc.buffer_log_count() {}",
+                    "save MARKS PostInputAction::DeduplicateAndSaveMarks buffer.buffer_log_count() {}",
                     n
                 );
                 if n > 0 {
-                    doc.tag(
+                    buffer.tag(
                         env.current_time,
                         max_offset,
                         marks_offsets,
@@ -790,8 +790,8 @@ pub fn run_text_mode_actions_vec(
                     );
 
                     dbg_println!(
-                        "MARK PostInputAction::DeduplicateAndSaveMarks doc revision {}",
-                        doc.nr_changes()
+                        "MARK PostInputAction::DeduplicateAndSaveMarks buffer revision {}",
+                        buffer.nr_changes()
                     );
                 } else {
                     dbg_println!("MARK PostInputAction::DeduplicateAndSaveMarks nothing to do");
@@ -812,17 +812,17 @@ pub fn run_text_mode_actions_vec(
                 dbg_println!("MARKS {:?}", marks_offsets);
 
                 //
-                let doc = v.document().unwrap();
-                let mut doc = doc.write();
-                let max_offset = doc.size() as u64;
-                doc.tag(
+                let buffer = v.buffer().unwrap();
+                let mut buffer = buffer.write();
+                let max_offset = buffer.size() as u64;
+                buffer.tag(
                     env.current_time,
                     max_offset,
                     marks_offsets,
                     selections_offsets,
                 );
 
-                dbg_println!("MARK SaveMarks doc revision {}", doc.nr_changes());
+                dbg_println!("MARK SaveMarks buffer revision {}", buffer.nr_changes());
             }
 
             PostInputAction::CancelSelection => {
@@ -850,10 +850,10 @@ pub fn run_text_mode_actions_vec(
             dbg_println!("min (mark) = {}", min);
             dbg_println!("max (mark) = {}", max);
 
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
 
-            let (s, e) = doc.get_cache_range();
+            let (s, e) = buffer.get_cache_range();
 
             // screen cache
             {
@@ -901,9 +901,9 @@ pub fn run_text_mode_actions_vec(
                     "UPDATE READ CACHE SIZE = {} Mib",
                     (max - min) / (1024 * 1024)
                 );
-                doc.set_cache(min, max); // TODO(ceg): optimize read with discard cache + append
+                buffer.set_cache(min, max); // TODO(ceg): optimize read with discard cache + append
 
-                let (s, e) = doc.get_cache_range();
+                let (s, e) = buffer.get_cache_range();
                 dbg_println!("UPDATE READ CACHE  MIN={}, MAX={}, diff={}", s, e, e - s);
             }
         }
@@ -929,15 +929,15 @@ fn run_text_mode_actions(
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
                 let mut v = view.write();
-                let doc = v.document().unwrap();
-                let doc = doc.read();
+                let buffer = v.buffer().unwrap();
+                let buffer = buffer.read();
 
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 // TODO(ceg): add selection in buffer log ?
                 // ex: cut-line
                 // undo must restore marks before cut
-                tm.prev_buffer_log_revision = doc.buffer_log.data.len();
+                tm.prev_buffer_log_revision = buffer.buffer_log.data.len();
 
                 // SAVE marks copy, slow fow now
                 // add marks revision ?
@@ -948,11 +948,11 @@ fn run_text_mode_actions(
 
             (editor::Stage::Input, editor::StagePosition::Post) => {
                 let mut v = view.write();
-                let doc = v.document.clone();
+                let buffer = v.buffer.clone();
 
-                if let Some(doc) = doc {
-                    let doc = doc.read();
-                    let max_offset = doc.size() as u64;
+                if let Some(buffer) = buffer {
+                    let buffer = buffer.read();
+                    let max_offset = buffer.size() as u64;
 
                     // refresh view offset after user input
                     v.start_offset = std::cmp::min(v.start_offset, max_offset);
@@ -964,8 +964,8 @@ fn run_text_mode_actions(
                         save_marks = true;
                     }
 
-                    // save marks on document changes
-                    if doc.buffer_log.pos > tm.prev_buffer_log_revision
+                    // save marks on buffer changes
+                    if buffer.buffer_log.pos > tm.prev_buffer_log_revision
                         && tm.prev_action == TextModeAction::MarksMove
                     {
                         // not undo/redo
@@ -1011,8 +1011,8 @@ fn run_text_mode_actions(
     // TODO(ceg): cut/paste
     if !true {
         let v = view.read();
-        let doc = v.document().unwrap();
-        let max_offset = doc.read().size() as u64;
+        let buffer = v.buffer().unwrap();
+        let max_offset = buffer.read().size() as u64;
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
         let marks = &tm.marks;
         for m in marks.iter() {
@@ -1106,12 +1106,12 @@ pub fn insert_codepoint_array(
         }
     };
 
-    // doc read only ?
+    // buffer read only ?
     {
         let v = view.read();
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.read();
-        if doc.is_syncing {
+        let buffer = v.buffer.as_ref().unwrap();
+        let buffer = buffer.read();
+        if buffer.is_syncing {
             // TODO(ceg): send/display notification
             return;
         }
@@ -1122,15 +1122,15 @@ pub fn insert_codepoint_array(
     let save_marks = {
         let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
-        let doc = v.document.as_ref().unwrap();
-        let doc = doc.read();
-        let last_pos = doc.buffer_log_pos() >= doc.buffer_log_count().saturating_sub(1);
+        let buffer = v.buffer.as_ref().unwrap();
+        let buffer = buffer.read();
+        let last_pos = buffer.buffer_log_pos() >= buffer.buffer_log_count().saturating_sub(1);
         dbg_println!(
-            "buffer log {} / {} | doc.changed {}, doc.nr_changes() {}",
-            doc.buffer_log_pos(),
-            doc.buffer_log_count(),
-            doc.changed, // NEW != changed -> need save
-            doc.nr_changes()
+            "buffer log {} / {} | buffer.changed {}, buffer.nr_changes() {}",
+            buffer.buffer_log_pos(),
+            buffer.buffer_log_count(),
+            buffer.changed, // NEW != changed -> need save
+            buffer.nr_changes()
         );
         !last_pos
             || tm.prev_action == TextModeAction::MarksMove
@@ -1162,9 +1162,9 @@ pub fn insert_codepoint_array(
         let mut view_growth = 0;
         let mut offset: u64 = 0;
         {
-            let mut doc = v.document.clone();
-            let doc = doc.as_mut().unwrap();
-            let mut doc = doc.write();
+            let mut buffer = v.buffer.clone();
+            let buffer = buffer.as_mut().unwrap();
+            let mut buffer = buffer.write();
 
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.prev_action = TextModeAction::BufferModification;
@@ -1193,7 +1193,7 @@ pub fn insert_codepoint_array(
                 }
 
                 m.offset += grow;
-                doc.insert(m.offset, utf8.len(), &utf8);
+                buffer.insert(m.offset, utf8.len(), &utf8);
 
                 // track insert operation
                 insert_ops.push(BufferOperation {
@@ -1209,14 +1209,14 @@ pub fn insert_codepoint_array(
                 grow += utf8.len() as u64;
             }
 
-            // notify doc subscriberss of insert ops
-            // cannot do this in doc.callback ?
+            // notify buffer subscriberss of insert ops
+            // cannot do this in buffer.callback ?
             // and notify all users the current view should not touch the marks ?
             // struct BufferId(u64)
             // struct BufferClientId(u64)
-            // view.doc_client_id = doc.add_client_cb(cb);
+            // view.buffer_client_id = buffer.add_client_cb(cb);
             // where cb = fn(BufferId, BufferClientId, [ops])
-            // doc.notify_operations(view.doc_client_id, &insert_ops);
+            // buffer.notify_operations(view.buffer_client_id, &insert_ops);
         }
         v.start_offset += view_growth;
 
@@ -1273,10 +1273,10 @@ pub fn remove_previous_codepoint(
     let start_offset = v.start_offset;
 
     {
-        let doc = v.document.clone();
-        let doc = doc.clone().unwrap();
-        let mut doc = doc.write();
-        if doc.size() == 0 {
+        let buffer = v.buffer.clone();
+        let buffer = buffer.clone().unwrap();
+        let mut buffer = buffer.write();
+        if buffer.size() == 0 {
             return;
         }
 
@@ -1295,15 +1295,15 @@ pub fn remove_previous_codepoint(
                 continue;
             }
 
-            m.move_backward(&doc, codec);
+            m.move_backward(&buffer, codec);
             dbg_println!("after move.backward m.offset= {}", m.offset);
 
             let mut data = vec![];
-            doc.read(m.offset, 4, &mut data);
+            buffer.read(m.offset, 4, &mut data);
             let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
             dbg_println!("read {} bytes", size);
 
-            let nr_removed = doc.remove(m.offset, size, None);
+            let nr_removed = buffer.remove(m.offset, size, None);
             dbg_println!("nr_removed {} bytes", nr_removed);
 
             dbg_println!(
@@ -1356,19 +1356,22 @@ pub fn undo(
 
     let v = &mut view.write();
 
-    let mut doc = v.document.clone();
-    let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
     let select_point = &mut tm.select_point;
 
-    dbg_println!("undo: doc.buffer_log_count {:?}", doc.buffer_log_count());
+    dbg_println!(
+        "undo: buffer.buffer_log_count {:?}",
+        buffer.buffer_log_count()
+    );
 
-    doc.undo_until_tag();
+    buffer.undo_until_tag();
 
-    if let Some((marks_offsets, selections_offsets)) = doc.get_tag_offsets() {
+    if let Some((marks_offsets, selections_offsets)) = buffer.get_tag_offsets() {
         dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
@@ -1395,9 +1398,9 @@ pub fn undo(
 pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write();
 
-    let mut doc = v.document.clone();
-    let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
@@ -1408,19 +1411,19 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
     dbg_println!(
         "REDO: marks before redo {:?}, log pos {}",
         marks,
-        doc.buffer_log_pos()
+        buffer.buffer_log_pos()
     );
 
-    doc.redo_until_tag();
+    buffer.redo_until_tag();
 
     dbg_println!(
         "REDO: marks after  redo {:?}, log pos {}",
         marks,
-        doc.buffer_log_pos()
+        buffer.buffer_log_pos()
     );
 
-    if let Some((marks_offsets, selections_offsets)) = doc.get_tag_offsets() {
-        dbg_println!("doc max size {:?}", doc.size());
+    if let Some((marks_offsets, selections_offsets)) = buffer.get_tag_offsets() {
+        dbg_println!("doc max size {:?}", buffer.size());
         dbg_println!("restore marks {:?}", marks_offsets);
         dbg_println!("restore selections {:?}", selections_offsets);
         marks.clear();
@@ -1433,7 +1436,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
             select_point.push(Mark { offset });
         }
     } else {
-        dbg_println!("REDO: no marks ? doc size {:?}", doc.size());
+        dbg_println!("REDO: no marks ? buffer size {:?}", buffer.size());
     }
 
     tm.pre_compose_action
@@ -1461,15 +1464,15 @@ pub fn remove_codepoint(
     let mut view_shrink: u64 = 0;
 
     {
-        let mut doc = v.document.clone();
-        let doc = doc.as_mut().unwrap();
-        let mut doc = doc.write();
+        let mut buffer = v.buffer.clone();
+        let buffer = buffer.as_mut().unwrap();
+        let mut buffer = buffer.write();
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         let codec = tm.text_codec.as_ref();
 
-        if doc.size() == 0 {
+        if buffer.size() == 0 {
             return;
         }
 
@@ -1481,18 +1484,18 @@ pub fn remove_codepoint(
             }
 
             let mut data = Vec::with_capacity(4);
-            doc.read(m.offset, data.capacity(), &mut data);
+            buffer.read(m.offset, data.capacity(), &mut data);
             let (_, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
 
             if m.offset < view_start {
                 view_shrink += size as u64;
             }
 
-            let nr_removed = doc.remove(m.offset, size as usize, None);
+            let nr_removed = buffer.remove(m.offset, size as usize, None);
             shrink += nr_removed as u64;
         }
 
-        let _max_offset = doc.size() as u64;
+        let _max_offset = buffer.size() as u64;
     }
     v.start_offset -= view_shrink;
 
@@ -1511,15 +1514,15 @@ pub fn remove_until_end_of_word(
 ) {
     let v = &mut view.write();
 
-    let mut doc = v.document.clone();
-    let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
     let codec = tm.text_codec.as_ref();
 
-    let size = doc.size() as u64;
+    let size = buffer.size() as u64;
 
     if size == 0 {
         return;
@@ -1538,7 +1541,7 @@ pub fn remove_until_end_of_word(
         // skip blanks until any char or end-of-line
         loop {
             data.clear();
-            doc.read(m.offset, data.capacity(), &mut data);
+            buffer.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
 
             if size == 0 {
@@ -1558,7 +1561,7 @@ pub fn remove_until_end_of_word(
         // skip until blank or end-of-line
         loop {
             data.clear();
-            doc.read(m.offset, data.capacity(), &mut data);
+            buffer.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
 
             if size == 0 {
@@ -1578,7 +1581,7 @@ pub fn remove_until_end_of_word(
         }
 
         // remove [start, m[
-        let nr_removed = doc.remove(start.offset, (m.offset - start.offset) as usize, None);
+        let nr_removed = buffer.remove(start.offset, (m.offset - start.offset) as usize, None);
 
         shrink += nr_removed as u64;
 
@@ -1587,7 +1590,7 @@ pub fn remove_until_end_of_word(
 
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
     tm.pre_compose_action.push(PostInputAction::CancelSelection); //TODO register last optype
-                                                                  // if doc changes cancel selection ?
+                                                                  // if buffer changes cancel selection ?
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1632,12 +1635,12 @@ pub fn cut_to_end_of_line(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    // doc read only ?
+    // buffer read only ?
     {
         let v = view.read();
-        let doc = v.document().unwrap();
-        let doc = doc.read();
-        if doc.is_syncing {
+        let buffer = v.buffer().unwrap();
+        let buffer = buffer.read();
+        if buffer.is_syncing {
             return;
         }
     }
@@ -1655,9 +1658,9 @@ pub fn cut_to_end_of_line(
 
     let v = &mut view.write();
 
-    let mut doc = v.document.clone();
-    let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1678,22 +1681,22 @@ pub fn cut_to_end_of_line(
         let offset0 = m.offset;
 
         let mut end = m.clone();
-        end.move_to_end_of_line(&doc, codec);
+        end.move_to_end_of_line(&buffer, codec);
         let offset1 = end.offset;
 
         // remove end-of-line (\n) ?
         if offset0 == offset1 && single_mark || remove_eol {
-            end.move_forward(&doc, codec);
+            end.move_forward(&buffer, codec);
         }
 
         // remove data
         let size = (end.offset - m.offset) as usize;
-        doc.remove(m.offset, size, None);
+        buffer.remove(m.offset, size, None);
         remove_size.insert(0, size);
 
         // save transaction's index
         tm.copy_buffer
-            .insert(0, CopyData::BufferLogIndex(doc.buffer_log.pos - 1));
+            .insert(0, CopyData::BufferLogIndex(buffer.buffer_log.pos - 1));
     }
 
     // update marks offsets
@@ -1714,18 +1717,18 @@ pub fn cut_to_end_of_line(
 pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
     let v = &mut view.write();
 
-    // doc read only ?
+    // buffer read only ?
     {
-        let doc = v.document().unwrap();
-        let doc = doc.read();
-        if doc.is_syncing {
+        let buffer = v.buffer().unwrap();
+        let buffer = buffer.read();
+        if buffer.is_syncing {
             return;
         }
     }
 
-    let mut doc = v.document.clone();
-    let doc = doc.as_mut().unwrap();
-    let mut doc = doc.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1750,7 +1753,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
             let copy = &tm.copy_buffer[midx];
             let data = match copy {
                 CopyData::BufferLogIndex(tridx) => {
-                    let tr = doc.buffer_log.data[*tridx].clone();
+                    let tr = buffer.buffer_log.data[*tridx].clone();
                     if let Some(ref data) = tr.data {
                         data.as_ref().clone()
                     } else {
@@ -1762,7 +1765,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
 
             dbg_println!("paste @ offset {} data.len {}", m.offset, data.len());
 
-            let nr_in = doc.insert(m.offset, data.len(), data.as_slice());
+            let nr_in = buffer.insert(m.offset, data.len(), data.as_slice());
             assert_eq!(nr_in, data.len());
             grow += nr_in as u64;
             m.offset += nr_in as u64;
@@ -1828,9 +1831,9 @@ pub fn copy_maybe_remove_selection_symmetric(
     let v = &mut view.as_ref().clone().write();
 
     // doc
-    let doc = v.document.clone();
-    let doc = doc.clone().unwrap();
-    let mut doc = doc.write();
+    let buffer = v.buffer.clone();
+    let buffer = buffer.clone().unwrap();
+    let mut buffer = buffer.write();
 
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
@@ -1857,7 +1860,7 @@ pub fn copy_maybe_remove_selection_symmetric(
         let data_size = (max - min) as usize;
         if copy {
             let mut data = Vec::with_capacity(data_size);
-            let nr_read = doc.read(min, data_size, &mut data);
+            let nr_read = buffer.read(min, data_size, &mut data);
             dbg_println!(
                 "nr copied from min({}) -> max({}) = {}",
                 min,
@@ -1871,7 +1874,7 @@ pub fn copy_maybe_remove_selection_symmetric(
             nr_bytes_copied += nr_read;
         }
         if remove {
-            let nr_removed = doc.remove(min, data_size, None);
+            let nr_removed = buffer.remove(min, data_size, None);
             assert_eq!(nr_removed, data_size);
             shrink += data_size as u64;
             nr_bytes_removed += data_size;
@@ -2247,9 +2250,9 @@ pub fn center_around_offset(
     if let Some(center_offset) = env.center_offset {
         let offset = {
             let v = view.read();
-            let doc = v.document().unwrap();
-            let doc = doc.read();
-            ::std::cmp::min(doc.size() as u64, center_offset)
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
+            ::std::cmp::min(buffer.size() as u64, center_offset)
         };
 
         center_view_around_offset(view, editor, env, offset); // TODO(ceg): enum { top center bottom } ? in text-mode
@@ -2423,9 +2426,9 @@ pub fn scroll_view_down(
         }
 
         let max_offset = {
-            let doc = v.document().unwrap();
-            let doc = doc.read();
-            doc.size() as u64
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
+            buffer.size() as u64
         };
 
         // avoid useless scroll
@@ -2533,5 +2536,5 @@ pub fn center_view_around_offset(
 }
 
 pub fn print_buffer_log(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    view.read().document().unwrap().read().buffer_log.dump();
+    view.read().buffer().unwrap().read().buffer_log.dump();
 }

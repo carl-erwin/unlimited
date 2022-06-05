@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use super::Mode;
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
@@ -227,9 +227,9 @@ pub fn open_doc_controller_stop(
             otm.reset();
 
             //
-            let doc = v.document().unwrap();
-            let mut doc = doc.write();
-            doc.delete_content(None);
+            let buffer = v.buffer().unwrap();
+            let mut buffer = buffer.write();
+            buffer.delete_content(None);
         }
 
         // set input focus to
@@ -245,8 +245,8 @@ fn create_open_doc_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let doc = BufferBuilder::new()
-        .document_name("goto-controller")
+    let buffer = BufferBuilder::new()
+        .buffer_name("goto-controller")
         .internal(true)
         .use_buffer_log(false)
         .finalize();
@@ -258,7 +258,7 @@ fn create_open_doc_controller_view(
         None,
         (x, y),
         (w, h),
-        doc,
+        buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
     );
@@ -369,11 +369,11 @@ fn open_doc_display_prompt(
     text_view: &mut View<'static>,
 ) {
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
-    let doc = controller_view.document().clone();
-    let mut doc = doc.as_ref().unwrap().write();
+    let buffer = controller_view.buffer().clone();
+    let mut buffer = buffer.as_ref().unwrap().write();
 
-    doc.delete_content(None);
-    doc.append("Open: ".as_bytes());
+    buffer.delete_content(None);
+    buffer.append("Open: ".as_bytes());
 
     // setup working directory
     {
@@ -388,7 +388,7 @@ fn open_doc_display_prompt(
         }
 
         let s: String = odm.prompt.iter().collect();
-        doc.append(s.as_bytes());
+        buffer.append(s.as_bytes());
     }
 
     dbg_println!("open_doc_display_prompt end");
@@ -403,8 +403,8 @@ fn create_open_doc_completion_view(
 
     dbg_print!("create_open_doc_completion_view");
 
-    let command_doc = BufferBuilder::new()
-        .document_name("completion-pop-up")
+    let command_buffer = BufferBuilder::new()
+        .buffer_name("completion-pop-up")
         .internal(true)
         .use_buffer_log(false)
         .finalize();
@@ -416,7 +416,7 @@ fn create_open_doc_completion_view(
         Some(parent_id),
         (0, 0),
         (1, 1),
-        command_doc,
+        command_buffer,
         &modes,
         0,
     );
@@ -663,12 +663,12 @@ fn show_completion_popup(
     let mut completion_view = completion_view.write();
 
     let list = &odm.completion_list;
-    let doc = completion_view.document().unwrap();
-    let mut doc = doc.write();
-    doc.delete_content(None);
+    let buffer = completion_view.buffer().unwrap();
+    let mut buffer = buffer.write();
+    buffer.delete_content(None);
 
     for s in list {
-        doc.append(s.as_bytes());
+        buffer.append(s.as_bytes());
     }
 
     // update position size
@@ -808,9 +808,9 @@ pub fn open_doc_controller_apply_current_completion(
             let mut completion_view = completion_view.write();
 
             {
-                let doc = completion_view.document().unwrap();
-                let mut doc = doc.write();
-                doc.delete_content(None);
+                let buffer = completion_view.buffer().unwrap();
+                let mut buffer = buffer.write();
+                buffer.delete_content(None);
             }
 
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -867,9 +867,9 @@ pub fn open_doc_controller_discard_prompt_suffix(
             let mut completion_view = completion_view.write();
 
             {
-                let doc = completion_view.document().unwrap();
-                let mut doc = doc.write();
-                doc.delete_content(None);
+                let buffer = completion_view.buffer().unwrap();
+                let mut buffer = buffer.write();
+                buffer.delete_content(None);
             }
 
             let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");

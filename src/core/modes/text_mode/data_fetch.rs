@@ -66,7 +66,7 @@ impl ContentFilter<'_> for RawDataFilter {
         self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
 
         // EOF
-        self.max_pos = view.read().document().unwrap().read().size() as u64;
+        self.max_pos = view.read().buffer().unwrap().read().size() as u64;
 
         if bench_to_eof() {
             let bench_size = 1024 * 32;
@@ -93,11 +93,11 @@ impl ContentFilter<'_> for RawDataFilter {
     ) {
         // dbg_println!("DATA FETCH: run -----------------------");
         // There is no input HERE
-        // we convert the document data into  buffer FilterIo
+        // we convert the buffer data into  buffer FilterIo
 
         // we read screen.width() bytes // TODO(ceg): width * codec_max_encode_size() for now
-        let doc = view.document.clone();
-        if let Some(ref doc) = doc {
+        let buffer = view.buffer.clone();
+        if let Some(ref buffer) = buffer {
             // 1st pass raw_data_filter
             let mut raw_data = vec![]; // TODO(ceg): write directly to next filter input
 
@@ -134,9 +134,9 @@ impl ContentFilter<'_> for RawDataFilter {
             }
 
             //
-            let doc = doc.read();
+            let buffer = buffer.read();
 
-            let rd = doc.read(self.pos, self.read_size, &mut raw_data);
+            let rd = buffer.read(self.pos, self.read_size, &mut raw_data);
 
             if self.debug {
                 dbg_println!(
@@ -145,7 +145,7 @@ impl ContentFilter<'_> for RawDataFilter {
                     rd,
                     self.read_size
                 );
-                dbg_println!("DATA FETCH: BUFFER SIZE {}", doc.size());
+                dbg_println!("DATA FETCH: BUFFER SIZE {}", buffer.size());
                 dbg_println!(
                     "DATA FETCH: POS {} + RD {}  = {}",
                     self.pos,
@@ -200,8 +200,8 @@ impl ContentFilter<'_> for RawDataFilter {
             self.pos += rd as u64;
             self.read_count += rd;
 
-            // TODO(ceg): cache doc size ?
-            if self.pos == doc.size() as u64 {
+            // TODO(ceg): cache buffer size ?
+            if self.pos == buffer.size() as u64 {
                 env.quit = true;
 
                 if true {

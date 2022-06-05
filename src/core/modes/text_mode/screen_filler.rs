@@ -267,7 +267,7 @@ impl ContentFilter<'_> for ScreenFilter {
         //env.screen.finalize();
 
         env.screen.check_invariants();
-        env.screen.doc_max_offset = env.max_offset;
+        env.screen.buffer_max_offset = env.max_offset;
         //        assert_eq!(env.base_offset, env.screen.first_offset.unwrap()); // ?
 
         dbg_println!(

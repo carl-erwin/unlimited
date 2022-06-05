@@ -22,7 +22,7 @@ use crate::core::view::LayoutOperation;
 
 use crate::core::view::View;
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 
 pub struct BasicEditorMode {
     // add common fields
@@ -54,10 +54,10 @@ impl<'a> Mode for BasicEditorMode {
         mut env: &mut EditorEnv<'static>,
         mut view: &mut View<'static>,
     ) {
-        let doc = view.document();
+        let buffer = view.buffer();
 
-        let status_doc = BufferBuilder::new()
-            .document_name("status-bar")
+        let status_buffer = BufferBuilder::new()
+            .buffer_name("status-bar")
             .internal(true)
             //           .use_buffer_log(false)
             .finalize();
@@ -71,13 +71,13 @@ impl<'a> Mode for BasicEditorMode {
                 LayoutOperation::Fixed {
                     size: 1 + 0, /* nano-like */
                 },
-                doc.clone(),
+                buffer.clone(),
                 vec![], // TODO(ceg): title-mode
             ),
             // main text view
             (
                 LayoutOperation::RemainMinus { minus: 1 },
-                doc.clone(),
+                buffer.clone(),
                 vec!["simple-view".to_owned()],
             ),
             /*
@@ -90,18 +90,18 @@ impl<'a> Mode for BasicEditorMode {
             // status bar
             (
                 LayoutOperation::RemainPercent { p: 100.0 },
-                status_doc,
+                status_buffer,
                 vec!["status-mode".to_owned()],
             ),
         ];
 
         let mut layout_ops = vec![];
-        let mut docs = vec![];
+        let mut buffers = vec![];
         let mut modes = vec![];
 
         for e in &ops_modes {
             layout_ops.push(e.0.clone());
-            docs.push(e.1.clone());
+            buffers.push(e.1.clone());
             modes.push(e.2.clone());
         }
 
@@ -116,7 +116,7 @@ impl<'a> Mode for BasicEditorMode {
             height,
             LayoutDirection::Vertical,
             &layout_ops,
-            &docs,
+            &buffers,
             &modes,
         );
 
@@ -206,10 +206,10 @@ impl ContentFilter<'_> for BasicEditorTitle {
         w = w.saturating_sub(self.title.len());
 
         let view = view.read();
-        let d = view.document().unwrap();
+        let d = view.buffer().unwrap();
         let d = d.read();
-        let mut doc_info = format!("{}", d.name);
-        let dlen = doc_info.len();
+        let mut buffer_info = format!("{}", d.name);
+        let dlen = buffer_info.len();
         if w > dlen {
             let margin = 1; // w / 2 - dlen / 2;
             let margin = (0..margin).map(|_| " ").collect::<String>();
@@ -217,25 +217,25 @@ impl ContentFilter<'_> for BasicEditorTitle {
         }
 
         if d.changed {
-            doc_info.push_str("* ");
+            buffer_info.push_str("* ");
         } else {
-            doc_info.push_str("  ");
-            //            doc_info.push_str(" ❰❱❮❯");
+            buffer_info.push_str("  ");
+            //            buffer_info.push_str(" ❰❱❮❯");
         }
         if d.is_syncing {
-            doc_info.push_str("(sync)");
+            buffer_info.push_str("(sync)");
         }
 
-        doc_info.push_str(&format!(" {} bytes", d.size()));
-        doc_info.push_str(&format!(" (F1 for help)"));
+        buffer_info.push_str(&format!(" {} bytes", d.size()));
+        buffer_info.push_str(&format!(" (F1 for help)"));
 
         if env.focus_view_id != view::Id(0) {
             if let Some(_v) = editor.view_map.get(&env.focus_view_id) {
-                doc_info.push_str(&format!(" (focus vid: {:?})", env.focus_view_id));
+                buffer_info.push_str(&format!(" (focus vid: {:?})", env.focus_view_id));
             }
         }
 
-        self.title.push_str(&doc_info);
+        self.title.push_str(&buffer_info);
     }
 
     fn run(

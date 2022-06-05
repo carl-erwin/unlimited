@@ -3,11 +3,11 @@
 
     We want:
 
-    An Updated collection of metadata that tracks number of newlines in the document sub-blocks
+    An Updated collection of metadata that tracks number of newlines in the buffer sub-blocks
 
     The root contains the total count of newlines
 
-    NB: This is tied to the document implementation
+    NB: This is tied to the buffer implementation
 
                  (root)
                    |
@@ -18,17 +18,17 @@
     [1]        [2]  [2]       [4]
 
     each time a node is indexed
-    the document impl must call update hierarchy with the build metadata diff
+    the buffer impl must call update hierarchy with the build metadata diff
 
-    the mode subscribes to the document events
+    the mode subscribes to the buffer events
 
-    When a node is indexed/added/removed, the document notify us
+    When a node is indexed/added/removed, the buffer notify us
     Then we build the node metadata
     and ask to update the hierarchy.
 
 
-    To be fully async we must: have a shadowed tree that matched the document internal representation ?
-    and keep a per node doc_revision
+    To be fully async we must: have a shadowed tree that matched the buffer internal representation ?
+    and keep a per node buffer_revision
 
     Must we re-index before remove ?
 */
@@ -52,12 +52,12 @@ use crate::core::event::input_map::build_input_event_map;
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::document;
-use crate::core::document::get_document_byte_count;
-use crate::core::document::get_document_byte_count_at_offset;
-use crate::core::document::Buffer;
-use crate::core::document::BufferEvent;
-use crate::core::document::BufferEventCb;
+use crate::core::buffer;
+use crate::core::buffer::get_buffer_byte_count;
+use crate::core::buffer::get_buffer_byte_count_at_offset;
+use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferEvent;
+use crate::core::buffer::BufferEventCb;
 
 use crate::core::view::LayoutEnv;
 use crate::core::view::ScreenOverlayFilter;
@@ -109,12 +109,12 @@ static LINENUM_INPUT_MAP: &str = r#"
 
 ]"#;
 
-// document meta data map
+// buffer meta data map
 lazy_static! {
-    static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, RwLock<LineNumberBufferMetaData>>>> =
+    static ref BUFFER_METADATA_MAP: Arc<RwLock<HashMap<buffer::Id, RwLock<LineNumberBufferMetaData>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 
-        // document::Id -> (doc, LineNumberBufferMetaData)
+        // buffer::Id -> (buffer, LineNumberBufferMetaData)
 }
 
 struct LineNumberBufferMetaData {
@@ -151,14 +151,14 @@ impl _LineNumberBufferNodeMetaData {
 
 pub struct LineNumberMode {
     // add common fields
-    doc_subscription: usize,
+    buffer_subscription: usize,
 }
 
 impl LineNumberMode {
     pub fn new() -> Self {
         dbg_println!("LineNumberMode");
         LineNumberMode {
-            doc_subscription: 0,
+            buffer_subscription: 0,
         }
     }
 
@@ -255,29 +255,29 @@ impl<'a> Mode for LineNumberMode {
         Box::new(ctx)
     }
 
-    fn configure_document(
+    fn configure_buffer(
         &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
-        doc: &mut Buffer<'static>,
+        buffer: &mut Buffer<'static>,
     ) {
-        // allocate document meta data
-        let doc_id = doc.id;
+        // allocate buffer meta data
+        let buffer_id = buffer.id;
 
-        DOC_METADATA_MAP
+        BUFFER_METADATA_MAP
             .as_ref()
             .write()
-            .entry(doc_id)
+            .entry(buffer_id)
             .or_insert(RwLock::new(LineNumberBufferMetaData::new()));
 
-        let meta = DOC_METADATA_MAP.write();
-        let meta = meta.get(&doc_id);
+        let meta = BUFFER_METADATA_MAP.write();
+        let meta = meta.get(&buffer_id);
         let mut meta = meta.as_ref().unwrap().write();
 
         if !meta.cb_installed {
             let cb = Box::new(LineNumberModeDocEventHandler { count: 0 });
 
-            self.doc_subscription = doc.register_subscriber(cb);
+            self.buffer_subscription = buffer.register_subscriber(cb);
 
             meta.cb_installed = true;
         }
@@ -341,14 +341,14 @@ impl<'a> Mode for LineNumberMode {
                 let linenum_view = editor.view_map.get(&dst.id).unwrap().read();
 
                 // TODO(ceg): resize line-number view
-                let doc = text_view.document();
-                let doc = doc.as_ref().unwrap().read();
-                let max_offset = doc.size() as u64 + 1;
-                let width = if !doc.indexed {
+                let buffer = text_view.buffer();
+                let buffer = buffer.as_ref().unwrap().read();
+                let max_offset = buffer.size() as u64 + 1;
+                let width = if !buffer.indexed {
                     // '@offset '
                     1 + num_digit(max_offset) + 1
                 } else {
-                    let ret = get_document_byte_count(&doc, '\n' as usize).unwrap_or(0);
+                    let ret = get_buffer_byte_count(&buffer, '\n' as usize).unwrap_or(0);
                     let n = num_digit(ret + 1); // nb line = line count + 1
 
                     // 'xxxx '
@@ -375,7 +375,7 @@ impl<'a> Mode for LineNumberMode {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl BufferEventCb for LineNumberModeDocEventHandler {
-    fn cb(&mut self, doc: &Buffer, event: &BufferEvent) {
+    fn cb(&mut self, buffer: &Buffer, event: &BufferEvent) {
         self.count += 1;
 
         dbg_println!(
@@ -404,7 +404,7 @@ impl BufferEventCb for LineNumberModeDocEventHandler {
             }
         }
 
-        doc.show_root_node_bytes_stats();
+        buffer.show_root_node_bytes_stats();
     }
 }
 
@@ -444,17 +444,17 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
         self.line_number.clear();
 
-        let doc = src.document();
-        let doc = doc.as_ref().unwrap().read();
+        let buffer = src.buffer();
+        let buffer = buffer.as_ref().unwrap().read();
 
-        if !doc.indexed {
+        if !buffer.indexed {
             return;
         }
 
-        // call to get_document_byte_count_at_offset are SLOW : compute only the first line
+        // call to get_buffer_byte_count_at_offset are SLOW : compute only the first line
         // and read the target screen to compute relative line count
         for offset in self.line_offsets.iter().take(1) {
-            let n = get_document_byte_count_at_offset(&doc, '\n' as usize, offset.0);
+            let n = get_buffer_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
             self.line_number.push((offset.0, n));
         }
 

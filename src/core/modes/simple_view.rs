@@ -47,8 +47,8 @@ impl<'a> Mode for SimpleViewMode {
         mut env: &mut EditorEnv<'static>,
         mut v: &mut View<'static>,
     ) {
-        let doc = v.document();
-        //        let doc_sz = doc.as_ref().unwrap().read().size();
+        let buffer = v.buffer();
+        //        let buffer_sz = buffer.as_ref().unwrap().read().size();
         let line_number_view_width = 13 + 2;
 
         // children_layout_and_modes
@@ -58,27 +58,27 @@ impl<'a> Mode for SimpleViewMode {
                 LayoutOperation::Fixed {
                     size: line_number_view_width,
                 }, // TODO(ceg): adjust size based on screen content
-                doc.clone(),
+                buffer.clone(),
                 vec!["line-number-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
             ),
             /*
                         // line changed
                         (
                             LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
-                            doc.clone(),
+                            buffer.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "line-change-mode" in screen overlay pass
                         ),
                         // fold
                         (
                             LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
-                            doc.clone(),
+                            buffer.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "fold-mode" in screen overlay pass
                         ),
             */
             // text
             (
                 LayoutOperation::RemainMinus { minus: 1 },
-                doc.clone(),
+                buffer.clone(),
                 vec![
                     "core-mode".to_owned(),
                     "text-mode".to_owned(),
@@ -90,18 +90,18 @@ impl<'a> Mode for SimpleViewMode {
             // scrollbar
             (
                 LayoutOperation::Fixed { size: 1 },
-                doc.clone(),
+                buffer.clone(),
                 vec!["vscrollbar-mode".to_owned()],
             ),
         ];
 
         let mut layout_ops = vec![];
-        let mut docs = vec![];
+        let mut buffers = vec![];
         let mut modes = vec![];
 
         for e in &ops_modes {
             layout_ops.push(e.0.clone());
-            docs.push(e.1.clone());
+            buffers.push(e.1.clone());
             modes.push(e.2.clone());
         }
 
@@ -118,7 +118,7 @@ impl<'a> Mode for SimpleViewMode {
             height,
             LayoutDirection::Horizontal,
             &layout_ops,
-            &docs,
+            &buffers,
             &modes,
         );
 

@@ -15,10 +15,10 @@ use regex::Regex;
 #[macro_use]
 pub(crate) mod macros;
 
+pub mod buffer;
 pub mod codec;
 pub mod codepointinfo;
 pub mod config;
-pub mod document;
 pub mod editor;
 pub mod error;
 pub mod event;
@@ -27,8 +27,8 @@ pub mod modes;
 pub mod screen;
 pub mod view;
 
+use crate::core::buffer::Buffer;
 use crate::core::config::Config;
-use crate::core::document::Buffer;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
@@ -150,8 +150,8 @@ text-mode =
 
     split layout.rs -> modes
 
-  document.predefined_modes() Option<vec["internal:welcome-mode"]>
-  document.predefined_modes() Option<vec["internal:debug-message"]>
+  buffer.predefined_modes() Option<vec["internal:welcome-mode"]>
+  buffer.predefined_modes() Option<vec["internal:debug-message"]>
 
   based on extension we will load predefine modes / keywords list etc ..
 
@@ -279,14 +279,14 @@ pub fn worker(
                     break;
                 }
 
-                Event::SyncTask { doc } => {
-                    document::sync_to_storage(&doc);
+                Event::SyncTask { buffer } => {
+                    buffer::sync_to_storage(&buffer);
 
                     let msg = EventMessage::new(0, Event::RefreshView);
                     core_tx.send(msg).unwrap_or(());
                 }
 
-                //                Event::OutsourcedTask { task_uid,  editor, editor_env, doc_id, vid, action, params ? } => {
+                //                Event::OutsourcedTask { task_uid,  editor, editor_env, buffer_id, vid, action, params ? } => {
                 //                    action();
                 //                }
                 _ => {
@@ -315,14 +315,14 @@ pub fn indexer(
                 }
 
                 // TODO(ceg): split in sub-threads/async task
-                Event::IndexTask { document_map } => {
+                Event::IndexTask { buffer_map } => {
                     dbg_println!("[receive index task ]");
 
                     let mut refresh_ui = false;
-                    let map = document_map.read();
+                    let map = buffer_map.read();
                     let mut t0 = std::time::Instant::now();
-                    for (_id, doc) in map.iter() {
-                        document::build_index(doc);
+                    for (_id, buffer) in map.iter() {
+                        buffer::build_index(buffer);
                         refresh_ui = true;
                         let t1 = std::time::Instant::now();
                         if (t1 - t0).as_millis() > 1000 {
@@ -350,7 +350,7 @@ pub fn indexer(
     }
 }
 
-use crate::core::document::BufferBuilder;
+use crate::core::buffer::BufferBuilder;
 
 /*
   We wil filter file list array
@@ -471,10 +471,10 @@ fn build_file_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     v
 }
 
-/// TODO(ceg): replace this by load/unload doc functions
-/// the ui will open the documents on demand
+/// TODO(ceg): replace this by load/unload buffer functions
+/// the ui will open the buffers on demand
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
-    let mut id = editor.document_map.read().len();
+    let mut id = editor.buffer_map.read().len();
 
     let arg_info = build_file_options(editor);
 
@@ -494,27 +494,27 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         }
 
         let b = BufferBuilder::new()
-            .document_name(&arg.path)
+            .buffer_name(&arg.path)
             .file_name(&arg.path)
             .internal(false)
             .use_buffer_log(true)
             .finalize();
 
         if let Some(b) = b {
-            let doc_id = document::Id(id);
-            b.write().id = doc_id; // TODO(ceg): improve doc id generation
-            editor.document_map.write().insert(doc_id, b);
+            let buffer_id = buffer::Id(id);
+            b.write().id = buffer_id; // TODO(ceg): improve buffer id generation
+            editor.buffer_map.write().insert(buffer_id, b);
             id += 1;
         }
     }
 
     // default buffer ?
-    let map_is_empty = editor.document_map.read().is_empty();
+    let map_is_empty = editor.buffer_map.read().is_empty();
     if map_is_empty {
         // edit.get_untitled_count() -> 1
 
         let b = BufferBuilder::new()
-            .document_name("untitled-1")
+            .buffer_name("untitled-1")
             .internal(false)
             .use_buffer_log(true)
             .finalize();
@@ -523,7 +523,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
                 let mut d = b.write();
                 let s = WELCOME_MESSAGE.as_bytes();
 
-                // move 1st tag to ctor/doc::new() ?
+                // move 1st tag to ctor/buffer::new() ?
                 d.tag(env.current_time, 0, vec![0], vec![]); // TODO(ceg): rm this only if the buffer log is cleared
                                                              //    create_views(&mut editor, &mut env);
 
@@ -533,23 +533,23 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
                 d.buffer_log_reset();
                 d.changed = false;
             }
-            let doc_id = document::Id(id);
-            editor.document_map.write().insert(doc_id, b);
+            let buffer_id = buffer::Id(id);
+            editor.buffer_map.write().insert(buffer_id, b);
             id += 1;
         }
     }
 
-    // configure document
+    // configure buffer
     let modes = editor.modes.clone();
     for (mode_name, mode) in modes.borrow().iter() {
-        // per mode document metadata
-        dbg_println!("setup mode[{}] document metadata", mode_name);
+        // per mode buffer metadata
+        dbg_println!("setup mode[{}] buffer metadata", mode_name);
         let mut mode = mode.borrow_mut();
-        let map = editor.document_map.clone();
+        let map = editor.buffer_map.clone();
         let mut map = map.write();
-        for (_, doc) in map.iter_mut() {
-            let mut doc = doc.write();
-            mode.configure_document(editor, env, &mut doc);
+        for (_, buffer) in map.iter_mut() {
+            let mut buffer = buffer.write();
+            mode.configure_buffer(editor, env, &mut buffer);
         }
     }
 
@@ -557,17 +557,17 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
 }
 
 pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
-    let document_map = editor.document_map.clone();
-    let document_map = document_map.read();
+    let buffer_map = editor.buffer_map.clone();
+    let buffer_map = buffer_map.read();
 
     // create default views
     // sort by arg pos first
-    let mut docs_id: Vec<document::Id> = document_map.iter().map(|(k, _v)| *k).collect();
-    docs_id.sort();
-    let mut docs: Vec<Arc<RwLock<Buffer>>> = vec![];
-    for id in docs_id.iter() {
-        if let Some(doc) = document_map.get(id) {
-            docs.push(Arc::clone(doc));
+    let mut buffers_id: Vec<buffer::Id> = buffer_map.iter().map(|(k, _v)| *k).collect();
+    buffers_id.sort();
+    let mut buffers: Vec<Arc<RwLock<Buffer>>> = vec![];
+    for id in buffers_id.iter() {
+        if let Some(buffer) = buffer_map.get(id) {
+            buffers.push(Arc::clone(buffer));
         }
     }
 
@@ -577,8 +577,8 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
     };
 
     // create views
-    for doc in docs {
-        let view = View::new(editor, env, None, (0, 0), (1, 1), Some(doc), &modes, 0);
+    for buffer in buffers {
+        let view = View::new(editor, env, None, (0, 0), (1, 1), Some(buffer), &modes, 0);
         dbg_println!("create {:?}", view.id);
 
         // top level views
@@ -586,13 +586,13 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
         editor.add_view(view.id, view);
     }
 
-    // index documents
+    // index buffers
     // TODO(ceg): send one event per doc
     if true {
         let msg = EventMessage {
             seq: 0,
             event: Event::IndexTask {
-                document_map: Arc::clone(&editor.document_map),
+                buffer_map: Arc::clone(&editor.buffer_map),
             },
         };
         editor.indexer_tx.send(msg).unwrap_or(());
