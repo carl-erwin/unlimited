@@ -5,10 +5,10 @@ mod inner;
 pub use bufferlog::*;
 pub use inner::*;
 
-pub use document::Document;
-pub use document::DocumentBuilder;
-pub use document::DocumentEvent;
-pub use document::DocumentEventCb;
+pub use document::Buffer;
+pub use document::BufferBuilder;
+pub use document::BufferEvent;
+pub use document::BufferEventCb;
 
 pub use document::build_index;
 pub use document::find_nth_byte_offset;

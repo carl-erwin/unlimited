@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::core::document::Document;
+use crate::core::document::Buffer;
 
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
@@ -253,12 +253,12 @@ pub enum ViewEvent {
 }
 
 // marks | selections Refresh_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
-// cb signature  fn cb_on_document_event(editor, env, DocumentEventSource { doc_id }, doc_event)
+// cb signature  fn cb_on_document_event(editor, env, BufferEventSource { doc_id }, doc_event)
 
 // register siblings view
 // text <--> scrollbar
 // cb signature  fn cb_on_view_event(editor, env, ViewEventSource { view_id }, ViewEventSource { view_id }, view_event)
-// cb signature  fn cb_on_document_event(editor, env, DocumentEventSource { doc_id }, doc_event)
+// cb signature  fn cb_on_document_event(editor, env, BufferEventSource { doc_id }, doc_event)
 
 //  enum ViewEvent {
 //    ViewOffsetsChange { start_offset, end_offset }
@@ -286,7 +286,7 @@ pub type SubscriberInfo = (
     ViewEventDestination,
 );
 
-/// The **View** is a way to present a given Document.<br/>
+/// The **View** is a way to present a given Buffer.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
 // TODO editor.env.current.view_id = view.id
@@ -324,7 +324,7 @@ pub struct View<'a> {
       maybe allow to change compose filter of status_view_id ?
       for custom status display ?
     */
-    pub document: Option<Arc<RwLock<Document<'static>>>>, // if none and no children ... panic ?
+    pub document: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
 
     pub modes: Vec<String>,
 
@@ -424,7 +424,7 @@ pub fn view_self_subscribe(
 }
 
 impl<'a> View<'a> {
-    pub fn document(&self) -> Option<Arc<RwLock<Document<'static>>>> {
+    pub fn document(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
         self.document.clone()
     }
 
@@ -473,14 +473,14 @@ impl<'a> View<'a> {
         }
     }
 
-    /// Create a new View at a given offset of the Document.<br/>
+    /// Create a new View at a given offset of the Buffer.<br/>
     pub fn new(
         editor: &mut Editor<'static>,
         env: &mut EditorEnv<'static>,
         parent_id: Option<Id>,
         x_y: Position,
         w_h: Dimension,
-        document: Option<Arc<RwLock<Document<'static>>>>,
+        document: Option<Arc<RwLock<Buffer<'static>>>>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
     ) -> View<'static> {

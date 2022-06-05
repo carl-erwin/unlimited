@@ -67,7 +67,7 @@ use crate::core::view::ViewEventSource;
   }
 
     document_list: Vec<
-        struct DocumentInfo {
+        struct BufferInfo {
             FileType: { directory(full_path), regular(full_path), internal("*debug-message*), char_device(full_path), block_device(full_path) }
             basename,: String,
             Title,: String,
@@ -161,12 +161,12 @@ pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 use crate::core::config::Config;
 
 use crate::core::document;
-use crate::core::document::Document;
-use crate::core::document::DocumentBuilder;
+use crate::core::document::Buffer;
+use crate::core::document::BufferBuilder;
 
 pub struct Editor<'a> {
     pub config: Config,
-    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Document<'static>>>>>>,
+    pub document_map: Arc<RwLock<HashMap<document::Id, Arc<RwLock<Buffer<'static>>>>>>,
     pub root_views: Vec<view::Id>,
     pub view_map: HashMap<view::Id, Rc<RwLock<View<'a>>>>,
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
@@ -205,7 +205,7 @@ impl<'a> Editor<'a> {
 
     ///
     pub fn setup_default_buffers(&mut self) {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         builder.document_name("debug-message").internal(true);
 
         let b = builder.finalize();
@@ -218,7 +218,7 @@ impl<'a> Editor<'a> {
             document_map.insert(document::Id(id), b);
         }
 
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         builder.document_name("scratch").internal(true);
 
         let b = builder.finalize();

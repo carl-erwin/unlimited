@@ -22,7 +22,7 @@ use crate::core::view::LayoutOperation;
 
 use crate::core::view::View;
 
-use crate::core::document::DocumentBuilder;
+use crate::core::document::BufferBuilder;
 
 pub struct BasicEditorMode {
     // add common fields
@@ -56,7 +56,7 @@ impl<'a> Mode for BasicEditorMode {
     ) {
         let doc = view.document();
 
-        let status_doc = DocumentBuilder::new()
+        let status_doc = BufferBuilder::new()
             .document_name("status-bar")
             .internal(true)
             //           .use_buffer_log(false)

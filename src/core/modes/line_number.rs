@@ -55,9 +55,9 @@ use crate::core::EditorEnv;
 use crate::core::document;
 use crate::core::document::get_document_byte_count;
 use crate::core::document::get_document_byte_count_at_offset;
-use crate::core::document::Document;
-use crate::core::document::DocumentEvent;
-use crate::core::document::DocumentEventCb;
+use crate::core::document::Buffer;
+use crate::core::document::BufferEvent;
+use crate::core::document::BufferEventCb;
 
 use crate::core::view::LayoutEnv;
 use crate::core::view::ScreenOverlayFilter;
@@ -111,37 +111,37 @@ static LINENUM_INPUT_MAP: &str = r#"
 
 // document meta data map
 lazy_static! {
-    static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, RwLock<LineNumberDocumentMetaData>>>> =
+    static ref DOC_METADATA_MAP: Arc<RwLock<HashMap<document::Id, RwLock<LineNumberBufferMetaData>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 
-        // document::Id -> (doc, LineNumberDocumentMetaData)
+        // document::Id -> (doc, LineNumberBufferMetaData)
 }
 
-struct LineNumberDocumentMetaData {
+struct LineNumberBufferMetaData {
     cb_installed: bool,
     _root_idx: Option<usize>,
 }
 
-impl LineNumberDocumentMetaData {
+impl LineNumberBufferMetaData {
     pub fn new() -> Self {
-        dbg_println!("LineNumberDocumentMetaData");
-        LineNumberDocumentMetaData {
+        dbg_println!("LineNumberBufferMetaData");
+        LineNumberBufferMetaData {
             cb_installed: false,
             _root_idx: None,
         }
     }
 }
 
-struct _LineNumberDocumentNodeMetaData {
+struct _LineNumberBufferNodeMetaData {
     nl_count: u64,
     cr_count: u64,
     lf_count: u64,
 }
 
-impl _LineNumberDocumentNodeMetaData {
+impl _LineNumberBufferNodeMetaData {
     pub fn _new() -> Self {
-        dbg_println!("LineNumberDocumentNodeMetaData");
-        _LineNumberDocumentNodeMetaData {
+        dbg_println!("LineNumberBufferNodeMetaData");
+        _LineNumberBufferNodeMetaData {
             nl_count: 0,
             cr_count: 0,
             lf_count: 0,
@@ -259,7 +259,7 @@ impl<'a> Mode for LineNumberMode {
         &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
-        doc: &mut Document<'static>,
+        doc: &mut Buffer<'static>,
     ) {
         // allocate document meta data
         let doc_id = doc.id;
@@ -268,7 +268,7 @@ impl<'a> Mode for LineNumberMode {
             .as_ref()
             .write()
             .entry(doc_id)
-            .or_insert(RwLock::new(LineNumberDocumentMetaData::new()));
+            .or_insert(RwLock::new(LineNumberBufferMetaData::new()));
 
         let meta = DOC_METADATA_MAP.write();
         let meta = meta.get(&doc_id);
@@ -374,8 +374,8 @@ impl<'a> Mode for LineNumberMode {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl DocumentEventCb for LineNumberModeDocEventHandler {
-    fn cb(&mut self, doc: &Document, event: &DocumentEvent) {
+impl BufferEventCb for LineNumberModeDocEventHandler {
+    fn cb(&mut self, doc: &Buffer, event: &BufferEvent) {
         self.count += 1;
 
         dbg_println!(
@@ -385,7 +385,7 @@ impl DocumentEventCb for LineNumberModeDocEventHandler {
         );
 
         match event {
-            DocumentEvent::NodeIndexed { node_index } => {
+            BufferEvent::NodeIndexed { node_index } => {
                 dbg_println!(
                     "TODO index node {} with target codec  {:?}",
                     node_index,
@@ -393,11 +393,11 @@ impl DocumentEventCb for LineNumberModeDocEventHandler {
                 );
             }
 
-            DocumentEvent::NodeAdded { node_index: _ } => {}
+            BufferEvent::NodeAdded { node_index: _ } => {}
 
-            DocumentEvent::NodeRemoved { node_index: _ } => {}
+            BufferEvent::NodeRemoved { node_index: _ } => {}
 
-            DocumentEvent::NodeChanged { node_index: _ } => {}
+            BufferEvent::NodeChanged { node_index: _ } => {}
 
             _ => {
                 dbg_println!("unhandled event {:?}", event);

@@ -8,7 +8,7 @@ use super::Mode;
 
 use super::text_mode::TextModeContext;
 
-use crate::core::document::DocumentBuilder;
+use crate::core::document::BufferBuilder;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
@@ -218,7 +218,7 @@ fn create_find_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let doc = DocumentBuilder::new()
+    let doc = BufferBuilder::new()
         .document_name("find-controller")
         .internal(true)
         .use_buffer_log(false)

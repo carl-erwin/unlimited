@@ -669,7 +669,7 @@ pub fn clone_and_move_mark_to_next_line(
 
             !last_pos
                 || tm.prev_action == TextModeAction::MarksMove
-                || tm.prev_action == TextModeAction::DocumentModification
+                || tm.prev_action == TextModeAction::BufferModification
         };
 
         if save {

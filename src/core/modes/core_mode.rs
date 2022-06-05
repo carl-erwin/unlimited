@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::Mode;
 
-use crate::core::document::Document;
+use crate::core::document::Buffer;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
@@ -17,7 +17,7 @@ use crate::core::event::*;
 
 use crate::core::event::input_map::build_input_event_map;
 
-use crate::core::document::DocumentBuilder;
+use crate::core::document::BufferBuilder;
 
 use crate::core::view;
 use crate::core::view::ChildView;
@@ -285,7 +285,7 @@ pub fn split_with_direction(
     height: usize,
     dir: view::LayoutDirection,
     layout_ops: &Vec<LayoutOperation>,
-    doc: &Vec<Option<Arc<RwLock<Document<'static>>>>>,
+    doc: &Vec<Option<Arc<RwLock<Buffer<'static>>>>>,
     modes: &Vec<Vec<String>>,
 ) {
     v.layout_direction = dir;
@@ -504,7 +504,7 @@ struct SplitInfo {
     y: usize,
     width: usize,
     height: usize,
-    doc: Option<Arc<RwLock<Document<'static>>>>,
+    doc: Option<Arc<RwLock<Buffer<'static>>>>,
     original_modes: Vec<String>,
     layout_index: Option<usize>,
 }
@@ -1121,7 +1121,7 @@ static HELP_MESSAGE: &str = r#"[Quit]
 [Save]
     ctrl+x ctrl+s               => save (done in the background)
 
-[Document Selection]
+[Buffer Selection]
     ctrl+o                      => Open file (TODO)
 
 "#;
@@ -1148,7 +1148,7 @@ pub fn help_popup(
         }
     }
 
-    let command_doc = DocumentBuilder::new()
+    let command_doc = BufferBuilder::new()
         .document_name("help-pop-up")
         .internal(true)
         //           .use_buffer_log(false)

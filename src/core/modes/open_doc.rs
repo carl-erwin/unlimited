@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use super::Mode;
 
-use crate::core::document::DocumentBuilder;
+use crate::core::document::BufferBuilder;
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
@@ -245,7 +245,7 @@ fn create_open_doc_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let doc = DocumentBuilder::new()
+    let doc = BufferBuilder::new()
         .document_name("goto-controller")
         .internal(true)
         .use_buffer_log(false)
@@ -403,7 +403,7 @@ fn create_open_doc_completion_view(
 
     dbg_print!("create_open_doc_completion_view");
 
-    let command_doc = DocumentBuilder::new()
+    let command_doc = BufferBuilder::new()
         .document_name("completion-pop-up")
         .internal(true)
         .use_buffer_log(false)

@@ -28,7 +28,7 @@ pub mod screen;
 pub mod view;
 
 use crate::core::config::Config;
-use crate::core::document::Document;
+use crate::core::document::Buffer;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
@@ -208,7 +208,7 @@ It comes with:
 
 
 
-[Document Selection]
+[Buffer Selection]
 
 
 
@@ -350,7 +350,7 @@ pub fn indexer(
     }
 }
 
-use crate::core::document::DocumentBuilder;
+use crate::core::document::BufferBuilder;
 
 /*
   We wil filter file list array
@@ -493,7 +493,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             }
         }
 
-        let b = DocumentBuilder::new()
+        let b = BufferBuilder::new()
             .document_name(&arg.path)
             .file_name(&arg.path)
             .internal(false)
@@ -513,7 +513,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     if map_is_empty {
         // edit.get_untitled_count() -> 1
 
-        let b = DocumentBuilder::new()
+        let b = BufferBuilder::new()
             .document_name("untitled-1")
             .internal(false)
             .use_buffer_log(true)
@@ -564,7 +564,7 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
     // sort by arg pos first
     let mut docs_id: Vec<document::Id> = document_map.iter().map(|(k, _v)| *k).collect();
     docs_id.sort();
-    let mut docs: Vec<Arc<RwLock<Document>>> = vec![];
+    let mut docs: Vec<Arc<RwLock<Buffer>>> = vec![];
     for id in docs_id.iter() {
         if let Some(doc) = document_map.get(id) {
             docs.push(Arc::clone(doc));

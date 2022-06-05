@@ -32,7 +32,7 @@ pub struct Id(pub usize);
 
 ///
 #[derive(Debug)]
-pub struct DocumentBuilder {
+pub struct BufferBuilder {
     internal: bool,
     use_buffer_log: bool,
     document_name: String,
@@ -41,26 +41,26 @@ pub struct DocumentBuilder {
 }
 
 #[derive(Debug)]
-struct DocumentMappedFileEventHandler<'a> {
-    _doc: Weak<RwLock<Document<'a>>>,
+struct BufferMappedFileEventHandler<'a> {
+    _doc: Weak<RwLock<Buffer<'a>>>,
 }
 
-fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> DocumentEvent {
+fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> BufferEvent {
     match evt {
-        MappedFileEvent::NodeChanged { node_index } => DocumentEvent::NodeChanged {
+        MappedFileEvent::NodeChanged { node_index } => BufferEvent::NodeChanged {
             node_index: *node_index,
         },
-        MappedFileEvent::NodeAdded { node_index } => DocumentEvent::NodeAdded {
+        MappedFileEvent::NodeAdded { node_index } => BufferEvent::NodeAdded {
             node_index: *node_index,
         },
-        MappedFileEvent::NodeRemoved { node_index } => DocumentEvent::NodeRemoved {
+        MappedFileEvent::NodeRemoved { node_index } => BufferEvent::NodeRemoved {
             node_index: *node_index,
         },
     }
 }
 
 ///
-impl DocumentBuilder {
+impl BufferBuilder {
     ///
     pub fn new() -> Self {
         Self {
@@ -103,8 +103,8 @@ impl DocumentBuilder {
     }
 
     ///
-    pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Document<'static>>>> {
-        Document::new(
+    pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
+        Buffer::new(
             &self.document_name,
             &self.file_name,
             self.mode.clone(),
@@ -114,16 +114,16 @@ impl DocumentBuilder {
 }
 
 #[derive(Debug)]
-pub struct DocumentReadCache {
+pub struct BufferReadCache {
     start: u64,
     end: u64,
     data: Vec<u8>,
     revision: usize,
 }
 
-impl DocumentReadCache {
+impl BufferReadCache {
     pub fn new() -> Self {
-        DocumentReadCache {
+        BufferReadCache {
             start: 0,
             end: 0,
             data: vec![],
@@ -180,51 +180,51 @@ impl DocumentReadCache {
     }
 }
 
-pub trait DocumentEventCb {
-    fn cb(&mut self, doc: &Document, event: &DocumentEvent);
+pub trait BufferEventCb {
+    fn cb(&mut self, doc: &Buffer, event: &BufferEvent);
 }
 
 #[derive(Debug, Clone)]
-pub enum DocumentEvent {
-    DocumentAdded,
-    DocumentOpened,
-    DocumentClosed,
-    DocumentRemoved,
-    DocumentFullyIndexed,
+pub enum BufferEvent {
+    BufferAdded,
+    BufferOpened,
+    BufferClosed,
+    BufferRemoved,
+    BufferFullyIndexed,
     NodeAdded { node_index: usize },
     NodeChanged { node_index: usize },
     NodeRemoved { node_index: usize },
     NodeIndexed { node_index: usize },
 }
 
-fn document_event_to_string(evt: &DocumentEvent) -> String {
+fn document_event_to_string(evt: &BufferEvent) -> String {
     match evt {
-        DocumentEvent::DocumentAdded => "Added".to_owned(),
-        DocumentEvent::DocumentOpened => "Opened".to_owned(),
-        DocumentEvent::DocumentClosed => "Closed".to_owned(),
-        DocumentEvent::DocumentRemoved => "Removed".to_owned(),
-        DocumentEvent::DocumentFullyIndexed => "FullyIndexed".to_owned(),
+        BufferEvent::BufferAdded => "Added".to_owned(),
+        BufferEvent::BufferOpened => "Opened".to_owned(),
+        BufferEvent::BufferClosed => "Closed".to_owned(),
+        BufferEvent::BufferRemoved => "Removed".to_owned(),
+        BufferEvent::BufferFullyIndexed => "FullyIndexed".to_owned(),
 
-        DocumentEvent::NodeAdded { node_index } => {
+        BufferEvent::NodeAdded { node_index } => {
             format!("NodeAdded idx: {}", node_index)
         }
-        DocumentEvent::NodeChanged { node_index } => {
+        BufferEvent::NodeChanged { node_index } => {
             format!("NodeChanged idx: {}", node_index)
         }
-        DocumentEvent::NodeRemoved { node_index, .. } => {
+        BufferEvent::NodeRemoved { node_index, .. } => {
             format!("NodeRemoved idx: {}", node_index)
         }
-        DocumentEvent::NodeIndexed { node_index, .. } => {
+        BufferEvent::NodeIndexed { node_index, .. } => {
             format!("NodeIndexed idx: {}", node_index)
         }
     }
 }
 
-pub struct Document<'a> {
+pub struct Buffer<'a> {
     pub id: Id,
     pub name: String,
     pub inner: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
-    cache: DocumentReadCache,
+    cache: BufferReadCache,
     pub buffer_log: BufferLog,
     pub use_buffer_log: bool,
     pub changed: bool,
@@ -232,12 +232,12 @@ pub struct Document<'a> {
     pub abort_indexing: bool,
     pub indexed: bool,
     pub last_tag_time: std::time::Instant,
-    pub subscribers: Vec<RefCell<Box<dyn DocumentEventCb>>>,
+    pub subscribers: Vec<RefCell<Box<dyn BufferEventCb>>>,
 }
 
-impl<'a> fmt::Debug for Document<'a> {
+impl<'a> fmt::Debug for Buffer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Document {}")
+        f.debug_struct("Buffer {}")
             .field("id", &self.id)
             .field("name", &self.name)
             .finish()
@@ -245,16 +245,16 @@ impl<'a> fmt::Debug for Document<'a> {
 }
 
 // NB: doc MUST be wrapped in Arc<RwLock<XXX>>
-unsafe impl<'a> Send for Document<'a> {}
-unsafe impl<'a> Sync for Document<'a> {}
+unsafe impl<'a> Send for Buffer<'a> {}
+unsafe impl<'a> Sync for Buffer<'a> {}
 
-impl<'a> Document<'a> {
+impl<'a> Buffer<'a> {
     pub fn new(
         document_name: &String,
         file_name: &String,
         mode: OpenMode,
         use_buffer_log: bool,
-    ) -> Option<Arc<RwLock<Document<'static>>>> {
+    ) -> Option<Arc<RwLock<Buffer<'static>>>> {
         dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
 
         let inner = if file_name.is_empty() {
@@ -272,11 +272,11 @@ impl<'a> Document<'a> {
             inner
         };
 
-        let doc = Document {
+        let doc = Buffer {
             id: Id(0),
             name: document_name.clone(),
             inner: inner.unwrap(),
-            cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
+            cache: BufferReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
             use_buffer_log,
             abort_indexing: false,
@@ -307,8 +307,8 @@ impl<'a> Document<'a> {
         self.cache.data.shrink_to_fit(); // ?
     }
 
-    pub fn build_cache(&self, start: u64, end: u64) -> DocumentReadCache {
-        let mut cache = DocumentReadCache::new(); // TODO ::with_capacity()
+    pub fn build_cache(&self, start: u64, end: u64) -> BufferReadCache {
+        let mut cache = BufferReadCache::new(); // TODO ::with_capacity()
 
         assert!(start <= end);
         cache.start = start;
@@ -352,7 +352,7 @@ impl<'a> Document<'a> {
         self.cache = self.build_cache(start, end)
     }
 
-    pub fn notify(&self, evt: &DocumentEvent) {
+    pub fn notify(&self, evt: &BufferEvent) {
         dbg_println!(
             "notify {:?}, nb subscribers {}",
             document_event_to_string(&evt),
@@ -399,7 +399,7 @@ impl<'a> Document<'a> {
     }
 
     // TODO(ceg): return cb slot / unregister slot_mask
-    pub fn register_subscriber(&mut self, cb: Box<dyn DocumentEventCb>) -> usize {
+    pub fn register_subscriber(&mut self, cb: Box<dyn BufferEventCb>) -> usize {
         let len = 1 + self.subscribers.len();
         self.subscribers.push(RefCell::new(cb));
         len
@@ -446,7 +446,7 @@ impl<'a> Document<'a> {
         offset: u64,
         nr_bytes: usize,
         data: &mut Vec<u8>,
-        cache: &DocumentReadCache,
+        cache: &BufferReadCache,
     ) -> usize {
         let doc_rev = self.nr_changes();
 
@@ -861,7 +861,7 @@ impl<'a> Document<'a> {
 use std::path::Path;
 
 // TODO(ceg): handle errors
-pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
+pub fn sync_to_storage(doc: &Arc<RwLock<Buffer>>) {
     // read/copy
     let mut fd = {
         let doc = doc.read();
@@ -1122,7 +1122,7 @@ pub fn update_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>)
 }
 
 // TODO(ceg): split code to provide index_single_node(nid)
-pub fn build_index(doc: &Arc<RwLock<Document>>) {
+pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
     let mut idx = {
         let doc = doc.read();
         {
@@ -1215,7 +1215,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         // notify subscribers
         if idx.is_some() {
             let doc = doc.read();
-            doc.notify(&DocumentEvent::NodeIndexed {
+            doc.notify(&BufferEvent::NodeIndexed {
                 node_index: idx.unwrap(),
             });
         }
@@ -1246,7 +1246,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 
         let doc = doc.read();
         if doc.indexed {
-            doc.notify(&DocumentEvent::DocumentFullyIndexed {});
+            doc.notify(&BufferEvent::BufferFullyIndexed {});
         }
     }
 }
@@ -1265,7 +1265,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
 //
 // return (line_count, offset's node_index)
 pub fn get_document_byte_count_at_offset(
-    doc: &Document,
+    doc: &Buffer,
     byte_index: usize,
     offset: u64,
 ) -> (u64, Option<usize>) {
@@ -1312,7 +1312,7 @@ pub fn get_document_byte_count_at_offset(
     (0, None)
 }
 
-pub fn get_document_byte_count(doc: &Document, byte_index: usize) -> Option<u64> {
+pub fn get_document_byte_count(doc: &Buffer, byte_index: usize) -> Option<u64> {
     assert!(byte_index < 256);
     let file = doc.inner.data.read();
     match file.root_index() {
@@ -1332,7 +1332,7 @@ pub fn get_document_byte_count(doc: &Document, byte_index: usize) -> Option<u64>
 //  [SZ(3), LF(1)]={a,LF,b}    [SZ(4), LF(2)]={a,LF,LF,b }   [5, LF(2)] data{a,LF,b,LF,c} [SZ(7), LF(4)]={a ,LF,LF,b ,Lf,LF,c}
 //                  0,1 ,2                     3, 4, 5,6                     7, 8,9,10,11                 12,13,14,15,16,17,18
 //
-pub fn find_nth_byte_offset(doc: &Document, byte: u8, index: u64) -> Option<u64> {
+pub fn find_nth_byte_offset(doc: &Buffer, byte: u8, index: u64) -> Option<u64> {
     assert!(index > 0);
 
     let mut index = index;
@@ -1420,7 +1420,7 @@ mod tests {
 
         println!("read file....");
 
-        let doc = DocumentBuilder::new()
+        let doc = BufferBuilder::new()
             .document_name("untitled-1")
             .file_name(&filename)
             .internal(false)
@@ -1480,7 +1480,7 @@ mod tests {
 
     #[test]
     fn undo_redo() {
-        let doc = DocumentBuilder::new()
+        let doc = BufferBuilder::new()
             .document_name("untitled-1")
             .internal(false)
             .finalize();
@@ -1540,7 +1540,7 @@ mod tests {
 
     #[test]
     fn doc_random_size_inserts() {
-        let doc = DocumentBuilder::new()
+        let doc = BufferBuilder::new()
             .document_name("untitled-1")
             .internal(false)
             .finalize();
@@ -1640,7 +1640,7 @@ mod tests {
                     file.sync_all().unwrap();
                     drop(slc);
 
-                    let doc = DocumentBuilder::new()
+                    let doc = BufferBuilder::new()
                         .file_name(&filename)
                         .document_name("untitled-1")
                         .internal(false)

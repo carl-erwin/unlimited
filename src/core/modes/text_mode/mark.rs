@@ -1,5 +1,5 @@
 //
-use crate::core::document::Document;
+use crate::core::document::Buffer;
 
 use crate::core::codec::text::SyncDirection;
 use crate::core::codec::text::TextCodec;
@@ -22,7 +22,7 @@ fn is_blank(cp: char) -> bool {
 
 // TODO(ceg): codec...
 pub fn read_char_forward(
-    doc: &Document,
+    doc: &Buffer,
     from_offset: u64,
     codec: &dyn TextCodec,
 ) -> (char, u64, usize) {
@@ -48,7 +48,7 @@ pub fn read_char_forward(
 
 // TODO(ceg): codec..., remove temporary vec -> slice
 pub fn read_char_backward(
-    doc: &Document,
+    doc: &Buffer,
     from_offset: u64,
     codec: &dyn TextCodec,
 ) -> (char, u64, usize) {
@@ -92,7 +92,7 @@ pub fn read_char_backward(
 pub fn read_char(
     _direction: SyncDirection,
     codec: &dyn TextCodec,
-    doc: &Document,
+    doc: &Buffer,
     from_offset: u64,
 ) -> (char, u64, usize) {
     if from_offset == 0 {
@@ -116,7 +116,7 @@ pub fn read_char(
 
 pub fn decode_until_offset_or_char(
     mark: &mut Mark,
-    doc: &Document,
+    doc: &Buffer,
     codec: &dyn TextCodec,
     limit: u64,
     c: Option<char>,
@@ -183,7 +183,7 @@ pub fn decode_until_offset_or_char(
 
 pub fn decode_until_end_of_line_or_offset(
     mark: &mut Mark,
-    doc: &Document,
+    doc: &Buffer,
     codec: &dyn TextCodec,
     limit: u64,
     build_data: bool,
@@ -226,7 +226,7 @@ impl Mark {
         Mark { offset }
     }
 
-    pub fn move_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset < doc.size() as u64 {
             // TODO(ceg): if '\r\n' must move + 1 in codec
             let (_, _, size) = read_char_forward(&doc, self.offset, codec);
@@ -237,7 +237,7 @@ impl Mark {
     }
 
     // TODO(ceg): check multi-byte utf8 sequence
-    pub fn move_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let (c, offset, size) = read_char_backward(&doc, self.offset, codec);
         dbg_println!(
             "move_backward : char = '{:?}', self.offset({}) = offset({}), size({})",
@@ -251,7 +251,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_start_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_start_of_line(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
@@ -267,7 +267,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_end_of_line(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_end_of_line(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
         self.offset = if let Some(offset) = doc.find(&encode[..sz], self.offset, None) {
@@ -279,14 +279,14 @@ impl Mark {
         self
     }
 
-    pub fn at_end_of_buffer(&self, doc: &Document) -> bool {
+    pub fn at_end_of_buffer(&self, doc: &Buffer) -> bool {
         // TODO(ceg): end_of_buffer().or_return()
         self.offset == doc.size() as u64
     }
 
     // skip_class(&mut self, direction, fn class_match, doc, codec)
     // class_match(char) -> bool
-    pub fn skip_blanks_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_blanks_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
 
@@ -305,7 +305,7 @@ impl Mark {
         self
     }
 
-    pub fn skip_non_blanks_backward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_non_blanks_backward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
 
@@ -324,7 +324,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_token_start(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_token_start(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.offset == 0 {
             return self;
         }
@@ -344,7 +344,7 @@ impl Mark {
         self
     }
 
-    pub fn skip_blanks_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_blanks_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let max_offset = doc.size() as u64;
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
@@ -364,7 +364,7 @@ impl Mark {
         self
     }
 
-    pub fn skip_non_blanks_forward(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn skip_non_blanks_forward(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let max_offset = doc.size() as u64;
         let mut prev_offset = self.offset;
         let (cp, _, _) = read_char_forward(&doc, prev_offset, codec);
@@ -383,7 +383,7 @@ impl Mark {
         self
     }
 
-    pub fn move_to_token_end(&mut self, doc: &Document, codec: &dyn TextCodec) -> &mut Mark {
+    pub fn move_to_token_end(&mut self, doc: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.at_end_of_buffer(doc) {
             return self;
         }
@@ -397,7 +397,7 @@ impl Mark {
 #[test]
 fn test_marks() {
     use crate::core::codec::text::utf8::Utf8Codec;
-    use crate::core::document::DocumentBuilder;
+    use crate::core::document::BufferBuilder;
     use crate::core::document::OpenMode;
 
     // TODO(ceg): move to utf8 tests
@@ -408,7 +408,7 @@ fn test_marks() {
     let codec = &Utf8Codec::new();
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)
@@ -436,7 +436,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)
@@ -461,7 +461,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)
@@ -487,7 +487,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)
@@ -512,7 +512,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)
@@ -537,7 +537,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = DocumentBuilder::new();
+        let mut builder = BufferBuilder::new();
         let doc = builder
             .document_name("test-1")
             .internal(false)

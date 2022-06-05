@@ -54,7 +54,7 @@
 
         in real world we have doc_ids + copy, no pointers
 
-        struct TextModeDocumentData { ...
+        struct TextModeBufferData { ...
           marks
           selections
           buffer log here ?
@@ -67,9 +67,9 @@
           screen
         }
 
-        type TextModeDocumentDataMap = HashMap<Document::Id, Arc<RwLock<TextModeDocumentData>> { ... }
+        type TextModeBufferDataMap = HashMap<Buffer::Id, Arc<RwLock<TextModeBufferData>> { ... }
 
-        type TextModeViewDataMap     = HashMap<Document::Id, Arc<RwLock<TextModeViewData>> { ... }
+        type TextModeViewDataMap     = HashMap<Buffer::Id, Arc<RwLock<TextModeViewData>> { ... }
 
 
 */
@@ -149,7 +149,7 @@ pub enum TextModeAction {
     CreateMarks,
     MarksMove,
     ScreenMove,
-    DocumentModification,
+    BufferModification,
     Undo,
     Redo,
 }
@@ -1134,7 +1134,7 @@ pub fn insert_codepoint_array(
         );
         !last_pos
             || tm.prev_action == TextModeAction::MarksMove
-            || tm.prev_action == TextModeAction::DocumentModification
+            || tm.prev_action == TextModeAction::BufferModification
     };
 
     // TODO(ceg): find a way to remove this
@@ -1167,7 +1167,7 @@ pub fn insert_codepoint_array(
             let mut doc = doc.write();
 
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-            tm.prev_action = TextModeAction::DocumentModification;
+            tm.prev_action = TextModeAction::BufferModification;
 
             let codec = tm.text_codec.as_ref();
             let mut utf8 = Vec::with_capacity(array.len());
@@ -1212,10 +1212,10 @@ pub fn insert_codepoint_array(
             // notify doc subscriberss of insert ops
             // cannot do this in doc.callback ?
             // and notify all users the current view should not touch the marks ?
-            // struct DocumentId(u64)
-            // struct DocumentClientId(u64)
+            // struct BufferId(u64)
+            // struct BufferClientId(u64)
             // view.doc_client_id = doc.add_client_cb(cb);
-            // where cb = fn(DocumentId, DocumentClientId, [ops])
+            // where cb = fn(BufferId, BufferClientId, [ops])
             // doc.notify_operations(view.doc_client_id, &insert_ops);
         }
         v.start_offset += view_growth;
@@ -1229,7 +1229,7 @@ pub fn insert_codepoint_array(
         let mut v = view.write();
         let mut tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-        tm.prev_action = TextModeAction::DocumentModification;
+        tm.prev_action = TextModeAction::BufferModification;
 
         if center {
             tm.pre_compose_action
@@ -1281,7 +1281,7 @@ pub fn remove_previous_codepoint(
         }
 
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        tm.prev_action = TextModeAction::DocumentModification;
+        tm.prev_action = TextModeAction::BufferModification;
 
         let codec = tm.text_codec.as_ref();
 
@@ -1342,7 +1342,7 @@ pub fn undo(
     let save_marks = {
         let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
-        tm.prev_action == TextModeAction::DocumentModification
+        tm.prev_action == TextModeAction::BufferModification
     };
     // TODO(ceg): fin a way to remove this
     if save_marks {

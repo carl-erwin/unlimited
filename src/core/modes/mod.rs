@@ -32,7 +32,7 @@ pub use text_mode::TextMode;
 pub use vscrollbar_mode::VscrollbarMode;
 pub use vsplit_mode::VsplitMode;
 
-use crate::core::document::Document;
+use crate::core::document::Buffer;
 
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
@@ -54,7 +54,7 @@ pub trait Mode {
         &mut self,
         _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
-        _doc: &mut Document<'static>,
+        _doc: &mut Buffer<'static>,
     ) {
     }
 
