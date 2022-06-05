@@ -18,8 +18,8 @@ use crate::core::mapped_file::UpdateHierarchyOp;
 
 use crate::core::mapped_file::NodeIndex;
 
-use super::buffer::InnerBuffer;
-use super::buffer::OpenMode;
+use super::inner::InnerBuffer;
+use super::inner::OpenMode;
 
 use super::bufferlog::BufferLog;
 use super::bufferlog::BufferOperation;

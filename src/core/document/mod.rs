@@ -1,9 +1,9 @@
-mod buffer;
 mod bufferlog;
 mod document;
+mod inner;
 
-pub use buffer::*;
 pub use bufferlog::*;
+pub use inner::*;
 
 pub use document::Document;
 pub use document::DocumentBuilder;
