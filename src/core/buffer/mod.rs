@@ -9,6 +9,7 @@ pub use buffer::Buffer;
 pub use buffer::BufferBuilder;
 pub use buffer::BufferEvent;
 pub use buffer::BufferEventCb;
+pub use buffer::BufferKind;
 
 pub use buffer::build_index;
 pub use buffer::find_nth_byte_offset;

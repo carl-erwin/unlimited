@@ -13,6 +13,7 @@ use super::text_mode::PostInputAction;
 use crate::core::buffer::get_byte_count;
 
 use crate::core::buffer::BufferBuilder;
+use crate::core::buffer::BufferKind;
 
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
@@ -209,7 +210,7 @@ fn create_goto_line_controller_view(
     let (x, y) = (0, 0);
     let (w, h) = (1, 1);
 
-    let buffer = BufferBuilder::new()
+    let buffer = BufferBuilder::new(BufferKind::File)
         .buffer_name("goto-controller")
         .internal(true)
         .use_buffer_log(false)

@@ -33,6 +33,7 @@ pub struct Id(pub usize);
 ///
 #[derive(Debug)]
 pub struct BufferBuilder {
+    kind: BufferKind,
     internal: bool,
     use_buffer_log: bool,
     buffer_name: String,
@@ -62,8 +63,9 @@ fn mapped_file_event_to_buffer_event(evt: &MappedFileEvent) -> BufferEvent {
 ///
 impl BufferBuilder {
     ///
-    pub fn new() -> Self {
+    pub fn new(kind: BufferKind) -> Self {
         Self {
+            kind,
             internal: false,
             use_buffer_log: false,
             buffer_name: String::new(),
@@ -105,6 +107,7 @@ impl BufferBuilder {
     ///
     pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
         Buffer::new(
+            self.kind,
             &self.buffer_name,
             &self.file_name,
             self.mode.clone(),
@@ -220,7 +223,14 @@ fn buffer_event_to_string(evt: &BufferEvent) -> String {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum BufferKind {
+    File,
+    Directory,
+}
+
 pub struct Buffer<'a> {
+    pub kind: BufferKind,
     pub id: Id,
     pub name: String,
     pub inner: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
@@ -250,6 +260,7 @@ unsafe impl<'a> Sync for Buffer<'a> {}
 
 impl<'a> Buffer<'a> {
     pub fn new(
+        kind: BufferKind,
         buffer_name: &String,
         file_name: &String,
         mode: OpenMode,
@@ -273,6 +284,7 @@ impl<'a> Buffer<'a> {
         };
 
         let buffer = Buffer {
+            kind: kind,
             id: Id(0),
             name: buffer_name.clone(),
             inner: inner.unwrap(),

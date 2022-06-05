@@ -23,6 +23,7 @@ use crate::core::view::LayoutOperation;
 use crate::core::view::View;
 
 use crate::core::buffer::BufferBuilder;
+use crate::core::buffer::BufferKind;
 
 pub struct BasicEditorMode {
     // add common fields
@@ -56,7 +57,7 @@ impl<'a> Mode for BasicEditorMode {
     ) {
         let buffer = view.buffer();
 
-        let status_buffer = BufferBuilder::new()
+        let status_buffer = BufferBuilder::new(BufferKind::File)
             .buffer_name("status-bar")
             .internal(true)
             //           .use_buffer_log(false)

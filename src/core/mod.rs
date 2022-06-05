@@ -28,6 +28,8 @@ pub mod screen;
 pub mod view;
 
 use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferKind;
+
 use crate::core::config::Config;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
@@ -493,7 +495,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             }
         }
 
-        let b = BufferBuilder::new()
+        let b = BufferBuilder::new(BufferKind::File)
             .buffer_name(&arg.path)
             .file_name(&arg.path)
             .internal(false)
@@ -513,7 +515,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     if map_is_empty {
         // edit.get_untitled_count() -> 1
 
-        let b = BufferBuilder::new()
+        let b = BufferBuilder::new(BufferKind::File)
             .buffer_name("untitled-1")
             .internal(false)
             .use_buffer_log(true)

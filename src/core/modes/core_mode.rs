@@ -8,6 +8,9 @@ use std::sync::Arc;
 use super::Mode;
 
 use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferBuilder;
+use crate::core::buffer::BufferKind;
+
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
@@ -16,8 +19,6 @@ use crate::core::EditorEnv;
 use crate::core::event::*;
 
 use crate::core::event::input_map::build_input_event_map;
-
-use crate::core::buffer::BufferBuilder;
 
 use crate::core::view;
 use crate::core::view::ChildView;
@@ -1148,7 +1149,7 @@ pub fn help_popup(
         }
     }
 
-    let command_buffer = BufferBuilder::new()
+    let command_buffer = BufferBuilder::new(BufferKind::File)
         .buffer_name("help-pop-up")
         .internal(true)
         //           .use_buffer_log(false)

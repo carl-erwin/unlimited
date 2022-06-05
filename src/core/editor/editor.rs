@@ -18,6 +18,12 @@ use std::time::Instant;
 pub use super::*;
 
 // crate
+use crate::core::buffer;
+use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferBuilder;
+use crate::core::buffer::BufferKind;
+
+use crate::core::config::Config;
 
 use crate::core::event;
 use crate::core::event::input_map::eval_input_event;
@@ -156,14 +162,6 @@ pub type RenderStageFunction = fn(
 
 pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 
-//
-//
-use crate::core::config::Config;
-
-use crate::core::buffer;
-use crate::core::buffer::Buffer;
-use crate::core::buffer::BufferBuilder;
-
 pub struct Editor<'a> {
     pub config: Config,
     pub buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'static>>>>>>,
@@ -205,7 +203,7 @@ impl<'a> Editor<'a> {
 
     ///
     pub fn setup_default_buffers(&mut self) {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         builder.buffer_name("debug-message").internal(true);
 
         let b = builder.finalize();
@@ -218,7 +216,7 @@ impl<'a> Editor<'a> {
             buffer_map.insert(buffer::Id(id), b);
         }
 
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         builder.buffer_name("scratch").internal(true);
 
         let b = builder.finalize();
