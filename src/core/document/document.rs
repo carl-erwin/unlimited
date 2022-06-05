@@ -223,7 +223,7 @@ fn document_event_to_string(evt: &DocumentEvent) -> String {
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
-    pub buffer: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
+    pub inner: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
     cache: DocumentReadCache,
     pub buffer_log: BufferLog,
     pub use_buffer_log: bool,
@@ -257,7 +257,7 @@ impl<'a> Document<'a> {
     ) -> Option<Arc<RwLock<Document<'static>>>> {
         dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
 
-        let buffer = if file_name.is_empty() {
+        let inner = if file_name.is_empty() {
             InnerBuffer::empty(mode.clone())
         } else {
             InnerBuffer::new(&file_name, mode.clone())
@@ -265,17 +265,17 @@ impl<'a> Document<'a> {
 
         let mut changed = false;
         // fallback
-        let buffer = if buffer.is_none() {
+        let inner = if inner.is_none() {
             changed = true;
             InnerBuffer::empty_with_name(&document_name, mode.clone())
         } else {
-            buffer
+            inner
         };
 
         let doc = Document {
             id: Id(0),
             name: document_name.clone(),
-            buffer: buffer.unwrap(),
+            inner: inner.unwrap(),
             cache: DocumentReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
             use_buffer_log,
@@ -302,7 +302,7 @@ impl<'a> Document<'a> {
         self.cache.data.clear();
 
         let size = (end - start) as usize;
-        let sz = self.buffer.read(start, size, &mut self.cache.data);
+        let sz = self.inner.read(start, size, &mut self.cache.data);
         self.cache.end = start + sz as u64;
         self.cache.data.shrink_to_fit(); // ?
     }
@@ -318,7 +318,7 @@ impl<'a> Document<'a> {
         }
 
         let size = (end - start) as usize;
-        let sz = self.buffer.read(start, size, &mut cache.data);
+        let sz = self.inner.read(start, size, &mut cache.data);
         cache.end = start + sz as u64;
         cache.data.shrink_to_fit(); // ?
         cache
@@ -329,22 +329,19 @@ impl<'a> Document<'a> {
     }
 
     pub fn file_name(&self) -> String {
-        self.buffer.file_name.clone()
+        self.inner.file_name.clone()
     }
 
     pub fn metadata(&self) -> Result<std::fs::Metadata> {
-        self.buffer.metadata()
+        self.inner.metadata()
     }
 
-    /// copy the content of the buffer up to 'nr_bytes' into the data Vec
-    /// the read bytes are appended to the data Vec
-    /// return XXX on error (TODO(ceg): use ioresult)
     pub fn size(&self) -> usize {
-        self.buffer.size
+        self.inner.size
     }
 
     pub fn nr_changes(&self) -> usize {
-        self.buffer.nr_changes() as usize
+        self.inner.nr_changes() as usize
     }
 
     pub fn is_cached(&self, start: u64, end: u64) -> bool {
@@ -368,25 +365,25 @@ impl<'a> Document<'a> {
 
     pub fn build_node_byte_count(&self, node_index: usize) {
         // let node_info = doc.get_node_info(node_index);
-        let mut file = self.buffer.data.write();
+        let mut file = self.inner.data.write();
         build_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn remove_node_byte_count(&self, node_index: usize) {
         // let node_info = doc.get_node_info(node_index);
-        let mut file = self.buffer.data.write();
+        let mut file = self.inner.data.write();
         remove_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn update_node_byte_count(&self, node_index: usize) {
         // let node_info = doc.get_node_info(node_index);
-        let mut file = self.buffer.data.write();
+        let mut file = self.inner.data.write();
         update_node_byte_count(&mut file, Some(node_index));
     }
 
     pub fn show_root_node_bytes_stats(&self) {
         // let node_info = doc.get_node_info(node_index);
-        let file = self.buffer.data.read();
+        let file = self.inner.data.read();
         if let Some(idx) = file.root_index() {
             let node = &file.pool[idx];
             if !node.indexed {
@@ -410,11 +407,11 @@ impl<'a> Document<'a> {
 
     // read ahead
 
-    /// copy the content of the buffer up to 'nr_bytes' into the data Vec
+    /// copy the content of the inner buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read(&self, offset: u64, nr_bytes: usize, data: &mut Vec<u8>) -> usize {
-        // return self.buffer.read(offset, nr_bytes, data);
+        // return self.inner.read(offset, nr_bytes, data);
 
         let doc_rev = self.nr_changes();
 
@@ -424,7 +421,7 @@ impl<'a> Document<'a> {
             // cache validation checks
             if false {
                 let mut real = vec![];
-                self.buffer.read(offset, nr_bytes, &mut real);
+                self.inner.read(offset, nr_bytes, &mut real);
                 assert!(real.len() == data.len());
                 for i in 0..real.len() {
                     assert!(real[i] == data[i]);
@@ -438,10 +435,10 @@ impl<'a> Document<'a> {
         // TODO(ceg): --panic-on-read-cache-miss
         // panic!("");
 
-        self.buffer.read(offset, nr_bytes, data)
+        self.inner.read(offset, nr_bytes, data)
     }
 
-    /// copy the content of the buffer up to 'nr_bytes' into the data Vec
+    /// copy the content of the inner buffer up to 'nr_bytes' into the data Vec
     /// the read bytes are appended to the data Vec
     /// return XXX on error (TODO(ceg): use ioresult)
     pub fn read_cached(
@@ -459,7 +456,7 @@ impl<'a> Document<'a> {
             // cache validation checks
             if false {
                 let mut real = vec![];
-                self.buffer.read(offset, nr_bytes, &mut real);
+                self.inner.read(offset, nr_bytes, &mut real);
                 assert!(real.len() == data.len());
                 for i in 0..real.len() {
                     assert!(real[i] == data[i]);
@@ -470,7 +467,7 @@ impl<'a> Document<'a> {
 
         dbg_println!("DATA NOT IN CACHE offset {} size {}", offset, nr_bytes);
 
-        self.buffer.read(offset, nr_bytes, data) // reread cache
+        self.inner.read(offset, nr_bytes, data) // reread cache
     }
 
     pub fn buffer_log_pos(&self) -> usize {
@@ -553,7 +550,7 @@ impl<'a> Document<'a> {
                     self.remove_node_byte_count(*node_index);
                     self.build_node_byte_count(*node_index);
 
-                    let mut file = self.buffer.data.write();
+                    let mut file = self.inner.data.write();
 
                     // remove prev counts
                     update_byte_index_hierarchy(
@@ -581,7 +578,7 @@ impl<'a> Document<'a> {
         }
     }
 
-    /// insert the 'data' Vec content in the buffer up to 'nr_bytes'
+    /// insert the 'data' Vec content in the inner buffer up to 'nr_bytes'
     /// return the number of written bytes (TODO(ceg): use io::Result)
     pub fn insert(&mut self, offset: u64, nr_bytes: usize, data: &[u8]) -> usize {
         // TODO(ceg): update cache if possible
@@ -599,7 +596,7 @@ impl<'a> Document<'a> {
             );
         }
 
-        let (sz, events) = self.buffer.insert(offset, nr_bytes, &data[..nr_bytes]);
+        let (sz, events) = self.inner.insert(offset, nr_bytes, &data[..nr_bytes]);
         if sz > 0 {
             self.changed = true;
         }
@@ -619,7 +616,7 @@ impl<'a> Document<'a> {
         self.insert(sz, data.len(), &data)
     }
 
-    /// remove up to 'nr_bytes' from the buffer starting at offset
+    /// remove up to 'nr_bytes' from the inner buffer starting at offset
     /// if removed_data is provided will call self.read(offset, nr_bytes, data)
     /// before remove the bytes
     /*
@@ -641,7 +638,7 @@ impl<'a> Document<'a> {
 
         let mut rm_data = Vec::with_capacity(nr_bytes);
 
-        let (nr_bytes_removed, events) = self.buffer.remove(offset, nr_bytes, Some(&mut rm_data));
+        let (nr_bytes_removed, events) = self.inner.remove(offset, nr_bytes, Some(&mut rm_data));
 
         if let Some(v) = removed_data {
             v.extend(rm_data.clone());
@@ -674,7 +671,7 @@ impl<'a> Document<'a> {
     }
 
     pub fn find(&self, data: &[u8], from_offset: u64, to_offset: Option<u64>) -> Option<u64> {
-        self.buffer.find(&data, from_offset, to_offset)
+        self.inner.find(&data, from_offset, to_offset)
     }
 
     pub fn find_reverse(
@@ -683,7 +680,7 @@ impl<'a> Document<'a> {
         from_offset: u64,
         to_offset: Option<u64>,
     ) -> Option<u64> {
-        self.buffer.find_reverse(&data, from_offset, to_offset)
+        self.inner.find_reverse(&data, from_offset, to_offset)
     }
 
     // TODO(ceg): return an array of offsets ?
@@ -701,11 +698,11 @@ impl<'a> Document<'a> {
 
         let mark_offset = match op.op_type {
             BufferOperationType::Insert => {
-                let sz = self.buffer.size();
+                let sz = self.inner.size();
 
                 // TODO(ceg): check i/o errors
                 let added = if let Some(data) = &op.data {
-                    let (_, events) = self.buffer.insert(op.offset, data.len(), &data);
+                    let (_, events) = self.inner.insert(op.offset, data.len(), &data);
                     self.changed = true;
 
                     self.update_hierarchy_from_events(&events);
@@ -720,16 +717,16 @@ impl<'a> Document<'a> {
                     0
                 };
 
-                assert_eq!(sz + added as usize, self.buffer.size());
+                assert_eq!(sz + added as usize, self.inner.size());
 
                 op.offset + added
             }
             BufferOperationType::Remove => {
-                let sz = self.buffer.size();
+                let sz = self.inner.size();
 
                 // TODO(ceg): check i/o errors
                 let _removed = if let Some(data) = &op.data {
-                    let (rm, events) = self.buffer.remove(op.offset, data.len(), None);
+                    let (rm, events) = self.inner.remove(op.offset, data.len(), None);
                     self.changed = true;
 
                     self.update_hierarchy_from_events(&events);
@@ -745,7 +742,7 @@ impl<'a> Document<'a> {
                     0
                 };
 
-                assert_eq!(sz - _removed, self.buffer.size());
+                assert_eq!(sz - _removed, self.inner.size());
 
                 op.offset
             }
@@ -892,7 +889,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
 
     let mut idx = {
         let doc = doc.read();
-        let file = doc.buffer.data.read();
+        let file = doc.inner.data.read();
         let (node_index, _, _) = file.find_node_by_offset(0);
         node_index
     };
@@ -901,7 +898,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         // do not hold the doc.lock more
         {
             let doc = doc.read();
-            let file = doc.buffer.data.read();
+            let file = doc.inner.data.read();
             let node = &file.pool[idx.unwrap()];
 
             let mut data = Vec::with_capacity(node.size as usize);
@@ -966,7 +963,7 @@ pub fn sync_to_storage(doc: &Arc<RwLock<Document>>) {
         let new_fd = File::open(&doc.file_name()).unwrap();
 
         // TODO(ceg): handle skip with ReadOnly
-        let mapped_file = doc.buffer.data.clone();
+        let mapped_file = doc.inner.data.clone();
         let mut mapped_file = mapped_file.write();
         crate::core::mapped_file::MappedFile::patch_storage_offset_and_file_descriptor(
             &mut mapped_file,
@@ -1133,7 +1130,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                 return;
             }
 
-            let file = doc.buffer.data.read();
+            let file = doc.inner.data.read();
             let (node_index, _, _) = file.find_node_by_offset(0);
             node_index
         }
@@ -1150,7 +1147,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
                 break;
             }
 
-            let file = doc.buffer.data.read();
+            let file = doc.inner.data.read();
             let node = &file.pool[idx.unwrap()];
             if node.indexed {
                 idx = node.link.next;
@@ -1200,7 +1197,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
         // update node info (idx)
         {
             let doc = doc.read();
-            let mut file = doc.buffer.data.write();
+            let mut file = doc.inner.data.write();
 
             let node_index = idx.unwrap();
 
@@ -1236,7 +1233,7 @@ pub fn build_index(doc: &Arc<RwLock<Document>>) {
             }
 
             // display root node info
-            let file = doc.buffer.data.read();
+            let file = doc.inner.data.read();
             if let Some(root_index) = file.root_index() {
                 let node = &file.pool[root_index];
                 dbg_println!(
@@ -1277,7 +1274,7 @@ pub fn get_document_byte_count_at_offset(
     let mut total_count = 0;
     let mut local_offset = offset;
 
-    let mut file = doc.buffer.data.write();
+    let mut file = doc.inner.data.write();
 
     let mut cur_index = file.root_index();
     while cur_index != None {
@@ -1317,7 +1314,7 @@ pub fn get_document_byte_count_at_offset(
 
 pub fn get_document_byte_count(doc: &Document, byte_index: usize) -> Option<u64> {
     assert!(byte_index < 256);
-    let file = doc.buffer.data.read();
+    let file = doc.inner.data.read();
     match file.root_index() {
         Some(idx) => Some(file.pool[idx].byte_count[byte_index]),
         _ => None,
@@ -1340,7 +1337,7 @@ pub fn find_nth_byte_offset(doc: &Document, byte: u8, index: u64) -> Option<u64>
 
     let mut index = index;
 
-    let mut file = doc.buffer.data.write();
+    let mut file = doc.inner.data.write();
     let mut global_offset = 0;
 
     let mut cur_index = file.root_index();
