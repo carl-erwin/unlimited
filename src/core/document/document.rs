@@ -18,7 +18,7 @@ use crate::core::mapped_file::UpdateHierarchyOp;
 
 use crate::core::mapped_file::NodeIndex;
 
-use super::buffer::Buffer;
+use super::buffer::InnerBuffer;
 use super::buffer::OpenMode;
 
 use super::bufferlog::BufferLog;
@@ -223,7 +223,7 @@ fn document_event_to_string(evt: &DocumentEvent) -> String {
 pub struct Document<'a> {
     pub id: Id,
     pub name: String,
-    pub buffer: Buffer<'a>, // TODO(ceg): provide iterator apis ?
+    pub buffer: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
     cache: DocumentReadCache,
     pub buffer_log: BufferLog,
     pub use_buffer_log: bool,
@@ -258,16 +258,16 @@ impl<'a> Document<'a> {
         dbg_println!("try open {} {} {:?}", document_name, file_name, mode);
 
         let buffer = if file_name.is_empty() {
-            Buffer::empty(mode.clone())
+            InnerBuffer::empty(mode.clone())
         } else {
-            Buffer::new(&file_name, mode.clone())
+            InnerBuffer::new(&file_name, mode.clone())
         };
 
         let mut changed = false;
         // fallback
         let buffer = if buffer.is_none() {
             changed = true;
-            Buffer::empty_with_name(&document_name, mode.clone())
+            InnerBuffer::empty_with_name(&document_name, mode.clone())
         } else {
             buffer
         };

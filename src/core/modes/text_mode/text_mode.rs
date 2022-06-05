@@ -186,7 +186,7 @@ struct ScreenOverlayFilterInfo<'a> {
 /// CopyData is used to implement the selection/cut/paste buffer
 pub enum CopyData {
     BufferLogIndex(usize), // the data is in the document buffer log index see BufferLog
-    Buffer(Vec<u8>),       // a standalone copy
+    InnerBuffer(Vec<u8>),  // a standalone copy
 }
 
 pub struct TextModeContext {
@@ -1757,7 +1757,7 @@ pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>
                         panic!("wrong transaction index");
                     }
                 }
-                CopyData::Buffer(data) => data.clone(),
+                CopyData::InnerBuffer(data) => data.clone(),
             };
 
             dbg_println!("paste @ offset {} data.len {}", m.offset, data.len());
@@ -1866,7 +1866,7 @@ pub fn copy_maybe_remove_selection_symmetric(
             );
 
             assert_eq!(nr_read, data.len());
-            tm.copy_buffer.push(CopyData::Buffer(data));
+            tm.copy_buffer.push(CopyData::InnerBuffer(data));
 
             nr_bytes_copied += nr_read;
         }

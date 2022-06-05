@@ -16,12 +16,12 @@ pub enum OpenMode {
     ReadWrite = 1,
 }
 
-/// The **Buffer** represents a linear array of bytes.<br/>
+/// The **InnerBuffer** represents a linear array of bytes.<br/>
 /// it can be in memory only or backed by a file.<br/>
 /// The editor **Modes** will use this api to read/modify the content
 /// of the file at the byte level
 #[derive(Debug)]
-pub struct Buffer<'a> {
+pub struct InnerBuffer<'a> {
     pub id: Id,
     /// the name of the file where the data will be synced
     pub file_name: String, // TODO(ceg): Option<String>
@@ -30,11 +30,11 @@ pub struct Buffer<'a> {
     /// the number of changes (since last save TODO)
     pub nr_changes: u64,
     mode: OpenMode,
-    pub data: FileHandle<'a>, // TODO(ceg): enum { DirectoryHandle | file }
+    pub data: FileHandle<'a>,
 }
 
-impl<'a> Buffer<'a> {
-    /// Creates a new `Buffer`.
+impl<'a> InnerBuffer<'a> {
+    /// Creates a new `InnerBuffer`.
     ///
     /// file_name: path to the file we want to load in the buffer,
     /// this function allocate a buffer
@@ -43,13 +43,13 @@ impl<'a> Buffer<'a> {
     /// if document_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successful open operation
-    pub fn new(file_name: &str, mode: OpenMode) -> Option<Buffer<'a>> {
+    pub fn new(file_name: &str, mode: OpenMode) -> Option<InnerBuffer<'a>> {
         // TODO(ceg): check permission
         // TODO(ceg): check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
         if file_name.is_empty() {
-            return Buffer::empty(mode);
+            return InnerBuffer::empty(mode);
         }
 
         let file = match MappedFile::new(file_name.to_owned()) {
@@ -65,7 +65,7 @@ impl<'a> Buffer<'a> {
 
         // println!("'{}' opened size '{}'", file_name, size);
 
-        Some(Buffer {
+        Some(InnerBuffer {
             id: 0,
             file_name: file_name.to_owned(),
             mode,
@@ -75,7 +75,7 @@ impl<'a> Buffer<'a> {
         })
     }
 
-    pub fn empty(mode: OpenMode) -> Option<Buffer<'a>> {
+    pub fn empty(mode: OpenMode) -> Option<InnerBuffer<'a>> {
         let file = match MappedFile::empty() {
             Some(file) => file,
             None => {
@@ -85,7 +85,7 @@ impl<'a> Buffer<'a> {
 
         let size = file.as_ref().read().size() as usize;
 
-        Some(Buffer {
+        Some(InnerBuffer {
             id: 0,
             file_name: String::new(),
             mode,
@@ -95,7 +95,7 @@ impl<'a> Buffer<'a> {
         })
     }
 
-    pub fn empty_with_name(file_name: &String, mode: OpenMode) -> Option<Buffer<'a>> {
+    pub fn empty_with_name(file_name: &String, mode: OpenMode) -> Option<InnerBuffer<'a>> {
         let file = match MappedFile::empty() {
             Some(file) => file,
             None => {
@@ -105,7 +105,7 @@ impl<'a> Buffer<'a> {
 
         let size = file.as_ref().read().size() as usize;
 
-        Some(Buffer {
+        Some(InnerBuffer {
             id: 0,
             file_name: file_name.clone(),
             mode,
@@ -247,7 +247,7 @@ impl<'a> Buffer<'a> {
 
 #[test]
 fn test_buffer() {
-    let mut bb = Buffer::empty(OpenMode::ReadWrite).unwrap();
+    let mut bb = InnerBuffer::empty(OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
