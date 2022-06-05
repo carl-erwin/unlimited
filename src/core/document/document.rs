@@ -47,13 +47,13 @@ struct BufferMappedFileEventHandler<'a> {
 
 fn mapped_file_event_to_document_event(evt: &MappedFileEvent) -> BufferEvent {
     match evt {
-        MappedFileEvent::NodeChanged { node_index } => BufferEvent::NodeChanged {
+        MappedFileEvent::NodeChanged { node_index } => BufferEvent::BufferNodeChanged {
             node_index: *node_index,
         },
-        MappedFileEvent::NodeAdded { node_index } => BufferEvent::NodeAdded {
+        MappedFileEvent::NodeAdded { node_index } => BufferEvent::BufferNodeAdded {
             node_index: *node_index,
         },
-        MappedFileEvent::NodeRemoved { node_index } => BufferEvent::NodeRemoved {
+        MappedFileEvent::NodeRemoved { node_index } => BufferEvent::BufferNodeRemoved {
             node_index: *node_index,
         },
     }
@@ -191,10 +191,10 @@ pub enum BufferEvent {
     BufferClosed,
     BufferRemoved,
     BufferFullyIndexed,
-    NodeAdded { node_index: usize },
-    NodeChanged { node_index: usize },
-    NodeRemoved { node_index: usize },
-    NodeIndexed { node_index: usize },
+    BufferNodeAdded { node_index: usize },
+    BufferNodeChanged { node_index: usize },
+    BufferNodeRemoved { node_index: usize },
+    BufferNodeIndexed { node_index: usize },
 }
 
 fn document_event_to_string(evt: &BufferEvent) -> String {
@@ -205,16 +205,16 @@ fn document_event_to_string(evt: &BufferEvent) -> String {
         BufferEvent::BufferRemoved => "Removed".to_owned(),
         BufferEvent::BufferFullyIndexed => "FullyIndexed".to_owned(),
 
-        BufferEvent::NodeAdded { node_index } => {
+        BufferEvent::BufferNodeAdded { node_index } => {
             format!("NodeAdded idx: {}", node_index)
         }
-        BufferEvent::NodeChanged { node_index } => {
+        BufferEvent::BufferNodeChanged { node_index } => {
             format!("NodeChanged idx: {}", node_index)
         }
-        BufferEvent::NodeRemoved { node_index, .. } => {
+        BufferEvent::BufferNodeRemoved { node_index, .. } => {
             format!("NodeRemoved idx: {}", node_index)
         }
-        BufferEvent::NodeIndexed { node_index, .. } => {
+        BufferEvent::BufferNodeIndexed { node_index, .. } => {
             format!("NodeIndexed idx: {}", node_index)
         }
     }
@@ -1215,7 +1215,7 @@ pub fn build_index(doc: &Arc<RwLock<Buffer>>) {
         // notify subscribers
         if idx.is_some() {
             let doc = doc.read();
-            doc.notify(&BufferEvent::NodeIndexed {
+            doc.notify(&BufferEvent::BufferNodeIndexed {
                 node_index: idx.unwrap(),
             });
         }

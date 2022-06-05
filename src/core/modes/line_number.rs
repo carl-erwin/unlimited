@@ -385,7 +385,7 @@ impl BufferEventCb for LineNumberModeDocEventHandler {
         );
 
         match event {
-            BufferEvent::NodeIndexed { node_index } => {
+            BufferEvent::BufferNodeIndexed { node_index } => {
                 dbg_println!(
                     "TODO index node {} with target codec  {:?}",
                     node_index,
@@ -393,11 +393,11 @@ impl BufferEventCb for LineNumberModeDocEventHandler {
                 );
             }
 
-            BufferEvent::NodeAdded { node_index: _ } => {}
+            BufferEvent::BufferNodeAdded { node_index: _ } => {}
 
-            BufferEvent::NodeRemoved { node_index: _ } => {}
+            BufferEvent::BufferNodeRemoved { node_index: _ } => {}
 
-            BufferEvent::NodeChanged { node_index: _ } => {}
+            BufferEvent::BufferNodeChanged { node_index: _ } => {}
 
             _ => {
                 dbg_println!("unhandled event {:?}", event);
