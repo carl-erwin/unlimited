@@ -1264,7 +1264,7 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) {
 //
 //
 // return (line_count, offset's node_index)
-pub fn get_buffer_byte_count_at_offset(
+pub fn get_byte_count_at_offset(
     buffer: &Buffer,
     byte_index: usize,
     offset: u64,
@@ -1312,7 +1312,7 @@ pub fn get_buffer_byte_count_at_offset(
     (0, None)
 }
 
-pub fn get_buffer_byte_count(buffer: &Buffer, byte_index: usize) -> Option<u64> {
+pub fn get_byte_count(buffer: &Buffer, byte_index: usize) -> Option<u64> {
     assert!(byte_index < 256);
     let file = buffer.inner.data.read();
     match file.root_index() {

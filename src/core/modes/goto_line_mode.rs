@@ -10,7 +10,7 @@ use super::text_mode::TextModeContext;
 
 use super::text_mode::PostInputAction;
 
-use crate::core::buffer::get_buffer_byte_count;
+use crate::core::buffer::get_byte_count;
 
 use crate::core::buffer::BufferBuilder;
 
@@ -358,7 +358,7 @@ pub fn goto_line_controller_add_char(
             let buffer = text_view.buffer().unwrap();
 
             // do this at start and store in gtm
-            let nb_lines = get_buffer_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
+            let nb_lines = get_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
 
             let gtm = text_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
             if gtm.eof {
@@ -413,7 +413,7 @@ pub fn goto_line_controller_del_char(
             let buffer = text_view.buffer().unwrap();
 
             // do this at start and store in gtm
-            let nb_lines = get_buffer_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
+            let nb_lines = get_byte_count(&buffer.read(), '\n' as usize).unwrap_or(0);
 
             let gtm = text_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
 

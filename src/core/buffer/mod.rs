@@ -12,8 +12,8 @@ pub use buffer::BufferEventCb;
 
 pub use buffer::build_index;
 pub use buffer::find_nth_byte_offset;
-pub use buffer::get_buffer_byte_count;
-pub use buffer::get_buffer_byte_count_at_offset;
+pub use buffer::get_byte_count;
+pub use buffer::get_byte_count_at_offset;
 
 pub use buffer::get_node_data;
 pub use buffer::sync_to_storage;

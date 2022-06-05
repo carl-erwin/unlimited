@@ -53,8 +53,8 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::buffer;
-use crate::core::buffer::get_buffer_byte_count;
-use crate::core::buffer::get_buffer_byte_count_at_offset;
+use crate::core::buffer::get_byte_count;
+use crate::core::buffer::get_byte_count_at_offset;
 use crate::core::buffer::Buffer;
 use crate::core::buffer::BufferEvent;
 use crate::core::buffer::BufferEventCb;
@@ -348,7 +348,7 @@ impl<'a> Mode for LineNumberMode {
                     // '@offset '
                     1 + num_digit(max_offset) + 1
                 } else {
-                    let ret = get_buffer_byte_count(&buffer, '\n' as usize).unwrap_or(0);
+                    let ret = get_byte_count(&buffer, '\n' as usize).unwrap_or(0);
                     let n = num_digit(ret + 1); // nb line = line count + 1
 
                     // 'xxxx '
@@ -451,10 +451,10 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
-        // call to get_buffer_byte_count_at_offset are SLOW : compute only the first line
+        // call to get_byte_count_at_offset are SLOW : compute only the first line
         // and read the target screen to compute relative line count
         for offset in self.line_offsets.iter().take(1) {
-            let n = get_buffer_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
+            let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
             self.line_number.push((offset.0, n));
         }
 
