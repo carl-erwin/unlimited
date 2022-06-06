@@ -40,10 +40,17 @@ use parking_lot::RwLock;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::core::event::*;
+
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
 
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
 use crate::core::editor::InputStageActionMap;
@@ -55,6 +62,8 @@ use crate::core::EditorEnv;
 use crate::core::buffer;
 use crate::core::buffer::get_byte_count;
 use crate::core::buffer::get_byte_count_at_offset;
+pub use buffer::find_nth_byte_offset;
+
 use crate::core::buffer::Buffer;
 use crate::core::buffer::BufferEvent;
 use crate::core::buffer::BufferEventCb;
@@ -69,10 +78,8 @@ use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
-use crate::core::event::*;
-
-use lazy_static::lazy_static;
-use std::collections::HashMap;
+use crate::core::modes::text_mode::mark::Mark;
+use crate::core::modes::text_mode::TextModeContext;
 
 fn num_digit(v: u64) -> u64 {
     match v {
@@ -114,7 +121,9 @@ lazy_static! {
     static ref BUFFER_METADATA_MAP: Arc<RwLock<HashMap<buffer::Id, RwLock<LineNumberBufferMetaData>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 
-        // buffer::Id -> (buffer, LineNumberBufferMetaData)
+    // move to core ?
+    static ref BUFFER_ID_TO_VIEW_ID_MAP: Arc<RwLock<HashMap<buffer::Id, HashSet<view::Id>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
 }
 
 struct LineNumberBufferMetaData {
@@ -229,6 +238,9 @@ pub struct LineNumberModeContext {
     // add per view fields
     linenum_view_id: view::Id,
     text_view_id: view::Id,
+
+    pub start_line: Option<u64>,
+    pub start_col: Option<u64>,
 }
 
 struct LineNumberModeDocEventHandler {
@@ -251,6 +263,8 @@ impl<'a> Mode for LineNumberMode {
         let ctx = LineNumberModeContext {
             linenum_view_id: view::Id(0),
             text_view_id: view::Id(0),
+            start_line: None,
+            start_col: None,
         };
         Box::new(ctx)
     }
@@ -283,6 +297,55 @@ impl<'a> Mode for LineNumberMode {
         }
     }
 
+    fn on_buffer_event(
+        &self,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        _event: &BufferEvent,
+        view: &mut View<'static>,
+    ) {
+        dbg_println!("mode '{}' on_buffer_event: event {:?}", self.name(), _event);
+
+        if let Some(buffer) = view.buffer() {
+            let max_offset = buffer.read().size() as u64;
+
+            let position = buffer.read().start_position;
+            if let Some(target_line) = position.line {
+                dbg_println!("goto line {:?} ?", target_line);
+
+                let offset = if target_line <= 1 {
+                    0
+                } else {
+                    let line_number = target_line.saturating_sub(1);
+                    if let Some(offset) =
+                        find_nth_byte_offset(&buffer.read(), '\n' as u8, line_number)
+                    {
+                        offset + 1
+                    } else {
+                        max_offset as u64
+                    }
+                };
+
+                dbg_println!("goto line {:?} offset : {}", target_line, offset);
+
+                let lnm = view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+                let text_view_id = lnm.text_view_id;
+
+                let text_view = get_view_by_id(editor, text_view_id);
+                let mut text_view = text_view.write();
+
+                // check offscreen
+                text_view.start_offset = offset;
+
+                // update marks ?
+                let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
+
+                tm.marks.clear();
+                tm.marks.push(Mark { offset });
+            }
+        }
+    }
+
     fn configure_view(
         &mut self,
         _editor: &mut Editor<'static>,
@@ -297,6 +360,17 @@ impl<'a> Mode for LineNumberMode {
         view.compose_screen_overlay_filters
             .borrow_mut()
             .push(Box::new(LineNumberOverlayFilter::new()));
+
+        let buffer_id = view.buffer().unwrap().read().id;
+        let view_id = view.id;
+
+        // move to core ?
+        BUFFER_ID_TO_VIEW_ID_MAP
+            .as_ref()
+            .write()
+            .entry(buffer_id)
+            .or_insert_with(HashSet::new)
+            .insert(view_id);
     }
 
     fn on_view_event(
@@ -324,7 +398,9 @@ impl<'a> Mode for LineNumberMode {
                     return;
                 }
 
-                let mut linenum_view = editor.view_map.get(&dst.id).unwrap().write();
+                let linenum_view = get_view_by_id(editor, dst.id);
+                let mut linenum_view = linenum_view.write();
+
                 let mut mode_ctx =
                     linenum_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
 
@@ -338,7 +414,8 @@ impl<'a> Mode for LineNumberMode {
                 }
 
                 let text_view = src_view;
-                let linenum_view = editor.view_map.get(&dst.id).unwrap().read();
+                let linenum_view = get_view_by_id(editor, dst.id);
+                let linenum_view = linenum_view.read();
 
                 // TODO(ceg): resize line-number view
                 let buffer = text_view.buffer();
@@ -385,7 +462,10 @@ impl BufferEventCb for LineNumberModeDocEventHandler {
         );
 
         match event {
-            BufferEvent::BufferNodeIndexed { node_index } => {
+            BufferEvent::BufferNodeIndexed {
+                buffer_id: _,
+                node_index,
+            } => {
                 dbg_println!(
                     "TODO index node {} with target codec  {:?}",
                     node_index,
@@ -393,11 +473,22 @@ impl BufferEventCb for LineNumberModeDocEventHandler {
                 );
             }
 
-            BufferEvent::BufferNodeAdded { node_index: _ } => {}
+            BufferEvent::BufferNodeAdded {
+                buffer_id: _,
+                node_index: _,
+            } => {}
 
-            BufferEvent::BufferNodeRemoved { node_index: _ } => {}
+            BufferEvent::BufferNodeRemoved {
+                buffer_id: _,
+                node_index: _,
+            } => {}
 
-            BufferEvent::BufferNodeChanged { node_index: _ } => {}
+            BufferEvent::BufferNodeChanged {
+                buffer_id: _,
+                node_index: _,
+            } => {}
+
+            BufferEvent::BufferFullyIndexed { buffer_id: _ } => {}
 
             _ => {
                 dbg_println!("unhandled event {:?}", event);
@@ -431,7 +522,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
     fn setup(
         &mut self,
-        editor: &Editor,
+        editor: &Editor<'static>,
         _env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -439,7 +530,8 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let view = view.read();
         let mode_ctx = view.mode_ctx::<LineNumberModeContext>("line-number-mode");
         let text_view_id = mode_ctx.text_view_id;
-        let src = editor.view_map.get(&text_view_id).unwrap().read();
+        let src = get_view_by_id(editor, text_view_id);
+        let src = src.read();
         self.line_offsets = src.screen.read().line_offset.clone();
 
         self.line_number.clear();

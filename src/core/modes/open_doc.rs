@@ -163,7 +163,7 @@ pub fn open_doc_start(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = view::get_status_view(&editor, &env, view);
+        let status_view_id = view::get_status_view(editor, env, view);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
             dbg_println!("status view is missing");
@@ -180,7 +180,7 @@ pub fn open_doc_start(
             let controller_view_id = odm.controller_view_id;
 
             // attach to status view
-            let controller = editor.view_map.get(&controller_view_id).unwrap();
+            let controller = get_view_by_id(editor, controller_view_id);
             controller.write().parent_id = Some(status_view_id.unwrap());
 
             v.controller = Some(ControllerView {
@@ -208,20 +208,25 @@ pub fn open_doc_controller_stop(
 ) {
     {
         let status_view_id = env.status_view_id.unwrap();
-        let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+        let status_view = get_view_by_id(editor, status_view_id);
+        let mut status_view = status_view.write();
+
         status_view.layout_direction = LayoutDirection::Horizontal;
         status_view.children.pop(); // discard child
     }
     {
         let root_view_id = env.root_view_id;
-        let mut root_view = editor.view_map.get(&root_view_id).unwrap().write();
-        root_view.floating_children.pop(); // discard child
+        get_view_by_id(editor, root_view_id)
+            .write()
+            .floating_children
+            .pop(); // discard child
     }
 
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
         {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
             text_view.controller = None;
 
             let otm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
@@ -341,7 +346,9 @@ fn open_doc_show_controller_view(
     let ctrl_view_id = {
         let status_view_id = env.status_view_id.unwrap();
 
-        let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+        let status_view = get_view_by_id(editor, status_view_id);
+        let mut status_view = status_view.write();
+
         status_view.layout_direction = LayoutDirection::Horizontal;
 
         let mut text_view = text_view.write();
@@ -484,7 +491,10 @@ pub fn open_doc_controller_add_char(
     let completion_view_id = {
         let v = view.read();
         let text_view_view_id = v.controlled_view.unwrap();
-        let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
+
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
         odm.prompt.append(&mut array);
         odm.completion_index = 0;
@@ -498,9 +508,9 @@ pub fn open_doc_controller_add_char(
     {
         let mut controller_view = view.write();
         let text_view_view_id = controller_view.controlled_view.unwrap();
-        let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
-        let mut text_view = text_view.write();
 
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
         {
             let completion_view = get_view_by_id(editor, completion_view_id);
             {
@@ -522,7 +532,10 @@ pub fn open_doc_controller_del_char(
     let completion_view_id = {
         let v = view.read();
         let text_view_view_id = v.controlled_view.unwrap();
-        let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
+
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
         if odm.prompt.len() <= 1 {
             return;
@@ -538,7 +551,12 @@ pub fn open_doc_controller_del_char(
 
     let mut controller_view = view.write();
     let text_view_view_id = controller_view.controlled_view.unwrap();
-    let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
+    let text_view = editor
+        .view_map
+        .read()
+        .get(&text_view_view_id)
+        .unwrap()
+        .clone();
     let mut text_view = text_view.write();
 
     {
@@ -565,7 +583,10 @@ pub fn open_doc_do_completion(
     {
         let v = view.read();
         let text_view_view_id = v.controlled_view.unwrap();
-        let mut text_view = editor.view_map.get(&text_view_view_id).unwrap().write();
+
+        let text_view = get_view_by_id(editor, text_view_view_id);
+        let mut text_view = text_view.write();
+
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
         // clear completion list/index
@@ -677,8 +698,9 @@ fn show_completion_popup(
         let text_view_view_id = controller_view.read().controlled_view.unwrap();
         let text_view = get_view_by_id(editor, text_view_view_id);
 
-        let status_view_id = view::get_status_view(&editor, &env, &text_view).unwrap();
-        let status_view = editor.view_map.get(&status_view_id).unwrap().read();
+        let status_view_id = view::get_status_view(editor, &env, &text_view).unwrap();
+        let status_view = get_view_by_id(editor, status_view_id);
+        let status_view = status_view.read();
         (
             status_view.global_x.unwrap(),
             status_view.global_y.unwrap(),
@@ -690,8 +712,7 @@ fn show_completion_popup(
     // TODO: get view global coordinates, update on  resize
     let parent_id = env.root_view_id;
     let (x, y, pop_width, pop_height) = {
-        let parent_view = editor.view_map.get(&parent_id).unwrap().read();
-        let dim = parent_view.dimension();
+        let dim = get_view_by_id(editor, parent_id).read().dimension();
         let w = st_w;
         //        let h = std::cmp::min(list.len(), dim.1 / 2);
         let h = dim.1.saturating_sub(_st_h); // / 3 + dim.1 / 3;
@@ -705,7 +726,8 @@ fn show_completion_popup(
     completion_view.width = pop_width;
     completion_view.height = pop_height;
 
-    let mut p_view = editor.view_map.get(&parent_id).unwrap().write();
+    let p_view = get_view_by_id(editor, parent_id);
+    let mut p_view = p_view.write();
     p_view.floating_children.pop();
     if p_view.floating_children.is_empty() {
         p_view.floating_children.push(ChildView {
@@ -835,7 +857,12 @@ pub fn open_doc_controller_apply_current_completion(
     {
         let mut controller_view = view.write();
         let text_view_view_id = controller_view.controlled_view.unwrap();
-        let text_view = editor.view_map.get(&text_view_view_id).unwrap().clone();
+        let text_view = editor
+            .view_map
+            .read()
+            .get(&text_view_view_id)
+            .unwrap()
+            .clone();
         let mut text_view = text_view.write();
 
         {

@@ -20,8 +20,8 @@ pub use super::*;
 // crate
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
-use crate::core::buffer::BufferBuilder;
-use crate::core::buffer::BufferKind;
+
+use crate::core::buffer::BufferEvent;
 
 use crate::core::config::Config;
 
@@ -33,6 +33,7 @@ use crate::core::event::Event;
 use crate::core::event::Event::Draw;
 use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+
 use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
 
@@ -166,7 +167,7 @@ pub struct Editor<'a> {
     pub config: Config,
     pub buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'static>>>>>>,
     pub root_views: Vec<view::Id>,
-    pub view_map: HashMap<view::Id, Rc<RwLock<View<'a>>>>,
+    pub view_map: Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'a>>>>>>,
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub dir_modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub core_tx: Sender<EventMessage<'a>>,
@@ -189,7 +190,7 @@ impl<'a> Editor<'a> {
             config,
             buffer_map: Arc::new(RwLock::new(HashMap::new())),
             root_views: vec![],
-            view_map: HashMap::new(),
+            view_map: Arc::new(RwLock::new(HashMap::new())),
             modes: Rc::new(RefCell::new(HashMap::new())),
             dir_modes: Rc::new(RefCell::new(HashMap::new())),
             ui_tx,
@@ -201,32 +202,6 @@ impl<'a> Editor<'a> {
 
     pub fn is_root_view(&self, id: view::Id) -> bool {
         self.root_views.iter().find(|&&x| x == id).is_some()
-    }
-
-    ///
-    pub fn setup_default_buffers(&mut self) {
-        let mut builder = BufferBuilder::new(BufferKind::File);
-        builder.buffer_name("debug-message").internal(true);
-
-        let b = builder.finalize();
-
-        let buffer_map = self.buffer_map.clone();
-        let mut buffer_map = buffer_map.write();
-
-        if let Some(b) = b {
-            let id = buffer_map.len();
-            buffer_map.insert(buffer::Id(id), b);
-        }
-
-        let mut builder = BufferBuilder::new(BufferKind::File);
-        builder.buffer_name("scratch").internal(true);
-
-        let b = builder.finalize();
-
-        if let Some(b) = b {
-            let id = buffer_map.len();
-            buffer_map.insert(buffer::Id(id), b);
-        }
     }
 
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
@@ -256,13 +231,36 @@ impl<'a> Editor<'a> {
     // insert view into editor global map, no checks
     pub fn add_view(&mut self, id: view::Id, view: View<'a>) {
         assert_ne!(id, view::Id(0));
-        self.view_map.insert(id, Rc::new(RwLock::new(view))); // move to View::new ?
+        self.view_map.write().insert(id, Rc::new(RwLock::new(view))); // move to View::new ?
     }
 }
 
-// move to editor::
-pub fn get_view_by_id(editor: &mut Editor<'static>, vid: view::Id) -> Rc<RwLock<View<'static>>> {
-    editor.view_map.get(&vid).unwrap().clone()
+pub fn get_view_map(
+    editor: &Editor<'static>,
+) -> Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'static>>>>>> {
+    let map = editor.view_map.clone();
+    map
+}
+
+pub fn get_view_by_id(editor: &Editor<'static>, vid: view::Id) -> Rc<RwLock<View<'static>>> {
+    editor.view_map.read().get(&vid).unwrap().clone()
+}
+
+pub fn remove_view_by_id(
+    editor: &Editor<'static>,
+    vid: view::Id,
+) -> Option<Rc<RwLock<View<'static>>>> {
+    let mut map = editor.view_map.write();
+    map.remove(&vid)
+}
+
+pub fn check_view_by_id(
+    editor: &Editor<'static>,
+    vid: view::Id,
+) -> Option<Rc<RwLock<View<'static>>>> {
+    let map = editor.view_map.read();
+    let rc = map.get(&vid)?;
+    Some(rc.clone())
 }
 
 //////////////////////////////////////////////
@@ -276,11 +274,10 @@ pub fn register_input_stage_action(
     map.insert(s.to_string(), func);
 }
 
-pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
+pub fn check_view_dimension(editor: &mut Editor<'static>, env: &EditorEnv) {
     dbg_println!("checking view dimension {:?}", env.root_view_id);
 
-    let view = editor.view_map.get(&env.root_view_id);
-    let view = view.unwrap();
+    let view = get_view_by_id(editor, env.root_view_id);
     let view = view.as_ref();
     let mut view = view.write();
 
@@ -423,7 +420,7 @@ fn process_single_input_event<'a>(
     env: &'a mut EditorEnv<'static>,
     view_id: view::Id,
 ) -> bool {
-    let mut view = &editor.view_map.get(&view_id).unwrap().clone();
+    let mut view = get_view_by_id(editor, view_id);
     {
         let v = view.read();
         dbg_println!("DISPATCH EVENT TO VID {:?}", view_id);
@@ -598,7 +595,12 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     // TODO(ceg): receive FPS from ui in Event ?
     if (p_rdr <= 60) || p_input <= 60 {
         // hit
-        let view = editor.view_map.get(&env.root_view_id).unwrap().clone();
+        let view = editor
+            .view_map
+            .read()
+            .get(&env.root_view_id)
+            .unwrap()
+            .clone();
         send_draw_event(&mut editor, &mut env, ui_tx, &view);
         env.last_rdr_event = Instant::now();
     }
@@ -610,13 +612,12 @@ fn get_focused_view_id(
     vid: view::Id,
 ) -> view::Id {
     let vid = vid;
-    let view = editor.view_map.get(&vid);
+    let view = check_view_by_id(editor, vid);
     if view.is_none() {
         return env.root_view_id;
     }
 
-    let view = view.unwrap().clone();
-
+    let view = view.unwrap();
     let v = view.read();
 
     // TODO(ceg): floating_children in priority ?
@@ -637,11 +638,11 @@ pub fn set_focus_on_view_id(
     mut env: &mut EditorEnv<'static>,
     vid: view::Id,
 ) {
-    let view = editor.view_map.get(&vid);
+    let view = check_view_by_id(editor, vid);
     if view.is_none() {
         return;
     }
-    let view = Rc::clone(view.unwrap());
+    let view = view.unwrap();
     let mut v = view.write();
 
     if v.ignore_focus == true {
@@ -684,7 +685,7 @@ pub fn set_active_view(
         if let Some(pid) = parent_id {
             dbg_println!("focus changed : checking parent {:?}", pid);
 
-            if let Some(pview) = editor.view_map.get(&pid) {
+            if let Some(pview) = check_view_by_id(editor, pid) {
                 let mut pview = pview.write();
                 pview.focus_to = Some(vid);
                 parent_id = pview.parent_id;
@@ -785,7 +786,7 @@ fn clip_coordinates_xy(
 
     loop {
         'inner: loop {
-            if let Some(v) = editor.view_map.get(&id) {
+            if let Some(v) = check_view_by_id(editor, id) {
                 let v = v.read();
 
                 if v.children.is_empty() {
@@ -795,7 +796,9 @@ fn clip_coordinates_xy(
                 }
 
                 for child in v.children.iter() {
-                    let child_v = editor.view_map.get(&child.id).unwrap().write();
+                    let child_v = get_view_by_id(editor, child.id);
+                    let child_v = child_v.write();
+
                     let screen = child_v.screen.read();
 
                     dbg_println!(
@@ -816,7 +819,8 @@ fn clip_coordinates_xy(
 
                 let mut last_id = view::Id(0);
                 for (idx, child) in v.children.iter().enumerate() {
-                    let child_v = editor.view_map.get(&child.id).unwrap().write();
+                    let child_v = get_view_by_id(editor, child.id);
+                    let child_v = child_v.read();
                     let screen = child_v.screen.read();
 
                     last_id = child_v.id;
@@ -959,7 +963,7 @@ fn run_stage(
     mut env: &mut EditorEnv<'static>,
     view_id: view::Id,
 ) -> Stage {
-    let view = editor.view_map.get(&view_id);
+    let view = check_view_by_id(editor, view_id);
     if view.is_none() {
         return match stage {
             Stage::Input => Stage::Compositing,
@@ -1010,12 +1014,17 @@ fn run_stage(
                         check_view_dimension(editor, env);
                         {
                             // NB: resize previous view's screen to lower memory usage
-                            if let Some(view) = editor.view_map.get(&env.prev_view_id) {
+                            if let Some(view) = check_view_by_id(editor, env.prev_view_id) {
                                 view.write().screen.write().resize(1, 1);
                             }
 
                             // prepare next view input
-                            let view = editor.view_map.get(&env.root_view_id).unwrap().clone();
+                            let view = editor
+                                .view_map
+                                .read()
+                                .get(&env.root_view_id)
+                                .unwrap()
+                                .clone();
                             view::run_stage(
                                 &mut editor,
                                 &mut env,
@@ -1143,7 +1152,7 @@ fn check_pointer_over_change(
     );
 
     {
-        if let Some(prev_v) = editor.view_map.get(&prev_view_id) {
+        if let Some(prev_v) = check_view_by_id(editor, prev_view_id) {
             let prev_v = prev_v.clone();
 
             let mut prev_v = prev_v.write();
@@ -1168,7 +1177,7 @@ fn check_pointer_over_change(
             }
         }
 
-        if let Some(new_v) = editor.view_map.get(&new_view_id) {
+        if let Some(new_v) = check_view_by_id(editor, new_view_id) {
             let new_v = new_v.clone();
             let mut new_v = new_v.write();
             let subscribers = { new_v.subscribers.clone() };
@@ -1207,7 +1216,7 @@ fn check_selection_change(
     }
 
     {
-        if let Some(new_v) = editor.view_map.get(&new_view_id) {
+        if let Some(new_v) = check_view_by_id(editor, new_view_id) {
             let new_v = new_v.clone();
             let mut new_v = new_v.write();
 
@@ -1219,7 +1228,7 @@ fn check_selection_change(
             }
 
             // notify prev
-            if let Some(prev_v) = editor.view_map.get(&prev_view_id) {
+            if let Some(prev_v) = check_view_by_id(editor, prev_view_id) {
                 let prev_v = prev_v.clone();
                 let mut prev_v = prev_v.write();
 
@@ -1403,6 +1412,56 @@ fn process_input_events(
     );
 }
 
+fn process_buffer_event(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    event: &BufferEvent,
+) {
+    dbg_println!("{:?}", event);
+
+    match event {
+        //
+        BufferEvent::BufferFullyIndexed { buffer_id } => {
+            let mut view_ids = vec![];
+
+            let map = get_view_map(editor);
+            let map = map.read();
+            for (view_id, v) in map.iter() {
+                let view = v.write();
+                if let Some(buffer) = view.buffer() {
+                    let buffer = buffer.read();
+                    if buffer.id == *buffer_id {
+                        view_ids.push(view_id);
+                    }
+                }
+            }
+
+            for view_id in view_ids {
+                let view = get_view_by_id(editor, *view_id);
+                let mut view = view.write();
+                if let Some(buffer) = view.buffer() {
+                    let buffer = buffer.read();
+                    if buffer.id == *buffer_id {
+                        let modes = view.modes.clone();
+                        for mode_name in modes {
+                            let map = editor.modes.borrow_mut().clone();
+                            if let Some(mode) = map.get(&mode_name) {
+                                let mode = mode.borrow_mut();
+                                mode.on_buffer_event(editor, env, event, &mut view);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        _ => {
+            // unexpected
+            panic!("{:?}", event);
+        }
+    }
+}
+
 pub fn main_loop(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
@@ -1441,9 +1500,13 @@ pub fn main_loop(
                 }
 
                 Event::Input { events } => {
-                    if !editor.view_map.is_empty() {
+                    if !editor.view_map.read().is_empty() {
                         process_input_events(&mut editor, &mut env, &ui_tx, &events);
                     }
+                }
+
+                Event::Buffer { event } => {
+                    process_buffer_event(&mut editor, &mut env, &event);
                 }
 
                 _ => {}

@@ -36,7 +36,7 @@ impl ContentFilter<'_> for CharMapFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        _editor: &Editor<'static>,
         _env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

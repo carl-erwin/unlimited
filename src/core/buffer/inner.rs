@@ -6,7 +6,8 @@ use crate::core::mapped_file::MappedFile;
 use crate::core::mapped_file::MappedFileEvent;
 
 //
-pub type Id = u64;
+pub use crate::core::mapped_file::Id;
+
 pub type Offset = u64;
 pub type PageSize = usize;
 
@@ -43,16 +44,16 @@ impl<'a> InnerBuffer<'a> {
     /// if buffer_name is null , file_name will be used to give a name to the buffer
     /// mode = 0 : read only , mode 1 : read_write
     /// the allocated_bid pointer will be filled on successful open operation
-    pub fn new(file_name: &str, mode: OpenMode) -> Option<InnerBuffer<'a>> {
+    pub fn new(id: Id, file_name: &str, mode: OpenMode) -> Option<InnerBuffer<'a>> {
         // TODO(ceg): check permission
         // TODO(ceg): check file's type => ignore directory (for now)
         // println!("-- mapping file {}", file_name);
 
         if file_name.is_empty() {
-            return InnerBuffer::empty(mode);
+            return InnerBuffer::empty(id, mode);
         }
 
-        let file = match MappedFile::new(file_name.to_owned()) {
+        let file = match MappedFile::new(id, file_name.to_owned()) {
             Some(file) => file,
             None => {
                 // TODO(ceg): return Result
@@ -66,7 +67,7 @@ impl<'a> InnerBuffer<'a> {
         // println!("'{}' opened size '{}'", file_name, size);
 
         Some(InnerBuffer {
-            id: 0,
+            id,
             file_name: file_name.to_owned(),
             mode,
             size,
@@ -75,8 +76,8 @@ impl<'a> InnerBuffer<'a> {
         })
     }
 
-    pub fn empty(mode: OpenMode) -> Option<InnerBuffer<'a>> {
-        let file = match MappedFile::empty() {
+    pub fn empty(id: Id, mode: OpenMode) -> Option<InnerBuffer<'a>> {
+        let file = match MappedFile::empty(id) {
             Some(file) => file,
             None => {
                 return None;
@@ -86,7 +87,7 @@ impl<'a> InnerBuffer<'a> {
         let size = file.as_ref().read().size() as usize;
 
         Some(InnerBuffer {
-            id: 0,
+            id,
             file_name: String::new(),
             mode,
             size,
@@ -95,8 +96,8 @@ impl<'a> InnerBuffer<'a> {
         })
     }
 
-    pub fn empty_with_name(file_name: &String, mode: OpenMode) -> Option<InnerBuffer<'a>> {
-        let file = match MappedFile::empty() {
+    pub fn empty_with_name(id: Id, file_name: &String, mode: OpenMode) -> Option<InnerBuffer<'a>> {
+        let file = match MappedFile::empty(id) {
             Some(file) => file,
             None => {
                 return None;
@@ -106,7 +107,7 @@ impl<'a> InnerBuffer<'a> {
         let size = file.as_ref().read().size() as usize;
 
         Some(InnerBuffer {
-            id: 0,
+            id,
             file_name: file_name.clone(),
             mode,
             size,
@@ -247,7 +248,7 @@ impl<'a> InnerBuffer<'a> {
 
 #[test]
 fn test_buffer() {
-    let mut bb = InnerBuffer::empty(OpenMode::ReadWrite).unwrap();
+    let mut bb = InnerBuffer::empty(Id(0), OpenMode::ReadWrite).unwrap();
 
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 

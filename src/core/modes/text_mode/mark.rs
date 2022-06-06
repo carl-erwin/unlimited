@@ -401,6 +401,7 @@ impl Mark {
 #[test]
 fn test_marks() {
     use crate::core::buffer::BufferBuilder;
+    use crate::core::buffer::BufferKind;
     use crate::core::buffer::OpenMode;
     use crate::core::codec::text::utf8::Utf8Codec;
 
@@ -412,7 +413,7 @@ fn test_marks() {
     let codec = &Utf8Codec::new();
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)
@@ -440,7 +441,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)
@@ -465,7 +466,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)
@@ -491,7 +492,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)
@@ -516,7 +517,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)
@@ -541,7 +542,7 @@ fn test_marks() {
     }
 
     {
-        let mut builder = BufferBuilder::new();
+        let mut builder = BufferBuilder::new(BufferKind::File);
         let buffer = builder
             .buffer_name("test-1")
             .internal(false)

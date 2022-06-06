@@ -11,7 +11,12 @@ use crate::core::buffer::Buffer;
 use crate::core::buffer::BufferBuilder;
 use crate::core::buffer::BufferKind;
 
+use crate::core::editor::check_view_by_id;
+use crate::core::editor::get_view_by_id;
+use crate::core::editor::remove_view_by_id;
+
 use crate::core::editor::register_input_stage_action;
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
@@ -172,13 +177,13 @@ pub fn application_quit_abort_setup(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
 
     dbg_println!("DOC CHANGED !\n");
     dbg_println!("STATUS VID = {:?}", status_view_id);
 
     if let Some(svid) = status_view_id {
-        let status_view = editor.view_map.get(&svid).unwrap();
+        let status_view = get_view_by_id(editor, svid);
         //
         let buffer = status_view.read().buffer().unwrap();
         let mut buffer = buffer.write();
@@ -231,9 +236,9 @@ pub fn application_quit_abort_no(
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
     if let Some(status_view_id) = status_view_id {
-        let status_view = editor.view_map.get(&status_view_id).unwrap();
+        let status_view = get_view_by_id(editor, status_view_id);
         let buffer = status_view.read().buffer().unwrap();
         let mut buffer = buffer.write();
         // clear buffer
@@ -368,7 +373,7 @@ pub fn split_with_direction(
         });
 
         let view = Rc::new(RwLock::new(view));
-        editor.view_map.insert(id, Rc::clone(&view));
+        editor.view_map.write().insert(id, Rc::clone(&view));
 
         match dir {
             LayoutDirection::Vertical => {
@@ -394,7 +399,7 @@ pub fn layout_view_ids_with_direction(
     layout_ops: &Vec<LayoutOperation>,
     view_ids: &Vec<view::Id>,
 ) {
-    let parent = editor.view_map.get(&parent_id).unwrap();
+    let parent = get_view_by_id(editor, parent_id);
     let mut parent = parent.write();
 
     parent.layout_direction = dir;
@@ -424,7 +429,7 @@ pub fn layout_view_ids_with_direction(
             }
         };
 
-        let view = editor.view_map.get(&view_ids[idx]).unwrap();
+        let view = get_view_by_id(editor, view_ids[idx]);
         let mut view = view.write();
 
         view.x = x;
@@ -463,7 +468,7 @@ fn find_first_splittable_parent(
     let mut start_id = { view.read().id };
 
     loop {
-        let view = editor.view_map.get(&start_id)?;
+        let view = get_view_by_id(editor, start_id);
         let v = view.read();
         if v.is_splittable {
             return Some(v.id);
@@ -567,9 +572,7 @@ pub fn split_view_with_direction(
     }
     let id = id.unwrap();
 
-    let view = editor.view_map.get(&id);
-    let view = view.unwrap().clone();
-
+    let view = get_view_by_id(editor, id);
     let split_info = build_split_info(&view, dir);
 
     // create new parent (will replace [view_to_split] in the hierarchy)
@@ -631,7 +634,7 @@ pub fn split_view_with_direction(
 
     // update grand parent, replace v1_id by p2_id
     if let Some(parent_id) = split_info.parent_id {
-        if let Some(gp) = editor.view_map.get(&parent_id) {
+        if let Some(gp) = check_view_by_id(editor, parent_id) {
             let mut gp = gp.write();
             if let Some(layout_index) = split_info.layout_index {
                 gp.children[layout_index].id = new_parent_id;
@@ -838,7 +841,7 @@ pub fn increase_left(
     }
 
     let pvid = v.parent_id.unwrap();
-    let pv = editor.view_map.get(&pvid).unwrap();
+    let pv = get_view_by_id(editor, pvid);
     let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
@@ -864,7 +867,7 @@ pub fn decrease_left(
     }
 
     let pvid = v.parent_id.unwrap();
-    let pv = editor.view_map.get(&pvid).unwrap();
+    let pv = get_view_by_id(editor, pvid);
     let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
@@ -891,7 +894,7 @@ pub fn increase_right(
     }
 
     let pvid = v.parent_id.unwrap();
-    let pv = editor.view_map.get(&pvid).unwrap();
+    let pv = get_view_by_id(editor, pvid);
     let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
@@ -917,7 +920,7 @@ pub fn decrease_right(
     }
 
     let pvid = v.parent_id.unwrap();
-    let pv = editor.view_map.get(&pvid).unwrap();
+    let pv = get_view_by_id(editor, pvid);
     let mut pv = pv.write();
 
     let lidx = v.layout_index.unwrap();
@@ -976,7 +979,7 @@ fn destroy_view_hierarchy(editor: &mut Editor<'static>, id: view::Id) {
     let mut ids = vec![];
 
     {
-        let v = editor.view_map.get(&id);
+        let v = check_view_by_id(editor, id);
         if v.is_none() {
             return;
         }
@@ -993,7 +996,7 @@ fn destroy_view_hierarchy(editor: &mut Editor<'static>, id: view::Id) {
         destroy_view_hierarchy(editor, id);
     }
     dbg_println!("DESTROY view {id:?}");
-    editor.view_map.remove(&id);
+    remove_view_by_id(editor, id);
 }
 
 pub fn destroy_view(
@@ -1032,7 +1035,7 @@ pub fn destroy_view(
         let p_id = p_id.unwrap();
 
         dbg_println!("-- DESTROY VEW : PARENT {:?}", p_id);
-        let v_p = editor.view_map.get(&p_id);
+        let v_p = check_view_by_id(editor, p_id);
         if v_p.is_none() {
             return;
         }
@@ -1043,7 +1046,7 @@ pub fn destroy_view(
         let pp_id = v_p.parent_id.unwrap();
         dbg_println!("-- DESTROY VIEW: PARENT PARENT {:?}", pp_id);
 
-        let v_pp = editor.view_map.get(&pp_id);
+        let v_pp = check_view_by_id(editor, pp_id);
         if v_pp.is_none() {
             return;
         }
@@ -1058,7 +1061,7 @@ pub fn destroy_view(
         let ppp_id = v_pp.parent_id.unwrap();
         dbg_println!("-- DESTROY PARENT PARENT VIEW {:?}", ppp_id);
 
-        let v_ppp = editor.view_map.get(&ppp_id);
+        let v_ppp = check_view_by_id(editor, ppp_id);
         if v_ppp.is_none() {
             return;
         }
@@ -1094,7 +1097,7 @@ pub fn destroy_view(
         // replace
         v_ppp.children[v_pp_layout_index.unwrap()].id = v_to_keep_id;
 
-        let to_keep = editor.view_map.get(&v_to_keep_id);
+        let to_keep = check_view_by_id(editor, v_to_keep_id);
         if to_keep.is_none() {
             return;
         }
@@ -1152,18 +1155,17 @@ pub fn help_popup(
     _view: &Rc<RwLock<View>>,
 ) {
     let root_view_id = editor.root_views[env.root_view_index];
-    let (root_width, root_height) = {
-        let main = editor.view_map.get(&root_view_id).unwrap().read();
-        (main.width, main.height)
-    };
+    let (root_width, root_height) = { get_view_by_id(editor, root_view_id).read().dimension() };
 
     // destroy previous
     {
         if let Some(info) = {
-            let mut main = editor.view_map.get(&root_view_id).unwrap().write();
-            main.floating_children.pop()
+            get_view_by_id(editor, root_view_id)
+                .write()
+                .floating_children
+                .pop()
         } {
-            editor.view_map.remove(&info.id);
+            remove_view_by_id(editor, info.id);
             return;
         }
     }
@@ -1202,7 +1204,8 @@ pub fn help_popup(
     );
 
     {
-        let mut main = editor.view_map.get(&root_view_id).unwrap().write();
+        let main = get_view_by_id(editor, root_view_id);
+        let mut main = main.write();
 
         assert_ne!(p_view.id, view::Id(0));
 

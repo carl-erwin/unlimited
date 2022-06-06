@@ -15,6 +15,8 @@ use crate::core::editor::Stage;
 use crate::core::editor::StageFunction;
 use crate::core::editor::StagePosition;
 
+use crate::core::editor::get_view_by_id;
+
 use crate::core::screen::Screen;
 
 pub mod layout;
@@ -326,7 +328,7 @@ pub struct View<'a> {
     */
     pub buffer: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
 
-    pub modes: Vec<String>,
+    pub modes: Vec<String>, // TODO: add Arc<dyn Modes>
 
     pub mode_ctx: HashMap<&'static str, Box<dyn Any>>,
     //
@@ -383,7 +385,7 @@ pub fn register_view_subscriber(
     src: ViewEventSource,
     dst: ViewEventDestination,
 ) -> Option<()> {
-    let src_view = editor.view_map.get(&src.id)?.clone();
+    let src_view = get_view_by_id(editor, src.id);
     let ctx = (mode.clone(), src, dst);
 
     let mut src_view = src_view.write();
@@ -598,7 +600,7 @@ impl<'a> View<'a> {
 
 //
 pub fn get_status_view(
-    editor: &Editor<'static>,
+    editor: &mut Editor<'static>,
     env: &EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) -> Option<Id> {
@@ -614,7 +616,7 @@ pub fn get_status_view(
 
     let v = view;
     while let Some(pvid) = v.parent_id {
-        let pv = editor.view_map.get(&pvid).unwrap();
+        let pv = get_view_by_id(editor, pvid);
         let pv = pv.read();
         if pv.status_view_id.is_some() {
             return pv.status_view_id;

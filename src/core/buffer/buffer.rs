@@ -8,12 +8,17 @@ use std::sync::Weak;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 //
 use crate::core::editor::user_is_active;
 
 use crate::core::mapped_file::MappedFile;
+
+pub use crate::core::mapped_file::Id;
+
 use crate::core::mapped_file::MappedFileEvent;
+
 use crate::core::mapped_file::UpdateHierarchyOp;
 
 use crate::core::mapped_file::NodeIndex;
@@ -25,10 +30,31 @@ use super::bufferlog::BufferLog;
 use super::bufferlog::BufferOperation;
 use super::bufferlog::BufferOperationType;
 
-//
+static BUFFER_ID: AtomicUsize = AtomicUsize::new(1);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Id(pub usize);
+/*
+  We will filter command line file list array
+
+  "+${line}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1 }
+  "+@${offset}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1, offset:${off} }
+  "filename:${line}:${col}" ->  FileInfo { name: start_line:${num}, start_column:${col} }
+*/
+#[derive(Debug, Copy, Clone)]
+pub struct BufferPosition {
+    pub offset: Option<u64>,
+    pub line: Option<u64>,
+    pub column: Option<u64>,
+}
+
+impl BufferPosition {
+    pub fn new() -> Self {
+        BufferPosition {
+            offset: None,
+            line: None,
+            column: None,
+        }
+    }
+}
 
 ///
 #[derive(Debug)]
@@ -39,6 +65,7 @@ pub struct BufferBuilder {
     buffer_name: String,
     file_name: String,
     mode: OpenMode,
+    start_position: BufferPosition,
 }
 
 #[derive(Debug)]
@@ -46,15 +73,18 @@ struct BufferMappedFileEventHandler<'a> {
     _buffer: Weak<RwLock<Buffer<'a>>>,
 }
 
-fn mapped_file_event_to_buffer_event(evt: &MappedFileEvent) -> BufferEvent {
+fn mapped_file_event_to_buffer_event(buffer_id: Id, evt: &MappedFileEvent) -> BufferEvent {
     match evt {
         MappedFileEvent::NodeChanged { node_index } => BufferEvent::BufferNodeChanged {
+            buffer_id,
             node_index: *node_index,
         },
         MappedFileEvent::NodeAdded { node_index } => BufferEvent::BufferNodeAdded {
+            buffer_id,
             node_index: *node_index,
         },
         MappedFileEvent::NodeRemoved { node_index } => BufferEvent::BufferNodeRemoved {
+            buffer_id,
             node_index: *node_index,
         },
     }
@@ -71,6 +101,7 @@ impl BufferBuilder {
             buffer_name: String::new(),
             file_name: String::new(),
             mode: OpenMode::ReadOnly,
+            start_position: BufferPosition::new(),
         }
     }
 
@@ -104,6 +135,11 @@ impl BufferBuilder {
         self
     }
 
+    pub fn start_position(&mut self, position: BufferPosition) -> &mut Self {
+        self.start_position = position;
+        self
+    }
+
     ///
     pub fn finalize<'a>(&self) -> Option<Arc<RwLock<Buffer<'static>>>> {
         Buffer::new(
@@ -112,6 +148,7 @@ impl BufferBuilder {
             &self.file_name,
             self.mode.clone(),
             self.use_buffer_log,
+            self.start_position,
         )
     }
 }
@@ -187,37 +224,52 @@ pub trait BufferEventCb {
     fn cb(&mut self, buffer: &Buffer, event: &BufferEvent);
 }
 
+// PartialEq, Eq
 #[derive(Debug, Clone)]
 pub enum BufferEvent {
-    BufferAdded,
-    BufferOpened,
-    BufferClosed,
-    BufferRemoved,
-    BufferFullyIndexed,
-    BufferNodeAdded { node_index: usize },
-    BufferNodeChanged { node_index: usize },
-    BufferNodeRemoved { node_index: usize },
-    BufferNodeIndexed { node_index: usize },
+    BufferAdded { buffer_id: Id },
+    BufferOpened { buffer_id: Id },
+    BufferClosed { buffer_id: Id },
+    BufferRemoved { buffer_id: Id },
+    BufferFullyIndexed { buffer_id: Id },
+    BufferNodeAdded { buffer_id: Id, node_index: usize },
+    BufferNodeChanged { buffer_id: Id, node_index: usize },
+    BufferNodeRemoved { buffer_id: Id, node_index: usize },
+    BufferNodeIndexed { buffer_id: Id, node_index: usize },
 }
 
 fn buffer_event_to_string(evt: &BufferEvent) -> String {
     match evt {
-        BufferEvent::BufferAdded => "Added".to_owned(),
-        BufferEvent::BufferOpened => "Opened".to_owned(),
-        BufferEvent::BufferClosed => "Closed".to_owned(),
-        BufferEvent::BufferRemoved => "Removed".to_owned(),
-        BufferEvent::BufferFullyIndexed => "FullyIndexed".to_owned(),
+        BufferEvent::BufferAdded { .. } => "Added".to_owned(),
+        BufferEvent::BufferOpened { .. } => "Opened".to_owned(),
+        BufferEvent::BufferClosed { .. } => "Closed".to_owned(),
+        BufferEvent::BufferRemoved { .. } => "Removed".to_owned(),
+        BufferEvent::BufferFullyIndexed { .. } => "FullyIndexed".to_owned(),
 
-        BufferEvent::BufferNodeAdded { node_index } => {
+        BufferEvent::BufferNodeAdded {
+            buffer_id: _,
+            node_index,
+        } => {
             format!("NodeAdded idx: {}", node_index)
         }
-        BufferEvent::BufferNodeChanged { node_index } => {
+        BufferEvent::BufferNodeChanged {
+            buffer_id: _,
+            node_index,
+        } => {
             format!("NodeChanged idx: {}", node_index)
         }
-        BufferEvent::BufferNodeRemoved { node_index, .. } => {
+        BufferEvent::BufferNodeRemoved {
+            buffer_id: _,
+            node_index,
+            ..
+        } => {
             format!("NodeRemoved idx: {}", node_index)
         }
-        BufferEvent::BufferNodeIndexed { node_index, .. } => {
+        BufferEvent::BufferNodeIndexed {
+            buffer_id: _,
+            node_index,
+            ..
+        } => {
             format!("NodeIndexed idx: {}", node_index)
         }
     }
@@ -236,6 +288,7 @@ pub struct Buffer<'a> {
     pub inner: InnerBuffer<'a>, // TODO(ceg): provide iterator apis ?
     cache: BufferReadCache,
     pub buffer_log: BufferLog,
+    pub start_position: BufferPosition,
     pub use_buffer_log: bool,
     pub changed: bool,
     pub is_syncing: bool,
@@ -265,38 +318,43 @@ impl<'a> Buffer<'a> {
         file_name: &String,
         mode: OpenMode,
         use_buffer_log: bool,
+        start_position: BufferPosition,
     ) -> Option<Arc<RwLock<Buffer<'static>>>> {
         dbg_println!("try open {} {} {:?}", buffer_name, file_name, mode);
+
+        let id = BUFFER_ID.fetch_add(1, Ordering::SeqCst);
+        let id = Id(id);
 
         let inner = match kind {
             BufferKind::File => {
                 if file_name.is_empty() {
-                    InnerBuffer::empty(mode.clone())
+                    InnerBuffer::empty(id, mode.clone())
                 } else {
-                    InnerBuffer::new(&file_name, mode.clone())
+                    InnerBuffer::new(id, &file_name, mode.clone())
                 }
             }
 
-            BufferKind::Directory => InnerBuffer::empty(mode.clone()),
+            BufferKind::Directory => InnerBuffer::empty(id, mode.clone()),
         };
 
         let mut changed = false;
         // fallback
         let inner = if inner.is_none() {
             changed = true;
-            InnerBuffer::empty_with_name(&buffer_name, mode.clone())
+            InnerBuffer::empty_with_name(id, &buffer_name, mode.clone())
         } else {
             inner
         };
 
         let buffer = Buffer {
+            id,
             kind: kind,
-            id: Id(0),
             name: buffer_name.clone(),
             inner: inner.unwrap(),
             cache: BufferReadCache::new(), // TODO(ceg): have a per view cache or move to View
             buffer_log: BufferLog::new(),
             use_buffer_log,
+            start_position,
             abort_indexing: false,
             indexed: false,
             changed,
@@ -622,7 +680,7 @@ impl<'a> Buffer<'a> {
         self.update_hierarchy_from_events(&events);
 
         for ev in &events {
-            let ev = mapped_file_event_to_buffer_event(&ev);
+            let ev = mapped_file_event_to_buffer_event(self.id, &ev);
             self.notify(&ev);
         }
 
@@ -674,7 +732,7 @@ impl<'a> Buffer<'a> {
         self.update_hierarchy_from_events(&events);
 
         for ev in &events {
-            let ev = mapped_file_event_to_buffer_event(&ev);
+            let ev = mapped_file_event_to_buffer_event(self.id, &ev);
             self.notify(&ev);
         }
 
@@ -726,7 +784,7 @@ impl<'a> Buffer<'a> {
                     self.update_hierarchy_from_events(&events);
 
                     for ev in &events {
-                        let ev = mapped_file_event_to_buffer_event(&ev);
+                        let ev = mapped_file_event_to_buffer_event(self.id, &ev);
                         self.notify(&ev);
                     }
 
@@ -750,7 +808,7 @@ impl<'a> Buffer<'a> {
                     self.update_hierarchy_from_events(&events);
 
                     for ev in &events {
-                        let ev = mapped_file_event_to_buffer_event(&ev);
+                        let ev = mapped_file_event_to_buffer_event(self.id, &ev);
                         self.notify(&ev);
                     }
 
@@ -1140,12 +1198,12 @@ pub fn update_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>)
 }
 
 // TODO(ceg): split code to provide index_single_node(nid)
-pub fn build_index(buffer: &Arc<RwLock<Buffer>>) {
+pub fn build_index(buffer: &Arc<RwLock<Buffer>>) -> bool {
     let mut idx = {
         let buffer = buffer.read();
         {
             if buffer.indexed {
-                return;
+                return true;
             }
 
             let file = buffer.inner.data.read();
@@ -1234,6 +1292,7 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) {
         if idx.is_some() {
             let buffer = buffer.read();
             buffer.notify(&BufferEvent::BufferNodeIndexed {
+                buffer_id: buffer.id,
                 node_index: idx.unwrap(),
             });
         }
@@ -1264,8 +1323,12 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) {
 
         let buffer = buffer.read();
         if buffer.indexed {
-            buffer.notify(&BufferEvent::BufferFullyIndexed {});
+            buffer.notify(&BufferEvent::BufferFullyIndexed {
+                buffer_id: buffer.id,
+            });
         }
+
+        buffer.indexed
     }
 }
 
@@ -1438,7 +1501,7 @@ mod tests {
 
         println!("read file....");
 
-        let buffer = BufferBuilder::new()
+        let buffer = BufferBuilder::new(BufferKind::File)
             .buffer_name("untitled-1")
             .file_name(&filename)
             .internal(false)
@@ -1498,7 +1561,7 @@ mod tests {
 
     #[test]
     fn undo_redo() {
-        let buffer = BufferBuilder::new()
+        let buffer = BufferBuilder::new(BufferKind::File)
             .buffer_name("untitled-1")
             .internal(false)
             .finalize();
@@ -1558,7 +1621,7 @@ mod tests {
 
     #[test]
     fn buffer_random_size_inserts() {
-        let buffer = BufferBuilder::new()
+        let buffer = BufferBuilder::new(BufferKind::File)
             .buffer_name("untitled-1")
             .internal(false)
             .finalize();
@@ -1630,18 +1693,20 @@ mod tests {
         use std::fs;
         use std::fs::File;
 
-        let max_size = 4096 * 2;
+        let start_size = 1024 * 60;
 
-        for test_size in 0..=max_size {
+        let max_size = 1024 * 100;
+
+        for test_size in (start_size..=max_size).step_by(10) {
             println!("checking test_size {}", test_size);
 
             let max_insert_size = 256;
-            for insert_size in 0..=max_insert_size {
+            for insert_size in (0..=max_insert_size).step_by(10) {
                 println!("checking insert_size {}", insert_size);
 
-                let max_insert_offset = std::cmp::min::<u64>(500, max_insert_size as u64);
+                let max_insert_offset = std::cmp::min::<u64>(1024, max_insert_size as u64);
 
-                for insert_offset in 0..=max_insert_offset {
+                for insert_offset in (0..=max_insert_offset).step_by(32) {
                     let filename = "/tmp/playground_save_test";
                     let _ = fs::remove_file(filename);
                     let filename = filename.to_owned();
@@ -1658,7 +1723,7 @@ mod tests {
                     file.sync_all().unwrap();
                     drop(slc);
 
-                    let buffer = BufferBuilder::new()
+                    let buffer = BufferBuilder::new(BufferKind::File)
                         .file_name(&filename)
                         .buffer_name("untitled-1")
                         .internal(false)

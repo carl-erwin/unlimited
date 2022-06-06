@@ -38,6 +38,7 @@ pub use vsplit_mode::VsplitMode;
 pub use dir_mode::DirMode;
 
 use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferEvent;
 
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
@@ -61,6 +62,20 @@ pub trait Mode {
         _env: &mut EditorEnv<'static>,
         _buffer: &mut Buffer<'static>,
     ) {
+    }
+
+    fn on_buffer_event(
+        &self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        _event: &BufferEvent,
+        _src_view: &mut View<'static>,
+    ) {
+        dbg_println!(
+            "(default) mode '{}' on_buffer_event: event {:?}",
+            self.name(),
+            _event
+        );
     }
 
     /// This function MUST be called once per view

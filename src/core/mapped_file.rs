@@ -78,6 +78,10 @@ impl Drop for Page {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: move to prover module
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id(pub usize);
+
 #[derive(Debug, Clone)]
 pub enum UpdateHierarchyOp {
     Add,
@@ -480,6 +484,7 @@ impl IndexMut<usize> for FreeListAllocator<Node> {
 
 pub struct MappedFile<'a> {
     phantom: PhantomData<&'a u8>,
+    pub id: Id,
     pub fd: Option<RcLockFile>,
     pub pool: FreeListAllocator<Node>,
     root_index: Option<NodeIndex>,
@@ -535,9 +540,10 @@ impl<'a> MappedFile<'a> {
         assert!(!n.used);
     }
 
-    pub fn empty() -> Option<FileHandle<'a>> {
+    pub fn empty(id: Id) -> Option<FileHandle<'a>> {
         let file = MappedFile {
             phantom: PhantomData,
+            id,
             fd: None,
             pool: FreeListAllocator::new(),
             root_index: None,
@@ -550,7 +556,7 @@ impl<'a> MappedFile<'a> {
         Some(Arc::new(RwLock::new(file)))
     }
 
-    pub fn new(path: String) -> Option<FileHandle<'a>> {
+    pub fn new(id: Id, path: String) -> Option<FileHandle<'a>> {
         // TODO(ceg): check page size % 4096 // sysconfig
 
         let fd = File::open(path.clone());
@@ -577,6 +583,7 @@ impl<'a> MappedFile<'a> {
 
         let mut file = MappedFile {
             phantom: PhantomData,
+            id,
             fd,
             pool: FreeListAllocator::new(),
             root_index: None,
@@ -2567,7 +2574,7 @@ mod tests {
         drop(slc);
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(filename) {
+        let file = match MappedFile::new(Id(0), filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2596,7 +2603,7 @@ mod tests {
         File::create(&filename).unwrap();
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(filename) {
+        let file = match MappedFile::new(Id(0), filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2649,7 +2656,7 @@ mod tests {
         }
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(filename) {
+        let file = match MappedFile::new(Id(0), filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };

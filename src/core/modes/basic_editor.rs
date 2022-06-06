@@ -7,7 +7,10 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
 
+use crate::core::editor::check_view_by_id;
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::InputStageActionMap;
+
 use crate::core::modes::core_mode::split_with_direction;
 use crate::core::Editor;
 use crate::core::EditorEnv;
@@ -124,7 +127,7 @@ impl<'a> Mode for BasicEditorMode {
         // mark children as non destroyable
         for i in 0..view.children.len() {
             let vid = view.children[i].id;
-            let v = editor.view_map.get(&vid).unwrap();
+            let v = get_view_by_id(editor, vid);
             v.write().destroyable = false;
         }
 
@@ -136,7 +139,7 @@ impl<'a> Mode for BasicEditorMode {
 
         // set focus on text view : TODO(ceg): title mode + configure
         let title_view_id = view.children[0].id;
-        let v = editor.view_map.get(&title_view_id).unwrap();
+        let v = get_view_by_id(editor, title_view_id);
         v.write()
             .compose_content_filters
             .borrow_mut()
@@ -194,7 +197,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
 
     fn setup(
         &mut self,
-        editor: &Editor,
+        editor: &Editor<'static>,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -231,7 +234,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
         buffer_info.push_str(&format!(" (F1 for help)"));
 
         if env.focus_view_id != view::Id(0) {
-            if let Some(_v) = editor.view_map.get(&env.focus_view_id) {
+            if let Some(_v) = check_view_by_id(editor, env.focus_view_id) {
                 buffer_info.push_str(&format!(" (focus vid: {:?})", env.focus_view_id));
             }
         }

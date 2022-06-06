@@ -27,7 +27,7 @@ impl ContentFilter<'_> for DirectoryReader {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        _editor: &Editor<'static>,
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

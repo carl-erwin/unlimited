@@ -14,6 +14,8 @@ use std::vec::Vec;
 
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferEvent;
+
 use crate::core::screen::Screen;
 
 //
@@ -100,6 +102,10 @@ pub enum Event<'a> {
     // test
     IndexTask {
         buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'a>>>>>>,
+    },
+
+    Buffer {
+        event: BufferEvent,
     },
 
     ApplicationQuit,

@@ -15,8 +15,10 @@ use crate::core::buffer::get_byte_count;
 use crate::core::buffer::BufferBuilder;
 use crate::core::buffer::BufferKind;
 
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
@@ -139,7 +141,7 @@ pub fn goto_line_start(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -154,7 +156,7 @@ pub fn goto_line_start(
         let id = gtm.controller_view_id;
 
         // attach to status view
-        let controller = editor.view_map.get(&id).unwrap();
+        let controller = get_view_by_id(editor, id);
         controller.write().parent_id = Some(status_view_id.unwrap());
 
         v.controller = Some(ControllerView {
@@ -181,9 +183,9 @@ pub fn goto_line_stop(
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
     if let Some(status_view_id) = status_view_id {
-        let status_view = editor.view_map.get(&status_view_id).unwrap();
+        let status_view = get_view_by_id(editor, status_view_id);
         let buffer = status_view.read().buffer().unwrap();
         let mut buffer = buffer.write();
         // clear buffer
@@ -284,7 +286,8 @@ fn goto_line_show_controller_view(
 ) {
     let status_view_id = env.status_view_id.unwrap();
 
-    let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+    let status_view = get_view_by_id(editor, status_view_id);
+    let mut status_view = status_view.write();
 
     status_view.layout_direction = LayoutDirection::Horizontal;
 
@@ -309,7 +312,9 @@ pub fn goto_line_controller_add_char(
         let v = view.read();
 
         if let Some(text_view_id) = v.controlled_view {
-            let text_view = editor.view_map.get(&text_view_id).unwrap().read();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let text_view = text_view.read();
+
             let gtm = text_view.mode_ctx::<GotoLineModeContext>("goto-line-mode");
             gtm.goto_line_str.len()
         } else {
@@ -354,7 +359,8 @@ pub fn goto_line_controller_add_char(
     let target_line = {
         let v = view.read();
         if let Some(text_view_id) = v.controlled_view {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
 
             let buffer = text_view.buffer().unwrap();
 
@@ -393,8 +399,7 @@ pub fn goto_line_controller_add_char(
 
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
-        let text_view = editor.view_map.get(&text_view_id).clone();
-        let text_view = text_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_id);
         goto_line_set_target_line(&text_view, target_line);
     }
 }
@@ -409,7 +414,8 @@ pub fn goto_line_controller_del_char(
     let target_line = {
         let v = view.read();
         if let Some(text_view_id) = v.controlled_view {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
 
             let buffer = text_view.buffer().unwrap();
 
@@ -449,8 +455,7 @@ pub fn goto_line_controller_del_char(
 
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
-        let text_view = editor.view_map.get(&text_view_id).clone();
-        let text_view = text_view.unwrap();
+        let text_view = get_view_by_id(editor, text_view_id);
         goto_line_set_target_line(&text_view, target_line);
     }
 }
@@ -462,7 +467,9 @@ pub fn goto_line_controller_stop(
 ) {
     {
         let status_view_id = env.status_view_id.unwrap();
-        let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+        let status_view = get_view_by_id(editor, status_view_id);
+        let mut status_view = status_view.write();
+
         status_view.layout_direction = LayoutDirection::Horizontal;
         // if last == expected id
         status_view.children.pop(); // replace previous Child
@@ -471,7 +478,9 @@ pub fn goto_line_controller_stop(
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
         {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
+
             text_view.controller = None;
 
             let gtm = text_view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");

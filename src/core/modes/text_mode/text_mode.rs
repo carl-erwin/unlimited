@@ -479,7 +479,29 @@ impl<'a> Mode for TextMode {
 
         view.compose_priority = 256; // TODO: move to caller
 
+        //
+        let start_offset = {
+            let buffer = view.buffer().unwrap();
+            let mut buffer = buffer.write();
+
+            dbg_println!(
+                "buffer.start_position.offset {:?}",
+                buffer.start_position.offset
+            );
+
+            let start_offset = buffer.start_position.offset;
+            buffer.start_position.offset = None; // do this once (1st view)
+
+            if let Some(offset) = start_offset {
+                std::cmp::min(buffer.size() as u64, offset)
+            } else {
+                0
+            }
+        };
+
         let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+        // refresh view offset after user input
+        tm.marks[0].offset = start_offset;
 
         // create first mark
         let marks_offsets: Vec<u64> = tm.marks.iter().map(|m| m.offset).collect();

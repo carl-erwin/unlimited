@@ -10,8 +10,10 @@ use super::text_mode::TextModeContext;
 
 use crate::core::buffer::BufferBuilder;
 use crate::core::buffer::BufferKind;
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
 use crate::core::EditorEnv;
@@ -145,7 +147,7 @@ pub fn find_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -160,7 +162,7 @@ pub fn find_start(
         let id = fm.controller_view_id;
 
         // attach to status view
-        let controller = editor.view_map.get(&id).unwrap();
+        let controller = get_view_by_id(editor, id);
         controller.write().parent_id = Some(status_view_id.unwrap());
         v.controller = Some(ControllerView {
             id,
@@ -181,7 +183,9 @@ pub fn find_controller_stop(
 ) {
     {
         let status_view_id = env.status_view_id.unwrap();
-        let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+        let status_view = get_view_by_id(editor, status_view_id);
+        let mut status_view = status_view.write();
+
         status_view.layout_direction = LayoutDirection::Horizontal;
         // if last == expected id
         status_view.children.pop(); // replace previous Child
@@ -190,7 +194,9 @@ pub fn find_controller_stop(
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
         {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
+
             text_view.controller = None;
 
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
@@ -283,7 +289,8 @@ fn find_show_controller_view(
 ) {
     let status_view_id = env.status_view_id.unwrap();
 
-    let mut status_view = editor.view_map.get(&status_view_id).unwrap().write();
+    let status_view = get_view_by_id(editor, status_view_id);
+    let mut status_view = status_view.write();
 
     status_view.layout_direction = LayoutDirection::Horizontal;
 
@@ -340,7 +347,9 @@ pub fn find_controller_add_char(
         let v = view.read();
 
         if let Some(text_view_id) = v.controlled_view {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
+
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.find_str.append(&mut array);
             fm.reverse
@@ -366,7 +375,9 @@ pub fn find_controller_del_char(
     {
         let v = view.read();
         if let Some(text_view_id) = v.controlled_view {
-            let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
+
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.find_str.pop();
             let offset = fm.match_start;
@@ -399,7 +410,9 @@ pub fn find_controller_next(
         let v = view.read();
         let find_str = {
             if let Some(text_view_id) = v.controlled_view {
-                let text_view = editor.view_map.get(&text_view_id).unwrap().read();
+                let text_view = get_view_by_id(editor, text_view_id);
+                let text_view = text_view.read();
+
                 let fm = text_view.mode_ctx::<FindModeContext>("find-mode");
                 fm.find_str.clone()
             } else {
@@ -411,7 +424,9 @@ pub fn find_controller_next(
 
         {
             if let Some(text_view_id) = v.controlled_view {
-                let text_view = editor.view_map.get(&text_view_id).unwrap().read();
+                let text_view = get_view_by_id(editor, text_view_id);
+                let text_view = text_view.read();
+
                 let tm = text_view.mode_ctx::<TextModeContext>("text-mode");
                 let codec = tm.text_codec.as_ref();
 
@@ -431,15 +446,17 @@ pub fn find_controller_next(
 
         {
             let offset = {
+                let text_view_id = *v.controlled_view.as_ref().unwrap();
                 let mark_offset = {
-                    let text_view_id = v.controlled_view.as_ref().unwrap();
-                    let text_view = editor.view_map.get(text_view_id).unwrap().read();
+                    let text_view = get_view_by_id(editor, text_view_id);
+                    let text_view = text_view.read();
                     let tm = text_view.mode_ctx::<TextModeContext>("text-mode");
                     tm.marks[tm.mark_index].offset
                 };
 
-                let text_view_id = v.controlled_view.as_ref().unwrap();
-                let text_view = editor.view_map.get(text_view_id).unwrap().read();
+                let text_view = get_view_by_id(editor, text_view_id);
+                let text_view = text_view.read();
+
                 let fm = text_view.mode_ctx::<FindModeContext>("find-mode");
                 if let Some(match_start) = fm.match_start {
                     let skip = if encoded_str.len() <= fm.previous_encoded_str_len {
@@ -456,8 +473,9 @@ pub fn find_controller_next(
 
             dbg_println!("FIND start @ offset = {:?}", offset);
 
-            let text_view_id = v.controlled_view.as_ref().unwrap();
-            let mut text_view = editor.view_map.get(text_view_id).unwrap().write();
+            let text_view_id = *v.controlled_view.as_ref().unwrap();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
 
             let buffer = text_view.buffer().unwrap();
             let buffer = buffer.write();
@@ -494,8 +512,8 @@ pub fn find_controller_next(
 
     if let Some(offset) = center_around_offset {
         let v = view.read();
-        let text_view_id = v.controlled_view.as_ref().unwrap();
-        let text_view = editor.view_map.get(text_view_id).unwrap().clone();
+        let text_view_id = *v.controlled_view.as_ref().unwrap();
+        let text_view = get_view_by_id(editor, text_view_id);
         center_view_around_offset(&text_view, editor, env, offset);
     }
 
@@ -512,8 +530,10 @@ pub fn find_controller_prev(
     {
         let v = view.read();
         let find_str = {
-            let text_view_id = v.controlled_view.as_ref().unwrap();
-            let text_view = editor.view_map.get(text_view_id).unwrap().read();
+            let text_view_id = *v.controlled_view.as_ref().unwrap();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let text_view = text_view.read();
+
             let fm = text_view.mode_ctx::<FindModeContext>("find-mode");
             fm.find_str.clone()
         };
@@ -521,8 +541,10 @@ pub fn find_controller_prev(
         let mut encoded_str = vec![];
 
         {
-            let text_view_id = v.controlled_view.as_ref().unwrap();
-            let text_view = editor.view_map.get(text_view_id).unwrap().read();
+            let text_view_id = *v.controlled_view.as_ref().unwrap();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let text_view = text_view.read();
+
             let tm = text_view.mode_ctx::<TextModeContext>("text-mode");
             let codec = tm.text_codec.as_ref();
 
@@ -539,8 +561,9 @@ pub fn find_controller_prev(
 
         {
             let offset = {
-                let text_view_id = v.controlled_view.as_ref().unwrap();
-                let mut text_view = editor.view_map.get(text_view_id).unwrap().write();
+                let text_view_id = *v.controlled_view.as_ref().unwrap();
+                let text_view = get_view_by_id(editor, text_view_id);
+                let mut text_view = text_view.write();
 
                 let mark_offset = {
                     let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -561,8 +584,10 @@ pub fn find_controller_prev(
 
             dbg_println!("FIND PREV start @ offset = {:?}", offset);
 
-            let text_view_id = v.controlled_view.as_ref().unwrap();
-            let mut text_view = editor.view_map.get(text_view_id).unwrap().write();
+            let text_view_id = *v.controlled_view.as_ref().unwrap();
+            let text_view = get_view_by_id(editor, text_view_id);
+            let mut text_view = text_view.write();
+
             let buffer = text_view.buffer().unwrap();
             let buffer = buffer.write();
 
@@ -594,8 +619,8 @@ pub fn find_controller_prev(
 
     if let Some(offset) = center_around_offset {
         let v = view.read();
-        let text_view_id = v.controlled_view.as_ref().unwrap();
-        let text_view = editor.view_map.get(text_view_id).unwrap().clone();
+        let text_view_id = *v.controlled_view.as_ref().unwrap();
+        let text_view = get_view_by_id(&editor, text_view_id);
         center_view_around_offset(&text_view, editor, env, offset);
     }
 
@@ -609,7 +634,9 @@ pub fn display_find_string(
 ) {
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
-        let mut text_view = editor.view_map.get(&text_view_id).unwrap().write();
+        let text_view = get_view_by_id(editor, text_view_id);
+        let mut text_view = text_view.write();
+
         let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
 
         // build find string
@@ -631,7 +658,7 @@ pub fn find_start_reverse(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(&editor, &env, view);
+    let status_view_id = view::get_status_view(editor, env, view);
 
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode
@@ -640,7 +667,7 @@ pub fn find_start_reverse(
 
     let svid = status_view_id.unwrap();
 
-    let status_view = editor.view_map.get(&svid).unwrap();
+    let status_view = get_view_by_id(editor, svid);
 
     // start/resume ?
     {

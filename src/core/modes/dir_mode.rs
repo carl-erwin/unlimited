@@ -5,12 +5,9 @@ use super::Mode;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::editor::InputStageActionMap;
-use crate::core::modes::text_mode::RawDataFilter;
+
 use crate::core::modes::text_mode::ScreenFilter;
-use crate::core::modes::text_mode::TabFilter;
-use crate::core::modes::text_mode::TextCodecFilter;
-use crate::core::modes::text_mode::UnicodeToTextFilter;
-use crate::core::modes::text_mode::Utf8Filter;
+
 use crate::core::view::View;
 
 use crate::core::screen::screen_apply;

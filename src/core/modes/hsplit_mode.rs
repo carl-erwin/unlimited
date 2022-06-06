@@ -7,6 +7,8 @@ use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
 
+use crate::core::editor::get_view_by_id;
+
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::input_map::build_input_event_map;
@@ -92,7 +94,11 @@ impl HsplitMode {
 // TODO?: mode:on_button_release(btn ?) ...
 // TODO?: mode:on_pointer_drag(btn, x,y)
 
-pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+pub fn hsplit_input_event(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv,
+    view: &Rc<RwLock<View>>,
+) {
     let mut v = view.write();
 
     let evt = v.input_ctx.trigger.last();
@@ -162,7 +168,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
     }
 
     if let Some(pvid) = v.parent_id {
-        let pv = editor.view_map.get(&pvid).unwrap();
+        let pv = get_view_by_id(editor, pvid);
         let mut pv = pv.write();
 
         let lidx = v.layout_index.unwrap() - 1; // text-view
@@ -171,7 +177,7 @@ pub fn hsplit_input_event(editor: &mut Editor, env: &mut EditorEnv, view: &Rc<Rw
         let max_size = pv.screen.read().height();
 
         let sibling_view_id = pv.children[lidx].id;
-        let sbv = editor.view_map.get(&sibling_view_id).unwrap();
+        let sbv = get_view_by_id(editor, sibling_view_id);
         let sbv = sbv.read();
         let cur_size = sbv.screen.read().height();
 

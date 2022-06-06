@@ -12,6 +12,7 @@ use crate::dbg_println;
 
 use crate::core::screen::Screen;
 
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 
@@ -90,7 +91,7 @@ pub trait ScreenOverlayFilter<'a> {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        _editor: &Editor<'static>,
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -232,13 +233,9 @@ fn notify_children(
     for child in all_children.iter() {
         dbg_println!(" notify {:?}", child);
 
-        let child_view_rc = Rc::clone(editor.view_map.get(&child.id).unwrap());
-        let subscribers = {
-            let child_v = child_view_rc.read();
-            child_v.subscribers.clone()
-        };
-
-        let mut child_v = child_view_rc.write();
+        let child_v = get_view_by_id(editor, child.id);
+        let mut child_v = child_v.write();
+        let subscribers = child_v.subscribers.clone();
 
         // NB: notify subscribers just before composition
         // use View::compose_priority to order notifications
@@ -342,7 +339,9 @@ fn compose_children(
         let mut y = 0;
         let children = view.children.clone();
         for (idx, child) in children.iter().enumerate() {
-            let mut child_v = editor.view_map.get(&child.id).unwrap().write();
+            let child_v = get_view_by_id(editor, child.id);
+            let mut child_v = child_v.write();
+
             let (w, h) = if layout_dir_is_vertical {
                 (width, sizes[idx])
             } else {
@@ -382,8 +381,8 @@ fn compose_children(
         let vida = idxa.view_id;
         let vidb = idxb.view_id;
 
-        let va = Rc::clone(editor.view_map.get(&vida).unwrap());
-        let vb = Rc::clone(editor.view_map.get(&vidb).unwrap());
+        let va = get_view_by_id(editor, vida);
+        let vb = get_view_by_id(editor, vidb);
 
         let pa = va.read().compose_priority;
         let pb = vb.read().compose_priority;
@@ -394,7 +393,8 @@ fn compose_children(
     // - add floating children (not yet sorted)
     let floating_children = view.floating_children.clone();
     for (_idx, child) in floating_children.iter().enumerate() {
-        let child_v = editor.view_map.get(&child.id).unwrap().read();
+        let child_v = get_view_by_id(editor, child.id);
+        let child_v = child_v.read();
 
         let x = child_v.x;
         let y = child_v.y;
@@ -430,8 +430,7 @@ fn compose_children(
 
         let vid = info.view_id;
 
-        let child_view_rc = editor.view_map.get(&vid);
-        let child_view_rc = child_view_rc.unwrap().clone();
+        let child_view_rc = get_view_by_id(editor, vid);
 
         let start_offset = {
             let child_v = child_view_rc.write();

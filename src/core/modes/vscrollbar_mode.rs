@@ -7,8 +7,10 @@ use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
 
+use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
+
 use crate::core::editor::InputStageActionMap;
 use crate::core::event::input_map::build_input_event_map;
 
@@ -122,7 +124,9 @@ impl<'a> Mode for VscrollbarMode {
                     return;
                 }
 
-                let mut dst = editor.view_map.get(&dst.id).unwrap().write();
+                let dst = get_view_by_id(editor, dst.id);
+                let mut dst = dst.write();
+
                 let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                 mode_ctx.target_view_id = src.id;
             }
@@ -131,7 +135,9 @@ impl<'a> Mode for VscrollbarMode {
                 let src = src_view;
                 let dim = src.screen.read().dimension();
 
-                let mut dst = editor.view_map.get(&dst.id).unwrap().write();
+                let dst = get_view_by_id(editor, dst.id);
+                let mut dst = dst.write();
+
                 let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
 
                 let buffer = src.buffer.as_ref().unwrap();
@@ -273,7 +279,8 @@ pub fn vscrollbar_input_event(
             };
 
             let dim = v.screen.read().dimension();
-            let mut dst = editor.view_map.get(&target_view_id).unwrap().write();
+            let dst = get_view_by_id(editor, target_view_id);
+            let mut dst = dst.write();
 
             let buffer_size = {
                 let buffer = dst.buffer.as_ref().unwrap();

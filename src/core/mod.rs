@@ -28,13 +28,17 @@ pub mod screen;
 pub mod view;
 
 use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferBuilder;
+use crate::core::buffer::BufferEvent;
 use crate::core::buffer::BufferKind;
+use crate::core::buffer::BufferPosition;
 
 use crate::core::config::Config;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
 use crate::core::event::EventMessage;
+
 use crate::core::view::View;
 
 //use crate::core::error::Error;
@@ -323,8 +327,27 @@ pub fn indexer(
                     let mut refresh_ui = false;
                     let map = buffer_map.read();
                     let mut t0 = std::time::Instant::now();
-                    for (_id, buffer) in map.iter() {
-                        buffer::build_index(buffer);
+                    for (id, buffer) in map.iter() {
+                        let is_indexed = buffer::build_index(buffer);
+                        if is_indexed == false {
+                            continue;
+                        }
+
+                        // notify
+                        let msg = EventMessage::new(
+                            0,
+                            Event::Buffer {
+                                event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
+                            },
+                        );
+                        core_tx.send(msg).unwrap_or(());
+
+                        // TODO: remove this: let the ui decide if the refresh is needed base on buffer_id
+
+                        // send ui refresh event
+                        let msg = EventMessage::new(0, Event::RefreshView);
+                        core_tx.send(msg).unwrap_or(());
+
                         refresh_ui = true;
                         let t1 = std::time::Instant::now();
                         if (t1 - t0).as_millis() > 1000 {
@@ -352,31 +375,17 @@ pub fn indexer(
     }
 }
 
-use crate::core::buffer::BufferBuilder;
-
-/*
-  We wil filter file list array
-
-  "+${line}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1 }
-  "+@${offset}", "filename" ->  FileInfo { name: start_line:${line}, start_column:1, offset:${off} }
-  "filename:${line}:${col}" ->  FileInfo { name: start_line:${num}, start_column:${col} }
-
-*/
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ArgInfo {
     path: String, // todo pathbuf
-    offset: Option<u64>,
-    line: Option<u64>,
-    column: Option<u64>,
+    start_position: BufferPosition,
 }
 
 impl ArgInfo {
-    fn new(path: String) -> Self {
+    pub fn new(path: String) -> Self {
         ArgInfo {
             path,
-            offset: None,
-            line: None,
-            column: None,
+            start_position: BufferPosition::new(),
         }
     }
 }
@@ -384,8 +393,9 @@ impl ArgInfo {
 fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
-    let re_line_col = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
-    let re_offset = Regex::new(r"@([0-9]+)").unwrap();
+    let re_offset_prefix = Regex::new(r"^\+?@([0-9]+)").unwrap();
+    let re_offset_suffix = Regex::new(r"^(.*):@([0-9]+)").unwrap();
+    let re_line_col_prefix = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
     let re_flc = Regex::new(r"^([^:]+):([0-9]+):?([0-9]+)?").unwrap();
 
     let mut it = editor.config.files_list.iter();
@@ -406,18 +416,20 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
             }
 
             Err(_e) => {
-                match re_line_col.captures(f) {
+                // prefix
+                match re_line_col_prefix.captures(f) {
                     None => {}
                     Some(cap) => {
-                        dbg_println!("found re_line_col match {:?}", cap);
+                        dbg_println!("found re_line_col_prefix match {:?}", cap);
                         // take next arg as file, no checking
                         match it.next() {
                             None => {}
                             Some(path) => {
                                 let mut arg = ArgInfo::new(path.clone());
-                                arg.line = Some(cap[1].trim_end().parse::<u64>().unwrap_or(1));
+                                arg.start_position.line =
+                                    Some(cap[1].trim_end().parse::<u64>().unwrap_or(1));
                                 if let Some(col) = cap.get(2) {
-                                    arg.column =
+                                    arg.start_position.column =
                                         Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
                                 }
                                 dbg_println!("new arg {:?}", arg);
@@ -428,7 +440,8 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                     }
                 }
 
-                match re_offset.captures(f) {
+                // prefix
+                match re_offset_prefix.captures(f) {
                     None => {}
                     Some(cap) => {
                         dbg_println!("found re_offset match {:?}", cap);
@@ -437,7 +450,8 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                             None => {}
                             Some(path) => {
                                 let mut arg = ArgInfo::new(path.clone());
-                                arg.offset = Some(cap[1].trim_end().parse::<u64>().unwrap_or(0));
+                                arg.start_position.offset =
+                                    Some(cap[1].trim_end().parse::<u64>().unwrap_or(0));
                                 dbg_println!("new arg {:?}", arg);
                                 v.push(arg);
                                 continue;
@@ -446,16 +460,33 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                     }
                 }
 
+                // suffix
+                match re_offset_suffix.captures(f) {
+                    None => {}
+                    Some(cap) => {
+                        dbg_println!("found re_offset_suffix match {:?}", cap);
+                        let mut arg = ArgInfo::new(cap[1].to_owned());
+                        arg.start_position.offset =
+                            Some(cap[2].trim_end().parse::<u64>().unwrap_or(0));
+                        dbg_println!("new arg {:?}", arg);
+                        v.push(arg);
+                        continue;
+                    }
+                }
+
+                // suffix
                 match re_flc.captures(f) {
                     None => {}
                     Some(cap) => {
                         dbg_println!("found re_flc match {:?}", cap);
 
                         let mut arg = ArgInfo::new(cap[1].to_owned());
-                        arg.line = Some(cap[2].trim_end().parse::<u64>().unwrap_or(1));
+                        arg.start_position.line =
+                            Some(cap[2].trim_end().parse::<u64>().unwrap_or(1));
 
                         if let Some(col) = cap.get(3) {
-                            arg.column = Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                            arg.start_position.column =
+                                Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
                         }
                         dbg_println!("new arg {:?}", arg);
                         v.push(arg);
@@ -508,11 +539,11 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             .file_name(&arg.path)
             .internal(false)
             .use_buffer_log(true)
+            .start_position(arg.start_position)
             .finalize();
 
         if let Some(b) = b {
-            let buffer_id = buffer::Id(id);
-            b.write().id = buffer_id; // TODO(ceg): improve buffer id generation
+            let buffer_id = b.read().id;
             editor.buffer_map.write().insert(buffer_id, b);
             id += 1;
         }

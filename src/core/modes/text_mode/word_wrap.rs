@@ -153,7 +153,7 @@ impl ContentFilter<'_> for WordWrapFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        _editor: &Editor<'static>,
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
