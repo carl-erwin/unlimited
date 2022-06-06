@@ -633,8 +633,6 @@ impl TextMode {
             ("text-mode:scroll-up", scroll_up),
             ("text-mode:scroll-down", scroll_down),
             //
-            ("select-next-view", select_next_view),
-            ("select-previous-view", select_previous_view),
             ("text-mode:center-around-mark", center_around_mark),
             ("text-mode:move-mark-to-clicked-area", button_press),
             // edition
@@ -2189,18 +2187,6 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
 
         _ => {}
     }
-}
-
-pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
-}
-
-pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = env.root_view_index.saturating_sub(1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
 }
 
 // TODO(ceg): view.center_around_offset()

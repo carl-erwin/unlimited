@@ -745,10 +745,7 @@ fn translate_crossterm_event(
             ::crossterm::event::MouseEventKind::Drag(_button) => {
                 // TODO(ceg): no Drag event in the editor yet ?
                 // TODO(ceg): filter dragged button
-
                 // return InputEvent::NoInputEvent;
-
-                dbg_println!("DRAG");
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),

@@ -549,15 +549,25 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     }
 
     // configure buffer
-    let modes = editor.modes.clone();
-    for (mode_name, mode) in modes.borrow().iter() {
-        // per mode buffer metadata
-        dbg_println!("setup mode[{}] buffer metadata", mode_name);
-        let mut mode = mode.borrow_mut();
-        let map = editor.buffer_map.clone();
-        let mut map = map.write();
-        for (_, buffer) in map.iter_mut() {
-            let mut buffer = buffer.write();
+
+    let file_modes = editor.modes.clone();
+    let dir_modes = editor.dir_modes.clone();
+
+    // per mode buffer metadata
+    let map = editor.buffer_map.clone();
+    let mut map = map.write();
+
+    for (_, buffer) in map.iter_mut() {
+        let mut buffer = buffer.write();
+
+        let modes = match buffer.kind {
+            BufferKind::File => file_modes.borrow(),
+            BufferKind::Directory => dir_modes.borrow(),
+        };
+
+        for (mode_name, mode) in modes.iter() {
+            dbg_println!("setup mode[{}] buffer metadata", mode_name);
+            let mut mode = mode.borrow_mut();
             mode.configure_buffer(editor, env, &mut buffer);
         }
     }

@@ -30,12 +30,13 @@ static CORE_INPUT_MAP: &str = r#"
 [
   {
     "events": [
+     { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
+     { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
      { "in": [{ "key": "F4"     }],                          "action": "toggle-debug-print" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-buffer" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
      { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
      { "in": [{ "key": "F1" } ],                             "action": "help-pop-up" }
-
     ]
   }
 ]"#;
@@ -126,10 +127,28 @@ impl CoreMode {
         register_input_stage_action(&mut map, "decrease-left", decrease_left);
         register_input_stage_action(&mut map, "increase-right", increase_right);
         register_input_stage_action(&mut map, "decrease-right", decrease_right);
+
+        register_input_stage_action(&mut map, "increase-right", increase_right);
+        register_input_stage_action(&mut map, "decrease-right", decrease_right);
+
+        register_input_stage_action(&mut map, "select-next-view", select_next_view);
+        register_input_stage_action(&mut map, "select-previous-view", select_previous_view);
     }
 }
 
 // Mode "core"
+pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
+    env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
+    env.root_view_id = editor.root_views[env.root_view_index];
+    dbg_println!("select {:?}", env.root_view_id);
+}
+
+pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
+    env.root_view_index = env.root_view_index.saturating_sub(1);
+    env.root_view_id = editor.root_views[env.root_view_index];
+    dbg_println!("select {:?}", env.root_view_id);
+}
+
 pub fn application_quit(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,

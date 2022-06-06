@@ -637,6 +637,7 @@ pub fn run_stage(
     let actions = view.read().stage_actions.clone();
 
     // disable for composition ?
+    dbg_println!("running {} {:?} {:?} actions", actions.len(), pos, stage);
     for a in actions {
         a.1(editor, env, view, pos, stage);
     }

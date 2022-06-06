@@ -243,8 +243,6 @@ impl<'a> Editor<'a> {
             .insert(name.to_owned(), Rc::new(RefCell::new(mode)));
     }
 
-
-
     pub fn get_mode<'e>(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn Mode>>>> {
         let h = self.modes.clone();
         let h = h.borrow();
@@ -299,6 +297,8 @@ pub fn check_view_dimension(editor: &Editor, env: &EditorEnv) {
     view.screen = Arc::new(RwLock::new(Box::new(Screen::new(env.width, env.height))));
     view.width = env.width; // remove view.width/height ?
     view.height = env.height;
+
+    dbg_println!("resize OK");
 }
 
 pub fn update_view_and_send_draw_event(
@@ -969,6 +969,8 @@ fn run_stage(
         };
     }
 
+    dbg_println!("run stage for view  {:?}", view_id);
+
     let start = Instant::now();
 
     let view = view.unwrap().clone();
@@ -1022,9 +1024,17 @@ fn run_stage(
                                 Stage::Input,
                             );
 
-                            // view changed -> call compositing stage
                             let id = env.root_view_id;
                             run_stages(Stage::Compositing, &mut editor, &mut env, id);
+
+                            // view changed -> call compositing stage
+                            // TODO(ceg): unique root view
+                            env.active_view = None;
+                            env.pointer_over_view_id = view::Id(0);
+                            env.last_selected_view_id = view::Id(0);
+                            env.focus_locked_on_view_id = None;
+
+                            env.prev_view_id = env.root_view_id;
                         }
                     }
                 }
@@ -1296,6 +1306,8 @@ fn run_input_stage(
             env.active_view
         );
 
+        let prev_root_index = env.root_view_index;
+
         let prev_active_view = env.active_view;
 
         let pointer_over_view_id = env.pointer_over_view_id;
@@ -1321,20 +1333,26 @@ fn run_input_stage(
             run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
         }
 
-        // update active view
-        if let Some(prev_active_view) = prev_active_view {
-            if prev_active_view != target_id {
-                let vid = match &ev {
-                    InputEvent::PointerMotion(event::PointerEvent { .. }) => prev_active_view,
-                    InputEvent::WheelUp { .. } => prev_active_view,
-                    InputEvent::WheelDown { .. } => prev_active_view,
-                    InputEvent::KeyPress { .. } => prev_active_view,
-                    _ => env.active_view.unwrap_or(target_id),
-                };
-                set_focus_on_view_id(&mut editor, &mut env, vid);
+        // update active view (no root change)
+        if prev_root_index == env.root_view_index {
+            dbg_println!("update active view ?");
+
+            if let Some(prev_active_view) = prev_active_view {
+                if prev_active_view != target_id {
+                    let vid = match &ev {
+                        InputEvent::PointerMotion(event::PointerEvent { .. }) => prev_active_view,
+                        InputEvent::WheelUp { .. } => prev_active_view,
+                        InputEvent::WheelDown { .. } => prev_active_view,
+                        InputEvent::KeyPress { .. } => prev_active_view,
+                        _ => env.active_view.unwrap_or(target_id),
+                    };
+
+                    dbg_println!("set focus on {:?}", vid);
+                    set_focus_on_view_id(&mut editor, &mut env, vid);
+                }
+            } else {
+                set_focus_on_view_id(&mut editor, &mut env, target_id);
             }
-        } else {
-            set_focus_on_view_id(&mut editor, &mut env, target_id);
         }
     }
 
@@ -1401,12 +1419,14 @@ pub fn main_loop(
 
     while !env.quit {
         if let Ok(msg) = core_rx.recv() {
+            dbg_println!("core: recv event: env = {:?}\n------------------", env);
+
             match msg.event {
                 Event::UpdateView { width, height } => {
                     env.width = width;
                     env.height = height;
 
-                    dbg_print!(
+                    dbg_println!(
                         "UpdateView env.width {} env.height {}",
                         env.width,
                         env.height

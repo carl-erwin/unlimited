@@ -82,11 +82,6 @@
 
         { "in": [{ "key": "F9" } ],                             "action": "text-mode:print-buffer-log" },
 
-       { "file selection": "---------------------------------------------------------------------------------"},
-
-       { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
-       { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
-
        { "cancel": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "Esc"}, { "key": "Esc"}],             "action": "editor:cancel" },
