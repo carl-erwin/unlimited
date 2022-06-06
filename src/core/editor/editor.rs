@@ -243,6 +243,8 @@ impl<'a> Editor<'a> {
             .insert(name.to_owned(), Rc::new(RefCell::new(mode)));
     }
 
+
+
     pub fn get_mode<'e>(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn Mode>>>> {
         let h = self.modes.clone();
         let h = h.borrow();
@@ -1290,7 +1292,7 @@ fn run_input_stage(
 
         // select view that will receive the event
         dbg_println!(
-            "CEG : before setup_focus_and_event -> active_view  env {:?}",
+            " before setup_focus_and_event -> active_view  env {:?}",
             env.active_view
         );
 
@@ -1302,7 +1304,7 @@ fn run_input_stage(
         let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         dbg_println!("setup_focus_and_event ->  Id {:?}", target_id);
 
-        dbg_println!("CEG : after setup_focus_and_event ->  env {:?}", env);
+        dbg_println!(" after setup_focus_and_event ->  env {:?}", env);
 
         check_pointer_over_change(&mut editor, &mut env, pointer_over_view_id, target_id);
 
@@ -1360,9 +1362,7 @@ fn process_input_events(
 
     env.time_spent = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
-    dbg_println!("CEG START run_input_stage");
     let mut stage = run_input_stage(&mut editor, &mut env, &events);
-    dbg_println!("CEG STOP run_input_stage");
 
     while stage != Stage::Input {
         let id = env.root_view_id;

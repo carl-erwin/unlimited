@@ -1007,7 +1007,7 @@ fn run_text_mode_actions(
 
     run_text_mode_actions_vec(editor, env, view, &actions);
 
-    // CEG: is this true after undo redo with multiple cursors ?
+    // NOTE(ceg): is this true after undo redo with multiple cursors ?
     // TODO(ceg): cut/paste
     if !true {
         let v = view.read();
