@@ -390,6 +390,16 @@ impl ArgInfo {
     }
 }
 
+fn filesystem_entry_exists(path: String) -> bool {
+    match fs::metadata(path) {
+        Ok(_metadata) => true,
+        Err(_e) => {
+            // permission etc ..
+            false
+        }
+    }
+}
+
 fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
@@ -425,16 +435,19 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                         match it.next() {
                             None => {}
                             Some(path) => {
-                                let mut arg = ArgInfo::new(path.clone());
-                                arg.start_position.line =
-                                    Some(cap[1].trim_end().parse::<u64>().unwrap_or(1));
-                                if let Some(col) = cap.get(2) {
-                                    arg.start_position.column =
-                                        Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                                if filesystem_entry_exists(path.clone()) {
+                                    let mut arg = ArgInfo::new(path.clone());
+                                    arg.start_position.line =
+                                        Some(cap[1].trim_end().parse::<u64>().unwrap_or(1));
+                                    if let Some(col) = cap.get(2) {
+                                        arg.start_position.column = Some(
+                                            col.as_str().trim_end().parse::<u64>().unwrap_or(1),
+                                        );
+                                    }
+                                    dbg_println!("new arg {:?}", arg);
+                                    v.push(arg);
+                                    continue;
                                 }
-                                dbg_println!("new arg {:?}", arg);
-                                v.push(arg);
-                                continue;
                             }
                         }
                     }
@@ -449,12 +462,14 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                         match it.next() {
                             None => {}
                             Some(path) => {
-                                let mut arg = ArgInfo::new(path.clone());
-                                arg.start_position.offset =
-                                    Some(cap[1].trim_end().parse::<u64>().unwrap_or(0));
-                                dbg_println!("new arg {:?}", arg);
-                                v.push(arg);
-                                continue;
+                                if filesystem_entry_exists(path.clone()) {
+                                    let mut arg = ArgInfo::new(path.clone());
+                                    arg.start_position.offset =
+                                        Some(cap[1].trim_end().parse::<u64>().unwrap_or(0));
+                                    dbg_println!("new arg {:?}", arg);
+                                    v.push(arg);
+                                    continue;
+                                }
                             }
                         }
                     }
@@ -464,13 +479,15 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                 match re_offset_suffix.captures(f) {
                     None => {}
                     Some(cap) => {
-                        dbg_println!("found re_offset_suffix match {:?}", cap);
-                        let mut arg = ArgInfo::new(cap[1].to_owned());
-                        arg.start_position.offset =
-                            Some(cap[2].trim_end().parse::<u64>().unwrap_or(0));
-                        dbg_println!("new arg {:?}", arg);
-                        v.push(arg);
-                        continue;
+                        if filesystem_entry_exists(cap[1].to_owned()) {
+                            dbg_println!("found re_offset_suffix match {:?}", cap);
+                            let mut arg = ArgInfo::new(cap[1].to_owned());
+                            arg.start_position.offset =
+                                Some(cap[2].trim_end().parse::<u64>().unwrap_or(0));
+                            dbg_println!("new arg {:?}", arg);
+                            v.push(arg);
+                            continue;
+                        }
                     }
                 }
 
@@ -480,17 +497,19 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
                     Some(cap) => {
                         dbg_println!("found re_flc match {:?}", cap);
 
-                        let mut arg = ArgInfo::new(cap[1].to_owned());
-                        arg.start_position.line =
-                            Some(cap[2].trim_end().parse::<u64>().unwrap_or(1));
+                        if filesystem_entry_exists(cap[1].to_owned()) {
+                            let mut arg = ArgInfo::new(cap[1].to_owned());
+                            arg.start_position.line =
+                                Some(cap[2].trim_end().parse::<u64>().unwrap_or(1));
 
-                        if let Some(col) = cap.get(3) {
-                            arg.start_position.column =
-                                Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                            if let Some(col) = cap.get(3) {
+                                arg.start_position.column =
+                                    Some(col.as_str().trim_end().parse::<u64>().unwrap_or(1));
+                            }
+                            dbg_println!("new arg {:?}", arg);
+                            v.push(arg);
+                            continue;
                         }
-                        dbg_println!("new arg {:?}", arg);
-                        v.push(arg);
-                        continue;
                     }
                 }
 
@@ -517,21 +536,26 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         dbg_println!("processing arg {:?}", arg);
 
         // check file type
-        let kind = if let Ok(metadata) = fs::metadata(&arg.path) {
-            let file_type = metadata.file_type();
+        let kind = match fs::metadata(&arg.path) {
+            Ok(metadata) => {
+                let file_type = metadata.file_type();
 
-            // ignore directories for now
-            if file_type.is_dir() {
-                BufferKind::Directory
-            } else if file_type.is_file() {
-                BufferKind::File
-            } else {
-                // display error
-                continue;
+                // ignore directories for now
+                if file_type.is_dir() {
+                    BufferKind::Directory
+                } else if file_type.is_file() {
+                    BufferKind::File
+                } else {
+                    // display error
+                    // links not handled yet
+                    continue;
+                }
             }
-        } else {
-            // display error
-            continue;
+
+            Err(_e) => {
+                // check not suck file
+                BufferKind::File
+            }
         };
 
         let b = BufferBuilder::new(kind)
