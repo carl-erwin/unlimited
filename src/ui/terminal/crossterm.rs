@@ -278,13 +278,13 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
         // TODO(ceg): fill len.len()..screen.width()
         let line = screen.get_line(li).unwrap();
 
-        for cell in line {
+        for (c, cell) in line.iter().enumerate() {
             let cpi = cell.cpi;
 
             // dbg_println!("RENDER Y={} X={} : cpi {:?}", li, c, cpi);
             if cpi.skip_render {
-                // ops.push(ScreenOp::MoveTo(c as u16 + 1, li as u16));
-                // continue;
+                ops.push(ScreenOp::MoveTo(c as u16 + 1, li as u16));
+                continue;
             }
 
             // fg color
