@@ -53,6 +53,14 @@ impl<'a> Mode for SimpleViewMode {
 
         // children_layout_and_modes
         let ops_modes = vec![
+            /*
+                        // fs tree changed
+                        (
+                            LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
+                            buffer.clone(),
+                            vec!["fstree-mode".to_owned()],
+                        ),
+            */
             // line numbers
             (
                 LayoutOperation::Fixed {

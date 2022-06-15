@@ -25,7 +25,7 @@ pub enum OpenMode {
 pub struct InnerBuffer<'a> {
     pub id: Id,
     /// the name of the file where the data will be synced
-    pub file_name: String, // TODO(ceg): Option<String>
+    pub file_name: String, // TODO(ceg): Option<String> path_name
     /// the current size of the buffer
     pub size: usize,
     /// the number of changes (since last save TODO)

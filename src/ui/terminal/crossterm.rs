@@ -219,16 +219,26 @@ pub fn main_loop(
         }
     }
 
-    /* Terminate crossterm */
-    execute!(
-        stdout,
-        SetAttribute(Attribute::Reset),
-        Clear(ClearType::All),
-        DisableMouseCapture,
-        Show
-    )?;
+    if crate::core::bench_to_eof() {
+        /* Terminate crossterm: no clear */
+        execute!(
+            stdout,
+            SetAttribute(Attribute::Reset),
+            DisableMouseCapture,
+            Show
+        )?;
+    } else {
+        /* Terminate crossterm */
+        execute!(
+            stdout,
+            SetAttribute(Attribute::Reset),
+            Clear(ClearType::All),
+            DisableMouseCapture,
+            Show
+        )?;
 
-    execute!(stdout, LeaveAlternateScreen,)?;
+        execute!(stdout, LeaveAlternateScreen,)?;
+    }
 
     crossterm::terminal::disable_raw_mode()?;
 
