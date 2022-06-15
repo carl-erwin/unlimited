@@ -4,13 +4,17 @@
 
 ### Added
 
-- rework internals : keep modes in mind
+- rework internals : add modes
 - add crossterm frontend (and use it by default)
 - add input map configuration (internal json for now)
 - add multi marks, update undo/redo support
 - add basic selection
 - add basic syntax highlighting
 - add word wrapping
+- add line numbers
+- add goto line
+- add basic fin in file (no regex)
+
 
 ### Removed
 
@@ -36,7 +40,7 @@
 
 ### Added
 
-- unlimited undo/redo at the byte level:<br/> every inserted character is added to the document's buffer log.<br/>
+- unlimited undo/redo at the byte level:<br/> every inserted character is added to the buffer log.<br/>
 <br/>
   This is the base api that will be used to implement other undo schemes (word, sentence, paragraph).
 
