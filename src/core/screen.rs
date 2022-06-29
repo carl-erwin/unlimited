@@ -46,7 +46,7 @@ impl ScreenCell {
 pub struct Screen {
     /// the underlying lines storage
     pub buffer: Vec<ScreenCell>,
-    /// the number of elements pushed in the screen
+    /// the number of elements pushed to the screen
     pub push_count: usize,
     // the maximum number of elements the screen can hold
     pub push_capacity: usize,
