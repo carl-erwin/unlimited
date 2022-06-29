@@ -72,7 +72,12 @@ impl TextStyle {
     pub fn default_selected_bg_color() -> (u8, u8, u8) {
         if USE_DARK_THEME {
             // dark theme
-            (68, 76, 85)
+            // (64, 75, 122)
+            // (45, 52, 85)
+            // (49, 58, 94)
+            // (37, 54, 130)
+            // (29, 42, 102)
+            (23, 34, 81)
         } else {
             // light theme
             let c = Self::default_bg_color();
