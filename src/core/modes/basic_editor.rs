@@ -224,7 +224,7 @@ impl ContentFilter<'_> for BasicEditorTitle {
             buffer_info.push_str("* ");
         } else {
             buffer_info.push_str("  ");
-            //            buffer_info.push_str(" ❰❱❮❯");
+            //            buffer_info.push_str(" ❰❱❮❯  ◄ ► ▼ ▲");
         }
         if d.is_syncing {
             buffer_info.push_str("(sync)");
