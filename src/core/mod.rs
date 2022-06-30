@@ -165,60 +165,49 @@ text-mode =
       ctrl+x ctrl+x r :  {left,right} alt+{left,right}
 */
 
-pub static WELCOME_MESSAGE: &str = r#"-*- Welcome to unlimitED! -*-
+pub static WELCOME_MESSAGE: &str = r#"unlimitED! is an experimental text editor.
+           There is ABSOLUTELY NO WARRANTY.
 
-unlimitED! is an experimental text editor (running in the terminal).
+USAGE: unlimited [OPTIONS] [--] [FILES]...    ( -h for help )
 
-
-SYNOPSIS
-unlimited [options] [file ..]
-
-
-It comes with:
-
-  - basic UTF-8 support
-  - very large file support
-  - "infinite" undo/redo
-  - multi-cursors
+It supports:
+  - basic UTF-8
+  - very large file
+  - "unlimited" undo/redo
+  - multi-cursors (wip)
   - mouse selection (graphical terminal)
 
-[Quit]
+[Quit]                 (NB: quit will wait for pending file(s) sync)
     Quit:           => ctrl+x ctrl+c
-
     Quit (no save)  => ctrl+x ctrl+q
 
-    NB: quit will wait for large file(s) sync to storage.
-
-
 [Moves]
-    Left            =>
-    Right           =>
-    Up              =>
-    Down            =>
-
+    Arrows          => move the main mark Left,Right,Up,Down
+    PageUp,PageDown => scroll the current view Up/Down
+    ctrl+a          => go to beginning of current line
+    ctrl+e          => go to end of current line
+    ctrl+l          => center view arround main mark
 
 [Edit]
-    ctrl+o          => Open file (TODO)
-
+    characters      => inserted as is
     ctrl+u          => Undo
     ctrl+r          => Redo
+    ctrl+o          => Open file (TODO)
 
-[Selection/Copy/Paste]
+[Selection/Copy/Cut/Paste]
     with the keyboard:
+    ctrl+Space      => start selection at main Mark
+    alt+w           => copy current selection
+    ctrl+w          => cut  current slection
+    ctrl+y          => paste last cut
 
-    with the mouse (X11 terminal):
+    with the mouse (X11 terminal, no clipboard support yet)
 
 [Save]
-    ctrl+x ctrl+s   => Save
-                    synchronization of large file(s) is done in the background and does not block the ui.
-
-
+    ctrl+x ctrl+s   => Save file(s) in the background (read only operations allowed).
 
 [Buffer Selection]
-
-
-
-NB: unlimitED! comes with ABSOLUTELY NO WARRANTY
+     (TODO)
 "#;
 
 /// This function is the core of the editor.
