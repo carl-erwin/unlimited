@@ -389,6 +389,7 @@ fn filesystem_entry_exists(path: String) -> bool {
     }
 }
 
+// parse command line files list and infer line,column positions
 fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
@@ -409,12 +410,13 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 
         // check file exits ?
         match fs::metadata(f) {
+            // file exits ? yes -> add to list
             Ok(_metadata) => {
                 // let file_type = metadata.file_type();
-                // yes -> simple FileInfo
                 v.push(ArgInfo::new(f.clone()));
             }
 
+            // file does not exits -> try regex
             Err(_e) => {
                 // prefix
                 match re_line_column_prefix.captures(f) {
@@ -513,12 +515,23 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     v
 }
 
+/// TODO(ceg): remove duplicates
+// do symlink resolution (annotation) before real path
+// check reap paths
+fn filter_arg_list(arg_info: Vec<ArgInfo>) -> Vec<ArgInfo> {
+    let v = arg_info;
+
+    v
+}
+
 /// TODO(ceg): replace this by load/unload buffer functions
 /// the ui will open the buffers on demand
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let mut id = editor.buffer_map.read().len();
 
     let arg_info = build_buffer_options(editor);
+
+    let arg_info = filter_arg_list(arg_info);
 
     dbg_println!("processing arg_info {:?}", arg_info);
 
