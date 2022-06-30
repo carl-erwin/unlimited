@@ -394,7 +394,7 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 
     let re_offset_prefix = Regex::new(r"^\+?@([0-9]+)").unwrap();
     let re_offset_suffix = Regex::new(r"^(.*):@([0-9]+)").unwrap();
-    let re_line_col_prefix = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
+    let re_line_column_prefix = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
     let re_file_line_column = Regex::new(r"^([^:]+):([0-9]+):?([0-9]+)?").unwrap();
 
     let mut it = editor.config.files_list.iter();
@@ -416,10 +416,10 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 
             Err(_e) => {
                 // prefix
-                match re_line_col_prefix.captures(f) {
+                match re_line_column_prefix.captures(f) {
                     None => {}
                     Some(cap) => {
-                        dbg_println!("found re_line_col_prefix match {:?}", cap);
+                        dbg_println!("found re_line_column_prefix match {:?}", cap);
                         // take next arg as file, no checking
                         match it.next() {
                             None => {}
