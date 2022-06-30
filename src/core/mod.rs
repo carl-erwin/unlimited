@@ -393,8 +393,9 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
     let re_offset_prefix = Regex::new(r"^\+?@([0-9]+)").unwrap();
-    let re_offset_suffix = Regex::new(r"^(.*):@([0-9]+)").unwrap();
     let re_line_column_prefix = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
+
+    let re_offset_suffix = Regex::new(r"^(.*):@([0-9]+)").unwrap();
     let re_file_line_column = Regex::new(r"^([^:]+):([0-9]+):?([0-9]+)?").unwrap();
 
     let mut it = editor.config.files_list.iter();
