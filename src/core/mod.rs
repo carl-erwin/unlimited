@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use regex::Regex;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 #[macro_use]
 pub(crate) mod macros;
 
@@ -46,7 +48,10 @@ use crate::core::view::View;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+static OFFSET_PREFIX_REGEX: &str = r"^\+?@([0-9]+)";
+static LINE_COLUMN_PREFIX_REGEX: &str = r"^\+([0-9]+):?([0-9]+)?";
+static OFFSET_SUFFIX_REGEX: &str = r"^(.*):@([0-9]+)";
+static FILE_LINE_COLUMN_REGEX: &str = r"^([^:]+):([0-9]+):?([0-9]+)?";
 
 //
 pub static DBG_PRINTLN_FLAG: AtomicUsize = AtomicUsize::new(0);
@@ -393,11 +398,12 @@ fn filesystem_entry_exists(path: String) -> bool {
 fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
     let mut v = vec![];
 
-    let re_offset_prefix = Regex::new(r"^\+?@([0-9]+)").unwrap();
-    let re_line_column_prefix = Regex::new(r"^\+([0-9]+):?([0-9]+)?").unwrap();
+    // TODO(ceg): move regex to static str, add unit test to compile them
 
-    let re_offset_suffix = Regex::new(r"^(.*):@([0-9]+)").unwrap();
-    let re_file_line_column = Regex::new(r"^([^:]+):([0-9]+):?([0-9]+)?").unwrap();
+    let re_offset_prefix = Regex::new(OFFSET_PREFIX_REGEX).unwrap();
+    let re_line_column_prefix = Regex::new(LINE_COLUMN_PREFIX_REGEX).unwrap();
+    let re_offset_suffix = Regex::new(OFFSET_SUFFIX_REGEX).unwrap();
+    let re_file_line_column = Regex::new(FILE_LINE_COLUMN_REGEX).unwrap();
 
     let mut it = editor.config.files_list.iter();
     loop {
@@ -722,4 +728,18 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(OpenDocMode::new()));
 
     editor.register_directory_mode(Box::new(DirMode::new()));
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_buffer_position_regex() {
+        use super::*;
+
+        Regex::new(OFFSET_PREFIX_REGEX).unwrap();
+        Regex::new(LINE_COLUMN_PREFIX_REGEX).unwrap();
+        Regex::new(OFFSET_SUFFIX_REGEX).unwrap();
+        Regex::new(FILE_LINE_COLUMN_REGEX).unwrap();
+    }
 }
