@@ -906,21 +906,30 @@ pub fn open_doc_controller_discard_prompt_suffix(
             odm.revision = 0;
             odm.completion_list = vec![];
 
-            let s: String = odm.prompt.iter().collect();
-            dbg_println!("do completion split prompt: {}", s);
-
-            let (prefix, suffix) = if let Some(last_sep) = s.rfind(std::path::MAIN_SEPARATOR) {
-                s.split_at(last_sep + 1)
+            // if last character is std::path::MAIN_SEPARATOR, pop twice
+            let count = if *odm.prompt.last().unwrap_or(&' ') == std::path::MAIN_SEPARATOR {
+                2
             } else {
-                (s.as_str(), "")
+                1
             };
 
-            dbg_println!("do completion prefix: {}", prefix);
-            dbg_println!("do completion suffix: {}", suffix);
+            for _ in 0..count {
+                let s: String = odm.prompt.iter().collect();
+                dbg_println!("do completion split prompt: {}", s);
 
-            odm.prompt = prefix.to_owned().chars().collect();
-            if suffix.is_empty() && odm.prompt.len() > 1 {
-                odm.prompt.pop();
+                let (prefix, suffix) = if let Some(last_sep) = s.rfind(std::path::MAIN_SEPARATOR) {
+                    s.split_at(last_sep + 1)
+                } else {
+                    (s.as_str(), "")
+                };
+
+                dbg_println!("do completion prefix: {}", prefix);
+                dbg_println!("do completion suffix: {}", suffix);
+
+                odm.prompt = prefix.to_owned().chars().collect();
+                if suffix.is_empty() && odm.prompt.len() > 1 {
+                    odm.prompt.pop();
+                }
             }
         }
     }
