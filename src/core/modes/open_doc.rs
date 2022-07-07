@@ -638,12 +638,8 @@ pub fn open_doc_do_completion(
                         }
                     }
                 }
-
-                if odm.completion_list.is_empty() {
-                    let s = format!("cannot complete '{}'\n", s);
-                    odm.completion_list.push(s.clone());
-                }
             }
+
             _ => {
                 dbg_println!("open file: cannot read {:?}", s);
                 let s = format!("cannot read '{}'\n", s);
