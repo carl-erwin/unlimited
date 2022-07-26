@@ -53,6 +53,7 @@ static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str = r#"
      { "in": [{ "key": "Escape" } ],    "action": "goto-line-controller:stop" },
      { "in": [{ "key": "\n" } ],        "action": "goto-line-controller:stop" },
      { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line-controller:stop" },
+     { "in": [{ "key": "ctrl+q" } ],    "action": "goto-line-controller:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "goto-line-controller:del-char" },
      { "default": [],                   "action": "goto-line-controller:add-char" }
    ]

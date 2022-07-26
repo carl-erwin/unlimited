@@ -183,8 +183,8 @@ It supports:
   - mouse selection (graphical terminal)
 
 [Quit]                 (NB: quit will wait for pending file(s) sync)
-    Quit:           => ctrl+x ctrl+c
-    Quit (no save)  => ctrl+x ctrl+q
+    Quit:           => ctrl+x ctrl+q
+    Quit (no save)  => ctrl+x ctrl+x ctrl+q
 
 [Moves]
     Arrows          => move the main mark Left,Right,Up,Down

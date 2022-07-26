@@ -48,7 +48,7 @@ static FIND_CONTROLLER_MAP: &str = r#"
     "events": [
      { "in": [{ "key": "Escape" } ],    "action": "find:stop" },
      { "in": [{ "key": "\n" } ],        "action": "find:stop" },
-     { "in": [{ "key": "ctrl+g" } ],    "action": "find:stop" },
+     { "in": [{ "key": "ctrl+q" } ],    "action": "find:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "find:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
      { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },

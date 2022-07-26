@@ -49,7 +49,7 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
     "events": [
      { "in": [{ "key": "Escape" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "\n" } ],        "action": "open-doc:stop" },
-     { "in": [{ "key": "ctrl+g" } ],    "action": "open-doc:stop" },
+     { "in": [{ "key": "ctrl+q" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
      { "in": [{ "key": "Up" } ],        "action": "open-doc:select-prev-completion" },

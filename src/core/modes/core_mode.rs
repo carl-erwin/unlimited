@@ -35,13 +35,13 @@ static CORE_INPUT_MAP: &str = r#"
 [
   {
     "events": [
-     { "in": [{ "key": "F2" } ],                             "action": "select-previous-view" },
-     { "in": [{ "key": "F3" } ],                             "action": "select-next-view" },
-     { "in": [{ "key": "F4"     }],                          "action": "toggle-debug-print" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],    "action": "save-buffer" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "application:quit" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],    "action": "application:quit-abort" },
-     { "in": [{ "key": "F1" } ],                             "action": "help-pop-up" }
+     { "in": [{ "key": "F2" } ],                                               "action": "select-previous-view" },
+     { "in": [{ "key": "F3" } ],                                               "action": "select-next-view" },
+     { "in": [{ "key": "F4"     }],                                            "action": "toggle-debug-print" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+s" } ],                      "action": "save-buffer" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+q" } ],                      "action": "application:quit" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+x" }, { "key": "ctrl+q" } ], "action": "application:quit-abort" },
+     { "in": [{ "key": "F1" } ],                                               "action": "help-pop-up" }
     ]
   }
 ]"#;
@@ -1121,8 +1121,8 @@ pub fn destroy_view(
 }
 
 static HELP_MESSAGE: &str = r#"[Quit]
-    Quit:                       => ctrl+x ctrl+c (wait for file(s) saving)
-    Quit (discard changes)      => ctrl+x ctrl+q
+    Quit:                       => ctrl+x ctrl+q (wait for file(s) saving)
+    Quit (discard changes)      => ctrl+x ctrl+x ctrl+q
 
 [Moves]
     Left                        => move cursor to previous character
