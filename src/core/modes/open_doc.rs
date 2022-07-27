@@ -117,6 +117,7 @@ pub struct OpenDocModeContext {
     pub prompt: Vec<char>,
     pub completion_list: Vec<String>,
     pub completion_index: usize,
+    pub error_msg: Option<String>,
 }
 
 impl OpenDocModeContext {
@@ -130,6 +131,7 @@ impl OpenDocModeContext {
             prompt: Vec::new(),
             completion_list: vec![],
             completion_index: 0,
+            error_msg: None,
         }
     }
     pub fn reset(&mut self) -> &mut Self {
@@ -612,6 +614,8 @@ pub fn open_doc_do_completion(
         dbg_println!("do completion: for '{:?}'", path);
         match fs::read_dir(&path) {
             Ok(path) => {
+                odm.error_msg = None;
+
                 for e in path {
                     dbg_println!("do completion: parent_path entry : '{:?}'", e);
                     let cur_path = PathBuf::from(e.as_ref().unwrap().path());
@@ -643,7 +647,9 @@ pub fn open_doc_do_completion(
             _ => {
                 dbg_println!("open file: cannot read {:?}", s);
                 let s = format!("cannot read '{}'\n", s);
-                odm.completion_list.push(s.clone());
+                odm.error_msg = Some(s);
+                odm.completion_list.clear();
+                odm.completion_index = 0;
             }
         }
 
@@ -680,13 +686,20 @@ fn show_completion_popup(
     let completion_view = get_view_by_id(editor, odm.completion_view_id);
     let mut completion_view = completion_view.write();
 
-    let list = &odm.completion_list;
     let buffer = completion_view.buffer().unwrap();
     let mut buffer = buffer.write();
     buffer.delete_content(None);
 
-    for s in list {
-        buffer.append(s.as_bytes());
+    match &odm.error_msg {
+        Some(msg) => {
+            buffer.append(msg.as_bytes());
+        }
+        _ => {
+            let list = &odm.completion_list;
+            for s in list {
+                buffer.append(s.as_bytes());
+            }
+        }
     }
 
     // update position size
@@ -748,6 +761,10 @@ pub fn open_doc_controller_select_next_completion(
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
+    if odm.error_msg.is_some() {
+        return;
+    }
+
     let completion_view = get_view_by_id(editor, odm.completion_view_id);
     {
         let mut completion_view = completion_view.write();
@@ -779,6 +796,10 @@ pub fn open_doc_controller_select_prev_completion(
     let mut text_view = text_view.write();
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+    if odm.error_msg.is_some() {
+        return;
+    }
 
     let completion_view = get_view_by_id(editor, odm.completion_view_id);
     {
