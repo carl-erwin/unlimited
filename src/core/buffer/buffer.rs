@@ -1445,7 +1445,7 @@ pub fn find_nth_byte_offset(buffer: &Buffer, byte: u8, index: u64) -> Option<u64
         }
 
         let count = file.pool[idx].byte_count[byte as usize];
-        if index >= count {
+        if index > count {
             // not fully indexed, or this byte does not exists
             return None;
         }
