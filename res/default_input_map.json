@@ -86,6 +86,8 @@
 
        { "in": [{ "key": "Esc"}, { "key": "Esc"}],             "action": "editor:cancel" },
 
+       { "in": [{ "key": "ctrl+q"}, { "key": "ctrl+q"}],       "action": "editor:cancel" },
+
        { "view manipulation": "------------------------------------------------------------------------"},
 
        { "in": [{ "key": "F5" } ],                             "action": "split-vertically" },
