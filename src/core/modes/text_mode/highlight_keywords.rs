@@ -50,6 +50,7 @@ enum TokenType {
     Dot,              // .
     ExclamationPoint, // !
     Equal,
+    Different, // ≠
     Plus,
     Minus,
     Mul,
@@ -57,6 +58,7 @@ enum TokenType {
     Mod,
     LowerThan,
     GreaterThan,
+    Dollar, // $
 }
 
 pub struct HighlightFilter {
@@ -118,12 +120,14 @@ impl HighlightFilter {
             TokenType::Colon => COLOR_GREEN,   // :
             TokenType::Semicolon => COLOR_GREEN, // ;
             TokenType::Ampersand => COLOR_CYAN, // &
+            TokenType::Dollar => COLOR_BLUE,   // $
             TokenType::VerticalBar => COLOR_CYAN, // |
             TokenType::Tilde => COLOR_CYAN,    // ~
             TokenType::CircumflexAccent => COLOR_CYAN, // ^
             TokenType::Dot => COLOR_GREEN,     // .
             TokenType::ExclamationPoint => COLOR_GREEN, // !
             TokenType::Equal => COLOR_GREEN,
+            TokenType::Different => COLOR_GREEN,
             TokenType::Plus => COLOR_GREEN,
             TokenType::Minus => COLOR_GREEN,
             TokenType::Mul => COLOR_GREEN,
@@ -238,6 +242,7 @@ fn get_token_type(c: char) -> TokenType {
         '\'' => TokenType::SingleQuote,
         '"' => TokenType::DoubleQuote,
         '=' => TokenType::Equal,
+        '≠' => TokenType::Different,
         '*' => TokenType::Mul,
         '+' => TokenType::Plus,
         '-' => TokenType::Minus,
@@ -254,6 +259,7 @@ fn get_token_type(c: char) -> TokenType {
         '^' => TokenType::CircumflexAccent,
         '.' => TokenType::Dot,
         '!' => TokenType::ExclamationPoint,
+        '$' => TokenType::Dollar,
 
         // '0'...'9' => TokenType::NUM,
         _ => TokenType::Identifier,
