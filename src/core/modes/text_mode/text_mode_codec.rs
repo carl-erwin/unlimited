@@ -39,21 +39,6 @@ impl ContentFilter<'_> for TextCodecFilter {
         filter_in: &[FilterIo],
         filter_out: &mut Vec<FilterIo>,
     ) {
-        // ref ? in setup
-        //        let _tm = view.mode_ctx::<TextModeContext>("text-mode");
-
-        // put in common
-        if filter_in.is_empty() {
-            dbg_println!("TextCodecFilter : empty input !!!!");
-            *filter_out = vec![];
-            return;
-        }
-
-        dbg_println!(
-            "TextCodecFilter : start @ offset {}",
-            filter_in[0].offset.unwrap()
-        );
-
         for d in filter_in.iter() {
             let base_offset = d.offset.unwrap();
 
@@ -140,28 +125,8 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, val: u8) {
     loop {
         // (re)decode current byte: restart on previous bytes if error
         ctx.state = utf8::decode_byte(ctx.state, ctx.accum[ctx.cp_size], &mut ctx.codep);
-        /*
-                if DEBUG {
-                    dbg_println!("utf8 decode byte  '0x{:x}'", ctx.accum[ctx.cp_size - 1]);
-                    dbg_println!(
-                        "utf8 ACCUM {:x?}' accum_size {} cp_size = {}",
-                        ctx.accum,
-                        ctx.accum_size,
-                        ctx.cp_size
-                    );
-                }
-        */
         match ctx.state {
             utf8::UTF8_ACCEPT => {
-                /*
-                                if DEBUG {
-                                    dbg_println!(
-                                ">>> utf8 decode cp OK current_offset = {:?} from_offset = {:?} ctx.cp_size {} cp:u32 {}",
-                                ctx.current_offset,
-                                ctx.from_offset,
-                                ctx.cp_size, ctx.codep);
-                                }
-                */
                 ctx.out.push(Unicode {
                     cp: ctx.codep,
                     size: 1 + ctx.cp_size as u32,
@@ -179,16 +144,6 @@ fn filter_utf8_byte(ctx: &mut Utf8FilterCtx, val: u8) {
             }
 
             utf8::UTF8_REJECT => {
-                /*
-                                if DEBUG {
-                                    dbg_println!(
-                                        "utf8 decode cp ERROR current_offset = {:?} from_offset = {:?} cp_size {}",
-                                        ctx.current_offset,
-                                        ctx.from_offset,
-                                        ctx.cp_size
-                                    );
-                                }
-                */
                 // decode error : invalid sequence
                 //let io = utf8_default_codepoint(ctx.from_offset, 1, 0xfffd);
                 ctx.out.push(Unicode {
@@ -253,70 +208,6 @@ impl Receiver for Utf8FilterCtx {
             cp: 0xfffd,
             size: 1,
         });
-    }
-}
-
-// if no encoding error found and first input byte is "utf8" synchronized
-#[inline]
-pub fn filter_utf8_bytearray_shift_accum(
-    mut ctx: &mut Utf8FilterCtx,
-    vec: &Vec<u8>,
-    _filter_out: &mut Vec<FilterIo>,
-) {
-    for b in vec {
-        let val = *b as u32;
-
-        //        dbg_println!("read val  {:x}", val);
-        if val < 0b10000000 {
-            // flush previous ?
-            if ctx.cp_size > 1 {
-                ctx.out.push(Unicode {
-                    cp: ctx.codep as u32,
-                    size: ctx.cp_size as u32,
-                });
-            }
-
-            //            dbg_println!("decoded ctx.codep({}) as '{}'", ctx.codep, unsafe {
-            //                char::from_u32_unchecked(val)
-            //            });
-
-            ctx.out.push(Unicode { cp: val, size: 1 });
-
-            // reset
-            ctx.codep = 0;
-            ctx.cp_size = 0;
-            continue;
-        }
-
-        //          mmxxxxxx   continuation
-        if (val & 0b11000000) == 0b10000000 {
-            ctx.codep = (ctx.codep << 6) | (val & 0b00111111);
-            ctx.cp_size += 1;
-        } else {
-            // flush
-            if ctx.cp_size > 1 {
-                ctx.out.push(Unicode {
-                    cp: ctx.codep as u32,
-                    size: ctx.cp_size as u32,
-                });
-
-                //                dbg_println!("decoded ctx.codep({}) as '{}'", ctx.codep, unsafe {
-                //                    char::from_u32_unchecked(ctx.codep)
-                //                });
-            }
-
-            ctx.cp_size += 1;
-            // check seq len
-            if (val & 0b11000000) == 0b11000000 {
-                ctx.codep = val & 0b00011111;
-            }
-            if (val & 0b11100000) == 0b11100000 {
-                ctx.codep = val & 0b00001111;
-            }
-            if (val & 0b11110000) == 0b00000111 {
-                ctx.codep = val & 0b00111111;
-            }
-        }
     }
 }
 
@@ -413,7 +304,6 @@ impl ContentFilter<'_> for Utf8Filter {
             match &d.data {
                 FilterData::ByteArray { vec } => {
                     filter_utf8_bytearray(&mut self.ctx, vec, &mut filter_out);
-                    //filter_utf8_bytearray_shift_accum(&mut self.ctx, vec, &mut filter_out);
                 }
 
                 FilterData::EndOfStream | FilterData::CustomLimitReached => {
