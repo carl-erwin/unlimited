@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use parking_lot::RwLock;
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use super::Mode;
 
@@ -14,6 +15,8 @@ use crate::core::buffer::BufferKind;
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 use crate::core::editor::set_focus_on_view_id;
+
+use crate::core::path_to_buffer_kind;
 
 use crate::core::editor::InputStageActionMap;
 use crate::core::Editor;
@@ -38,8 +41,9 @@ static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
   {
     "events": [
-     { "in": [{ "key": "ctrl+o" } ],    "action": "open-doc:start" }
-    ]
+     { "in": [{ "key": "ctrl+o" } ],                      "action": "open-doc:start" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ], "action": "open-doc:start" }
+     ]
   }
 ]"#;
 
@@ -48,7 +52,7 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
   {
     "events": [
      { "in": [{ "key": "Escape" } ],    "action": "open-doc:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "open-doc:stop" },
+     { "in": [{ "key": "\n" } ],        "action": "open-doc:show-buffer" },
      { "in": [{ "key": "ctrl+q" } ],    "action": "open-doc:stop" },
      { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
      { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
@@ -293,6 +297,12 @@ fn create_open_doc_controller_view(
         }
 
         let mut action_map = InputStageActionMap::new();
+
+        register_input_stage_action(
+            &mut action_map,
+            "open-doc:show-buffer",
+            open_doc_controller_show_buffer,
+        );
 
         register_input_stage_action(&mut action_map, "open-doc:stop", open_doc_controller_stop);
         register_input_stage_action(
@@ -761,6 +771,10 @@ pub fn open_doc_controller_select_next_completion(
 
     let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
+    if odm.completion_list.is_empty() {
+        return;
+    }
+
     if odm.error_msg.is_some() {
         return;
     }
@@ -996,4 +1010,130 @@ pub fn open_doc_controller_select_first_completion(
         let mut text_view = text_view.write();
         open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
     }
+}
+
+pub fn open_doc_controller_show_buffer(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let (root_view_idx, new_root_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
+    if !ok {
+        return;
+    }
+
+    open_doc_controller_stop(editor, env, view);
+
+    // switch
+    env.root_view_index = root_view_idx;
+    env.root_view_id = new_root_view_id;
+}
+
+fn open_doc_controller_load_buffer(
+    editor: &mut Editor<'static>,
+    env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) -> (usize, view::Id, bool) {
+    // walk through buffer list/view
+    // if ! already opened create new buffer + new view
+    // show view
+
+    // split code and reuse in main loader
+
+    let controller_view = view.write();
+    let text_view_view_id = controller_view.controlled_view.unwrap();
+    let text_view = get_view_by_id(editor, text_view_view_id);
+    let mut text_view = text_view.write();
+    let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+
+    let path = if odm.completion_list.is_empty() {
+        // create
+        let s: String = odm.prompt.iter().collect();
+        s
+    } else {
+        let mut path = odm.completion_list[odm.completion_index].clone();
+        path.pop(); // remove ending \n
+        path
+    };
+
+    dbg_println!("open-doc: try opening '{}'", path);
+
+    let kind = path_to_buffer_kind(&path);
+
+    let b = BufferBuilder::new(kind)
+        .buffer_name(&path)
+        .file_name(&path)
+        .internal(false)
+        .use_buffer_log(true)
+        .finalize();
+
+    // TODO: buffer id allocator fn
+    let buffer_id = if let Some(b) = b {
+        let buffer_id = b.read().id;
+        editor.buffer_map.write().insert(buffer_id, b);
+        buffer_id
+    } else {
+        return (env.root_view_index, env.root_view_id, false);
+    };
+
+    // configure buffer
+
+    // per mode buffer metadata
+    {
+        let file_modes = editor.modes.clone();
+        let dir_modes = editor.dir_modes.clone();
+
+        let map = editor.buffer_map.clone();
+        let mut map = map.write();
+
+        for (_, buffer) in map.iter_mut() {
+            let mut buffer = buffer.write();
+
+            let modes = match buffer.kind {
+                BufferKind::File => file_modes.borrow(),
+                BufferKind::Directory => dir_modes.borrow(),
+            };
+
+            for (mode_name, mode) in modes.iter() {
+                dbg_println!("setup mode[{}] buffer metadata", mode_name);
+                let mut mode = mode.borrow_mut();
+                mode.configure_buffer(editor, env, &mut buffer);
+            }
+        }
+    }
+
+    // pub fn create_view(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>, buffer, modes) -> View<'static> {
+    let buffer_map = editor.buffer_map.clone();
+    let buffer_map = buffer_map.read();
+    let buffer = buffer_map.get(&buffer_id).unwrap();
+    let buffer = buffer.clone();
+
+    // create views
+    let modes = match kind {
+        BufferKind::File => vec!["basic-editor".to_owned()],
+        BufferKind::Directory => vec!["core-mode".to_owned(), "dir-mode".to_owned()],
+    };
+
+    let view = View::new(editor, env, None, (0, 0), (1, 1), Some(buffer), &modes, 0);
+    dbg_println!("open-doc : create view id {:?}", view.id);
+
+    // a new top level view
+    let idx = editor.root_views.len();
+    let new_root_view_id = view.id;
+    editor.root_views.push(view.id);
+    editor.add_view(view.id, view);
+
+    // index buffers
+    // TODO(ceg): send one event per doc
+    if true {
+        let msg = EventMessage {
+            seq: 0,
+            event: Event::IndexTask {
+                buffer_map: Arc::clone(&editor.buffer_map),
+            },
+        };
+        editor.indexer_tx.send(msg).unwrap_or(());
+    }
+
+    (idx, new_root_view_id, true)
 }

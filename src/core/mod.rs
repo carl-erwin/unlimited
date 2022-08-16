@@ -530,11 +530,33 @@ fn filter_arg_list(arg_info: Vec<ArgInfo>) -> Vec<ArgInfo> {
     v
 }
 
+pub fn path_to_buffer_kind(path: &String) -> BufferKind {
+    match fs::metadata(&path) {
+        Ok(metadata) => {
+            let file_type = metadata.file_type();
+
+            // ignore directories for now
+            if file_type.is_dir() {
+                BufferKind::Directory
+            } else if file_type.is_file() {
+                BufferKind::File
+            } else {
+                // display error
+                // links not handled yet
+                panic!("not supported yet");
+            }
+        }
+
+        Err(_e) => {
+            // check no such file
+            BufferKind::File
+        }
+    }
+}
+
 /// TODO(ceg): replace this by load/unload buffer functions
 /// the ui will open the buffers on demand
 pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
-    let mut id = editor.buffer_map.read().len();
-
     let arg_info = build_buffer_options(editor);
 
     let arg_info = filter_arg_list(arg_info);
@@ -562,7 +584,7 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             }
 
             Err(_e) => {
-                // check not suck file
+                // check no such file
                 BufferKind::File
             }
         };
@@ -578,7 +600,6 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
         if let Some(b) = b {
             let buffer_id = b.read().id;
             editor.buffer_map.write().insert(buffer_id, b);
-            id += 1;
         }
     }
 
@@ -606,9 +627,8 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
                 d.buffer_log_reset();
                 d.changed = false;
             }
-            let buffer_id = buffer::Id(id);
+            let buffer_id = b.read().id;
             editor.buffer_map.write().insert(buffer_id, b);
-            id += 1;
         }
     }
 
@@ -635,8 +655,6 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             mode.configure_buffer(editor, env, &mut buffer);
         }
     }
-
-    dbg_println!("id {}", id);
 }
 
 pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
