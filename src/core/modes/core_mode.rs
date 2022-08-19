@@ -1001,7 +1001,7 @@ fn destroy_view_hierarchy(editor: &mut Editor<'static>, id: view::Id) {
 
 pub fn destroy_view(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let to_destroy_id = {
@@ -1010,7 +1010,11 @@ pub fn destroy_view(
 
         let v = view.read();
 
-        dbg_println!("-- DESTROY VIEW {:?}", v.id);
+        dbg_println!(
+            "-- DESTROY VIEW id {:?}: v.destroyable {}",
+            v.id,
+            v.destroyable
+        );
 
         if !v.destroyable {
             return;
@@ -1054,6 +1058,22 @@ pub fn destroy_view(
         let mut v_pp = v_pp.write();
         if v_pp.destroyable == false {
             dbg_println!("-- DESTROY : TOP VIEW REACHED");
+
+            if editor.root_views.len() <= 1 {
+                // keep atr least 1 root view
+                dbg_println!("-- DESTROY VIEW : keep last root view");
+                return;
+            }
+
+            // destroy current root view
+            let idx = env.root_view_index;
+
+            // TODO: recursively destroy old root view
+            let _old_root_view_id = editor.root_views[idx];
+
+            editor.root_views.remove(idx);
+            env.root_view_index = std::cmp::min(env.root_view_index, editor.root_views.len() - 1);
+            env.root_view_id = editor.root_views[env.root_view_index];
             return;
         }
 

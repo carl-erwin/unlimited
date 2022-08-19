@@ -99,7 +99,7 @@
        { "in": [{ "key": "shift+F7" } ],                       "action": "decrease-right" },
 
        { "in": [{ "key": "F7" } ],                             "action": "destroy-view" },
-       { "in": [{ "key": "ctrl+x" }, { "key": "Delete" } ],    "action": "destroy-view" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+c" } ],    "action": "destroy-view" },
 
        { "in": [{ "key": "ctrl+x" }, { "key": "3" } ],         "action": "split-vertically" },
        { "in": [{ "key": "ctrl+x" }, { "key": "2" } ],         "action": "split-horizontally" },
