@@ -2,11 +2,8 @@ use parking_lot::RwLock;
 use std::rc::Rc;
 
 use crate::core::codec::text::u32_to_char;
-use crate::core::view::ContentFilter;
-use crate::core::view::FilterData;
-use crate::core::view::FilterIo;
-use crate::core::view::LayoutEnv;
-use crate::core::view::View;
+use crate::core::codepointinfo::TextStyle;
+use crate::core::view::{ContentFilter, FilterData, FilterIo, LayoutEnv, View};
 use crate::core::Editor;
 
 pub struct TabFilter {
@@ -65,19 +62,25 @@ impl ContentFilter<'_> for TabFilter {
                 let codepoint = u32_to_char(*real_cp);
                 match codepoint {
                     '\t' => {
-                        self.prev_cp = '\t';
-                        // TODO(ceg): setup
+                        self.prev_cp = '\t'; // TODO(ceg): user configuration/file hints
                         let tab_size = 8;
                         let padding = tab_size - (self.column_count % tab_size);
-
-                        //dbg_println!(" TAB column count = {}, padding = {}", self.column_count, padding);
 
                         for (idx, _) in (0..padding).enumerate() {
                             // \t -> ' '
                             let mut new_io = FilterIo::replace_displayed_codepoint(io, ' ');
-                            new_io.style.color = self.tab_color;
-                            new_io.size = if idx == 0 { io.size } else { 0 };
-                            new_io.metadata = if idx == 0 { io.metadata } else { true };
+
+                            // display the tab expansion with 2 colors
+                            // the 1st char uses a distinct color from the rest of the expansion
+                            if idx == 0 {
+                                new_io.metadata = io.metadata;
+                                new_io.style.color = TextStyle::default_color();
+                                new_io.size = io.size;
+                            } else {
+                                new_io.metadata = true;
+                                new_io.style.color = self.tab_color;
+                                new_io.size = 0;
+                            };
                             filter_out.push(new_io);
                         }
                         self.column_count += padding;
