@@ -253,11 +253,6 @@ impl Screen {
             }
         }
 
-        // screen.is_full() ? all line used ?
-        if self.current_line_index == self.height() {
-            return (false, self.current_line_index);
-        }
-
         // check cpi
         let mut line_feed = false;
 
@@ -310,10 +305,11 @@ impl Screen {
         // does char fit ?
         if unicode_width > self.current_line_remain {
             self.select_next_line_index();
-            // self.is_full() ?
-            if self.current_line_index == self.height() {
-                return (false, self.current_line_index);
-            }
+        }
+
+        // screen.is_full() ? all line used ?
+        if self.current_line_index == self.height() {
+            return (false, self.current_line_index);
         }
 
         // update line info: move to self.finalize()
