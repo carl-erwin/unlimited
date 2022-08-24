@@ -69,7 +69,11 @@ impl ContentFilter<'_> for RawDataFilter {
         self.max_pos = view.read().buffer().unwrap().read().size() as u64;
 
         if bench_to_eof() {
-            let bench_size = 1024 * 32;
+            let bench_size = match std::env::var("UNLIMITED_BENCH_FILE_FETCH_CHUNK_SIZE") {
+                Ok(val) => val.parse::<usize>().unwrap(),
+                Err(_) => 1024 * 32,
+            };
+
             self.read_max = (self.max_pos - self.pos) as usize;
             self.read_max = std::cmp::min(bench_size, self.read_max);
             self.read_size = self.read_max;

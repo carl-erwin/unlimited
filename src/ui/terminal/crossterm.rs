@@ -132,6 +132,11 @@ pub fn main_loop(
     crate::core::event::pending_input_event_inc(1);
     core_tx.send(msg).unwrap_or(()); // if removed the 1st screen is not displayed
 
+    let force_draw = match std::env::var("UNLIMITED_CROSSTERM_FORCE_DRAW") {
+        Ok(_) => true,
+        Err(_) => false,
+    };
+
     loop {
         if let Ok(evt) = ui_rx.recv() {
             match evt.event {
@@ -177,7 +182,7 @@ pub fn main_loop(
                         fps_t0 = start;
                     }
 
-                    let mut draw = false;
+                    let mut draw = force_draw;
 
                     if p_rdr < 1 {
                         draw = true;
