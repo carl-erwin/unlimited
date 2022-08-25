@@ -1,9 +1,9 @@
 pub mod char_map;
-pub mod data_fetch;
 pub mod draw_mark;
 pub mod highlight_keywords;
 pub mod highlight_selection;
 pub mod mark;
+pub mod raw_data_filter;
 pub mod screen_filler;
 pub mod tab_expansion;
 pub mod text_mode_codec;
@@ -18,10 +18,10 @@ pub mod show_trailing_spaces;
 mod text_mode;
 
 pub use char_map::*;
-pub use data_fetch::*;
 pub use draw_mark::*;
 pub use highlight_keywords::*;
 pub use highlight_selection::*;
+pub use raw_data_filter::*;
 pub use screen_filler::*;
 pub use show_trailing_spaces::*;
 pub use tab_expansion::*;
