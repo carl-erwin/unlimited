@@ -198,9 +198,9 @@ pub fn main_loop(
 
                         // the slow part
                         {
-                            let mut screen = screen.write();
-                            let mut last_screen = last_screen.write();
-                            draw_view(&mut last_screen, &mut screen, &mut stdout);
+                            let screen = screen.read();
+                            let last_screen = last_screen.write();
+                            draw_view(&last_screen, &screen, &mut stdout);
                         }
                         last_screen = screen;
                     }
@@ -256,7 +256,7 @@ pub fn main_loop(
     2 : create editor internal result type Result<>
     3 : use idiomatic    func()? style
 */
-fn draw_view(last_screen: &mut Screen, screen: &mut Screen, stdout: &mut std::io::StdoutLock) {
+fn draw_view(last_screen: &Screen, screen: &Screen, stdout: &mut std::io::StdoutLock) {
     if true {
         let _ = draw_screen(last_screen, screen, stdout);
     } else {
@@ -393,8 +393,8 @@ fn cpis_have_same_style(a: &CodepointInfo, b: &CodepointInfo) -> bool {
      if width || height change -> clear redraw all
 */
 fn draw_screen(
-    last_screen: &mut Screen,
-    screen: &mut Screen,
+    last_screen: &Screen,
+    screen: &Screen,
     stdout: &mut std::io::StdoutLock,
 ) -> Result<()> {
     let _screen_change = screen_changed(last_screen, screen);
@@ -424,7 +424,7 @@ fn draw_screen(
 
     let mut l = 0;
     while l < height {
-        let line = screen.get_line_mut(l);
+        let line = screen.get_line(l);
         if line.is_none() {
             panic!("");
         }
