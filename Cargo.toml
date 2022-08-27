@@ -28,6 +28,9 @@ path = "test-tools/test_screen.rs"
 
 
 
+[features]
+gfx-sdl = ["dep:sdl2"]
+
 [dependencies]
 lazy_static = "1.4.0"
 parking_lot = "0.12.1"
@@ -36,8 +39,13 @@ rand = "0.8.4"
 clap = "3.1.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
 #crossterm = { git = "https://github.com/crossterm-rs/crossterm" , branch = "0.20" }
 crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "sigterm-handler" }
+
+
+sdl2 = { version = "0.35.2", optional = true }
+
 unicode-width = "0.1.8"
 utf8parse = "0.2.0"
 regex = "1.5.5"
