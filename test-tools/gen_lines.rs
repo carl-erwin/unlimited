@@ -21,7 +21,6 @@ fn main() {
 }
 
 fn gen_lines(start: u64, stop: u64, line_width: u64) {
-
     let stdout = io::stdout();
     let mut buff = BufWriter::new(stdout);
 
@@ -29,7 +28,8 @@ fn gen_lines(start: u64, stop: u64, line_width: u64) {
     let sz = v.len();
     for line_number in start..start + stop {
         let s = &v[line_number as usize % sz];
-        buff.write_fmt(format_args!("{:012} {}\n", line_number, s)).unwrap();
+        buff.write_fmt(format_args!("{:012} {}\n", line_number, s))
+            .unwrap();
     }
 }
 
@@ -44,7 +44,7 @@ fn gen_line(line_width: u64) -> Vec<String> {
     for c in &table {
         let mut string = String::new();
         for _ in 0..line_width {
-          string.push(*c as char);
+            string.push(*c as char);
         }
         v.push(string);
     }

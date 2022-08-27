@@ -11,6 +11,22 @@ doc = false
 name = "unlimited"
 path = "src/main.rs"
 
+[[bin]]
+doc = false
+name = "gen_lines"
+path = "test-tools/gen_lines.rs"
+
+[[bin]]
+doc = false
+name = "gen_utf8"
+path = "test-tools/gen_utf8.rs"
+
+[[bin]]
+doc = false
+name = "test_screen"
+path = "test-tools/test_screen.rs"
+
+
 
 [dependencies]
 lazy_static = "1.4.0"
