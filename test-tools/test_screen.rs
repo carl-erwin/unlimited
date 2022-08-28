@@ -3,34 +3,24 @@ extern crate unlimited;
 use std::env;
 use std::fs::File;
 
-use std::io;
 use std::io::prelude::*;
 
 use std::io::BufReader;
-use std::io::BufWriter;
 
 //use std::io::{self, IoSlice, Write};
 
 use std::time::Duration;
-use std::time::Instant;
 
 use unlimited::core::codepointinfo::CodepointInfo;
 use unlimited::core::screen::*;
 
 fn main() -> std::io::Result<()> {
-    let stdout = io::stdout();
-    let stdout = stdout.lock();
+    let mut buf = Vec::with_capacity(1024 * 64);
+    buf.resize(buf.capacity(), 0);
 
-    let mut wbuf = BufWriter::with_capacity(1024 * 16, stdout);
-
-    let buf = &mut [0; 1024 * 16];
-
-    let width = 200;
-    let height = 100;
+    let width = 350;
+    let height = 85;
     let mut screen = Screen::new(width, height);
-
-    let mut w = 0;
-    let mut h = 0;
 
     let mut fps = 0;
     let mut t0 = std::time::Instant::now();
