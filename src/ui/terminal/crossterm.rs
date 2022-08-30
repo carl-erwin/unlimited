@@ -589,13 +589,7 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
     } //
 }
 
-fn translate_crossterm_event(
-    evt: ::crossterm::event::Event,
-    pending_resize: &mut bool,
-) -> InputEvent {
-    // translate crossterm event
-    *pending_resize = false;
-
+fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
 
     match evt {
@@ -783,7 +777,6 @@ fn translate_crossterm_event(
         ::crossterm::event::Event::Resize(width, height) => {
             // println!("New size {}x{}", width, height)
             // TODO(ceg): not really an input
-            *pending_resize = true;
             return InputEvent::RefreshUi {
                 width: width as usize,
                 height: height as usize,
@@ -937,24 +930,20 @@ fn get_input_events(
 ) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(255);
     let mut wait_ms = 60_000;
-    let mut min_wait_ms = 1;
+    let min_wait_ms = 1;
 
     let mut start = Instant::now();
     let mut prev_ev_time = start;
 
     let mut count = 0;
-    let mut pending_resize = false;
 
     // accumulate events up to 1 millisecond
     loop {
         if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 prev_ev_time = Instant::now();
-                let evt = translate_crossterm_event(cross_evt, &mut pending_resize);
+                let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
-                if pending_resize {
-                    min_wait_ms = 4; // wait for other resize events
-                }
             }
         }
 
