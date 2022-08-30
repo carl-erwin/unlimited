@@ -914,7 +914,7 @@ pub fn open_doc_controller_discard_prompt_suffix(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    {
+    let completion_view_id = {
         let controller_view = view.write();
         let text_view_view_id = controller_view.controlled_view.unwrap();
         let text_view = get_view_by_id(editor, text_view_view_id);
@@ -936,6 +936,7 @@ pub fn open_doc_controller_discard_prompt_suffix(
 
             odm.revision = 0;
             odm.completion_list = vec![];
+            odm.completion_index = 0;
 
             // if last character is std::path::MAIN_SEPARATOR, pop twice
             let count = if *odm.prompt.last().unwrap_or(&' ') == std::path::MAIN_SEPARATOR {
@@ -962,16 +963,34 @@ pub fn open_doc_controller_discard_prompt_suffix(
                     odm.prompt.pop();
                 }
             }
+
+            odm.completion_view_id
         }
-    }
+    };
 
     open_doc_do_completion(editor, env, view, false);
 
+    // factorize this with helper
     {
         let mut controller_view = view.write();
         let text_view_view_id = controller_view.controlled_view.unwrap();
-        let text_view = get_view_by_id(editor, text_view_view_id);
+        let text_view = editor
+            .view_map
+            .read()
+            .get(&text_view_view_id)
+            .unwrap()
+            .clone();
         let mut text_view = text_view.write();
+
+        {
+            let completion_view = get_view_by_id(editor, completion_view_id);
+            {
+                let mut completion_view = completion_view.write();
+                let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+                tm.marks[0].offset = 0;
+            }
+            center_around_mark_if_offscreen(editor, env, &completion_view);
+        }
         open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
     }
 }
