@@ -27,9 +27,8 @@ name = "test_screen"
 path = "test-tools/test_screen.rs"
 
 
-
 [features]
-gfx-sdl = ["dep:sdl2"]
+gfx-sdl = ["dep:sdl2", "dep:gl"]
 
 [dependencies]
 lazy_static = "1.4.0"
@@ -45,6 +44,8 @@ crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "sigter
 
 
 sdl2 = { version = "0.35.2", optional = true }
+gl = { version = "0.14.0", optional = true }
+
 
 unicode-width = "0.1.8"
 utf8parse = "0.2.0"

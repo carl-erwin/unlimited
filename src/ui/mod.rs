@@ -20,7 +20,12 @@ pub fn main_loop(
 
         #[cfg(feature = "gfx-sdl")]
         "sdl" | "sdl2" => {
-            graphical::sdl2::main_loop(ui_rx, ui_tx, core_tx).ok();
+            graphical::sdl2::main_loop_sdl(ui_rx, ui_tx, core_tx).ok();
+        }
+
+        #[cfg(feature = "gfx-sdl")]
+        "gl" => {
+            graphical::sdl2::main_loop_sdl_gl(ui_rx, ui_tx, core_tx).ok();
         }
 
         _ => {
