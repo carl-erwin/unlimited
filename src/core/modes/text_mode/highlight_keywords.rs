@@ -176,13 +176,19 @@ impl HighlightFilter {
             | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef" | "union"
             | "unsigned" | "void" | "volatile" | "while" | "inline" => (0, 128, 128),
 
+            "esac" | "done" => (0, 128, 128),
+
             "if" | "then" | "else" => COLOR_BRACE,
+
+            "fi" | "in" => COLOR_BRACE,
 
             // some C++ keywords
             "bool" | "class" | "template" | "namespace" | "auto" => (0, 128, 128),
 
             //
             "return" | "goto" | "true" | "false" => COLOR_BLUE,
+
+            "export" => COLOR_BLUE,
 
             _ => {
                 let mut non_alnum = 0;
