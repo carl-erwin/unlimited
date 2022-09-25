@@ -315,7 +315,7 @@ pub fn scroll_screen_up(
             let screen = screen.read();
             let (width, height) = screen.dimension();
 
-            rewind += (width * height * 4) as u64;
+            rewind += (width * height / 2) as u64; // rewind max is width * height * 4, but this is slower
 
             let start_offset = offset.saturating_sub(rewind);
             (start_offset, width, height)
