@@ -507,9 +507,6 @@ pub fn eval_input_event(
                 dbg_println!("found out_node {:?}", out_node);
             }
             None => {
-                let ev = InputEvent::FallbackEvent;
-                let event_hash = compute_input_event_hash(&ev);
-
                 *out_node = None;
                 *in_node = None;
 
@@ -517,6 +514,7 @@ pub fn eval_input_event(
                     return None;
                 };
 
+                let event_hash = compute_input_event_hash(&InputEvent::FallbackEvent);
                 match input_map.get(&event_hash) {
                     Some(event) => {
                         if let Some(action) = &event.as_ref().action {
