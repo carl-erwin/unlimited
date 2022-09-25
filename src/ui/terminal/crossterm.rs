@@ -280,8 +280,8 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
     let mut ops = vec![];
 
     // current Brush/Pen
-    let mut prev_fg = None;
-    let mut prev_bg = None;
+    let mut prev_fg = (0, 0, 0);
+    let mut prev_bg = (0, 0, 0);
     let mut is_inverse = false;
 
     // reset Style
@@ -303,36 +303,24 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
             }
 
             // fg color
-            let color = Color::Rgb {
-                r: cpi.style.color.0,
-                g: cpi.style.color.1,
-                b: cpi.style.color.2,
-            };
-            if prev_fg.is_none() || *prev_fg.as_ref().unwrap() != color {
+            if prev_fg != cpi.style.color {
                 ops.push(ScreenOp::SetFgColor(
                     cpi.style.color.0,
                     cpi.style.color.1,
                     cpi.style.color.2,
                 ));
             }
-            prev_fg = Some(color);
+            prev_fg = cpi.style.color;
 
             // bg color
-            let bg_color = Color::Rgb {
-                r: cpi.style.bg_color.0,
-                g: cpi.style.bg_color.1,
-                b: cpi.style.bg_color.2,
-            };
-
-            if prev_bg.is_none() || *prev_bg.as_ref().unwrap() != bg_color {
+            if prev_bg != cpi.style.bg_color {
                 ops.push(ScreenOp::SetBgColor(
                     cpi.style.bg_color.0,
                     cpi.style.bg_color.1,
                     cpi.style.bg_color.2,
                 ));
             }
-
-            prev_bg = Some(bg_color);
+            prev_bg = cpi.style.bg_color;
 
             // inverse
             if cpi.style.is_inverse != is_inverse {
@@ -418,8 +406,9 @@ fn draw_screen(
     let mut ops = vec![];
 
     // current Brush/Pen
-    let mut prev_fg = None;
-    let mut prev_bg = None;
+    let mut prev_bg = (0, 0, 0);
+    let mut prev_fg = (0, 0, 0);
+
     let mut is_inverse = false;
 
     let mut l = 0;
@@ -490,29 +479,17 @@ fn draw_screen(
             is_inverse = cpi.style.is_inverse;
 
             // fg color
-            let color = Color::Rgb {
-                r: cpi.style.color.0,
-                g: cpi.style.color.1,
-                b: cpi.style.color.2,
-            };
-            if prev_fg.is_none() || *prev_fg.as_ref().unwrap() != color {
+            if prev_fg != cpi.style.color {
                 ops.push(ScreenOp::SetFgColor(
                     cpi.style.color.0,
                     cpi.style.color.1,
                     cpi.style.color.2,
                 ));
             }
-
-            prev_fg = Some(color);
+            prev_fg = cpi.style.color;
 
             // bg color
-            let bg_color = Color::Rgb {
-                r: cpi.style.bg_color.0,
-                g: cpi.style.bg_color.1,
-                b: cpi.style.bg_color.2,
-            };
-
-            if prev_bg.is_none() || *prev_bg.as_ref().unwrap() != bg_color {
+            if prev_bg != cpi.style.bg_color {
                 ops.push(ScreenOp::SetBgColor(
                     cpi.style.bg_color.0,
                     cpi.style.bg_color.1,
@@ -520,7 +497,7 @@ fn draw_screen(
                 ));
             }
 
-            prev_bg = Some(bg_color);
+            prev_bg = cpi.style.bg_color;
 
             ops.push(ScreenOp::PrintText(cpi.displayed_cp));
 
