@@ -578,6 +578,11 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
         let w = env.screen.width();
 
+        let mut color = CodepointInfo::new().style.color;
+        color.0 = color.0.saturating_sub(70);
+        color.1 = color.1.saturating_sub(70);
+        color.2 = color.2.saturating_sub(70);
+
         // show line numbers
         if !self.line_number.is_empty() {
             let mut prev_line = 0;
@@ -598,10 +603,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 for c in s.chars() {
                     let mut cpi = CodepointInfo::new();
                     cpi.displayed_cp = c;
-                    cpi.style.color.0 = cpi.style.color.0.saturating_sub(70);
-                    cpi.style.color.1 = cpi.style.color.1.saturating_sub(70);
-                    cpi.style.color.2 = cpi.style.color.2.saturating_sub(70);
-
+                    cpi.style.color = color;
                     env.screen.push(cpi);
                 }
                 env.screen.select_next_line_index();
@@ -615,10 +617,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
-                cpi.style.color.0 = cpi.style.color.0.saturating_sub(70);
-                cpi.style.color.1 = cpi.style.color.1.saturating_sub(70);
-                cpi.style.color.2 = cpi.style.color.2.saturating_sub(70);
-
+                cpi.style.color = color;
                 env.screen.push(cpi);
             }
             env.screen.select_next_line_index();
