@@ -907,25 +907,27 @@ fn get_input_events(
 ) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(255);
     let mut wait_ms = 60_000;
+    let max_wait_ms = 150;
     let min_wait_ms = 1;
 
     let mut start = Instant::now();
-    let mut prev_ev_time = start;
+    let mut prev_len = 0;
 
     let mut count = 0;
 
-    // accumulate events up to 1 millisecond
+    // accumulate events up to max_wait_ms millisecond
     loop {
         if ::crossterm::event::poll(Duration::from_millis(wait_ms))? {
             if let Ok(cross_evt) = ::crossterm::event::read() {
-                prev_ev_time = Instant::now();
+                prev_len = accum.len();
                 let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
             }
         }
 
-        count += 1;
         wait_ms = min_wait_ms;
+
+        count += 1;
         if count == 1 {
             // delay flush of 1st input event (min_wait_ms)
             // real start
@@ -933,13 +935,17 @@ fn get_input_events(
             continue;
         }
 
-        let d = prev_ev_time.elapsed();
-        if d < Duration::from_millis(1) || start.elapsed() < Duration::from_millis(min_wait_ms) {
-            // batch input
-            continue;
+        // count >= 2
+        let d = start.elapsed();
+        if d >= Duration::from_millis(max_wait_ms) {
+            break;
         }
 
-        break;
+        if prev_len == accum.len() {
+            // no new event received -> flush
+            break;
+        }
+        prev_len = accum.len();
     }
 
     // TODO(ceg): --limit-input-rate
