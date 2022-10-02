@@ -1151,9 +1151,7 @@ pub fn build_node_byte_count(mut file: &mut MappedFile, idx: Option<NodeIndex>) 
     // count node bytes (no lock)
     for b in data.iter() {
         let byte_idx = *b as usize;
-        if *b as char == '\n' {
-            node.byte_count[byte_idx] += 1;
-        }
+        node.byte_count[byte_idx] += 1;
     }
     node.indexed = true;
 
