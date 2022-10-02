@@ -49,7 +49,10 @@ impl<'a> Mode for SimpleViewMode {
     ) {
         let buffer = v.buffer();
         //        let buffer_sz = buffer.as_ref().unwrap().read().size();
-        let line_number_view_width = 13 + 2;
+        let line_number_view_width = match std::env::var("SINGLE_VIEW") {
+            Ok(_) => 0,
+            _ => 13 + 2,
+        };
 
         // children_layout_and_modes
         let ops_modes = vec![

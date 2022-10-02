@@ -432,6 +432,11 @@ impl<'a> Mode for LineNumberMode {
                     n + 1
                 };
 
+                let width = match std::env::var("SINGLE_VIEW") {
+                    Ok(_) => 0,
+                    _ => width,
+                };
+
                 if let Some(p_view) = parent {
                     p_view.children[linenum_view.layout_index.unwrap()].layout_op =
                         LayoutOperation::Fixed {
