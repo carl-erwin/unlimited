@@ -436,10 +436,7 @@ fn process_single_input_event<'a>(
     // record input sequence
     {
         let mut v = view.write();
-        dbg_println!("eval input event input ev = {:?}", ev);
-        dbg_println!("prev (accum) events = {:?}", v.input_ctx.trigger);
         v.input_ctx.trigger.push((*ev).clone());
-        dbg_println!("cur (accum) events = {:?}", v.input_ctx.trigger);
     }
 
     // action_name = check_input_map_stack(editor, env, v);
@@ -875,7 +872,6 @@ fn clip_coordinates_and_get_view_id(
     vid: view::Id,
 ) -> (view::Id, InputEvent) {
     let mut ev = ev.clone();
-    dbg_println!("CLIPPING input event: {:?}", ev);
 
     let vid = match &mut ev {
         InputEvent::ButtonPress(event::ButtonEvent { x, y, .. }) => {
@@ -898,8 +894,6 @@ fn clip_coordinates_and_get_view_id(
         InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
     };
-
-    dbg_println!("CLIPPING ev out: {:?}, vid {:?}", ev, vid);
 
     (vid, ev)
 }
@@ -1325,8 +1319,6 @@ fn run_input_stage(
         let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
         dbg_println!("setup_focus_and_event ->  Id {:?}", target_id);
 
-        dbg_println!(" after setup_focus_and_event ->  env {:?}", env);
-
         check_pointer_over_change(&mut editor, &mut env, pointer_over_view_id, target_id);
 
         let new_clicked = env.last_selected_view_id;
@@ -1478,8 +1470,6 @@ pub fn main_loop(
 
     while !env.quit {
         if let Ok(msg) = core_rx.recv() {
-            dbg_println!("core: recv event: env = {:?}\n------------------", env);
-
             match msg.event {
                 Event::UpdateView { width, height } => {
                     env.width = width;
