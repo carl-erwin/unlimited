@@ -73,7 +73,7 @@ pub struct EditorEnv<'a> {
     pub current_input_event: crate::core::event::InputEvent,
     /// This flag is set when an input event as triggered a change
     /// and the ui must be refresh
-    pub event_processed: bool,
+    pub refresh_ui: bool,
 
     pub pending_events: usize,
     pub last_rdr_event: Instant,
@@ -128,7 +128,7 @@ impl<'a> EditorEnv<'a> {
             graphic_display,
             quit: false,
             current_input_event: crate::core::event::InputEvent::NoInputEvent,
-            event_processed: false,
+            refresh_ui: false,
             pending_events: 0,
             last_rdr_event: Instant::now(),
             current_time: Instant::now(),

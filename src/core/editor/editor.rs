@@ -988,8 +988,7 @@ fn run_stage(
 
                     // - need_rendering ? -
                     // move ev to env.current_event
-                    env.event_processed =
-                        process_single_input_event(&mut editor, &mut env, view_id);
+                    env.refresh_ui = process_single_input_event(&mut editor, &mut env, view_id);
                 }
                 StagePosition::Post => {
                     view::run_stage(&mut editor, &mut env, &view, pos, stage);
@@ -997,7 +996,7 @@ fn run_stage(
                     env.process_input_end = Instant::now();
 
                     if env.root_view_id != env.prev_view_id {
-                        env.event_processed = true;
+                        env.refresh_ui = true;
 
                         dbg_println!(
                             "view change {:?} ->  {:?}",
