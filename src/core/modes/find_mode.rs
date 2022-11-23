@@ -32,6 +32,9 @@ use crate::core::view::LayoutOperation;
 
 use crate::core::modes::text_mode::center_view_around_offset;
 
+use crate::core::modes::text_mode::cancel_selection;
+use crate::core::modes::text_mode::movement::cancel_marks;
+
 static FIND_TRIGGER_MAP: &str = r#"
 [
   {
@@ -195,6 +198,13 @@ pub fn find_controller_stop(
     if let Some(text_view_id) = v.controlled_view {
         {
             let text_view = get_view_by_id(editor, text_view_id);
+
+            // reset marks, clear selection
+            {
+                cancel_marks(editor, env, &text_view);
+                cancel_selection(editor, env, &text_view);
+            }
+
             let mut text_view = text_view.write();
 
             text_view.controller = None;
@@ -202,11 +212,13 @@ pub fn find_controller_stop(
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.reset();
 
-            //
-            let buffer = v.buffer().unwrap();
-            let mut buffer = buffer.write();
-            buffer.delete_content(None);
-            buffer.append("Find: ".as_bytes());
+            // reset prompt buffer
+            {
+                let buffer = v.buffer().unwrap();
+                let mut buffer = buffer.write();
+                buffer.delete_content(None);
+                buffer.append("Find: ".as_bytes());
+            }
         }
 
         // set input focus to
