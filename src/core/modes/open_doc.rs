@@ -63,6 +63,8 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
      { "in": [{ "key": "Left" } ],      "action": "open-doc:discard-prompt-suffix" },
      { "in": [{ "key": "ctrl+h" } ],    "action": "open-doc:discard-prompt-suffix" },
      { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+Space" } ],"action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+Enter" } ],"action": "open-doc:apply-current-completion" },
      { "in": [{ "key": "ctrl+l" } ],    "action": "open-doc:apply-current-completion" },
      { "in": [{ "key": "Home" } ],      "action": "open-doc:select-first-completion" },
      { "in": [{ "key": "End" } ],       "action": "open-doc:select-last-completion" },
