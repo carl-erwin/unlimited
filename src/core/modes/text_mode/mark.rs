@@ -12,10 +12,19 @@ pub struct Mark {
     pub offset: u64,
 }
 
+// TODO(ceg): handle CR LF properly
+
 fn is_blank(cp: char) -> bool {
     // TODO(ceg): put definition of word in array of char and use any(is_word_vec)
     match cp {
         ' ' /*| '\r'*/ | '\n' | '\t' => true,
+        _ => false,
+    }
+}
+
+fn is_end_of_line(cp: char) -> bool {
+    match cp {
+        '\n' => true,
         _ => false,
     }
 }
@@ -284,6 +293,15 @@ impl Mark {
         self.offset == buffer.size() as u64
     }
 
+    pub fn skip_end_of_line(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        let (cp, _, size) = read_char_forward(&buffer, self.offset, codec);
+        // skip_backward blanks
+        if is_end_of_line(cp) {
+            self.offset += size as u64;
+        }
+        self
+    }
+
     // skip_class(&mut self, direction, fn class_match, buffer, codec)
     // class_match(char) -> bool
     pub fn skip_blanks_backward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
@@ -348,6 +366,29 @@ impl Mark {
         self
     }
 
+    pub fn skip_blanks_forward_until_end_of_line(
+        &mut self,
+        buffer: &Buffer,
+        codec: &dyn TextCodec,
+    ) -> &mut Mark {
+        let max_offset = buffer.size() as u64;
+        let mut prev_offset = self.offset;
+
+        // skip blanks except end of line
+        while prev_offset < max_offset {
+            let (cp, _, size) = read_char_forward(&buffer, prev_offset, codec);
+            if !is_blank(cp) || is_end_of_line(cp) {
+                break;
+            }
+
+            prev_offset += size as u64;
+        }
+
+        self.offset = prev_offset;
+
+        self
+    }
+
     pub fn skip_blanks_forward(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         let max_offset = buffer.size() as u64;
         let mut prev_offset = self.offset;
@@ -391,9 +432,11 @@ impl Mark {
         if self.at_end_of_buffer(buffer) {
             return self;
         }
-        // skip blanks
-        self.skip_blanks_forward(buffer, codec);
+
+        self.skip_end_of_line(buffer, codec);
+        self.skip_blanks_forward_until_end_of_line(buffer, codec);
         self.skip_non_blanks_forward(buffer, codec);
+
         self
     }
 }
