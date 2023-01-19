@@ -288,6 +288,14 @@ impl Mark {
         self
     }
 
+    pub fn at_beginning_of_buffer(&self, _buffer: &Buffer) -> bool {
+        self.offset == 0
+    }
+
+    pub fn at_start_of_buffer(&self, _buffer: &Buffer) -> bool {
+        self.at_beginning_of_buffer(_buffer)
+    }
+
     pub fn at_end_of_buffer(&self, buffer: &Buffer) -> bool {
         // TODO(ceg): end_of_buffer().or_return()
         self.offset == buffer.size() as u64
@@ -323,6 +331,37 @@ impl Mark {
         self
     }
 
+    // skip_class(&mut self, direction, fn class_match, buffer, codec)
+    // class_match(char) -> bool
+    pub fn skip_blanks_backward_until_end_of_line(
+        &mut self,
+        buffer: &Buffer,
+        codec: &dyn TextCodec,
+    ) -> &mut Mark {
+        let mut prev_offset = self.offset;
+
+        // read current char
+        let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
+
+        if cp == '\n' {
+            return self;
+        }
+
+        // blank ?
+        if is_blank(cp) {
+            while prev_offset > 0 {
+                let ret = read_char_backward(&buffer, prev_offset, codec);
+                prev_offset = ret.1;
+                if !is_blank(ret.0) || ret.0 == '\n' {
+                    break;
+                }
+            }
+            self.offset = prev_offset;
+        }
+
+        self
+    }
+
     pub fn skip_non_blanks_backward(
         &mut self,
         buffer: &Buffer,
@@ -347,21 +386,24 @@ impl Mark {
     }
 
     pub fn move_to_token_start(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        if self.offset == 0 {
+        if self.at_start_of_buffer(buffer) {
             return self;
         }
 
-        let (cp, _, _) = read_char_forward(&buffer, self.offset, codec);
-        if !is_blank(cp) {
-            self.skip_non_blanks_backward(buffer, codec);
+        self.move_backward(buffer, codec);
+        let ret = read_char_forward(&buffer, self.offset, codec);
+        if ret.0 == '\n' {
+            return self;
         }
 
-        self.skip_blanks_backward(buffer, codec);
+        self.skip_blanks_backward_until_end_of_line(buffer, codec);
         self.skip_non_blanks_backward(buffer, codec);
-        let (cp, _, _) = read_char_forward(&buffer, self.offset, codec);
-        if is_blank(cp) {
-            self.move_forward(buffer, codec);
+
+        if self.at_start_of_buffer(buffer) {
+            return self;
         }
+
+        self.move_forward(buffer, codec);
 
         self
     }
