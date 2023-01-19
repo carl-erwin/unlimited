@@ -343,7 +343,7 @@ impl Mark {
         // read current char
         let (cp, _, _) = read_char_forward(&buffer, prev_offset, codec);
 
-        if cp == '\n' {
+        if is_end_of_line(cp) {
             return self;
         }
 
@@ -352,7 +352,7 @@ impl Mark {
             while prev_offset > 0 {
                 let ret = read_char_backward(&buffer, prev_offset, codec);
                 prev_offset = ret.1;
-                if !is_blank(ret.0) || ret.0 == '\n' {
+                if !is_blank(ret.0) || is_end_of_line(ret.0) {
                     break;
                 }
             }
@@ -392,7 +392,7 @@ impl Mark {
 
         self.move_backward(buffer, codec);
         let ret = read_char_forward(&buffer, self.offset, codec);
-        if ret.0 == '\n' {
+        if is_end_of_line(ret.0) {
             return self;
         }
 
