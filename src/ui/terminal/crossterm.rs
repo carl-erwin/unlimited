@@ -570,7 +570,47 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
 
     match evt {
+
+        ::crossterm::event::Event::FocusGained => {
+            return InputEvent::NoInputEvent;
+        }
+
+        ::crossterm::event::Event::FocusLost => {
+            return InputEvent::NoInputEvent;
+        }
+
+        ::crossterm::event::Event::Paste(_) => {
+            return InputEvent::NoInputEvent;
+        }
+
+
         ::crossterm::event::Event::Key(ke) => match ke.code {
+
+            ::crossterm::event::KeyCode::KeypadBegin | ::crossterm::event::KeyCode::Media(_) | ::crossterm::event::KeyCode::Modifier(_) => {
+                return InputEvent::NoInputEvent;
+            }
+
+            ::crossterm::event::KeyCode::PrintScreen => {
+                return InputEvent::NoInputEvent;
+            }
+            ::crossterm::event::KeyCode::Pause => {
+                return InputEvent::NoInputEvent;
+            }
+            ::crossterm::event::KeyCode::Menu => {
+                return InputEvent::NoInputEvent;
+            }
+
+            //
+            ::crossterm::event::KeyCode::CapsLock => {
+                return InputEvent::NoInputEvent;
+            }
+            ::crossterm::event::KeyCode::ScrollLock => {
+                return InputEvent::NoInputEvent;
+            }
+            ::crossterm::event::KeyCode::NumLock => {
+                return InputEvent::NoInputEvent;
+            }
+
             ::crossterm::event::KeyCode::Char(c) => {
                 return InputEvent::KeyPress {
                     mods: key_modifiers_no_shift(ke.modifiers),
@@ -758,11 +798,9 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 width: width as usize,
                 height: height as usize,
             };
-        }
-
-        ::crossterm::event::Event::Terminate => {
-            // TODO(ceg): not really an input
-        }
+        } //        ::crossterm::event::Event::Terminate => {
+          //            // TODO(ceg): not really an input
+          //        }
     }
 
     InputEvent::NoInputEvent
