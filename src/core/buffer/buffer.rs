@@ -1014,15 +1014,9 @@ pub fn sync_to_storage(buffer: &Arc<RwLock<Buffer>>) {
 
     // update
     {
-        use std::os::unix::fs::PermissionsExt;
+        // TODO(ceg): store permission when opening the file, compare to current permission, etc..
 
         let mut buffer = buffer.write();
-
-        // TODO(ceg): use mapped file fd, will panic if file is removed
-        let perms = match buffer.metadata() {
-            Ok(metadata) => metadata.permissions(),
-            Err(_) => std::fs::Permissions::from_mode(0o600),
-        };
 
         let tmp_file_name = format!("{}{}", buffer.file_name(), ".update"); // TODO(ceg): move '.update' to global config
 
@@ -1031,6 +1025,21 @@ pub fn sync_to_storage(buffer: &Arc<RwLock<Buffer>>) {
             let _tmp_backup_name = format!("{}{}", buffer.file_name(), "~");
             // TODO(ceg): move '~' to global config
             // let _ = ::std::fs::rename(&buffer.file_name(), &tmp_backup_name);
+        }
+
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            // TODO(ceg): use mapped file fd, will panic if file is removed
+            let perms = match buffer.metadata() {
+                Ok(metadata) => metadata.permissions(),
+                Err(_) => std::fs::Permissions::from_mode(0o600),
+            };
+
+            // TODO(ceg): check result, handle io results properly
+            // set buffer status to : permission denied etc
+            let _ = ::std::fs::set_permissions(&tmp_file_name, perms);
         }
 
         let _ = ::std::fs::rename(&tmp_file_name, &buffer.file_name());
@@ -1045,10 +1054,6 @@ pub fn sync_to_storage(buffer: &Arc<RwLock<Buffer>>) {
             &mut mapped_file,
             new_fd,
         );
-
-        // TODO(ceg): check result, handle io results properly
-        // set buffer status to : permission denied etc
-        let _ = ::std::fs::set_permissions(&buffer.file_name(), perms);
 
         buffer.changed = false;
         buffer.is_syncing = false;
