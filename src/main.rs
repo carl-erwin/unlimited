@@ -1,9 +1,12 @@
 // std
+use std::collections::HashMap;
+
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
 use std::thread;
+use std::time::Duration;
 
 // ext
 extern crate clap;
@@ -68,6 +71,8 @@ fn _check_env_flags() {
 
 /// Parse command and an return a Config
 fn parse_command_line() -> Config {
+    let mut fatal_error = false;
+
     let matches = Command::new("unlimited")
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
@@ -96,12 +101,24 @@ fn parse_command_line() -> Config {
                 .long("--bench-to-eof")
                 .help("render all screen until EOF is reached and quit (wip: no proper quit yet)"),
         )
-        .arg(Arg::new("NO_UI_RENDER").long("--no-ui-render"))
+        .arg(
+            Arg::new("NO_UI_RENDER")
+                .long("--no-ui-render")
+                .help("disable screen output"),
+        )
         .arg(
             Arg::new("RAW_FILTER_TO_SCREEN")
-                .short('r') // TODO remove
+                .short('r')
                 .long("--raw-data-to-screen")
                 .help("disable all filters and put the file's bytes directly to screen"),
+        )
+        .arg(
+            Arg::new("CONFIG_VARS")
+                .short('c')
+                .long("--cfg-var")
+                .help("configuration variables")
+                .takes_value(true)
+                .multiple_values(true),
         )
         .arg(
             Arg::new("FILES")
@@ -150,8 +167,41 @@ fn parse_command_line() -> Config {
         core::set_no_ui_render(true);
     }
 
+    // configuration variables
+    let mut vars: HashMap<String, String> = HashMap::new();
+    if matches.is_present("CONFIG_VARS") {
+        let v = matches
+            .values_of("CONFIG_VARS")
+            .unwrap()
+            .map(|x| {
+                let split: Vec<_> = x.split('=').collect();
+                if split.len() != 2 {
+                    fatal_error = true;
+                    eprintln!("error: invalid configuration variable: {x}");
+                    ("".to_owned(), "".to_owned())
+                } else {
+                    (split[0].to_owned(), split[1].to_owned())
+                }
+            })
+            .collect::<Vec<(String, String)>>();
+        for e in v {
+            if e.0.is_empty() {
+                continue;
+            }
+            vars.insert(e.0, e.1);
+        }
+    }
+
+    // debug
+    println!("config vars = \n{:?}", vars);
+
+    if fatal_error {
+        std::process::exit(1);
+    }
+
     Config {
         files_list,
         ui_frontend,
+        vars,
     }
 }
