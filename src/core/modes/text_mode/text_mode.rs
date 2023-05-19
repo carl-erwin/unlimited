@@ -427,6 +427,14 @@ fn build_text_mode_color_map() -> HashMap<char, (u8, u8, u8)> {
     color_map
 }
 
+fn config_var_is_set(editor: &Editor<'static>, var_name: &str, default: bool) -> bool {
+    if let Some(v) = editor.config.vars.get(var_name) {
+        !(v == "0")
+    } else {
+        default
+    }
+}
+
 impl<'a> Mode for TextMode {
     fn name(&self) -> &'static str {
         &"text-mode"
@@ -469,7 +477,7 @@ impl<'a> Mode for TextMode {
 
     fn configure_view(
         &mut self,
-        _editor: &mut Editor<'static>,
+        editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
@@ -547,18 +555,45 @@ impl<'a> Mode for TextMode {
                 "text/screen", // mandatory
             ]
         } else {
-            vec![
-                "binary/raw",
-                "text/utf8-to-unicode", // TODO(ceg) update/remove TextCodecFilter
-                "text/unicode-to-text",
-                "text/highlight-keywords",
-                "text/highlight-selection",
-                "text/tab-expansion",
-                "text/char-map",
-                "text/show-trailing-spaces",
-                "text/word-wrap",
-                "text/screen", // mandatory
-            ]
+            let mut v = vec![];
+
+            // TODO(ceg): fine a way to list all plugins from command line
+            // --show-config
+            //
+            v.push("binary/raw"); // mandatory
+
+            //
+            v.push("text/utf8-to-unicode"); // TODO(ceg) update/remove TextCodecFilter
+            v.push("text/unicode-to-text");
+
+            if config_var_is_set(&editor, "text-mode:highlight-keywords", true) {
+                v.push("text/highlight-keywords"); // TODO: move to overlay
+            }
+
+            if config_var_is_set(&editor, "text-mode:highlight-selection", true) {
+                v.push("text/highlight-selection"); // TODO: move to overlay
+            }
+
+            if config_var_is_set(&editor, "text-mode:tabs", true) {
+                v.push("text/tab-expansion");
+            }
+
+            if config_var_is_set(&editor, "text-mode:char-map", false) {
+                v.push("text/char-map");
+            }
+
+            if config_var_is_set(&editor, "text-mode:trailing-spaces", true) {
+                v.push("text/show-trailing-spaces");
+            }
+
+            if config_var_is_set(&editor, "text-mode:word-wrap", true) {
+                v.push("text/word-wrap");
+            }
+
+            //
+            v.push("text/screen"); // mandatory
+
+            v
         };
 
         for f in content_filters_pipeline {
