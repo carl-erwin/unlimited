@@ -1661,7 +1661,7 @@ mod tests {
 
                 // randomize s.len
 
-                let random_size: usize = rng.gen_range(0, s.len());
+                let random_size: usize = rng.gen_range(0..s.len());
                 println!("random insert size = {}", random_size);
                 let off_update = buffer.insert(off, random_size, s.as_ref());
                 off += off_update as u64;
