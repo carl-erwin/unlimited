@@ -51,7 +51,7 @@
        { "in": [{ "key": "ctrl+u" }],                          "action": "text-mode:undo" },
        { "in": [{ "key": "ctrl+r" }],                          "action": "text-mode:redo" },
 
-       { "deletion": "---------------------------------------------------------------------------------"},
+       { "edit/deletion": "------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+d" }],                          "action": "text-mode:remove-codepoint" },
        { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
@@ -61,6 +61,8 @@
        { "in": [{ "key": "ctrl+Delete" }],                     "action": "text-mode:remove-until-end-of-word" },
 
        { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
+
+       { "in": [{ "key": "ctrl+t" }],                          "action": "text-mode:transpose-char" },
 
        { "cut/paste/selection": "---------------------------------------------------------------------------------"},
 

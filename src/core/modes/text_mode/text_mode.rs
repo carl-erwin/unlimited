@@ -121,6 +121,8 @@ use crate::core::view::View;
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
+use crate::core::modes::text_mode::mark::read_char_raw_forward;
+
 use super::movement::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -701,6 +703,7 @@ impl TextMode {
             ),
             ("text-mode:paste", paste),
             ("text-mode:cut-to-end-of-line", cut_to_end_of_line),
+            ("text-mode:transpose-char", transpose_char),
             (
                 "text-mode:remove-until-end-of-word",
                 remove_until_end_of_word,
@@ -1766,6 +1769,126 @@ pub fn cut_to_end_of_line(
     assert!(tm.copy_buffer.len() == mlen);
 
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
+    tm.pre_compose_action.push(PostInputAction::CancelSelection);
+}
+
+/*
+    TODO(ceg): with multi marks ?
+
+    if multi marks: return
+    if offset == 0: return
+    if current char is end-of-line : move left
+    a[b]x -> ba[x]
+
+    its like:
+    cut cur char + move left + paste
+
+    expose basic editing/move commands:
+
+    start_transaction()
+    stop_transaction()
+    move_forward(n)
+    move_backward(n)
+    move_forward_until_char(c)
+    move_backward_until_char(c)
+    start_selections()
+    stop_selections()
+
+    TODO: save marks add tags etc ..
+
+*/
+pub fn transpose_char(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    // buffer read only ?
+    {
+        let v = view.read();
+        let buffer = v.buffer().unwrap();
+        let buffer = buffer.read();
+        if buffer.is_syncing {
+            // TODO(ceg): move this test ot upper layer
+            // tag function as content editor ? fn.is_editing_function()
+            return;
+        }
+    }
+
+    {
+        let v = &view.read();
+        let buffer = v.buffer.clone();
+        let buffer = buffer.as_ref().unwrap();
+        let buffer = buffer.read();
+        if buffer.size() < 2 {
+            return;
+        }
+    }
+
+    // save marks
+    run_text_mode_actions_vec(
+        &mut editor,
+        &mut env,
+        &view,
+        &vec![PostInputAction::SaveMarks {
+            caller: &"cut_to_end_of_line",
+        }],
+    );
+
+    let v = &mut view.write();
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
+
+    if buffer.size() < 2 {
+        return;
+    }
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    let codec = tm.text_codec.as_ref();
+
+    tm.copy_buffer.clear();
+
+    let single_mark = tm.marks.len() == 1;
+    if !single_mark {
+        // no multi-char transpose now
+        return;
+    }
+
+    let mut m = &mut tm.marks[0];
+
+    // beginning of buffer ?
+    if m.offset == 0 {
+        return;
+    }
+
+    // get current char
+    let off2 = m.offset;
+    let (c2, _, c2_size, _) = read_char_raw_forward(&buffer, off2, codec);
+    if c2 == '\n' || off2 + c2_size as u64 >= buffer.end_offset() {
+        m.move_backward(&buffer, codec);
+    }
+
+    // save current char
+    // read char
+    let off2 = m.offset;
+    let (_c2, _, c2_size, c2_raw) = read_char_raw_forward(&buffer, off2, codec);
+    if c2_size == 0 {
+        return;
+    }
+
+    //
+    m.move_backward(&buffer, codec);
+    let off1 = m.offset;
+    let len1 = off2 - off1;
+    let len2 = c2_size as u64;
+
+    buffer.remove(off2, c2_size, None);
+    buffer.insert(off1, c2_size, &c2_raw);
+
+    //
+    m.offset = off1 + len1 + len2;
+
     tm.pre_compose_action.push(PostInputAction::CancelSelection);
 }
 

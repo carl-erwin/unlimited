@@ -416,6 +416,14 @@ impl<'a> Buffer<'a> {
         self.inner.size
     }
 
+    pub fn start_offset(&self) -> u64 {
+        0
+    }
+
+    pub fn end_offset(&self) -> u64 {
+        self.inner.size as u64
+    }
+
     pub fn nr_changes(&self) -> usize {
         self.inner.nr_changes() as usize
     }

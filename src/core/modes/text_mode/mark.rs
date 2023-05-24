@@ -29,6 +29,34 @@ fn is_end_of_line(cp: char) -> bool {
     }
 }
 
+// decode + extract raw data
+pub fn read_char_raw_forward(
+    buffer: &Buffer,
+    from_offset: u64,
+    codec: &dyn TextCodec,
+) -> (char, u64, usize, Vec<u8>) {
+    if from_offset == buffer.size() as u64 {
+        // return None;
+        return (b'\0' as char, 0, 0, vec![]);
+    }
+
+    let mut data = Vec::with_capacity(4);
+    let sz = buffer.read(from_offset, data.capacity(), &mut data); // TODO(ceg): decode up to capacity ?
+
+    if DEBUG {
+        dbg_println!(
+            "DOC read {} bytes from offset {} {:x?}",
+            sz,
+            from_offset,
+            data
+        );
+    }
+
+    let r = codec.decode(SyncDirection::Forward, &data, 0);
+    unsafe { data.set_len(r.2) }
+    (r.0, r.1, r.2, data)
+}
+
 // TODO(ceg): codec...
 pub fn read_char_forward(
     buffer: &Buffer,
