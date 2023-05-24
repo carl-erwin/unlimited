@@ -164,24 +164,6 @@ pub fn main_loop(
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
-                    if crate::core::bench_to_eof() && (start - fps_t0).as_millis() >= 1000 {
-                        let screen = screen.read();
-
-                        eprintln!(
-                                "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
-                                start.duration_since(startup).as_millis(),
-                                screen.first_offset,
-                                draw_req,
-                                fps,
-                                p_rdr,
-                                p_input
-                            );
-
-                        fps = 0;
-                        draw_req = 0;
-                        fps_t0 = start;
-                    }
-
                     let mut draw = force_draw;
 
                     if p_rdr < 1 {
@@ -193,6 +175,7 @@ pub fn main_loop(
                         fps += 1;
                     }
 
+                    let mut first_offset = 0;
                     if draw {
                         fps += 1;
 
@@ -200,22 +183,40 @@ pub fn main_loop(
                         {
                             let screen = screen.read();
                             let last_screen = last_screen.write();
+                            first_offset = screen.first_offset.unwrap_or(0);
+
                             draw_view(&last_screen, &screen, &mut stdout);
                         }
                         last_screen = screen;
                     }
 
-                    if false {
+                    if !true {
                         let p_rdr = crate::core::event::pending_render_event_count();
 
                         let end = Instant::now();
 
-                        dbg_println!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
+                        eprintln!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
                         (end - start).as_micros(),
                         fps,
                         p_input,
                         p_rdr, draw
                     );
+                    }
+
+                    if (start - fps_t0).as_millis() >= 1000 {
+                        dbg_println!(
+                                 "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
+                                 start.duration_since(startup).as_millis(),
+                                 first_offset,
+                                 draw_req,
+                                 fps,
+                                 p_rdr,
+                                 p_input
+                             );
+
+                        fps = 0;
+                        draw_req = 0;
+                        fps_t0 = Instant::now();
                     }
                 }
 
@@ -264,6 +265,7 @@ fn draw_view(last_screen: &Screen, screen: &Screen, stdout: &mut std::io::Stdout
     }
 }
 
+#[derive(Debug, Clone)]
 enum ScreenOp {
     MoveTo(u16, u16),
     SetFgColor(u8, u8, u8),
@@ -335,6 +337,8 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
             ops.push(ScreenOp::PrintText(cpi.displayed_cp));
         }
     }
+
+    dbg_println!("NB screen (dumb) ops {}\r", ops.len());
 
     for op in ops {
         match op {
@@ -506,8 +510,6 @@ fn draw_screen(
 
         l += 1;
     }
-
-    // dbg_println!("NB screen ops {}\r", ops.len());
 
     for op in ops {
         match op {
@@ -899,7 +901,7 @@ fn send_input_events(
          In the case of unlimitED we could use a 2M input buffer ?
 
        *) An other solution (hack) (my fork on github)
-        change input fd from blocking to no-blocking mode, do read loop and restore mode on exit.
+        change input fd from blocking to non-blocking mode, do read loop and restore mode on exit.
 */
 fn get_input_events(
     tx: &Sender<EventMessage>,
