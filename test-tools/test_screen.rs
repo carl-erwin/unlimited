@@ -41,11 +41,14 @@ fn main() -> std::io::Result<()> {
                 let mut cpi = CodepointInfo::new();
                 cpi.cp = *c as char;
                 cpi.displayed_cp = *c as char;
-
-                let (ok, _line_index) = screen.push(cpi);
-                if !ok {
-                    screen.clear();
-                    fps += 1;
+                'retry: loop {
+                    let (ok, _line_index) = screen.push(cpi);
+                    if !ok {
+                        screen.clear();
+                        fps += 1;
+                        break 'retry;
+                    }
+                    break;
                 }
             }
 
