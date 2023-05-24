@@ -527,6 +527,13 @@ fn compose_children(
 // This function can be considered as the core of the editor.<br/>
 // It will run the configured filters until the screen is filled or eof is reached.<br/>
 // the screen MUST be cleared first (for LayoutPass::ScreenContent,  LayoutPass::ScreenContentAndOverlay)
+//
+// TODO(ceg): we ca precompute the rendering order
+// by sorting the Views.
+// ie: if View(id=A) depends on the content of View(id=B)
+// we render B first etc..
+//
+//
 pub fn run_compositing_stage_direct(
     editor: &mut Editor<'static>,
     editor_env: &mut EditorEnv<'static>,

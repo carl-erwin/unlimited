@@ -6,7 +6,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
 use std::thread;
-use std::time::Duration;
+//use std::time::Duration;
 
 // ext
 extern crate clap;
