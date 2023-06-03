@@ -11,17 +11,17 @@ doc = false
 name = "unlimited"
 path = "src/main.rs"
 
-[[bin]]
+[[example]]
 doc = false
 name = "gen_lines"
 path = "test-tools/gen_lines.rs"
 
-[[bin]]
+[[example]]
 doc = false
 name = "gen_utf8"
 path = "test-tools/gen_utf8.rs"
 
-[[bin]]
+[[example]]
 doc = false
 name = "test_screen"
 path = "test-tools/test_screen.rs"
