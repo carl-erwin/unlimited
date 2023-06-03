@@ -22,6 +22,8 @@ use unlimited::ui;
 
 use unlimited::core::event::EventMessage;
 
+use unlimited::dbg_println;
+
 /// Program entry point
 /// It parses the command line to build the configuration.
 /// Creates the core thread.
@@ -193,7 +195,7 @@ fn parse_command_line() -> Config {
     }
 
     // debug
-    println!("config vars = \n{:?}", vars);
+    dbg_println!("config vars = \n{:?}", vars);
 
     if fatal_error {
         std::process::exit(1);
