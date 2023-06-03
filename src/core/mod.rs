@@ -170,50 +170,7 @@ text-mode =
       ctrl+x ctrl+x r :  {left,right} alt+{left,right}
 */
 
-pub static WELCOME_MESSAGE: &str = r#"unlimitED! is an experimental text editor.
-           There is ABSOLUTELY NO WARRANTY.
-
-USAGE: unlimited [OPTIONS] [--] [FILES]...    ( -h for help )
-
-It supports:
-  - basic UTF-8
-  - very large file
-  - "unlimited" undo/redo
-  - multi-cursors (wip)
-  - mouse selection (graphical terminal)
-
-[Quit]                 (NB: quit will wait for pending file(s) sync)
-    Quit:           => ctrl+x ctrl+q
-    Quit (no save)  => ctrl+x ctrl+x ctrl+q
-
-[Moves]
-    Arrows          => move the main mark Left,Right,Up,Down
-    PageUp,PageDown => scroll the current view Up/Down
-    ctrl+a          => go to beginning of current line
-    ctrl+e          => go to end of current line
-    ctrl+l          => center view arround main mark
-
-[Edit]
-    characters      => inserted as is
-    ctrl+u          => Undo
-    ctrl+r          => Redo
-    ctrl+o          => Open file (TODO)
-
-[Selection/Copy/Cut/Paste]
-    with the keyboard:
-    ctrl+Space      => start selection at main Mark
-    alt+w           => copy current selection
-    ctrl+w          => cut  current slection
-    ctrl+y          => paste last cut
-
-    with the mouse (X11 terminal, no clipboard support yet)
-
-[Save]
-    ctrl+x ctrl+s   => Save file(s) in the background (read only operations allowed).
-
-[Buffer Selection]
-     (TODO)
-"#;
+pub static WELCOME_MESSAGE: &str = std::include_str!("../../res/welcome_screen.txt");
 
 /// This function is the core of the editor.
 /// It should be ran in an other thread than the main one (which is kept for ui)
