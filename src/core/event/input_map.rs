@@ -448,12 +448,47 @@ fn parse_event_entry_input(mut ctx: &mut ParseCtx, _name: &String, value: &serde
     }
 }
 
+fn reset_io_nodes(
+    in_node: &mut Option<Rc<InputEventRule>>,
+    out_node: &mut Option<Rc<InputEventRule>>,
+) {
+    *in_node = None;
+    *out_node = None;
+}
+
+fn walk_input_event_tree(
+    event_hash: u64,
+    node: &Rc<InputEventRule>,
+    mut in_node: &mut Option<Rc<InputEventRule>>,
+    mut out_node: &mut Option<Rc<InputEventRule>>,
+) -> Option<String> {
+
+    if let Some(map) = &node.as_ref().children {
+        let map = map.borrow();
+        match map.get(&event_hash) {
+            Some(event) => {
+                if let Some(action) = &event.as_ref().action {
+                    return Some(action.to_string());
+                }
+
+                *out_node = Some(Rc::clone(event));
+                dbg_println!("found out_node {:?}", out_node);
+            }
+            None => {}
+        }
+    } else {
+        // dbg_println!("no children found: reset");
+        reset_io_nodes(&mut in_node, &mut out_node);
+    }
+    None
+}
+
 pub fn eval_input_event(
     ev: &InputEvent,
     input_map: &InputEventMap,
     default_action_mode: DefaultActionMode,
-    in_node: &mut Option<Rc<InputEventRule>>,
-    out_node: &mut Option<Rc<InputEventRule>>,
+    mut in_node: &mut Option<Rc<InputEventRule>>,
+    mut out_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
     dbg_println!("   eval_input_event --------------------------");
 
@@ -463,72 +498,42 @@ pub fn eval_input_event(
 
     dbg_println!("event_hash = {}", event_hash);
 
-    // not first level ?
-    if let Some(node) = in_node.as_ref() {
-        dbg_println!("Not 1st level");
+    if let Some(node) = in_node.clone() {
+        return walk_input_event_tree(event_hash, &node, in_node, out_node);
+    }
 
-        if let Some(map) = &node.as_ref().children {
-            let map = map.borrow();
-            match map.get(&event_hash) {
+    // NB: fallback happens only at first level
+    dbg_println!("--- 1st level event ---");
+
+    match input_map.get(&event_hash) {
+        Some(event) => {
+            if let Some(action) = &event.as_ref().action {
+                reset_io_nodes(&mut in_node, &mut out_node);
+                return Some(action.to_string());
+            }
+
+            *out_node = Some(Rc::clone(event));
+        }
+        None => {
+            reset_io_nodes(&mut in_node, &mut out_node);
+            if default_action_mode == DefaultActionMode::IgnoreDefaultAction {
+                return None;
+            };
+
+            // get fallback action
+            let event_hash = compute_input_event_hash(&InputEvent::FallbackEvent);
+            match input_map.get(&event_hash) {
                 Some(event) => {
                     if let Some(action) = &event.as_ref().action {
-                        dbg_println!("\n\n eval_input_event");
                         return Some(action.to_string());
                     }
-
-                    *out_node = Some(Rc::clone(event));
-
-                    dbg_println!("found out_node {:?}", out_node);
                 }
-                None => {}
-            }
-        } else {
-            dbg_println!("no children found: reset");
-            // reset
-            *out_node = None;
-            *in_node = None;
-        }
-    } else {
-        // NB: fallback happens only at first level
-        dbg_println!("--- 1st level event ---");
-
-        match input_map.get(&event_hash) {
-            Some(event) => {
-                if let Some(action) = &event.as_ref().action {
-                    //dbg_println!("found action");
-                    // reset
-                    *out_node = None;
-                    *in_node = None;
-
-                    return Some(action.to_string());
-                }
-
-                *out_node = Some(Rc::clone(event));
-                dbg_println!("found out_node {:?}", out_node);
-            }
-            None => {
-                *out_node = None;
-                *in_node = None;
-
-                if default_action_mode == DefaultActionMode::IgnoreDefaultAction {
-                    return None;
-                };
-
-                let event_hash = compute_input_event_hash(&InputEvent::FallbackEvent);
-                match input_map.get(&event_hash) {
-                    Some(event) => {
-                        if let Some(action) = &event.as_ref().action {
-                            dbg_println!("default found action {}", action);
-                            return Some(action.to_string());
-                        }
-                    }
-                    None => {
-                        dbg_println!("no default action defined");
-                    }
+                None => {
+                    dbg_println!("no default action defined");
                 }
             }
         }
-    };
+    }
 
     None
 }
