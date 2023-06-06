@@ -1147,7 +1147,7 @@ fn open_doc_controller_load_buffer(
     // index buffers
     // TODO(ceg): send one event per doc
     if true {
-        let msg = EventMessage {
+        let msg = Message {
             seq: 0,
             event: Event::IndexTask {
                 buffer_map: Arc::clone(&editor.buffer_map),

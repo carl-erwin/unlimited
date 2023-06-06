@@ -462,7 +462,6 @@ fn walk_input_event_tree(
     mut in_node: &mut Option<Rc<InputEventRule>>,
     mut out_node: &mut Option<Rc<InputEventRule>>,
 ) -> Option<String> {
-
     if let Some(map) = &node.as_ref().children {
         let map = map.borrow();
         match map.get(&event_hash) {

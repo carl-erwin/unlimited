@@ -39,7 +39,7 @@ use crate::core::config::Config;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
-use crate::core::event::EventMessage;
+use crate::core::event::Message;
 
 use crate::core::view::View;
 
@@ -176,9 +176,9 @@ pub static WELCOME_MESSAGE: &str = std::include_str!("../../res/welcome_screen.t
 /// It should be ran in an other thread than the main one (which is kept for ui)
 pub fn run(
     config: Config,
-    core_rx: &Receiver<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
+    core_rx: &Receiver<Message<'static>>,
+    core_tx: &Sender<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
 ) {
     let (worker_tx, worker_rx) = channel();
     let (indexer_tx, indexer_rx) = channel();
@@ -223,10 +223,7 @@ pub fn run(
 
 /////////////////////// worker.rs
 
-pub fn worker(
-    worker_rx: &Receiver<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
-) {
+pub fn worker(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<'static>>) {
     dbg_println!("[starting worker thread]");
     loop {
         if let Ok(evt) = worker_rx.recv() {
@@ -239,7 +236,7 @@ pub fn worker(
                 Event::SyncTask { buffer } => {
                     buffer::sync_to_storage(&buffer);
 
-                    let msg = EventMessage::new(0, Event::RefreshView);
+                    let msg = Message::new(0, Event::RefreshView);
                     core_tx.send(msg).unwrap_or(());
                 }
 
@@ -254,10 +251,7 @@ pub fn worker(
     }
 }
 
-pub fn indexer(
-    worker_rx: &Receiver<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
-) {
+pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<'static>>) {
     if !use_byte_index() {
         return;
     }
@@ -285,7 +279,7 @@ pub fn indexer(
                         }
 
                         // notify
-                        let msg = EventMessage::new(
+                        let msg = Message::new(
                             0,
                             Event::Buffer {
                                 event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
@@ -296,14 +290,14 @@ pub fn indexer(
                         // TODO: remove this: let the ui decide if the refresh is needed base on buffer_id
 
                         // send ui refresh event
-                        let msg = EventMessage::new(0, Event::RefreshView);
+                        let msg = Message::new(0, Event::RefreshView);
                         core_tx.send(msg).unwrap_or(());
 
                         refresh_ui = true;
                         let t1 = std::time::Instant::now();
                         if (t1 - t0).as_millis() > 1000 {
                             // send ui refresh event
-                            let msg = EventMessage::new(0, Event::RefreshView);
+                            let msg = Message::new(0, Event::RefreshView);
                             core_tx.send(msg).unwrap_or(());
 
                             refresh_ui = false;
@@ -313,7 +307,7 @@ pub fn indexer(
 
                     // last ui refresh
                     if refresh_ui {
-                        let msg = EventMessage::new(0, Event::RefreshView);
+                        let msg = Message::new(0, Event::RefreshView);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }
@@ -650,7 +644,7 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
     // index buffers
     // TODO(ceg): send one event per doc
     if true {
-        let msg = EventMessage {
+        let msg = Message {
             seq: 0,
             event: Event::IndexTask {
                 buffer_map: Arc::clone(&editor.buffer_map),

@@ -56,21 +56,21 @@ pub fn pending_render_event_count() -> usize {
 
 /// Message sent between core and ui threads.
 #[derive(Debug, Clone)]
-pub struct EventMessage<'a> {
+pub struct Message<'a> {
     /// sequence number. should be reused in corresponding answer.
     pub seq: usize,
     /// underlying event.
     pub event: Event<'a>,
-    // pub reply_to: Sender<EventMessage>, // clone
+    // pub reply_to: Sender<Message>, // clone
 }
 
-impl<'a> EventMessage<'a> {
+impl<'a> Message<'a> {
     pub fn new(seq: usize, event: Event<'a>) -> Self {
-        EventMessage { seq, event }
+        Message { seq, event }
     }
 }
 
-/// Events sent between core and ui threads via EventMessage encapsulation.
+/// Events sent between core and ui threads via Message encapsulation.
 #[derive(Debug, Clone)]
 pub enum Event<'a> {
     /// Sent by ui thread. Request the rendering of a given view.

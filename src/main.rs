@@ -20,7 +20,7 @@ use unlimited::core::config::Config;
 use unlimited::core::VERSION;
 use unlimited::ui;
 
-use unlimited::core::event::EventMessage;
+use unlimited::core::event::Message;
 
 use unlimited::dbg_println;
 
@@ -52,9 +52,9 @@ fn main() {
 
 fn start_core_thread(
     config: Config,
-    core_tx: Sender<EventMessage<'static>>,
-    core_rx: Receiver<EventMessage<'static>>,
-    ui_tx: Sender<EventMessage<'static>>,
+    core_tx: Sender<Message<'static>>,
+    core_rx: Receiver<Message<'static>>,
+    ui_tx: Sender<Message<'static>>,
 ) -> Option<thread::JoinHandle<()>> {
     let _tx_ = ui_tx.clone();
     let core_tx = core_tx.clone();

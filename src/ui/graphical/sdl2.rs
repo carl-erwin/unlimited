@@ -8,7 +8,7 @@ use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
 
-use crate::core::event::EventMessage;
+use crate::core::event::Message;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
@@ -24,9 +24,9 @@ pub type Result<T> = std::result::Result<T, ErrorKind>;
 pub type ErrorKind = io::Error;
 
 pub fn main_loop_sdl(
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
+    ui_rx: &Receiver<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
+    core_tx: &Sender<Message<'static>>,
 ) -> Result<()> {
     let sdl_context = sdl2::init().unwrap();
 
@@ -146,9 +146,9 @@ struct Cell {
 }
 
 pub fn main_loop_sdl_gl(
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
+    ui_rx: &Receiver<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
+    core_tx: &Sender<Message<'static>>,
 ) -> Result<()> {
     let sdl_context = sdl2::init().unwrap();
 

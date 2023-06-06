@@ -36,8 +36,8 @@ use crate::core::event::Event;
 use crate::core::event::Event::*;
 use crate::core::event::PointerEvent;
 
-use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::event::Message;
 use crate::core::screen::Screen;
 
 //use crate::core::event::InputEvent::*;
@@ -48,7 +48,7 @@ use crate::core::event::KeyModifiers;
 
 use crate::core::codepointinfo::CodepointInfo;
 
-fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
+fn stdin_thread(core_tx: &Sender<Message>, ui_tx: &Sender<Message>) {
     // TODO(ceg): generate_test from logs grep | awk >>
     //    let v = autotest_0001();
     //    send_input_events(&v, &tx);
@@ -62,9 +62,9 @@ fn stdin_thread(core_tx: &Sender<EventMessage>, ui_tx: &Sender<EventMessage>) {
 // }
 
 pub fn main_loop(
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
+    ui_rx: &Receiver<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
+    core_tx: &Sender<Message<'static>>,
 ) -> Result<()> {
     let startup = Instant::now();
     let mut draw_req = 0;
@@ -122,7 +122,7 @@ pub fn main_loop(
     // first request
     // check terminal size
     let (width, height) = crossterm::terminal::size().ok().unwrap();
-    let msg = EventMessage::new(
+    let msg = Message::new(
         get_next_seq(&mut seq),
         Event::UpdateView {
             width: width as usize,
@@ -141,17 +141,15 @@ pub fn main_loop(
         if let Ok(evt) = ui_rx.recv() {
             match evt.event {
                 Event::ApplicationQuit => {
-                    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+                    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                     break;
                 }
 
                 UpdateView { width, height } => {
-                    let msg = EventMessage::new(
-                        get_next_seq(&mut seq),
-                        Event::UpdateView { width, height },
-                    );
+                    let msg =
+                        Message::new(get_next_seq(&mut seq), Event::UpdateView { width, height });
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                 }
@@ -770,11 +768,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     InputEvent::NoInputEvent
 }
 
-fn send_input_events(
-    accum: Vec<InputEvent>,
-    tx: &Sender<EventMessage>,
-    _ui_tx: &Sender<EventMessage>,
-) {
+fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Sender<Message>) {
     let mut v = Vec::<InputEvent>::new();
 
     // merge consecutive characters as "array" of chars
@@ -783,7 +777,7 @@ fn send_input_events(
     if accum.len() == 1 {
         match accum[0] {
             InputEvent::RefreshUi { width, height } => {
-                let msg = EventMessage::new(0, Event::UpdateView { width, height });
+                let msg = Message::new(0, Event::UpdateView { width, height });
 
                 // ui_tx.send(msg).unwrap_or(()); ?
 
@@ -794,7 +788,7 @@ fn send_input_events(
 
             _ => {
                 // send
-                let msg = EventMessage::new(0, Event::Input { events: accum });
+                let msg = Message::new(0, Event::Input { events: accum });
                 crate::core::event::pending_input_event_inc(1);
                 tx.send(msg).unwrap_or(());
                 return;
@@ -849,7 +843,7 @@ fn send_input_events(
 
     // resize are urgent
     if refresh {
-        let msg = EventMessage::new(
+        let msg = Message::new(
             0,
             Event::UpdateView {
                 width: new_width,
@@ -875,7 +869,7 @@ fn send_input_events(
     // send
     if !v.is_empty() {
         let ev_count = v.len();
-        let msg = EventMessage::new(0, Event::Input { events: v });
+        let msg = Message::new(0, Event::Input { events: v });
         crate::core::event::pending_input_event_inc(ev_count);
         tx.send(msg).unwrap_or(());
     }
@@ -903,10 +897,7 @@ fn send_input_events(
        *) An other solution (hack) (my fork on github)
         change input fd from blocking to non-blocking mode, do read loop and restore mode on exit.
 */
-fn get_input_events(
-    tx: &Sender<EventMessage>,
-    ui_tx: &Sender<EventMessage>,
-) -> ::crossterm::Result<()> {
+fn get_input_events(tx: &Sender<Message>, ui_tx: &Sender<Message>) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(255);
     let mut wait_ms = 60_000;
     let max_wait_ms = 150;

@@ -289,7 +289,7 @@ pub fn save_buffer(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &Rc
     let buffer_map = buffer_map.read();
 
     if let Some(buffer) = buffer_map.get(&buffer_id) {
-        let msg = EventMessage {
+        let msg = Message {
             seq: 0,
             event: Event::SyncTask {
                 buffer: Arc::clone(buffer),

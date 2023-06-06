@@ -4,13 +4,13 @@ mod terminal;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
-use crate::core::event::EventMessage;
+use crate::core::event::Message;
 
 pub fn main_loop(
     ui_name: &str,
-    ui_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
-    core_tx: &Sender<EventMessage<'static>>,
+    ui_rx: &Receiver<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
+    core_tx: &Sender<Message<'static>>,
 ) {
     // TODO(ceg): switch ui here
     match ui_name {

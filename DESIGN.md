@@ -11,14 +11,14 @@ Unlimited design will evolve at will. Suggestions are welcomed.
      <br/>
 
      These two threads communicate through standard channels (mpsc).<br/>
-     The data sent/received is call an **EventMessage**.<br/>
+     The data sent/received is call an **Message**.<br/>
 
 ------
 
 ### Editor primitives
 
-- **EventMessage**<br/>
-An **EventMessage** main purpose is to encapsulate user inputs.<br/>
+- **Message**<br/>
+An **Message** main purpose is to encapsulate user inputs.<br/>
 TODO(ceg): add time info/ sequence / etc.<br/>
 
 - **Event**<br/>

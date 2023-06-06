@@ -31,8 +31,8 @@ use crate::core::event::input_map::DefaultActionMode;
 
 use crate::core::event::Event;
 use crate::core::event::Event::Draw;
-use crate::core::event::EventMessage;
 use crate::core::event::InputEvent;
+use crate::core::event::Message;
 
 use crate::core::event::Key;
 use crate::core::event::KeyModifiers;
@@ -170,10 +170,10 @@ pub struct Editor<'a> {
     pub view_map: Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'a>>>>>>,
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub dir_modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
-    pub core_tx: Sender<EventMessage<'a>>,
-    pub ui_tx: Sender<EventMessage<'a>>,
-    pub worker_tx: Sender<EventMessage<'a>>,
-    pub indexer_tx: Sender<EventMessage<'a>>,
+    pub core_tx: Sender<Message<'a>>,
+    pub ui_tx: Sender<Message<'a>>,
+    pub worker_tx: Sender<Message<'a>>,
+    pub indexer_tx: Sender<Message<'a>>,
 }
 
 impl<'a> Editor<'a> {
@@ -181,10 +181,10 @@ impl<'a> Editor<'a> {
     pub fn new(
         config: Config,
         //
-        core_tx: Sender<EventMessage<'a>>,
-        ui_tx: Sender<EventMessage<'a>>,
-        worker_tx: Sender<EventMessage<'a>>,
-        indexer_tx: Sender<EventMessage<'a>>,
+        core_tx: Sender<Message<'a>>,
+        ui_tx: Sender<Message<'a>>,
+        worker_tx: Sender<Message<'a>>,
+        indexer_tx: Sender<Message<'a>>,
     ) -> Editor<'a> {
         Editor {
             config,
@@ -320,14 +320,14 @@ pub fn update_view_and_send_draw_event(
 pub fn send_draw_event(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
-    ui_tx: &Sender<EventMessage>,
+    ui_tx: &Sender<Message>,
     view: &Rc<RwLock<View>>,
 ) {
     let view = view.read();
 
     let new_screen = Arc::clone(&view.screen);
 
-    let msg = EventMessage::new(
+    let msg = Message::new(
         0, // get_next_seq(&mut seq), TODO
         Draw {
             screen: new_screen,
@@ -580,7 +580,7 @@ fn process_single_input_event<'a>(
     true
 }
 
-fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Sender<EventMessage>) {
+fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Sender<Message>) {
     //
     let p_input = crate::core::event::pending_input_event_count();
     let p_rdr = crate::core::event::pending_render_event_count();
@@ -1373,7 +1373,7 @@ fn run_input_stage(
 fn process_input_events(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    _ui_tx: &Sender<EventMessage>,
+    _ui_tx: &Sender<Message>,
     events: &Vec<InputEvent>,
 ) {
     let start = Instant::now();
@@ -1456,8 +1456,8 @@ fn process_buffer_event(
 pub fn main_loop(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
-    core_rx: &Receiver<EventMessage<'static>>,
-    ui_tx: &Sender<EventMessage<'static>>,
+    core_rx: &Receiver<Message<'static>>,
+    ui_tx: &Sender<Message<'static>>,
 ) {
     let mut seq: usize = 0;
 
@@ -1511,14 +1511,14 @@ pub fn main_loop(
     }
 
     // send ApplicationQuit to worker thread
-    let msg = EventMessage::new(0, Event::ApplicationQuit);
+    let msg = Message::new(0, Event::ApplicationQuit);
     editor.worker_tx.send(msg).unwrap_or(());
 
     // send ApplicationQuit to ui thread
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
     ui_tx.send(msg).unwrap_or(());
 
     // send ApplicationQuit to indexer thread
-    let msg = EventMessage::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
     editor.indexer_tx.send(msg).unwrap_or(());
 }

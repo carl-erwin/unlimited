@@ -1,4 +1,4 @@
-use crate::core::event::EventMessage;
+use crate::core::event::Message;
 use std::sync::mpsc::Sender;
 
 use crate::core::view::ContentFilter;
@@ -29,7 +29,7 @@ pub struct ScreenFilter {
     last_offset: Option<u64>,
     screen_is_full: bool,
     pub display_eof: bool,
-    pub ui_tx: Option<Sender<EventMessage<'static>>>,
+    pub ui_tx: Option<Sender<Message<'static>>>,
 }
 
 impl<'a> ScreenFilter {
@@ -59,7 +59,7 @@ impl<'a> ScreenFilter {
             if bench_to_eof() {
                 let new_screen = env.screen.clone();
 
-                let msg = EventMessage::new(
+                let msg = Message::new(
                     0, // get_next_seq(&mut seq), TODO
                     crate::core::event::Event::Draw {
                         screen: std::sync::Arc::new(RwLock::new(Box::new(new_screen))),
