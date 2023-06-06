@@ -537,7 +537,7 @@ fn process_single_input_event<'a>(
     if action_name.is_none() {
         let v = view.read();
         if v.input_ctx.current_node.is_some() {
-            dbg_println!(" no action found , but sequence started -> return false");
+            dbg_println!(" no action found, but sequence started -> return false");
         } else {
             dbg_println!("no action found -> return false");
         }
