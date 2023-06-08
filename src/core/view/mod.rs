@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use crate::core::buffer;
 use crate::core::buffer::Buffer;
 
 use crate::core::editor::Editor;
@@ -326,6 +327,7 @@ pub struct View<'a> {
       maybe allow to change compose filter of status_view_id ?
       for custom status display ?
     */
+    pub buffer_id: buffer::Id,
     pub buffer: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
 
     pub modes: Vec<String>, // TODO: add Arc<dyn Modes>
@@ -492,6 +494,11 @@ impl<'a> View<'a> {
         let mode_ctx = HashMap::new();
         let input_ctx = InputContext::new();
 
+        let buffer_id = match buffer {
+            Some(ref arc) => arc.as_ref().read().id,
+            _ => buffer::Id(0),
+        };
+
         dbg_println!("CREATE new VIEW {id}, modes {modes:?}");
 
         let mut v = View {
@@ -504,6 +511,7 @@ impl<'a> View<'a> {
             controller: None,
             controlled_view: None,
             id: Id(id),
+            buffer_id,
             buffer,
             screen,
             //

@@ -704,6 +704,8 @@ impl TextMode {
             ("text-mode:paste", paste),
             ("text-mode:cut-to-end-of-line", cut_to_end_of_line),
             ("text-mode:transpose-char", transpose_char),
+            ("text-mode:move-line-up", move_line_up),
+            ("text-mode:move-line-down", move_line_down),
             (
                 "text-mode:remove-until-end-of-word",
                 remove_until_end_of_word,
@@ -1560,6 +1562,226 @@ pub fn remove_codepoint(
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
     tm.pre_compose_action.push(PostInputAction::CancelSelection);
+}
+
+pub fn move_line_up(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    // compute offsets
+
+    let (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset) = {
+        let v = &mut view.write();
+
+        let mut buffer = v.buffer.clone();
+        let buffer = buffer.as_mut().unwrap();
+        let buffer = buffer.write();
+
+        // let buffer = editor.buffer_by_id(v.buffer_id);
+        // let buffer = buffer.write();
+
+        // first line ?
+        if buffer.size() == 0 {
+            return;
+        }
+
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+
+        // - count(marks) > 1: ignore
+        if tm.marks.len() > 1 {
+            return;
+        }
+
+        let codec = tm.text_codec.as_ref();
+
+        // - save mark offset
+        let m_offset = tm.marks[0].offset;
+
+        let mut m = tm.marks[0].clone();
+
+        // - go to beginning of line : save s_offset
+        m.move_to_start_of_line(&buffer, codec);
+        let s_offset = m.offset;
+
+        // fist line ?
+        if s_offset == 0 {
+            return;
+        }
+
+        // restore mark
+        m.offset = m_offset;
+
+        // - go to end of line + save e_offset
+        m.move_to_end_of_line(&buffer, codec);
+        let e_offset = m.offset;
+
+        // - move to end of previous line
+        m.offset = s_offset;
+        m.move_backward(&buffer, codec);
+        // - go to beginning of previous line : save t_offset
+        m.move_to_start_of_line(&buffer, codec);
+
+        // save previous line start offset
+        let t_offset = m.offset;
+        m.move_to_end_of_line(&buffer, codec);
+        // save previous line end offset
+        let t_end_offset = m.offset;
+
+        // - mark_local_offset m_offset - s_offset
+        let mark_local_offset = m_offset - s_offset;
+
+        (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset)
+    };
+
+    // save marks
+    {
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"move_line_up",
+            }],
+        );
+    }
+
+    // apply
+    {
+        let v = &mut view.write();
+
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let mut buffer = buffer.write();
+
+        // - remove s_offset..e_offset -> line (no \n)
+        let sz1 = (e_offset - s_offset) as usize;
+        let mut l1_data = Vec::<u8>::with_capacity(sz1);
+        buffer.remove(s_offset, sz1, Some(&mut l1_data));
+
+        // - remove t_offset..t_end_offset -> line (no \n)
+        let sz2 = (t_end_offset - t_offset) as usize;
+        let mut l2_data = Vec::<u8>::with_capacity(sz2);
+        buffer.remove(t_offset, sz2, Some(&mut l2_data));
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        //
+        buffer.insert(t_offset, l1_data.len(), &l1_data);
+        let off = t_offset + l1_data.len() as u64 + 1;
+        buffer.insert(off, l2_data.len(), &l2_data);
+
+
+        tm.marks[0].offset = t_offset + mark_local_offset;
+    }
+}
+
+
+pub fn move_line_down(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    // compute offsets
+    let (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset) = {
+        let v = &mut view.write();
+
+        let mut buffer = v.buffer.clone();
+        let buffer = buffer.as_mut().unwrap();
+        let buffer = buffer.write();
+
+        // let buffer = editor.buffer_by_id(v.buffer_id);
+        // let buffer = buffer.write();
+        let max_offset = buffer.size() as u64;
+        if max_offset == 0 {
+            return;
+        }
+
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+
+        // - count(marks) > 1: ignore
+        if tm.marks.len() > 1 {
+            return;
+        }
+
+        let codec = tm.text_codec.as_ref();
+
+        // - save mark offset
+        let m_offset = tm.marks[0].offset;
+
+        let mut m = tm.marks[0].clone();
+
+        // - go to end of line
+        m.move_to_end_of_line(&buffer, codec);
+        let e_offset = m.offset;
+        if e_offset == max_offset {
+            // eof
+            return;
+        }
+
+        // restore mark
+        m.offset = m_offset;
+
+        // - go to beginning of line : save s_offset
+        m.move_to_start_of_line(&buffer, codec);
+        let s_offset = m.offset;
+
+        // - mark_local_offset m_offset - s_offset
+        let mark_local_offset = m_offset - s_offset;
+
+        // skip end of line + \n
+        m.offset = e_offset;
+        m.move_forward(&buffer, codec);
+        // - we are at the start of next line
+        // save target/insert offset
+        let t_offset = m.offset;
+
+        // - go to end of next line : save t_end_offset
+        m.move_to_end_of_line(&buffer, codec);
+        let t_end_offset = m.offset;
+
+
+        (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset)
+    };
+
+    // save marks
+    {
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"move_line_down",
+            }],
+        );
+    }
+
+    // apply
+    {
+        let v = &mut view.write();
+
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let mut buffer = buffer.write();
+
+        // - remove t_offset..t_end_offset -> line (no \n)
+        let sz2 = (t_end_offset - t_offset) as usize;
+        let mut l2_data = Vec::<u8>::with_capacity(sz2);
+        buffer.remove(t_offset, sz2, Some(&mut l2_data));
+
+        // - remove s_offset..e_offset -> line (no \n)
+        let sz1 = (e_offset - s_offset) as usize;
+        let mut l1_data = Vec::<u8>::with_capacity(sz1);
+        buffer.remove(s_offset, sz1, Some(&mut l1_data));
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        //
+        buffer.insert(s_offset, l2_data.len(), &l2_data);
+
+        let off = s_offset + l2_data.len() as u64 + 1;
+        buffer.insert(off, l1_data.len(), &l1_data);
+
+        tm.marks[0].offset = off + mark_local_offset;
+    }
 }
 
 /// Skip blanks (if any) and remove until end of the word.

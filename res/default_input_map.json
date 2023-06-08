@@ -8,10 +8,11 @@
        { "in": [{ "key": "Right"    }],                        "action": "text-mode:move-marks-forward" },
 
        { "in": [{ "key": "Up"       }],                        "action": "text-mode:move-marks-to-previous-line" },
-       { "in": [{ "key": "ctrl+shift+Up" }],                    "action": "text-mode:clone-and-move-mark-to-previous-line" },
+       { "in": [{ "key": "ctrl+shift+Up" }],                   "action": "text-mode:clone-and-move-mark-to-previous-line" },
 
        { "in": [{ "key": "Down" }],                            "action": "text-mode:move-marks-to-next-line" },
-       { "in": [{ "key": "ctrl+shift+Down" }],                  "action": "text-mode:clone-and-move-mark-to-next-line" },
+       { "in": [{ "key": "ctrl+shift+Down" }],                 "action": "text-mode:clone-and-move-mark-to-next-line" },
+
 
        { "in": [{ "key": "PageUp"   }],                        "action": "text-mode:page-up" },
        { "in": [{ "key": "PageDown" }],                        "action": "text-mode:page-down" },
@@ -63,6 +64,9 @@
        { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },
 
        { "in": [{ "key": "ctrl+t" }],                          "action": "text-mode:transpose-char" },
+
+       { "in": [{ "key": "alt+Up" }],                          "action": "text-mode:move-line-up" },
+       { "in": [{ "key": "alt+Down" }],                        "action": "text-mode:move-line-down" },
 
        { "cut/paste/selection": "---------------------------------------------------------------------------------"},
 
