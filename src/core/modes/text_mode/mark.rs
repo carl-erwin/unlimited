@@ -1,3 +1,5 @@
+use core::panic;
+
 //
 use crate::core::buffer::Buffer;
 
@@ -293,13 +295,24 @@ impl Mark {
             return self;
         }
 
+        dbg_println!("move_to_start_of_line: self.offset {}", self.offset);
+
         let mut encode = [0; 4];
         let sz = codec.encode('\n' as u32, &mut encode);
-        self.offset = if let Some(offset) = buffer.find_reverse(&encode[..sz], self.offset, None) {
-            offset + sz as u64
-        } else {
-            0
-        };
+
+        let target_offset =
+            if let Some(offset) = buffer.find_reverse(&encode[..sz], self.offset, None) {
+                dbg_println!("move_to_start_of_line: find at offset {}", offset);
+                dbg_println!("move_to_start_of_line: encode sz {}", sz);
+
+                offset + sz as u64
+            } else {
+                dbg_println!("move_to_start_of_line: not found");
+                0
+            };
+        dbg_println!("move_to_start_of_line: target_offset {}", target_offset);
+
+        self.offset = target_offset;
 
         self
     }

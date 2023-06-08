@@ -1175,13 +1175,22 @@ impl<'a> MappedFile<'a> {
     }
 
     fn find_reverse_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
+
+        dbg_println!("find_reverse_in_vec : data[{}] = {:?}", data.len(), data);
+
         'outer: for (d_pos, b) in v.iter().enumerate().rev() {
+
+            dbg_println!("find_reverse_in_vec : d_pos {} *b {}", d_pos, *b);
+
             if *b == data[0] && d_pos + data.len() <= v.len() {
                 for i in 0..data.len() {
                     if data[i] != v[d_pos + i] {
                         continue 'outer;
                     }
                 }
+
+                dbg_println!("find_reverse_in_vec : found at d_pos {}", d_pos);
+
                 return Some(d_pos);
             }
         }
@@ -1208,7 +1217,6 @@ impl<'a> MappedFile<'a> {
         dbg_println!("find_reverse: min_offset {:?}", min_offset);
 
         let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
-        // let mut chunk: Vec<u8> = Vec::with_capacity(16);
         loop {
             dbg_println!("find_reverse: from_offset {}", from_offset);
 
