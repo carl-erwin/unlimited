@@ -233,6 +233,10 @@ impl<'a> Editor<'a> {
         assert_ne!(id, view::Id(0));
         self.view_map.write().insert(id, Rc::new(RwLock::new(view))); // move to View::new ?
     }
+
+    pub fn buffer_by_id(&mut self, bid: buffer::Id) -> Arc<RwLock<Buffer<'static>>> {
+        self.buffer_map.write().get(&bid).unwrap().clone()
+    }
 }
 
 pub fn get_view_map(
