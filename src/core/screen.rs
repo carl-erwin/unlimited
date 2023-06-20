@@ -122,13 +122,10 @@ impl Screen {
             return;
         }
 
-        let mut cur_offset = self.first_offset.clone();
+        let mut cur_offset = self.first_offset;
 
-        match (cur_offset, self.buffer[0].cpi.offset) {
-            (Some(cur), Some(first)) => {
-                assert_eq!(cur, first)
-            }
-            _ => {}
+        if let (Some(cur), Some(first)) = (cur_offset, self.buffer[0].cpi.offset) {
+            assert_eq!(cur, first)
         }
 
         if self.has_eof() {
@@ -242,7 +239,7 @@ impl Screen {
         // self.check_invariants();
 
         // TODO(ceg):  cpi.check_invariants();
-        if !true {
+        if false {
             if !cpi.metadata && cpi.size == 0 {
                 dbg_println!("CPI = {:?}", cpi);
                 panic!();
@@ -334,7 +331,7 @@ impl Screen {
         }
 
         if self.push_count == 0 {
-            self.first_offset = cpi.offset.clone();
+            self.first_offset = cpi.offset;
         } else {
             let cpi_offset = cpi.offset;
             let last_offset = self.last_offset;

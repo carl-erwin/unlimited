@@ -1175,11 +1175,9 @@ impl<'a> MappedFile<'a> {
     }
 
     fn find_reverse_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
-
         dbg_println!("find_reverse_in_vec : data[{}] = {:?}", data.len(), data);
 
         'outer: for (d_pos, b) in v.iter().enumerate().rev() {
-
             dbg_println!("find_reverse_in_vec : d_pos {} *b {}", d_pos, *b);
 
             if *b == data[0] && d_pos + data.len() <= v.len() {

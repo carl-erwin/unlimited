@@ -274,7 +274,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                     let mut t0 = std::time::Instant::now();
                     for (id, buffer) in map.iter() {
                         let is_indexed = buffer::build_index(buffer);
-                        if is_indexed == false {
+                        if !is_indexed {
                             continue;
                         }
 
@@ -476,13 +476,11 @@ fn build_buffer_options(editor: &Editor<'static>) -> Vec<ArgInfo> {
 // do symlink resolution (annotation) before real path
 // check reap paths
 fn filter_arg_list(arg_info: Vec<ArgInfo>) -> Vec<ArgInfo> {
-    let v = arg_info;
-
-    v
+    arg_info
 }
 
 pub fn path_to_buffer_kind(path: &String) -> BufferKind {
-    match fs::metadata(&path) {
+    match fs::metadata(path) {
         Ok(metadata) => {
             let file_type = metadata.file_type();
 

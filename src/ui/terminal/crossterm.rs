@@ -132,10 +132,7 @@ pub fn main_loop(
     crate::core::event::pending_input_event_inc(1);
     core_tx.send(msg).unwrap_or(()); // if removed the 1st screen is not displayed
 
-    let force_draw = match std::env::var("UNLIMITED_CROSSTERM_FORCE_DRAW") {
-        Ok(_) => true,
-        Err(_) => false,
-    };
+    let force_draw = std::env::var("UNLIMITED_CROSSTERM_FORCE_DRAW").is_ok();
 
     loop {
         if let Ok(evt) = ui_rx.recv() {
@@ -188,7 +185,7 @@ pub fn main_loop(
                         last_screen = screen;
                     }
 
-                    if !true {
+                    if false {
                         let p_rdr = crate::core::event::pending_render_event_count();
 
                         let end = Instant::now();

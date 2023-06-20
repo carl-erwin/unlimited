@@ -189,8 +189,8 @@ impl VscrollbarMode {
         VscrollbarMode {}
     }
 
-    pub fn register_input_stage_actions<'a>(mut map: &'a mut InputStageActionMap<'a>) {
-        register_input_stage_action(&mut map, "vscrollbar:input-event", vscrollbar_input_event);
+    pub fn register_input_stage_actions<'a>(map: &'a mut InputStageActionMap<'a>) {
+        register_input_stage_action(map, "vscrollbar:input-event", vscrollbar_input_event);
     }
 }
 

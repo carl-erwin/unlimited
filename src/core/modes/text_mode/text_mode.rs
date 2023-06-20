@@ -1631,7 +1631,13 @@ pub fn move_line_up(
         // - mark_local_offset m_offset - s_offset
         let mark_local_offset = m_offset - s_offset;
 
-        (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset)
+        (
+            s_offset,
+            e_offset,
+            t_offset,
+            t_end_offset,
+            mark_local_offset,
+        )
     };
 
     // save marks
@@ -1670,11 +1676,9 @@ pub fn move_line_up(
         let off = t_offset + l1_data.len() as u64 + 1;
         buffer.insert(off, l2_data.len(), &l2_data);
 
-
         tm.marks[0].offset = t_offset + mark_local_offset;
     }
 }
-
 
 pub fn move_line_down(
     mut editor: &mut Editor<'static>,
@@ -1739,8 +1743,13 @@ pub fn move_line_down(
         m.move_to_end_of_line(&buffer, codec);
         let t_end_offset = m.offset;
 
-
-        (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset)
+        (
+            s_offset,
+            e_offset,
+            t_offset,
+            t_end_offset,
+            mark_local_offset,
+        )
     };
 
     // save marks

@@ -47,7 +47,7 @@ pub struct VsplitModeContext {
 
 impl<'a> Mode for VsplitMode {
     fn name(&self) -> &'static str {
-        &"vsplit-mode"
+        "vsplit-mode"
     }
 
     fn build_action_map(&self) -> InputStageActionMap<'static> {
@@ -243,6 +243,12 @@ impl VsplitModeComposeFilter {
     }
 }
 
+impl Default for VsplitModeComposeFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContentFilter<'_> for VsplitModeComposeFilter {
     fn name(&self) -> &'static str {
         &"vsplit-compose-filter"
@@ -265,7 +271,7 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         cpi.displayed_cp = '│';
 
         loop {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(cpi);
             if !b {
                 env.quit = true;
                 break;

@@ -173,26 +173,21 @@ impl FilterIo {
     }
 
     pub fn check_invariants(&self) {
-        match self {
-            FilterIo {
-                metadata,
-                size,
-                offset: _,
-                data: FilterData::TextInfo { .. },
-                ..
-            } => {
-                if *size > 0 && *metadata {
-                    dbg_println!("INVALID IO [METADATA] {:?}", self);
-                    panic!("");
-                }
-                if *size == 0 && !metadata {
-                    dbg_println!("INVALID IO [NON META] {:?}", self);
-                    panic!("");
-                }
+        if let FilterIo {
+            metadata,
+            size,
+            offset: _,
+            data: FilterData::TextInfo { .. },
+            ..
+        } = self
+        {
+            if *size > 0 && *metadata {
+                dbg_println!("INVALID IO [METADATA] {:?}", self);
+                panic!("");
             }
-
-            _ => {
-                // TODO:
+            if *size == 0 && !metadata {
+                dbg_println!("INVALID IO [NON META] {:?}", self);
+                panic!("");
             }
         }
     }

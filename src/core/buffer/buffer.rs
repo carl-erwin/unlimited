@@ -328,27 +328,27 @@ impl<'a> Buffer<'a> {
         let inner = match kind {
             BufferKind::File => {
                 if file_name.is_empty() {
-                    InnerBuffer::empty(id, mode.clone())
+                    InnerBuffer::empty(id, mode)
                 } else {
-                    InnerBuffer::new(id, &file_name, mode.clone())
+                    InnerBuffer::new(id, &file_name, mode)
                 }
             }
 
-            BufferKind::Directory => InnerBuffer::empty(id, mode.clone()),
+            BufferKind::Directory => InnerBuffer::empty(id, mode),
         };
 
         let mut changed = false;
         // fallback
         let inner = if inner.is_none() {
             changed = true;
-            InnerBuffer::empty_with_name(id, &buffer_name, mode.clone())
+            InnerBuffer::empty_with_name(id, &buffer_name, mode)
         } else {
             inner
         };
 
         let buffer = Buffer {
             id,
-            kind: kind,
+            kind,
             name: buffer_name.clone(),
             inner: inner.unwrap(),
             cache: BufferReadCache::new(), // TODO(ceg): have a per view cache or move to View
