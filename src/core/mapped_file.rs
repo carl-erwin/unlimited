@@ -1175,19 +1175,14 @@ impl<'a> MappedFile<'a> {
     }
 
     fn find_reverse_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
-        dbg_println!("find_reverse_in_vec : data[{}] = {:?}", data.len(), data);
 
         'outer: for (d_pos, b) in v.iter().enumerate().rev() {
-            dbg_println!("find_reverse_in_vec : d_pos {} *b {}", d_pos, *b);
-
             if *b == data[0] && d_pos + data.len() <= v.len() {
                 for i in 0..data.len() {
                     if data[i] != v[d_pos + i] {
                         continue 'outer;
                     }
                 }
-
-                dbg_println!("find_reverse_in_vec : found at d_pos {}", d_pos);
 
                 return Some(d_pos);
             }
@@ -1211,43 +1206,33 @@ impl<'a> MappedFile<'a> {
             return None;
         }
 
-        dbg_println!("find_reverse: from_offset {}", from_offset);
-        dbg_println!("find_reverse: min_offset {:?}", min_offset);
 
-        let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024 * 2);
+        let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024);
         loop {
-            dbg_println!("find_reverse: from_offset {}", from_offset);
 
             let remain = from_offset.saturating_sub(min_offset);
-            dbg_println!("find_reverse: remain {}", remain);
             if remain == 0 {
                 break;
             }
 
             chunk.clear();
-            let rd_size = std::cmp::min(chunk.capacity() + data.len(), remain as usize);
-            dbg_println!("find_reverse: rd_size {}", rd_size);
+            let rd_size = std::cmp::min(chunk.capacity(), remain as usize);
 
             let base_offset = from_offset.saturating_sub(rd_size as u64);
-            dbg_println!("find_reverse: base_offset {:?}", base_offset);
+            dbg_println!("find_reverse base_offset {base_offset} + rd_size {rd_size}");
 
             let mut it = MappedFile::iter_from(&file, base_offset);
             let _n_read = MappedFile::read(&mut it, rd_size, &mut chunk); // TODO(ceg) io error
 
-            dbg_println!("find_reverse: chunk @{base_offset} = {:?}", chunk);
-            dbg_println!(
-                "find_reverse: chunk last = '{}'",
-                *chunk.last().unwrap() as char
-            );
-
             let index = MappedFile::find_reverse_in_vec(&chunk, &data);
             if let Some(index) = index {
-                dbg_println!("find_reverse: index Some({:?})", index);
                 return Some(base_offset + index as u64);
             } else {
-                // from_offset = base_offset.saturating_sub(1);
+
+                from_offset = base_offset.saturating_sub(chunk.capacity() as u64);
+
                 // TODO: data[0] not found in chunk ->  from_offset = base_offset.saturating_sub(1);
-                from_offset = from_offset.saturating_sub(data.len() as u64);
+                // from_offset = from_offset.saturating_sub(data.len() as u64);
             }
         }
 
