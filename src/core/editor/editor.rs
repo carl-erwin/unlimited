@@ -1301,7 +1301,8 @@ fn run_input_stage(
     let mut recompose = false;
     let _ui_tx = editor.ui_tx.clone();
 
-    for ev in flat_events.iter() {
+    let nb_events = flat_events.len();
+    for (idx, ev) in flat_events.iter().enumerate() {
         if env.pending_events > 0 {
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
@@ -1332,8 +1333,8 @@ fn run_input_stage(
 
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
-        // if !env.skip_compositing
-        {
+        // recompute intermediate screen up to date
+        if idx + 1 < nb_events {
             run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
         }
 
@@ -1360,12 +1361,9 @@ fn run_input_stage(
         }
     }
 
-    // flush_ui_event(editor, env, &ui_tx);
-    //run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
-
     // POST ?
-    let id = env.root_view_id;
-    run_stage(Post, Stage::Input, &mut editor, &mut env, id);
+    // let id = env.root_view_id;
+    // run_stage(Post, Stage::Input, &mut editor, &mut env, id);
 
     if recompose {
         Stage::Compositing
