@@ -973,12 +973,6 @@ fn run_text_mode_actions(
 ) {
     dbg_println!("run_text_mode_actions stage {:?} pos {:?},", stage, pos);
 
-    {
-        let mut v = view.write();
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
-    }
-
     let actions: Vec<PostInputAction> = {
         match (stage, pos) {
             (editor::Stage::Input, editor::StagePosition::Pre) => {
@@ -1003,8 +997,9 @@ fn run_text_mode_actions(
             (editor::Stage::Input, editor::StagePosition::Post) => {
                 let mut v = view.write();
                 let buffer = v.buffer.clone();
+                let buffer = buffer.as_ref().unwrap();
 
-                if let Some(buffer) = buffer {
+                {
                     let buffer = buffer.read();
                     let max_offset = buffer.size() as u64;
 
@@ -1014,6 +1009,7 @@ fn run_text_mode_actions(
                     let mut save_marks = false;
                     // save marks if any change is detected
                     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
                     if tm.prev_mark_revision != tm.mark_revision {
                         save_marks = true;
                     }
@@ -1021,17 +1017,32 @@ fn run_text_mode_actions(
                     // save marks on buffer changes
                     if buffer.buffer_log.pos > tm.prev_buffer_log_revision
                         && tm.prev_action == TextModeAction::MarksMove
+                        || tm.prev_action == TextModeAction::BufferModification
                     {
+                        // update read cache
+                        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
+
                         // not undo/redo
                         save_marks = true;
                     }
 
+                    if tm.prev_action == TextModeAction::Undo
+                        || tm.prev_action == TextModeAction::Redo
+                    {
+                        assert_eq!(save_marks, false);
+                        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
+                    }
+
                     if save_marks {
-                        tm.pre_compose_action
-                            .push(PostInputAction::DeduplicateAndSaveMarks {
-                                caller: &"run_text_mode_actions",
-                            });
-                        tm.pre_compose_action.push(PostInputAction::CheckMarks);
+                        {
+                            // undo/redo just restore marks and selections
+                            tm.pre_compose_action
+                                .push(PostInputAction::DeduplicateAndSaveMarks {
+                                    caller: &"run_text_mode_actions",
+                                });
+
+                            tm.pre_compose_action.push(PostInputAction::CheckMarks);
+                        }
                     }
                 }
 
@@ -1058,6 +1069,10 @@ fn run_text_mode_actions(
             }
         }
     };
+
+    if actions.is_empty() {
+        return;
+    }
 
     run_text_mode_actions_vec(editor, env, view, &actions);
 
@@ -1171,40 +1186,22 @@ pub fn insert_codepoint_array(
         }
     }
 
-    // check previous action:
-    // if previous action was mark(s) move -> save current marks before modifying the buffer
+    // check previous action: if previous action was a mark move -> tag new positions
     let save_marks = {
         let v = view.read();
         let tm = v.mode_ctx::<TextModeContext>("text-mode");
-        let buffer = v.buffer.as_ref().unwrap();
-        let buffer = buffer.read();
-        let last_pos = buffer.buffer_log_pos() >= buffer.buffer_log_count().saturating_sub(1);
-        dbg_println!(
-            "buffer log {} / {} | buffer.changed {}, buffer.nr_changes() {}",
-            buffer.buffer_log_pos(),
-            buffer.buffer_log_count(),
-            buffer.changed, // NEW != changed -> need save
-            buffer.nr_changes()
-        );
-        !last_pos
-            || tm.prev_action == TextModeAction::MarksMove
-            || tm.prev_action == TextModeAction::BufferModification
+        tm.prev_action == TextModeAction::MarksMove
     };
 
-    // TODO(ceg): find a way to remove this
     if save_marks {
-        // if undo/redo pos is last do nothing
-        dbg_println!("insert_codepoint_array: SAVING marks");
         run_text_mode_actions_vec(
             editor,
             env,
             view,
             &vec![PostInputAction::DeduplicateAndSaveMarks {
-                caller: &"insert_code_point_array",
+                caller: &"insert_codepoint_array",
             }],
         );
-    } else {
-        dbg_println!("skip buff lod save marks");
     }
 
     // delete selection before insert
@@ -1388,26 +1385,10 @@ pub fn remove_previous_codepoint(
 
 /// Undo the previous write operation and sync the screen around the main mark.<br/>
 pub fn undo(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    _editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    // check previous action:
-    let save_marks = {
-        let v = view.read();
-        let tm = v.mode_ctx::<TextModeContext>("text-mode");
-        tm.prev_action == TextModeAction::BufferModification
-    };
-    // TODO(ceg): fin a way to remove this
-    if save_marks {
-        run_text_mode_actions_vec(
-            editor,
-            env,
-            view,
-            &vec![PostInputAction::DeduplicateAndSaveMarks { caller: &"undo" }],
-        );
-    }
-
     let v = &mut view.write();
 
     let mut buffer = v.buffer.clone();
@@ -1417,6 +1398,8 @@ pub fn undo(
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     let marks = &mut tm.marks;
     let select_point = &mut tm.select_point;
+
+    buffer.buffer_log_dump();
 
     dbg_println!(
         "undo: buffer.buffer_log_count {:?}",
@@ -1442,8 +1425,7 @@ pub fn undo(
 
     tm.mark_index = 0; // ??
 
-    tm.pre_compose_action
-        .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+    tm.pre_compose_action.push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
     tm.prev_action = TextModeAction::Undo;
 }
@@ -1497,6 +1479,7 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
         .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
     tm.prev_action = TextModeAction::Redo;
+
     /*
     TODO(ceg): add this function pointer attr
     if TextModeAction::Modification -> save marks before exec, etc ...
@@ -1779,7 +1762,6 @@ pub fn move_line_down(
 
         //
         buffer.insert(s_offset, l2_data.len(), &l2_data);
-
         let off = s_offset + l2_data.len() as u64 + 1;
         buffer.insert(off, l1_data.len(), &l1_data);
 

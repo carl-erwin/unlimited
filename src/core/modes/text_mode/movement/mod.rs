@@ -789,7 +789,6 @@ pub fn move_marks_to_previous_line(
         }
 
         // schedule actions
-        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
         tm.pre_compose_action.push(PostInputAction::CheckMarks);
         // save last op
         tm.prev_action = TextModeAction::MarksMove;
