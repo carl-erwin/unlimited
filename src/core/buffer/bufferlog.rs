@@ -54,7 +54,7 @@ impl BufferLog {
             op.dump();
         }
         dbg_println!("dump buffer log pos = {}\r", self.pos);
-        dbg_println!("}}\r");
+        dbg_println!("}} ---\r");
     }
 
     pub fn dump_to_current_log_pos(&self) {
@@ -71,7 +71,7 @@ impl BufferLog {
         op_type: BufferOperationType,
         data: Option<Arc<Vec<u8>>>,
     ) -> usize {
-        dbg_println!("-- BufferLog::add()");
+        dbg_println!("-- BufferLog::add() before");
         self.dump();
 
         let op = BufferOperation {
@@ -88,6 +88,9 @@ impl BufferLog {
 
         self.data.push(op);
         self.pos = self.data.len();
+
+        dbg_println!("-- BufferLog::add() after");
+        self.dump();
 
         self.pos
     }

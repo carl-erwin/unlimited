@@ -1175,7 +1175,6 @@ impl<'a> MappedFile<'a> {
     }
 
     fn find_reverse_in_vec(v: &Vec<u8>, data: &[u8]) -> Option<usize> {
-
         'outer: for (d_pos, b) in v.iter().enumerate().rev() {
             if *b == data[0] && d_pos + data.len() <= v.len() {
                 for i in 0..data.len() {
@@ -1206,10 +1205,8 @@ impl<'a> MappedFile<'a> {
             return None;
         }
 
-
         let mut chunk: Vec<u8> = Vec::with_capacity(1024 * 1024);
         loop {
-
             let remain = from_offset.saturating_sub(min_offset);
             if remain == 0 {
                 break;
@@ -1228,7 +1225,6 @@ impl<'a> MappedFile<'a> {
             if let Some(index) = index {
                 return Some(base_offset + index as u64);
             } else {
-
                 from_offset = base_offset.saturating_sub(chunk.capacity() as u64);
 
                 // TODO: data[0] not found in chunk ->  from_offset = base_offset.saturating_sub(1);

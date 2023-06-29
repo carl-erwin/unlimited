@@ -465,7 +465,7 @@ impl<'a> Mode for TextMode {
             color_map: Some(color_map),
             pre_compose_action: vec![],
             post_compose_action: vec![],
-            prev_action: TextModeAction::MarksMove,
+            prev_action: TextModeAction::Ignore,
         };
 
         Box::new(ctx)
@@ -838,7 +838,7 @@ pub fn run_text_mode_actions_vec(
                 if n > 0 {
                     buffer.tag(
                         env.current_time,
-                        max_offset,
+                        max_offset, // ???
                         marks_offsets,
                         selections_offsets,
                     );
@@ -1015,12 +1015,9 @@ fn run_text_mode_actions(
                     }
 
                     // save marks on buffer changes
-                    if buffer.buffer_log.pos > tm.prev_buffer_log_revision
-                        && tm.prev_action == TextModeAction::MarksMove
-                        || tm.prev_action == TextModeAction::BufferModification
+                    if buffer.buffer_log.pos != tm.prev_buffer_log_revision
+                        && tm.prev_action == TextModeAction::BufferModification
                     {
-                        // update read cache
-                        tm.pre_compose_action.push(PostInputAction::UpdateReadCache);
 
                         // not undo/redo
                         save_marks = true;
@@ -1401,6 +1398,13 @@ pub fn undo(
 
     buffer.buffer_log_dump();
 
+    if buffer.buffer_log_pos() == 0 {
+        dbg_println!("undo: no undo history");
+
+        tm.prev_action = TextModeAction::Ignore; // ?
+        return;
+    }
+
     dbg_println!(
         "undo: buffer.buffer_log_count {:?}",
         buffer.buffer_log_count()
@@ -1425,7 +1429,8 @@ pub fn undo(
 
     tm.mark_index = 0; // ??
 
-    tm.pre_compose_action.push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+    tm.pre_compose_action
+        .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
     tm.prev_action = TextModeAction::Undo;
 }
