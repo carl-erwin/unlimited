@@ -177,7 +177,7 @@ pub fn main_loop(
                         // the slow part
                         {
                             let screen = screen.read();
-                            let last_screen = last_screen.write();
+                            let last_screen = last_screen.read();
                             first_offset = screen.first_offset.unwrap_or(0);
 
                             draw_view(&last_screen, &screen, &mut stdout);
