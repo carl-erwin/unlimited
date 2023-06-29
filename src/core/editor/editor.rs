@@ -956,14 +956,14 @@ fn run_stages(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view_id: view::Id,
-) -> Stage {
+) {
     use StagePosition::In;
     use StagePosition::Post;
     use StagePosition::Pre;
 
     run_stage(Pre, stage, &mut editor, &mut env, view_id);
     run_stage(In, stage, &mut editor, &mut env, view_id);
-    run_stage(Post, stage, &mut editor, &mut env, view_id)
+    run_stage(Post, stage, &mut editor, &mut env, view_id);
 }
 
 fn run_stage(
@@ -972,15 +972,10 @@ fn run_stage(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view_id: view::Id,
-) -> Stage {
+) {
     let view = check_view_by_id(editor, view_id);
     if view.is_none() {
-        return match stage {
-            Stage::Input => Stage::Compositing,
-            Stage::Compositing => Stage::UpdateUi,
-            Stage::UpdateUi => Stage::Input,
-            // Stage::Restart ?
-        };
+        return;
     }
 
     dbg_println!("run stage for view  {:?}", view_id);
@@ -995,7 +990,6 @@ fn run_stage(
             match pos {
                 StagePosition::Pre => {
                     env.process_input_start = Instant::now();
-                    env.skip_compositing = false;
                     view::run_stage(&mut editor, &mut env, &view, pos, stage);
                 }
 
@@ -1011,6 +1005,7 @@ fn run_stage(
 
                     env.process_input_end = Instant::now();
 
+                    // root view changed ?
                     if env.root_view_id != env.prev_view_id {
                         env.refresh_ui = true;
 
@@ -1034,6 +1029,7 @@ fn run_stage(
                                 .get(&env.root_view_id)
                                 .unwrap()
                                 .clone();
+
                             view::run_stage(
                                 &mut editor,
                                 &mut env,
@@ -1060,11 +1056,12 @@ fn run_stage(
         }
 
         //
-        Stage::Compositing => match pos {
-            StagePosition::Pre => view::run_stage(&mut editor, &mut env, &view, pos, stage),
-            StagePosition::In => view::run_stage(&mut editor, &mut env, &view, pos, stage),
-            StagePosition::Post => view::run_stage(&mut editor, &mut env, &view, pos, stage),
-        },
+        Stage::Compositing => {
+            view::run_stage(&mut editor, &mut env, &view, pos, stage);
+            if let (StagePosition::In, Stage::Compositing) = (pos, stage) {
+                view::compute_root_view_layout(editor, env, &view);
+            }
+        }
 
         //
         Stage::UpdateUi => match pos {
@@ -1088,24 +1085,6 @@ fn run_stage(
     let end = Instant::now();
     let diff = (end - start).as_micros();
     env.time_spent[stage_to_index(stage)][stage_pos_to_index(pos)] += diff;
-
-    if pos != StagePosition::Post {
-        return stage;
-    }
-
-    match stage {
-        Stage::Input => {
-            if env.skip_compositing {
-                dbg_println!("skip Stage::Compositing");
-                Stage::UpdateUi
-            } else {
-                Stage::Compositing
-            }
-        }
-        Stage::Compositing => Stage::UpdateUi,
-        Stage::UpdateUi => Stage::Input,
-        // Stage::Restart ?
-    }
 }
 
 /*
@@ -1290,20 +1269,18 @@ fn check_selection_change(
 }
 
 // Loop over all input events
-fn run_input_stage(
+fn run_all_stages(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     events: &Vec<InputEvent>,
-) -> Stage {
-    use StagePosition::Post;
-
+) {
     // Pre
     // self.flat_events
     env.pending_events = crate::core::event::pending_input_event_count();
     let flat_events = events;
     //let flat_events = flatten_input_events(&events);
     if flat_events.is_empty() {
-        return Stage::Input;
+        return;
     };
 
     // IN : move flat_events to en, StageTrait pre/in/post
@@ -1313,8 +1290,7 @@ fn run_input_stage(
     let mut recompose = false;
     let _ui_tx = editor.ui_tx.clone();
 
-    let nb_events = flat_events.len();
-    for (idx, ev) in flat_events.iter().enumerate() {
+    for ev in flat_events.iter() {
         if env.pending_events > 0 {
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
@@ -1345,10 +1321,9 @@ fn run_input_stage(
 
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
-        // recompute intermediate screen up to date
-        if idx + 1 < nb_events {
-            run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
-        }
+        // render intermediate screen
+        assert_ne!(target_id, env.root_view_id);
+        run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
 
         // update active view (no root change)
         if prev_root_index == env.root_view_index {
@@ -1373,15 +1348,12 @@ fn run_input_stage(
         }
     }
 
-    // POST ?
-    // let id = env.root_view_id;
-    // run_stage(Post, Stage::Input, &mut editor, &mut env, id);
+    // must render root view once
+    let id = env.root_view_id;
+    run_stages(Stage::Compositing, &mut editor, &mut env, id);
 
-    if recompose {
-        Stage::Compositing
-    } else {
-        Stage::UpdateUi
-    }
+    // send screen to ui
+    run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
 }
 
 fn process_input_events(
@@ -1390,17 +1362,10 @@ fn process_input_events(
     _ui_tx: &Sender<Message>,
     events: &Vec<InputEvent>,
 ) {
-    let start = Instant::now();
-
     env.time_spent = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
-    let mut stage = run_input_stage(&mut editor, &mut env, &events);
-
-    while stage != Stage::Input {
-        let id = env.root_view_id;
-        stage = run_stages(stage, &mut editor, &mut env, id);
-    }
-
+    let start = Instant::now();
+    run_all_stages(&mut editor, &mut env, &events);
     let end = Instant::now();
 
     for (idx, _f) in env.time_spent.iter().enumerate() {

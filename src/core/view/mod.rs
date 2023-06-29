@@ -651,10 +651,6 @@ pub fn run_stage(
     for a in actions {
         a.1(editor, env, view, pos, stage);
     }
-
-    if let (StagePosition::In, Stage::Compositing) = (pos, stage) {
-        compute_root_view_layout(editor, env, view); // can be merged with stage_actions ?
-    }
 }
 
 pub fn compute_root_view_layout(

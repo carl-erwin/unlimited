@@ -109,8 +109,6 @@ pub struct EditorEnv<'a> {
 
     pub center_offset: Option<u64>,
 
-    pub skip_compositing: bool, // hint: clear this in pre Input
-
     // stages stats
     pub time_spent: [[u128; 3]; 3],
 }
@@ -148,7 +146,6 @@ impl<'a> EditorEnv<'a> {
             prev_view_id: view::Id(1), // NB
             root_view_id: view::Id(1), // NB
             center_offset: None,
-            skip_compositing: false,
             active_view: None,
             pointer_over_view_id: view::Id(0),
             last_selected_view_id: view::Id(0),

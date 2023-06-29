@@ -1215,8 +1215,6 @@ fn move_onscreen_single_mark_to_next_line(
                     tm.prev_action = TextModeAction::MarksMove;
                 }
             }
-            // do not update screen twice
-            env.skip_compositing = true;
 
             run_compositing_stage_direct(
                 editor,
