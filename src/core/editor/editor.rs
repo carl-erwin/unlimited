@@ -239,6 +239,18 @@ impl<'a> Editor<'a> {
     }
 }
 
+pub fn config_var_is_set(editor: &Editor<'static>, var_name: &str, default: bool) -> bool {
+    if let Some(v) = editor.config.vars.get(var_name) {
+        !(v == "0")
+    } else {
+        default
+    }
+}
+
+pub fn config_var_get<'a>(editor: &'a Editor<'a>, var_name: &str) -> Option<&'a String> {
+    editor.config.vars.get(var_name)
+}
+
 pub fn get_view_map(
     editor: &Editor<'static>,
 ) -> Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'static>>>>>> {

@@ -125,6 +125,8 @@ use crate::core::modes::text_mode::mark::read_char_raw_forward;
 
 use super::movement::*;
 
+use crate::core::editor::config_var_is_set;
+
 #[derive(Debug, Clone, Copy)]
 pub enum PostInputAction {
     ScrollUp { n: usize },
@@ -427,14 +429,6 @@ fn build_text_mode_color_map() -> HashMap<char, (u8, u8, u8)> {
     color_map.insert('\t', tab_color);
 
     color_map
-}
-
-fn config_var_is_set(editor: &Editor<'static>, var_name: &str, default: bool) -> bool {
-    if let Some(v) = editor.config.vars.get(var_name) {
-        !(v == "0")
-    } else {
-        default
-    }
 }
 
 impl<'a> Mode for TextMode {
