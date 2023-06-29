@@ -18,6 +18,11 @@ use std::time::Instant;
 pub use super::*;
 
 // crate
+use crate::core::disable_dbg_println;
+use crate::core::enable_dbg_println;
+use crate::core::get_dbg_println_flag;
+use crate::core::toggle_dbg_println;
+
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
 
@@ -561,6 +566,10 @@ fn process_single_input_event<'a>(
         return false;
     }
 
+    let mut debug_action = false;
+
+    let debug_flag = get_dbg_println_flag();
+
     // exec_input_action()
     let action = {
         let mut v = view.write();
@@ -576,14 +585,30 @@ fn process_single_input_event<'a>(
             v.input_ctx.stack_pos = None;
             return false;
         }
+
+        let var = format!("trace:{action_name}");
+        if config_var_is_set(&editor, &var, false) {
+            debug_action = true;
+        }
+
         let f = action_fn.clone().unwrap();
         f.clone()
     };
 
     // return action ?
+    if debug_action {
+        enable_dbg_println();
+    }
+
     let start = Instant::now();
+
     action(editor, env, &mut view);
     let end = Instant::now();
+
+    if debug_flag == 0 {
+        disable_dbg_println();
+    }
+
     dbg_println!("time to run action {} µs", (end - start).as_micros());
 
     {

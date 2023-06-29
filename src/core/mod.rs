@@ -54,6 +54,10 @@ static OFFSET_SUFFIX_REGEX: &str = r"^(.*):@([0-9]+)";
 static FILE_LINE_COLUMN_REGEX: &str = r"^([^:]+):([0-9]+):?([0-9]+)?";
 
 //
+pub fn get_dbg_println_flag() -> usize {
+    DBG_PRINTLN_FLAG.load(Ordering::Relaxed)
+}
+
 pub static DBG_PRINTLN_FLAG: AtomicUsize = AtomicUsize::new(0);
 
 pub fn enable_dbg_println() {
