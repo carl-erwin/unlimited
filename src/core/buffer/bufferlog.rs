@@ -71,6 +71,9 @@ impl BufferLog {
         op_type: BufferOperationType,
         data: Option<Arc<Vec<u8>>>,
     ) -> usize {
+        dbg_println!("-- BufferLog::add()");
+        self.dump();
+
         let op = BufferOperation {
             op_type,
             data,

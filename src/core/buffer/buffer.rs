@@ -554,6 +554,10 @@ impl<'a> Buffer<'a> {
         self.inner.read(offset, nr_bytes, data) // reread cache
     }
 
+    pub fn buffer_log_dump(&self) {
+        self.buffer_log.dump()
+    }
+
     pub fn buffer_log_pos(&self) -> usize {
         self.buffer_log.pos
     }
