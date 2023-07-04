@@ -65,6 +65,15 @@ impl BufferLog {
         dbg_println!("----------------------------------\r");
     }
 
+    pub fn last_index(&self) -> Option<usize> {
+        let len = self.data.len();
+        if len > 0 {
+            Some(len - 1)
+        } else {
+            None
+        }
+    }
+
     pub fn add(
         &mut self,
         offset: u64,
