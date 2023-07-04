@@ -2913,6 +2913,18 @@ pub fn center_view_around_offset(
     scroll_view_up(view, editor, env, h);
 }
 
+use crate::core::disable_dbg_println;
+use crate::core::enable_dbg_println;
+use crate::core::get_dbg_println_flag;
+
 pub fn print_buffer_log(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
+    let debug_flag = get_dbg_println_flag();
+    enable_dbg_println();
+
+    dbg_println!("-------------------------------------------------------");
     view.read().buffer().unwrap().read().buffer_log.dump();
+
+    if debug_flag == 0 {
+        disable_dbg_println();
+    }
 }
