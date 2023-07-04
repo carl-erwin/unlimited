@@ -1245,6 +1245,10 @@ pub fn move_marks_to_next_line(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     if move_onscreen_single_mark_to_next_line(editor, env, view) {
+        // save last op
+        let mut v = view.write();
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        tm.prev_action = TextModeAction::MarksMove;
         return;
     }
 
