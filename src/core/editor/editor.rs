@@ -21,7 +21,6 @@ pub use super::*;
 use crate::core::disable_dbg_println;
 use crate::core::enable_dbg_println;
 use crate::core::get_dbg_println_flag;
-use crate::core::toggle_dbg_println;
 
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
