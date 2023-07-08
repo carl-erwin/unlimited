@@ -49,6 +49,8 @@ impl BufferLog {
     pub fn dump(&self) {
         dbg_println!("-- BufferLog::dump() {{\r");
 
+        dbg_println!("--  pos {}\r", self.pos);
+
         for (idx, op) in self.data.iter().enumerate() {
             dbg_println!("dump buffer log [{}] = \r", idx);
             op.dump();
