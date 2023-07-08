@@ -46,6 +46,9 @@ use crate::core::view::View;
 //use crate::core::error::Error;
 //type UnlResult<T> = Result<T, Error>;
 
+use once_cell::sync::Lazy;
+pub static BOOT_TIME: Lazy<std::time::SystemTime> = Lazy::new(|| std::time::SystemTime::now());
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 static OFFSET_PREFIX_REGEX: &str = r"^\+?@([0-9]+)";

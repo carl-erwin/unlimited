@@ -6,7 +6,7 @@ macro_rules! dbg_println {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("{}:{} ", file!(), line!());
+            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis() ,file!(), line!());
             eprintln!($($arg)*)
         }
     }};
@@ -20,7 +20,7 @@ macro_rules! dbg_print {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("{}:{} ", file!(), line!());
+            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis() ,file!(), line!());
             eprint!($($arg)*)
         }
     }};
