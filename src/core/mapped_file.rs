@@ -1307,16 +1307,23 @@ impl<'a> MappedFile<'a> {
                     }
 
                     Page::InRam(base, ref mut len, capacity) => {
-                        let mut v = unsafe { Vec::from_raw_parts(base as *mut u8, *len, capacity) };
 
                         let index = it.local_offset as usize;
-                        for (n, b) in data.iter().enumerate() {
-                            v.insert(index + n, *b);
+                        unsafe {
+                            let mut v = Vec::from_raw_parts(base as *mut u8, *len, capacity);
+
+                            assert!(index <= v.len());
+
+                            let insert_ptr = v.as_mut_ptr().offset(index as isize);
+                            std::ptr::copy(
+                                insert_ptr,
+                                insert_ptr.offset(data.len() as isize),
+                                v.len() - index,
+                            );
+                            std::ptr::copy_nonoverlapping(data.as_ptr(), insert_ptr, data.len());
+                            *len = *len + data.len();
+                            mem::forget(v);
                         }
-
-                        *len = v.len();
-
-                        mem::forget(v);
                     }
                 },
             },
