@@ -29,17 +29,15 @@ macro_rules! dbg_print {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! trace_block {
-    ($($arg:tt)*) => {{
-        use crate::core::DBG_PRINTLN_FLAG;
-        use std::sync::atomic::Ordering;
+    ($trace_label:expr, $($arg:tt)*) => {
 
         let now = std::time::SystemTime::now();
 
         $($arg)*
 
-        if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprintln!("trace_block [{}] {}:{} ", now.elapsed().unwrap().as_millis(),file!(), line!());
+        if crate::core::DBG_PRINTLN_FLAG.load(std::sync::atomic::Ordering::Relaxed) != 0 {
+            eprintln!("-- trace_block [{} ms] {} ({}:{}) ", now.elapsed().unwrap().as_millis(), $trace_label,  file!(), line!());
         }
 
-    }};
+    };
 }
