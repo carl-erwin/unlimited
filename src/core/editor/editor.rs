@@ -239,7 +239,7 @@ impl<'a> Editor<'a> {
     }
 
     pub fn buffer_by_id(&mut self, bid: buffer::Id) -> Arc<RwLock<Buffer<'static>>> {
-        self.buffer_map.write().get(&bid).unwrap().clone()
+        self.buffer_map.read().get(&bid).unwrap().clone()
     }
 }
 
