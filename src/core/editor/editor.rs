@@ -1315,10 +1315,6 @@ fn run_all_stages(
     let _ui_tx = editor.ui_tx.clone();
 
     for ev in flat_events.iter() {
-        if env.pending_events > 0 {
-            env.pending_events = crate::core::event::pending_input_event_dec(1);
-        }
-
         // select view that will receive the event
         dbg_println!(
             " before setup_focus_and_event -> active_view  env {:?}",
@@ -1369,6 +1365,11 @@ fn run_all_stages(
             } else {
                 set_focus_on_view_id(&mut editor, &mut env, target_id);
             }
+        }
+
+        //
+        if env.pending_events > 0 {
+            env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
     }
 
