@@ -853,7 +853,7 @@ pub fn run_text_mode_actions_vec(
             }
 
             PostInputAction::SaveMarks { caller } => {
-                dbg_println!("marks SaveMarks {}", caller);
+                dbg_println!("PostInputAction::SaveMarks {}", caller);
 
                 let v = &mut view.write();
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
@@ -1018,7 +1018,6 @@ fn run_text_mode_actions(
                     if buffer.buffer_log.pos != tm.prev_buffer_log_revision
                         && tm.prev_action == TextModeAction::BufferModification
                     {
-
                         // not undo/redo
                         save_marks = true;
                     }
@@ -1667,6 +1666,8 @@ pub fn move_line_down(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
+    trace_block!("move_line_down start",
+
     // compute offsets
     let (s_offset, e_offset, t_offset, t_end_offset, mark_local_offset) = {
         let v = &mut view.write();
@@ -1696,6 +1697,7 @@ pub fn move_line_down(
 
         let mut m = tm.marks[0].clone();
 
+        dbg_println!("move to end of line");
         // - go to end of line
         m.move_to_end_of_line(&buffer, codec);
         let e_offset = m.offset;
@@ -1707,12 +1709,16 @@ pub fn move_line_down(
         // restore mark
         m.offset = m_offset;
 
+        dbg_println!("move to start of line");
+
         // - go to beginning of line : save s_offset
         m.move_to_start_of_line(&buffer, codec);
         let s_offset = m.offset;
 
         // - mark_local_offset m_offset - s_offset
         let mark_local_offset = m_offset - s_offset;
+
+        dbg_println!("skip new line");
 
         // skip end of line + \n
         m.offset = e_offset;
@@ -1721,9 +1727,13 @@ pub fn move_line_down(
         // save target/insert offset
         let t_offset = m.offset;
 
+        dbg_println!("move to end of line");
+
         // - go to end of next line : save t_end_offset
         m.move_to_end_of_line(&buffer, codec);
         let t_end_offset = m.offset;
+
+        dbg_println!("move to end of line done");
 
         (
             s_offset,
@@ -1734,44 +1744,84 @@ pub fn move_line_down(
         )
     };
 
-    // save marks
-    {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![PostInputAction::SaveMarks {
-                caller: &"move_line_down",
-            }],
-        );
-    }
+    );
+
+    trace_block!(
+        "move_line_down save marks",
+        // save marks
+            dbg_println!("save marks");
+
+            run_text_mode_actions_vec(
+                &mut editor,
+                &mut env,
+                &view,
+                &vec![PostInputAction::SaveMarks {
+                    caller: &"move_line_down",
+                }],
+            );
+
+            dbg_println!("save marks done");
+    );
 
     // apply
-    {
+    dbg_println!("apply");
+
+    trace_block!("move_line_down apply", {
+        dbg_println!("get view for write...");
+
         let v = &mut view.write();
 
+        dbg_println!("get view Ok");
+
+        dbg_println!("get buffer by id...");
+
         let buffer = editor.buffer_by_id(v.buffer_id);
+
+        dbg_println!("get buffer by id ok...");
+
+        dbg_println!("get buffer for write...");
+
         let mut buffer = buffer.write();
 
-        // - remove t_offset..t_end_offset -> line (no \n)
-        let sz2 = (t_end_offset - t_offset) as usize;
-        let mut l2_data = Vec::<u8>::with_capacity(sz2);
-        buffer.remove(t_offset, sz2, Some(&mut l2_data));
+        dbg_println!("get buffer Ok");
 
-        // - remove s_offset..e_offset -> line (no \n)
-        let sz1 = (e_offset - s_offset) as usize;
-        let mut l1_data = Vec::<u8>::with_capacity(sz1);
-        buffer.remove(s_offset, sz1, Some(&mut l1_data));
+        dbg_println!("remove 1");
 
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        trace_block!("move_line_down remove 1",
 
-        //
-        buffer.insert(s_offset, l2_data.len(), &l2_data);
-        let off = s_offset + l2_data.len() as u64 + 1;
-        buffer.insert(off, l1_data.len(), &l1_data);
+            // - remove t_offset..t_end_offset -> line (no \n)
+            let sz2 = (t_end_offset - t_offset) as usize;
+            let mut l2_data = Vec::<u8>::with_capacity(sz2);
+            buffer.remove(t_offset, sz2, Some(&mut l2_data));
+        );
 
-        tm.marks[0].offset = off + mark_local_offset;
-    }
+        dbg_println!("remove 2");
+
+        trace_block!("move_line_down remove 2",
+
+            // - remove s_offset..e_offset -> line (no \n)
+            let sz1 = (e_offset - s_offset) as usize;
+            let mut l1_data = Vec::<u8>::with_capacity(sz1);
+            buffer.remove(s_offset, sz1, Some(&mut l1_data));
+        );
+
+        trace_block!("move_line_down insert 1",
+            //
+            buffer.insert(s_offset, l2_data.len(), &l2_data);
+            let off = s_offset + l2_data.len() as u64 + 1;
+        );
+
+        trace_block!("move_line_down insert 2",
+
+                buffer.insert(off, l1_data.len(), &l1_data);
+
+                let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+                tm.marks[0].offset = off + mark_local_offset;
+        );
+    });
+
+    dbg_println!("apply done");
+    dbg_println!("move_line_down end");
 }
 
 /// Skip blanks (if any) and remove until end of the word.

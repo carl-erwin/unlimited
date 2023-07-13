@@ -570,7 +570,7 @@ impl<'a> MappedFile<'a> {
         let file_size = metadata.len();
 
         // TODO(ceg): find good sizes, add user configuration
-        let sub_page_size = 1024 * 1024 * 2;
+        let sub_page_size = 1024 * 2;
 
         let page_size = match file_size {
             _ if file_size < (1024 * 4) => 32,
@@ -595,8 +595,11 @@ impl<'a> MappedFile<'a> {
             _ => 1024 * 1024 * 16,
         };
 
-        dbg_println!("MappedFile::new() : file_size {}", file_size);
-        dbg_println!("MappedFile::new() : page_size {}", page_size);
+        let sub_page_reserve = 2 * 1024;
+
+        dbg_println!("MappedFile::new() : file_size        {}", file_size);
+        dbg_println!("MappedFile::new() : page_size        {}", page_size);
+        dbg_println!("MappedFile::new() : sub_page_reserve {}", sub_page_reserve);
 
         let mut file = MappedFile {
             phantom: PhantomData,
@@ -606,7 +609,7 @@ impl<'a> MappedFile<'a> {
             root_index: None,
             page_size,
             sub_page_size,
-            sub_page_reserve: 2 * 1024,
+            sub_page_reserve,
             events: vec![],
         };
 
@@ -668,12 +671,10 @@ impl<'a> MappedFile<'a> {
     }
 
     pub fn cleanup_events(&mut self) {
-        dbg_println!("CLEANUP EVENTS {:?}", self.events);
-
         for event in &self.events {
             match event {
                 MappedFileEvent::NodeRemoved { node_index } => {
-                    dbg_println!("CLEANUP {:?}", event);
+                    dbg_println!("recycle node {:?}", node_index);
                     if self.pool[*node_index].to_delete {
                         self.pool[*node_index].clear();
                         self.pool.release(*node_index);
@@ -1273,7 +1274,8 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::Real(ref it) => match &it.page {
                 ref rc => match *rc.borrow_mut() {
                     Page::ReadOnlyStorageCopy(..) => {
-                        if DEBUG {
+                        //if DEBUG
+                        {
                             dbg_println!(
                                 "MAPPED FILE: Page::ReadOnlyStorageCopy: check_free_space 0"
                             );
@@ -1283,7 +1285,8 @@ impl<'a> MappedFile<'a> {
                     }
 
                     Page::InRam(_, ref mut len, capacity) => {
-                        if DEBUG {
+                        //if DEBUG
+                        {
                             dbg_println!(
                                 "MAPPED FILE: Page::InRam: check_free_space capacity {}, len {}",
                                 capacity,
@@ -1307,6 +1310,10 @@ impl<'a> MappedFile<'a> {
                     }
 
                     Page::InRam(base, ref mut len, capacity) => {
+                        dbg_println!("insert in place ");
+                        dbg_println!("len {} ", len);
+                        dbg_println!("capacity {} ", capacity);
+                        dbg_println!("data.len() {} ", data.len());
 
                         let index = it.local_offset as usize;
                         unsafe {
@@ -1324,6 +1331,7 @@ impl<'a> MappedFile<'a> {
                             *len = *len + data.len();
                             mem::forget(v);
                         }
+                        dbg_println!("insert end");
                     }
                 },
             },
@@ -1336,10 +1344,14 @@ impl<'a> MappedFile<'a> {
     // 3 - build a sub-tree to insert the data (make room for more inserts)
     // 4 - copy the data
     // 5 - replace the parent node
-    // 6 - update hierachy
+    // 6 - update hierarchy
     // 7 - TODO(ceg): update iterator internal using find + local_offset on the allocated subtree
     pub fn insert(it_: &mut FileIterator<'a>, data: &[u8]) -> (usize, Vec<MappedFileEvent>) {
-        dbg_println!("CALL CLEANUP");
+        dbg_println!("-----------------");
+
+        dbg_println!("insert : {} bytes", data.len());
+
+        // clear previous
         {
             let rcfile = it_.get_file();
             let mut file = rcfile.write();
@@ -1357,7 +1369,9 @@ impl<'a> MappedFile<'a> {
         }
 
         // check iterator type
+        dbg_println!("insert : check iterator type");
         let (node_to_split, node_size, local_offset, it_page) = match &*it_ {
+            // EOF
             MappedFileIterator::End(ref rcfile) => {
                 let mut file = rcfile.write();
                 let fd = if let Some(fd) = &file.fd {
@@ -1404,24 +1418,26 @@ impl<'a> MappedFile<'a> {
         }
 
         let available = MappedFile::check_free_space(it_);
-        if DEBUG {
+        if true || DEBUG {
             dbg_println!("MAPPED FILE: available space = {}", available);
         }
 
         /////// in place insert ?
+        dbg_println!("MAPPED FILE: node_size = {}", node_size);
 
-        if available >= data_len {
+        if available >= data_len && node_size <= 1024 * 1024 {
             if DEBUG {
                 dbg_println!(
                     "MAPPED FILE: available({})>= data_len({})",
                     available,
                     data_len
                 );
-                dbg_println!("MAPPED FILE: insert in place");
             }
 
             // insert in current node
+            dbg_println!("MAPPED FILE: insert in place START");
             MappedFile::insert_in_place(it_, data);
+            dbg_println!("MAPPED FILE: insert in place END");
 
             // update parents
             let rcfile = it_.get_file();
@@ -1449,9 +1465,7 @@ impl<'a> MappedFile<'a> {
         ////////////////////////////////////////////////
         // new subtree
 
-        if DEBUG {
-            dbg_println!("MAPPED FILE: allocate new subtree");
-        }
+        dbg_println!("insert : allocate new subtree");
 
         let rcfile = it_.get_file();
         let mut file = rcfile.write();
@@ -1479,15 +1493,10 @@ impl<'a> MappedFile<'a> {
 
         // TODO(ceg): provide user apis to tweak allocations
         let sub_page_min_size = sub_page_size as usize;
-        //let new_page_size = ::std::cmp::min(new_size / sub_page_min_size, sub_page_min_size);
-        //let new_page_size = ::std::cmp::max(new_page_size, sub_page_min_size);
-        //let new_page_size = new_page_size / 2;
         let new_page_size = sub_page_min_size;
 
-        if DEBUG {
-            dbg_println!("MAPPED FILE: new_size {}", new_size);
-            dbg_println!("MAPPED FILE: new_page_size {}", new_page_size);
-        }
+        dbg_println!("MAPPED FILE: new_size {}", new_size);
+        dbg_println!("MAPPED FILE: new_page_size {}", new_page_size);
 
         let subroot_node = Node {
             used: true,
@@ -1698,6 +1707,8 @@ impl<'a> MappedFile<'a> {
     // 4 - TODO(ceg): update iterator internal using find + local_offset on the modified subtree
     // TODO(ceg): split nodes before remove
     pub fn remove(it_: &mut FileIterator<'a>, nr: usize) -> (usize, Vec<MappedFileEvent>) {
+        dbg_println!("remove {} bytes", nr);
+
         let mut events = vec![];
         if nr == 0 {
             return (0, events);
@@ -1712,8 +1723,7 @@ impl<'a> MappedFile<'a> {
             MappedFileIterator::Real(ref it) => (it.file.write(), it.node_idx, it.local_offset),
         };
 
-        dbg_println!("CALL CLEANUP");
-        file.cleanup_events();
+        file.cleanup_events(); // TODO(ceg): rename, recycle ?
 
         MappedFile::print_all_used_nodes(&file, "MAPPED FILE: remove : BEFORE deletion");
 
@@ -2038,7 +2048,7 @@ impl<'a> MappedFile<'a> {
     }
 
     fn print_all_used_nodes(file: &MappedFile, rsn: &str) {
-        if DEBUG {
+        if false && DEBUG {
             dbg_println!("*************  ALL USED NODES ({}) ***********", rsn);
             for i in 0..file.pool.slot.len() {
                 let n = &file.pool.slot[i];

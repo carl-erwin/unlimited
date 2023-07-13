@@ -31,9 +31,14 @@ macro_rules! dbg_print {
 macro_rules! trace_block {
     ($trace_label:expr, $($arg:tt)*) => {
 
+        dbg_println!("{} START", $trace_label);
+
         let now = std::time::SystemTime::now();
 
         $($arg)*
+
+        dbg_println!("{} END", $trace_label);
+
 
         if crate::core::DBG_PRINTLN_FLAG.load(std::sync::atomic::Ordering::Relaxed) != 0 {
             eprintln!("-- trace_block [{} ms] {} ({}:{}) ", now.elapsed().unwrap().as_millis(), $trace_label,  file!(), line!());
