@@ -1229,6 +1229,9 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) -> bool {
 
     let t0 = std::time::Instant::now();
 
+    let wait_min = 1000 / 4; // config or
+
+    let mut wait = wait_min;
     let mut data = vec![];
     while idx != None {
         // read node bytes
@@ -1281,8 +1284,13 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) -> bool {
 
         // yield some cpu time
         if user_is_active() {
-            let wait = std::time::Duration::from_millis(16);
-            std::thread::sleep(wait);
+            dbg_println!("user_is_active pause indexing");
+            wait = std::cmp::min(wait + 1, 500);
+            std::thread::sleep(std::time::Duration::from_millis(wait));
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+
+            wait = wait_min;
         }
 
         // update node info (idx)

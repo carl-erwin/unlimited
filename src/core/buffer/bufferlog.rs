@@ -47,6 +47,10 @@ impl BufferLog {
     }
 
     pub fn dump(&self) {
+        if true {
+            return;
+        }
+
         dbg_println!("-- BufferLog::dump() {{\r");
 
         dbg_println!("--  pos {}\r", self.pos);
