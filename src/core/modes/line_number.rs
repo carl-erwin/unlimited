@@ -243,7 +243,7 @@ pub struct LineNumberModeContext {
     pub start_col: Option<u64>,
 }
 
-struct LineNumberModeDocEventHandler {
+struct LineNumberModeBufferEventHandler {
     pub count: usize,
 }
 
@@ -289,7 +289,7 @@ impl<'a> Mode for LineNumberMode {
         let mut meta = meta.as_ref().unwrap().write();
 
         if !meta.cb_installed {
-            let cb = Box::new(LineNumberModeDocEventHandler { count: 0 });
+            let cb = Box::new(LineNumberModeBufferEventHandler { count: 0 });
 
             self.buffer_subscription = buffer.register_subscriber(cb);
 
@@ -456,12 +456,12 @@ impl<'a> Mode for LineNumberMode {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl BufferEventCb for LineNumberModeDocEventHandler {
+impl BufferEventCb for LineNumberModeBufferEventHandler {
     fn cb(&mut self, buffer: &Buffer, event: &BufferEvent) {
         self.count += 1;
 
         dbg_println!(
-            "LineNumberModeDocEventHandler ev {:?} CB count = {}",
+            "LineNumberModeBufferEventHandler ev {:?} CB count = {}",
             event,
             self.count
         );
