@@ -689,8 +689,9 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 };
             }
 
-            _ => { return InputEvent::NonInputEvent; }
-
+            _ => {
+                return InputEvent::NoInputEvent;
+            }
         },
 
         ::crossterm::event::Event::Mouse(event) => match event.kind {
@@ -760,11 +761,12 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             };
         }
 
-/*
-        ::crossterm::event::Event::Terminate => {
-            // TODO(ceg): not really an input
-        }
-*/
+        /*
+                ::crossterm::event::Event::Terminate => {
+                    // TODO(ceg): not really an input
+                }
+        */
+        _ => {}
     }
 
     InputEvent::NoInputEvent
