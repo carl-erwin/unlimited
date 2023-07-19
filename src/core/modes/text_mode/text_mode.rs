@@ -1658,6 +1658,9 @@ pub fn move_line_up(
         buffer.insert(off, l2_data.len(), &l2_data);
 
         tm.marks[0].offset = t_offset + mark_local_offset;
+
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
     }
 }
 
@@ -1817,6 +1820,10 @@ pub fn move_line_down(
 
                 let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
                 tm.marks[0].offset = off + mark_local_offset;
+
+                tm.pre_compose_action
+                .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+
         );
     });
 
