@@ -200,8 +200,7 @@ pub fn main_loop(
 
                     if (start - fps_t0).as_millis() >= 1000 {
                         dbg_println!(
-                                 "DRAW: crossterm | time {}| offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
-                                 start.duration_since(startup).as_millis(),
+                                 "DRAW: crossterm | offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
                                  first_offset,
                                  draw_req,
                                  fps,
