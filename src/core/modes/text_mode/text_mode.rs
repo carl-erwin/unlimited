@@ -680,6 +680,7 @@ impl TextMode {
             ),
             ("text-mode:copy-selection", copy_selection),
             ("text-mode:cut-selection", cut_selection),
+            ("text-mode:exchange-point-and-mark", exchange_point_and_mark),
             // screen
             ("text-mode:page-up", scroll_to_previous_screen),
             ("text-mode:page-down", scroll_to_next_screen),
@@ -2426,6 +2427,34 @@ pub fn cut_selection(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     copy_maybe_remove_selection(editor, env, view, true, true);
+}
+
+pub fn exchange_point_and_mark(
+    _editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let v = &mut view.write();
+
+    if !v.check_mode_ctx::<TextModeContext>("text-mode") {
+        // needed ?
+        return;
+    }
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    // swap selection point and mark
+    if tm.marks.len() == 1 /* restrict for now */ && tm.marks.len() == tm.select_point.len() {
+        for i in 0..tm.marks.len() {
+            std::mem::swap(&mut tm.marks[i].offset, &mut tm.select_point[i].offset);
+        }
+
+        /* always center if offscreen */
+        {
+            tm.pre_compose_action
+                .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+        }
+    }
 }
 
 pub fn button_press(

@@ -41,8 +41,7 @@ static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
   {
     "events": [
-     { "in": [{ "key": "ctrl+o" } ],                      "action": "open-doc:start" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ], "action": "open-doc:start" }
+     { "in": [{ "key": "ctrl+o" } ],   "action": "open-doc:start" }
      ]
   }
 ]"#;
