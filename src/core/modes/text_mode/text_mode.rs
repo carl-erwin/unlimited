@@ -2569,6 +2569,11 @@ pub fn button_release(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
     let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
     if (button as usize) < tm.button_state.len() {
         tm.button_state[button as usize] = 0;
+
+        // swap selection point and mark and button release
+        if tm.marks.len() == 1 && tm.select_point.len() == 1 {
+            std::mem::swap(&mut tm.marks[0].offset, &mut tm.select_point[0].offset);
+        }
     }
 }
 
