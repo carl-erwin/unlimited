@@ -573,26 +573,34 @@ impl<'a> MappedFile<'a> {
         let sub_page_size = 1024 * 2;
 
         let page_size = match file_size {
-            _ if file_size < (1024 * 4) => 32,
-            _ if file_size < (1024 * 8) => 64,
-            _ if file_size < (1024 * 16) => 128,
-            _ if file_size < (1024 * 32) => 256,
-            _ if file_size < (1024 * 64) => 512,
-            _ if file_size < (1024 * 128) => 1024 * 1,
-            _ if file_size < (1024 * 256) => 1024 * 2,
-            _ if file_size < (1024 * 512) => 1024 * 4,
-            _ if file_size < (1 * 1024 * 1024) => 1024 * 8,
-            _ if file_size < (2 * 1024 * 1024) => 1024 * 16,
-            _ if file_size < (4 * 1024 * 1024) => 1024 * 32,
-            _ if file_size < (8 * 1024 * 1024) => 1024 * 64,
-            _ if file_size < (16 * 1024 * 1024) => 1024 * 128,
-            _ if file_size < (32 * 1024 * 1024) => 1024 * 256,
-            _ if file_size < (64 * 1024 * 1024) => 1024 * 512,
-            _ if file_size < (128 * 1024 * 1024) => 1024 * 1024,
-            _ if file_size < (256 * 1024 * 1024) => 1024 * 1024 * 2,
-            _ if file_size < (512 * 1024 * 1024) => 1024 * 1024 * 4,
-            _ if file_size < (1024 * 1024 * 1024) => 1024 * 1024 * 8,
-            _ => 1024 * 1024 * 16,
+            _ if file_size <= (1024 * 4) => 32,
+            _ if file_size <= (1024 * 8) => 64,
+            _ if file_size <= (1024 * 16) => 128,
+            _ if file_size <= (1024 * 32) => 256,
+            _ if file_size <= (1024 * 64) => 512,
+            _ if file_size <= (1024 * 128) => 1024 * 1,
+            _ if file_size <= (1024 * 256) => 1024 * 2,
+            _ if file_size <= (1024 * 512) => 1024 * 4,
+            _ if file_size <= (1 * 1024 * 1024) => 1024 * 8,
+            _ if file_size <= (2 * 1024 * 1024) => 1024 * 16,
+            _ if file_size <= (4 * 1024 * 1024) => 1024 * 32,
+            _ if file_size <= (8 * 1024 * 1024) => 1024 * 64,
+            _ if file_size <= (16 * 1024 * 1024) => 1024 * 128,
+            _ if file_size <= (32 * 1024 * 1024) => 1024 * 192,
+            _ if file_size <= (64 * 1024 * 1024) => 1024 * 256,
+            _ if file_size <= (128 * 1024 * 1024) => 1024 * (256 + 64),
+            _ if file_size <= (256 * 1024 * 1024) => 1024 * (256 + 128),
+            _ if file_size <= (512 * 1024 * 1024) => 1024 * (256 + 256),
+            //
+            _ if file_size <= (1 * 1024 * 1024 * 1024) => 1024 * 1024,
+            _ if file_size <= (2 * 1024 * 1024 * 1024) => 1024 * 1024 * 2,
+            _ if file_size <= (4 * 1024 * 1024 * 1024) => 1024 * 1024 * 4,
+            _ if file_size <= (8 * 1024 * 1024 * 1024) => 1024 * 1024 * 8,
+            _ if file_size <= (16 * 1024 * 1024 * 1024) => 1024 * 1024 * 16,
+            _ if file_size <= (22 * 1024 * 1024 * 1024) => 1024 * 1024 * 32,
+            _ if file_size <= (64 * 1024 * 1024 * 1024) => 1024 * 1024 * 64,
+
+            _ => 1024 * 1024 * 128,
         };
 
         let sub_page_reserve = 2 * 1024;
@@ -2640,6 +2648,8 @@ mod tests {
         let _ = fs::remove_file("/tmp/playground_insert_test");
         File::create(&filename).unwrap();
 
+        crate::core::enable_dbg_println();
+
         dbg_println!("-- mapping the test file");
         let file = match MappedFile::new(Id(0), filename) {
             Some(file) => file,
@@ -2668,6 +2678,8 @@ mod tests {
         use std::fs;
         use std::fs::File;
         //        use std::io::prelude::*;
+
+        crate::core::enable_dbg_println();
 
         let filename = "/tmp/playground_insert_test".to_owned();
         {
