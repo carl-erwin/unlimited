@@ -88,7 +88,7 @@
 
         { "in": [{ "key": "F9" } ],                             "action": "text-mode:print-buffer-log" },
 
-       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+x" } ],    "action": "text-mode:exchange-point-and-mark" },
+       { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+x" }, { "key": "ctrl+x" } ],    "action": "text-mode:exchange-point-and-mark" },
 
        { "cancel": "---------------------------------------------------------------------------------"},
 
