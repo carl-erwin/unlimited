@@ -1,46 +1,40 @@
-unlimitED! is an experimental text editor. (ABSOLUTELY NO WARRANTY).
+unlimitED! is an experimental text editor. (WITH ABSOLUTELY NO WARRANTY)
 
 USAGE: unlimited [OPTIONS] [--] [FILES]...    ( -h for help )
 
-It supports:
-  - basic UTF-8
-  - very large file
-  - "unlimited" undo/redo
-  - multi-cursors (wip)
-  - mouse selection (graphical terminal)
+[Quit]
+    Quit:          => ctrl+x ctrl+q       (wait for file(s) sync)
+    Quit (no save) => ctrl+x ctrl+x ctrl+q
 
-[Quit]                 (NB: quit will wait for pending file(s) sync)
-    Quit:           => ctrl+x ctrl+q
-    Quit (no save)  => ctrl+x ctrl+x ctrl+q
-
-[Moves]
-    Arrows          => move the main mark Left,Right,Up,Down
-    PageUp,PageDown => scroll the current view Up/Down
-    ctrl+a          => go to beginning of current line
-    ctrl+e          => go to end of current line
-    ctrl+l          => center view around main mark
+[Cursor Moves]
+    move Left,Right,Up,Down         => Arrows
+    move to beginning of line       => ctrl+a
+    move to end of line             => ctrl+e
+    center view around main mark    => ctrl+l
+    scroll the current view Up/Down => PageUp,PageDown
 
 [Edit]
-    any character   => inserted as is
-    ctrl+u          => Undo
-    ctrl+r          => Redo
-    alt+Up          => move line Up
-    alt+Down        => move line Down
+    insert any character => type the character
+    Undo                 => ctrl+u
+    Redo                 => ctrl+r
+    move line Up         => alt+Up
+    move line Down       => alt+Down
 
 [Selection/Copy/Cut/Paste]
-    with the keyboard:
-    ctrl+Space      => start selection at main Mark
-    alt+w           => copy current selection
-    ctrl+w          => cut  current selection
-    ctrl+y          => paste last cut
+    Keyboard:
+     start selection at main Mark      => ctrl+Space
+     exchange selection point and Mark => ctrl+x ctrl+x ctrl+x
+     copy current selection            => alt+w
+     cut  current selection            => ctrl+w
+     paste last cut                    => ctrl+y
 
-    with the mouse:
-    button-1        => move cursor to clicked area
-    button-1 (hold) => select text with the mouse
+    Mouse:
+     move cursor to clicked area       => press button-1
+     select text with the mouse        => press and move button-1
 
 [Save]
-    ctrl+x ctrl+s   => Save file(s) in the background (read only operations allowed).
+    Save file => ctrl+x ctrl+s   (read only operations allowed)
 
 [Buffer Selection/Navigation]
-    ctrl+o          => Open file (TODO: directory)
-    ctrl+x ctrl+c   => Close current view
+    Open file           => ctrl+o            (wip)
+    Close current view  => ctrl+x ctrl+c
