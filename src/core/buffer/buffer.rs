@@ -1720,16 +1720,15 @@ mod tests {
 
         let max_size = 1024 * 100;
 
-        for test_size in (start_size..=max_size).step_by(10) {
-            println!("checking test_size {}", test_size);
-
-            let max_insert_size = 256;
-            for insert_size in (0..=max_insert_size).step_by(10) {
-                println!("checking insert_size {}", insert_size);
-
+        for test_size in (start_size..=max_size).step_by(128) {
+            let max_insert_size = 1024;
+            for insert_size in (128..=max_insert_size).step_by(128) {
                 let max_insert_offset = std::cmp::min::<u64>(1024, max_insert_size as u64);
 
-                for insert_offset in (0..=max_insert_offset).step_by(32) {
+                for insert_offset in (32..=max_insert_offset).step_by(32) {
+                    let mut ref_vec: Vec<u8> = Vec::new();
+
+                    // (re)create file
                     let filename = "/tmp/playground_save_test";
                     let _ = fs::remove_file(filename);
                     let filename = filename.to_owned();
@@ -1744,8 +1743,10 @@ mod tests {
                     // write to disk
                     file.write_all(&slc).unwrap();
                     file.sync_all().unwrap();
-                    drop(slc);
 
+                    ref_vec.append(&mut slc);
+
+                    // open buffer
                     let buffer = BufferBuilder::new(BufferKind::File)
                         .file_name(&filename)
                         .buffer_name("untitled-1")
@@ -1755,26 +1756,51 @@ mod tests {
                     let expected_size = {
                         let mut data = vec![];
                         for _ in 0..insert_size {
-                            data.push(b'x');
+                            data.push(b'd');
                         }
 
                         let mut buffer = buffer.as_ref().unwrap().write();
                         let buffer_size = buffer.size();
 
+                        crate::core::enable_dbg_println();
+                        dbg_println!("checking test_size {test_size} : insert @ {insert_offset} size {insert_size}");
+                        crate::core::disable_dbg_println();
                         buffer.insert(insert_offset, data.len(), data.as_ref());
-                        buffer_size + data.len()
+                        crate::core::enable_dbg_println();
+                        dbg_println!("done");
+                        crate::core::disable_dbg_println();
+
+                        for i in 0..data.len() {
+                            ref_vec.insert(i + insert_offset as usize, data[i]);
+                        }
+
+                        buffer_size + insert_size
                     };
 
-                    let buffer = buffer.as_ref().unwrap();
-                    sync_to_storage(&buffer);
+                    {
+                        let buffer = buffer.as_ref().unwrap();
+                        sync_to_storage(&buffer);
 
-                    // check on disk size
-                    match std::fs::metadata(filename) {
-                        Err(e) => panic!("{}", e.to_string()),
-                        Ok(m) => {
-                            assert_eq!(m.len(), expected_size as u64);
+                        // check on disk size
+                        match std::fs::metadata(filename) {
+                            Err(e) => panic!("{}", e.to_string()),
+                            Ok(m) => {
+                                assert_eq!(m.len(), expected_size as u64);
+                            }
                         }
                     }
+
+                    // check content
+                    let mut tmp_vec = vec![];
+                    let buffer = buffer.as_ref().unwrap().read();
+                    let nread = buffer.read(0, ref_vec.len(), &mut tmp_vec);
+                    assert_eq!(nread, expected_size);
+                    let matching = ref_vec
+                        .iter()
+                        .zip(&tmp_vec)
+                        .filter(|&(a, b)| a == b)
+                        .count();
+                    assert_eq!(matching, expected_size);
                 }
             }
         }
