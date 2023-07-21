@@ -240,7 +240,7 @@ fn create_goto_line_controller_view(
     controller_view.controlled_view = Some(view.id);
 
     // set controller target as view.id
-    let mut gtm = view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
+    let gtm = view.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
 
     gtm.controller_view_id = controller_view.id;
 

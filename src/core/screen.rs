@@ -367,14 +367,14 @@ impl Screen {
 
         unsafe {
             //self.buffer[self.push_count].cpi = cpi;
-            let mut cell = self.buffer.get_unchecked_mut(self.push_count);
+            let cell = self.buffer.get_unchecked_mut(self.push_count);
             cell.cpi = cpi;
 
             for i in 1..unicode_width {
                 //self.buffer[self.push_count + i].cpi = cpi;
                 //self.buffer[self.push_count + i].cpi.skip_render = true;
 
-                let mut cell = self.buffer.get_unchecked_mut(self.push_count + i);
+                let cell = self.buffer.get_unchecked_mut(self.push_count + i);
                 cell.cpi = cpi;
                 cell.cpi.skip_render = true;
             }

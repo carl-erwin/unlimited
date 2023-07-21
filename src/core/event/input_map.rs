@@ -391,7 +391,7 @@ fn parse_event_entry(mut ctx: &mut ParseCtx, _name: &String, value: &serde_json:
     }
 }
 
-fn parse_event_entry_action(mut ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
+fn parse_event_entry_action(ctx: &mut ParseCtx, _name: &String, value: &serde_json::Value) {
     // copy string to event
     if let Value::String(ref s) = value {
         //dbg_println!("action = '{}'", s);
@@ -400,7 +400,7 @@ fn parse_event_entry_action(mut ctx: &mut ParseCtx, _name: &String, value: &serd
 }
 
 fn parse_event_entry_default_action(
-    mut ctx: &mut ParseCtx,
+    ctx: &mut ParseCtx,
     _name: &String,
     _value: &serde_json::Value,
 ) {

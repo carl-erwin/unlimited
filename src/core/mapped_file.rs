@@ -569,7 +569,7 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
-        let page_size = match file_size {
+        let _page_size = match file_size {
             _ if file_size <= (1024 * 4) => 32,
             _ if file_size <= (1024 * 8) => 64,
             _ if file_size <= (1024 * 16) => 128,
@@ -1587,7 +1587,7 @@ impl<'a> MappedFile<'a> {
 
             // alloc+fill node
             {
-                let mut n = &mut file.pool[*idx];
+                let n = &mut file.pool[*idx];
                 let mut v = Vec::with_capacity(n.size as usize + room);
 
                 if DEBUG {

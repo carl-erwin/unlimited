@@ -321,7 +321,7 @@ impl ContentFilter<'_> for HighlightFilter {
 
         // flush too big token
         if self.token_io.len() > self.max_token_size {
-            for mut io in self.token_io.iter_mut() {
+            for io in self.token_io.iter_mut() {
                 io.style.color = self.new_color;
             }
             filter_out.append(&mut self.token_io);
@@ -349,7 +349,7 @@ impl ContentFilter<'_> for HighlightFilter {
 
                     // flush token: set color
                     self.colorize_token();
-                    for mut io in self.token_io.iter_mut() {
+                    for io in self.token_io.iter_mut() {
                         io.style.color = self.new_color;
                     }
                     filter_out.append(&mut self.token_io);
@@ -368,7 +368,7 @@ impl ContentFilter<'_> for HighlightFilter {
                 } => {
                     // flush pending token: set color
                     self.colorize_token();
-                    for mut io in self.token_io.iter_mut() {
+                    for io in self.token_io.iter_mut() {
                         io.style.color = self.new_color;
                     }
 

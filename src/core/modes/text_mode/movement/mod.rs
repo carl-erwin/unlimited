@@ -393,7 +393,7 @@ fn move_on_screen_mark_to_previous_line(
 
     let screen = v.screen.clone();
     let screen = screen.read();
-    let mut m = &mut marks[midx];
+    let m = &mut marks[midx];
 
     // TODO(ceg): if v.is_mark_on_screen(m) -> (bool, x, y) + (prev/new offset)?
     match screen.find_cpi_by_offset(m.offset) {

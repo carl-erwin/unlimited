@@ -280,7 +280,7 @@ fn create_open_doc_controller_view(
 
     controller_view.controlled_view = Some(view.id);
 
-    let mut odm = view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
+    let odm = view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
     // save controller id
     odm.controller_view_id = controller_view.id;

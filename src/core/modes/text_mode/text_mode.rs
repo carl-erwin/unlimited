@@ -1275,7 +1275,7 @@ pub fn insert_codepoint_array(
 
     {
         let mut v = view.write();
-        let mut tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
         tm.prev_action = TextModeAction::BufferModification;
 
@@ -2125,7 +2125,7 @@ pub fn transpose_char(
         return;
     }
 
-    let mut m = &mut tm.marks[0];
+    let m = &mut tm.marks[0];
 
     // beginning of buffer ?
     if m.offset == 0 {

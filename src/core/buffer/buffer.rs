@@ -1302,7 +1302,7 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) -> bool {
 
             // save byte counters
             {
-                let mut node = &mut file.pool[node_index];
+                let node = &mut file.pool[node_index];
                 node.byte_count = byte_count;
                 node.indexed = true;
                 idx = node.link.next;

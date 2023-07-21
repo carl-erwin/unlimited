@@ -66,7 +66,6 @@ pub fn main_loop(
     ui_tx: &Sender<Message<'static>>,
     core_tx: &Sender<Message<'static>>,
 ) -> Result<()> {
-    let startup = Instant::now();
     let mut draw_req = 0;
     let mut fps = 0;
     let mut fps_t0 = Instant::now();

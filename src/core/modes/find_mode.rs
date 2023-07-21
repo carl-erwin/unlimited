@@ -264,7 +264,7 @@ fn create_find_controller_view(
     controller_view.controlled_view = Some(view.id);
 
     // set controller target as view.id
-    let mut fm = view.mode_ctx_mut::<FindModeContext>("find-mode");
+    let fm = view.mode_ctx_mut::<FindModeContext>("find-mode");
 
     fm.controller_view_id = controller_view.id;
 

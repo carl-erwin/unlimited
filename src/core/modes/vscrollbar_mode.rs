@@ -127,7 +127,7 @@ impl<'a> Mode for VscrollbarMode {
                 let dst = get_view_by_id(editor, dst.id);
                 let mut dst = dst.write();
 
-                let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                let mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                 mode_ctx.target_view_id = src.id;
             }
 
@@ -138,7 +138,7 @@ impl<'a> Mode for VscrollbarMode {
                 let dst = get_view_by_id(editor, dst.id);
                 let mut dst = dst.write();
 
-                let mut mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                let mode_ctx = dst.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
 
                 let buffer = src.buffer.as_ref().unwrap();
                 let buffer = buffer.read();
@@ -167,14 +167,12 @@ impl<'a> Mode for VscrollbarMode {
             }
 
             ViewEvent::Enter => {
-                let mut mode_ctx =
-                    src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                let mode_ctx = src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                 mode_ctx.pointer_over = true;
             }
 
             ViewEvent::Leave => {
-                let mut mode_ctx =
-                    src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                let mode_ctx = src_view.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                 mode_ctx.pointer_over = false;
             }
 
@@ -223,7 +221,7 @@ pub fn vscrollbar_input_event(
 
                 if *button == 0 {
                     let y = *y as usize;
-                    let mut mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
+                    let mode_ctx = v.mode_ctx_mut::<VscrollbarModeContext>("vscrollbar-mode");
                     if y >= mode_ctx.scroll_start && y < mode_ctx.scroll_end {
                         mode_ctx.selected = true;
                         env.focus_locked_on_view_id = Some(v.id);

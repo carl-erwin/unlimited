@@ -595,7 +595,7 @@ pub fn run_compositing_stage_direct(
 
 fn run_content_filters(
     editor: &Editor<'static>,
-    mut layout_env: &mut LayoutEnv,
+    layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,
     parent_view: Option<&View<'static>>,
@@ -706,7 +706,7 @@ fn run_content_filters(
 
 fn run_screen_overlay_filters(
     editor: &Editor<'static>,
-    mut layout_env: &mut LayoutEnv,
+    layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,
     parent_view: Option<&View<'static>>,

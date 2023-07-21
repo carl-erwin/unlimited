@@ -401,7 +401,7 @@ impl<'a> Mode for LineNumberMode {
                 let linenum_view = get_view_by_id(editor, dst.id);
                 let mut linenum_view = linenum_view.write();
 
-                let mut mode_ctx =
+                let mode_ctx =
                     linenum_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
 
                 mode_ctx.text_view_id = src.id;
