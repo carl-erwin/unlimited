@@ -136,13 +136,13 @@ impl HighlightFilter {
             TokenType::LowerThan => COLOR_GREEN,
             TokenType::GreaterThan => COLOR_GREEN,
             TokenType::Identifier => {
-                self.set_indentifier_color();
+                self.set_identifier_color();
                 self.new_color
             }
         };
     }
 
-    fn set_indentifier_color(&mut self) {
+    fn set_identifier_color(&mut self) {
         // select color
         let token_str = if let Ok(s) = String::from_utf8(self.utf8_token.clone()) {
             s
