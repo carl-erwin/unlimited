@@ -56,6 +56,10 @@ static FIND_CONTROLLER_MAP: &str = r#"
      { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
      { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },
      { "in": [{ "key": "ctrl+r" } ],    "action": "find:prev" },
+     { "in": [{ "key": "Right" } ],     "action": "find:next" },
+     { "in": [{ "key": "Left" } ],      "action": "find:prev" },
+     { "in": [{ "key": "Down" } ],      "action": "find:next" },
+     { "in": [{ "key": "Up" } ],        "action": "find:prev" },
      { "default": [],                   "action": "find:add-char" }
    ]
   }
@@ -334,8 +338,8 @@ pub fn find_controller_add_char(
                         alt: false,
                         shift: false,
                     },
-                key: Key::UnicodeArray(ref v),
-            } => v.clone(), // should move Rc<> ?
+                key: Key::UnicodeArray(ref vec),
+            } => vec.clone(), // should move Rc<> ?
 
             InputEvent::KeyPress {
                 key: Key::Unicode(c),
