@@ -16,6 +16,8 @@ use crate::core::codepointinfo::TextStyle;
 
 use crate::core::view::View;
 
+use once_cell::sync::Lazy;
+
 //
 static COLOR_DEFAULT: (u8, u8, u8) = (192, 192, 192);
 static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
@@ -25,6 +27,71 @@ static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
 static COLOR_BLUE: (u8, u8, u8) = (35, 168, 242);
 static COLOR_BRACE: (u8, u8, u8) = (0, 185, 163);
 static COLOR_NUMBER: (u8, u8, u8) = (111, 100, 80);
+
+// keyword <-> color map
+use std::collections::HashMap;
+
+pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
+    let mut map: HashMap<&str, (u8, u8, u8)> = HashMap::new();
+
+    // some Rust keywords
+    for k in &["use", "crate", "pub", "unsafe", "panic"] {
+        map.insert(k, COLOR_RED);
+    }
+
+    for k in &[
+        "let", "ref", "mut", "fn", "impl", "trait", "type", "Option", "Some", "None", "Result",
+        "borrow", "unwrap",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    // some C preprocessor tokens
+    for k in &[
+        "#include", "#if", "#ifdef", "#ifndef", "#endif", "#else", "#undef", "#define", "#pragma",
+    ] {
+        map.insert(k, COLOR_RED);
+    }
+
+    // some C keywords
+    for k in &[
+        "break", "case", "char", "const", "continue", "default", "do", "double", "enum", "extern",
+        "float", "for", "int", "long", "register", "short", "signed", "sizeof", "static", "struct",
+        "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "inline",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    // some C++ keywords
+    for k in &["bool", "class", "template", "namespace", "auto"] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["export", "return", "goto", "true", "false"] {
+        map.insert(k, COLOR_BLUE);
+    }
+
+    for k in &[
+        "str", "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["if", "then", "else", "fi"] {
+        map.insert(k, COLOR_BRACE);
+    }
+
+    for k in &["export", "return", "goto", "true", "false"] {
+        map.insert(k, COLOR_BLUE);
+    }
+
+    // shell
+    for k in &["esac"] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    map
+});
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TokenType {
@@ -144,92 +211,50 @@ impl HighlightFilter {
 
     fn set_identifier_color(&mut self) {
         // select color
-        let token_str = if let Ok(s) = String::from_utf8(self.utf8_token.clone()) {
-            s
+        let token_str = std::str::from_utf8(&self.utf8_token[..]);
+        let token_str = if let Ok(s) = token_str { s } else { "�" };
+
+        self.new_color = if let Some((&_, &color)) = KEYWORD_MAP.get_key_value::<&str>(&token_str) {
+            color
         } else {
-            "�".to_string()
-        };
+            let mut non_alnum = 0;
+            let mut digit_count = 0;
 
-        // dbg_println!("TOKEN_STR = '{}'", token_str);
-        self.new_color = match token_str.as_ref() {
-            // some Rust keywords
-            "use" | "crate" | "pub" => COLOR_RED,
+            let skip_n = if self.utf8_token.len() >= 2
+                && self.utf8_token[0] == b'0'
+                && self.utf8_token[1] == b'x'
+            {
+                2
+            } else {
+                0
+            };
 
-            // some Rust keywords
-            "let" | "ref" | "mut" | "fn" | "impl" | "trait" | "type" => (0, 128, 128),
-            "Option" | "Some" | "None" | "Result" => (0, 128, 128),
-
-            "unsafe" | "panic" => COLOR_RED,
-
-            "borrow" | "unwrap" => (0, 128, 128),
-
-            "str" | "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64"
-            | "i128" | "f32" | "f64" => (0, 128, 128),
-
-            // some C preprocessor tokens
-            "#include" | "#if" | "#ifdef" | "#ifndef" | "#endif" | "#else" | "#undef"
-            | "#define" | "#pragma" => COLOR_RED,
-
-            // some C keywords
-            "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double"
-            | "enum" | "extern" | "float" | "for" | "int" | "long" | "register" | "short"
-            | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef" | "union"
-            | "unsigned" | "void" | "volatile" | "while" | "inline" => (0, 128, 128),
-
-            "esac" | "done" => (0, 128, 128),
-
-            "if" | "then" | "else" => COLOR_BRACE,
-
-            "fi" | "in" => COLOR_BRACE,
-
-            // some C++ keywords
-            "bool" | "class" | "template" | "namespace" | "auto" => (0, 128, 128),
-
-            //
-            "return" | "goto" | "true" | "false" => COLOR_BLUE,
-
-            "export" => COLOR_BLUE,
-
-            _ => {
-                let mut non_alnum = 0;
-                let mut digit_count = 0;
-
-                let skip_n = if self.utf8_token.len() >= 2
-                    && self.utf8_token[0] == b'0'
-                    && self.utf8_token[1] == b'x'
-                {
-                    2
-                } else {
-                    0
-                };
-
-                for c in self.utf8_token.iter().skip(skip_n) {
-                    if *c == b'_' {
-                        continue;
-                    }
-
-                    if *c >= b'0' && *c <= b'9' {
-                        digit_count += 1;
-                        continue;
-                    }
-
-                    if *c >= b'a' && *c <= b'f' {
-                        continue;
-                    }
-
-                    if *c >= b'A' && *c <= b'F' {
-                        continue;
-                    }
-
-                    non_alnum += 1;
-                    break;
+            for c in self.utf8_token.iter().skip(skip_n) {
+                if *c == b'_' {
+                    continue;
                 }
 
-                if non_alnum == 0 && digit_count != 0 {
-                    COLOR_NUMBER
-                } else {
-                    self.new_color
+                if *c >= b'0' && *c <= b'9' {
+                    digit_count += 1;
+                    continue;
                 }
+
+                if *c >= b'a' && *c <= b'f' {
+                    continue;
+                }
+
+                if *c >= b'A' && *c <= b'F' {
+                    continue;
+                }
+
+                non_alnum += 1;
+                break;
+            }
+
+            if non_alnum == 0 && digit_count != 0 {
+                COLOR_NUMBER
+            } else {
+                self.new_color
             }
         };
     }
