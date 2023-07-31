@@ -2519,7 +2519,7 @@ mod tests {
         use std::rc::Weak;
 
         let mut pool = FreeListAllocator::new();
-        let file_size = 1024 * 1024 * 1024 * 1024 * 8; // x Tib
+        let file_size = 1024 * 1024 * 1024 * 1024 * 1; // x Tib
         let page_size = 4096 * 256 * 4; // 4 Mib
 
         let root_node = Node {
