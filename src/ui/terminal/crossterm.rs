@@ -6,15 +6,11 @@ use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event,
     event::{DisableMouseCapture, EnableMouseCapture},
-    queue,
+    execute, queue,
     style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
-    Result,
-};
-
-use crossterm::{
-    execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    Result,
 };
 
 use std::vec::Vec;
