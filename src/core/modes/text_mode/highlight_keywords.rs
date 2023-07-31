@@ -320,12 +320,12 @@ impl ContentFilter<'_> for HighlightFilter {
         self.skip_filter = false;
 
         let p_input = crate::core::event::pending_input_event_count();
-        if p_input > 1 {
+        if p_input > 4 {
             //dbg_println!("*** SKIP HIGHLIGHT *** p_input {}", p_input);
             self.skip_filter = true;
         }
         let p_rdr = crate::core::event::pending_render_event_count();
-        if p_rdr > 1 {
+        if p_rdr > 4 {
             //dbg_println!("*** SKIP HIGHLIGHT *** p_input {}", p_input);
             self.skip_filter = true;
         }
