@@ -121,8 +121,12 @@ pub fn main_loop(
     // first request
     // check terminal size
     let (width, height) = crossterm::terminal::size().ok().unwrap();
+
+    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
     let msg = Message::new(
         get_next_seq(&mut seq),
+        0,
+        ts,
         Event::UpdateView {
             width: width as usize,
             height: height as usize,
@@ -135,22 +139,28 @@ pub fn main_loop(
 
     loop {
         if let Ok(evt) = ui_rx.recv() {
+            let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
             match evt.event {
                 Event::ApplicationQuit => {
-                    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+                    let msg = Message::new(get_next_seq(&mut seq), 0, ts, Event::ApplicationQuit);
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                     break;
                 }
 
                 UpdateView { width, height } => {
-                    let msg =
-                        Message::new(get_next_seq(&mut seq), Event::UpdateView { width, height });
+                    let msg = Message::new(
+                        get_next_seq(&mut seq),
+                        0,
+                        ts,
+                        Event::UpdateView { width, height },
+                    );
                     crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                 }
 
-                Draw { screen, time: _ } => {
+                Draw { screen } => {
                     draw_req += 1;
 
                     let start = Instant::now();
@@ -211,6 +221,14 @@ pub fn main_loop(
                         draw_req = 0;
                         fps_t0 = Instant::now();
                     }
+
+                    let ts_now = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+                    dbg_println!(
+                        "input latency: ts_now {} - input_ts {} = {}",
+                        ts_now,
+                        evt.input_ts,
+                        ts_now - evt.input_ts
+                    );
                 }
 
                 _ => {}
@@ -763,7 +781,12 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     InputEvent::NoInputEvent
 }
 
-fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Sender<Message>) {
+fn send_input_events(
+    accum: Vec<InputEvent>,
+    ts: u128,
+    tx: &Sender<Message>,
+    _ui_tx: &Sender<Message>,
+) {
     let mut v = Vec::<InputEvent>::new();
 
     // merge consecutive characters as "array" of chars
@@ -772,7 +795,7 @@ fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Send
     if accum.len() == 1 {
         match accum[0] {
             InputEvent::RefreshUi { width, height } => {
-                let msg = Message::new(0, Event::UpdateView { width, height });
+                let msg = Message::new(0, 0, ts, Event::UpdateView { width, height });
 
                 // ui_tx.send(msg).unwrap_or(()); ?
 
@@ -783,7 +806,7 @@ fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Send
 
             _ => {
                 // send
-                let msg = Message::new(0, Event::Input { events: accum });
+                let msg = Message::new(0, 0, ts, Event::Input { events: accum });
                 crate::core::event::pending_input_event_inc(1);
                 tx.send(msg).unwrap_or(());
                 return;
@@ -840,6 +863,8 @@ fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Send
     if refresh {
         let msg = Message::new(
             0,
+            0,
+            ts,
             Event::UpdateView {
                 width: new_width,
                 height: new_height,
@@ -864,7 +889,7 @@ fn send_input_events(accum: Vec<InputEvent>, tx: &Sender<Message>, _ui_tx: &Send
     // send
     if !v.is_empty() {
         let ev_count = v.len();
-        let msg = Message::new(0, Event::Input { events: v });
+        let msg = Message::new(0, 0, ts, Event::Input { events: v });
         crate::core::event::pending_input_event_inc(ev_count);
         tx.send(msg).unwrap_or(());
     }
@@ -942,8 +967,10 @@ fn get_input_events(tx: &Sender<Message>, ui_tx: &Sender<Message>) -> ::crosster
         return Ok(());
     }
 
+    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
     if !accum.is_empty() {
-        send_input_events(accum, tx, ui_tx);
+        send_input_events(accum, ts, tx, ui_tx);
     }
 
     Ok(())

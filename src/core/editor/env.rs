@@ -111,6 +111,8 @@ pub struct EditorEnv<'a> {
 
     // stages stats
     pub time_spent: [[u128; 3]; 3],
+
+    pub input_ts: u128,
 }
 
 impl<'a> EditorEnv<'a> {
@@ -152,6 +154,7 @@ impl<'a> EditorEnv<'a> {
             focus_locked_on_view_id: None,
             status_view_id: None,
             time_spent: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            input_ts: 0,
         }
     }
 }

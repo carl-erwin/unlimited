@@ -339,7 +339,7 @@ pub fn update_view_and_send_draw_event(
 
 pub fn send_draw_event(
     _editor: &mut Editor,
-    _env: &mut EditorEnv,
+    env: &mut EditorEnv,
     ui_tx: &Sender<Message>,
     view: &Rc<RwLock<View>>,
 ) {
@@ -347,12 +347,14 @@ pub fn send_draw_event(
 
     let new_screen = Arc::clone(&view.screen);
 
+    let input_ts = env.input_ts;
+    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
     let msg = Message::new(
         0, // get_next_seq(&mut seq), TODO
-        Draw {
-            screen: new_screen,
-            time: Instant::now(),
-        },
+        input_ts,
+        ts,
+        Draw { screen: new_screen },
     );
 
     crate::core::event::pending_render_event_inc(1);
@@ -1463,16 +1465,10 @@ pub fn main_loop(
     core_rx: &Receiver<Message<'static>>,
     ui_tx: &Sender<Message<'static>>,
 ) {
-    let mut seq: usize = 0;
-
-    fn get_next_seq(seq: &mut usize) -> usize {
-        *seq += 1;
-
-        *seq
-    }
-
     while !env.quit {
         if let Ok(msg) = core_rx.recv() {
+            env.input_ts = msg.ts;
+
             match msg.event {
                 Event::UpdateView { width, height } => {
                     env.width = width;
@@ -1515,14 +1511,14 @@ pub fn main_loop(
     }
 
     // send ApplicationQuit to worker thread
-    let msg = Message::new(0, Event::ApplicationQuit);
+    let msg = Message::new(0, 0, 0, Event::ApplicationQuit);
     editor.worker_tx.send(msg).unwrap_or(());
 
     // send ApplicationQuit to ui thread
-    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+    let msg = Message::new(0, 0, 0, Event::ApplicationQuit);
     ui_tx.send(msg).unwrap_or(());
 
     // send ApplicationQuit to indexer thread
-    let msg = Message::new(get_next_seq(&mut seq), Event::ApplicationQuit);
+    let msg = Message::new(0, 0, 0, Event::ApplicationQuit);
     editor.indexer_tx.send(msg).unwrap_or(());
 }

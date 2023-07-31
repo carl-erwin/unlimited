@@ -288,9 +288,13 @@ pub fn save_buffer(editor: &mut Editor<'static>, _env: &mut EditorEnv, view: &Rc
     let buffer_map = editor.buffer_map.clone();
     let buffer_map = buffer_map.read();
 
+    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
     if let Some(buffer) = buffer_map.get(&buffer_id) {
         let msg = Message {
             seq: 0,
+            input_ts: 0,
+            ts,
             event: Event::SyncTask {
                 buffer: Arc::clone(buffer),
             },

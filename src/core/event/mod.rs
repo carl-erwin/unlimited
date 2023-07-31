@@ -9,7 +9,6 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 use std::vec::Vec;
 
 use crate::core::buffer;
@@ -59,14 +58,23 @@ pub fn pending_render_event_count() -> usize {
 pub struct Message<'a> {
     /// sequence number. should be reused in corresponding answer.
     pub seq: usize,
+    // timestamp since application startup (in milliseconds) of the source/input Message which triggered this response message or 0
+    pub input_ts: u128,
+    // timestamp since application startup (in milliseconds) of this Message or 0
+    pub ts: u128,
     /// underlying event.
     pub event: Event<'a>,
     // pub reply_to: Sender<Message>, // clone
 }
 
 impl<'a> Message<'a> {
-    pub fn new(seq: usize, event: Event<'a>) -> Self {
-        Message { seq, event }
+    pub fn new(seq: usize, input_ts: u128, ts: u128, event: Event<'a>) -> Self {
+        Message {
+            seq,
+            input_ts,
+            ts,
+            event,
+        }
     }
 }
 
@@ -85,7 +93,6 @@ pub enum Event<'a> {
     /// Sent by core thread. Contains the rendered screen that maps view_id.
     Draw {
         screen: Arc<RwLock<Box<Screen>>>,
-        time: Instant,
     },
 
     /// Sent by ui thread. contains user input information.

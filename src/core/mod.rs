@@ -242,8 +242,9 @@ pub fn worker(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<'
 
                 Event::SyncTask { buffer } => {
                     buffer::sync_to_storage(&buffer);
+                    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
-                    let msg = Message::new(0, Event::RefreshView);
+                    let msg = Message::new(0, 0, ts, Event::RefreshView);
                     core_tx.send(msg).unwrap_or(());
                 }
 
@@ -285,9 +286,13 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                             continue;
                         }
 
+                        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
                         // notify
                         let msg = Message::new(
                             0,
+                            0,
+                            ts,
                             Event::Buffer {
                                 event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
                             },
@@ -297,14 +302,16 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                         // TODO: remove this: let the ui decide if the refresh is needed base on buffer_id
 
                         // send ui refresh event
-                        let msg = Message::new(0, Event::RefreshView);
+                        let msg = Message::new(0, 0, ts, Event::RefreshView);
                         core_tx.send(msg).unwrap_or(());
 
                         refresh_ui = true;
                         let t1 = std::time::Instant::now();
                         if (t1 - t0).as_millis() > 1000 {
                             // send ui refresh event
-                            let msg = Message::new(0, Event::RefreshView);
+
+                            let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+                            let msg = Message::new(0, 0, ts, Event::RefreshView);
                             core_tx.send(msg).unwrap_or(());
 
                             refresh_ui = false;
@@ -314,7 +321,8 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
 
                     // last ui refresh
                     if refresh_ui {
-                        let msg = Message::new(0, Event::RefreshView);
+                        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+                        let msg = Message::new(0, 0, ts, Event::RefreshView);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }
@@ -649,8 +657,12 @@ pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
     // index buffers
     // TODO(ceg): send one event per doc
     if true {
+        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
         let msg = Message {
             seq: 0,
+            input_ts: 0,
+            ts,
             event: Event::IndexTask {
                 buffer_map: Arc::clone(&editor.buffer_map),
             },

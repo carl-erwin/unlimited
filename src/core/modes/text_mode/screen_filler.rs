@@ -54,6 +54,8 @@ impl<'a> ScreenFilter {
         // always transform displayed '\n' in ' '
         // (fix redraw if char map filter is disabled)
 
+        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
         let ret = env.screen.push(cpi);
         if !ret.0 {
             if bench_to_eof() {
@@ -61,9 +63,10 @@ impl<'a> ScreenFilter {
 
                 let msg = Message::new(
                     0, // get_next_seq(&mut seq), TODO
+                    0,
+                    ts,
                     crate::core::event::Event::Draw {
                         screen: std::sync::Arc::new(RwLock::new(Box::new(new_screen))),
-                        time: std::time::Instant::now(),
                     },
                 );
 

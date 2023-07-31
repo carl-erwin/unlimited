@@ -1143,11 +1143,15 @@ fn open_doc_controller_load_buffer(
     editor.root_views.push(view.id);
     editor.add_view(view.id, view);
 
+    let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
     // index buffers
     // TODO(ceg): send one event per doc
     if true {
         let msg = Message {
             seq: 0,
+            input_ts: 0,
+            ts,
             event: Event::IndexTask {
                 buffer_map: Arc::clone(&editor.buffer_map),
             },
