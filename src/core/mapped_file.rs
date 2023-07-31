@@ -569,37 +569,6 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
-        let _page_size = match file_size {
-            _ if file_size <= (1024 * 4) => 32,
-            _ if file_size <= (1024 * 8) => 64,
-            _ if file_size <= (1024 * 16) => 128,
-            _ if file_size <= (1024 * 32) => 256,
-            _ if file_size <= (1024 * 64) => 512,
-            _ if file_size <= (1024 * 128) => 1024 * 1,
-            _ if file_size <= (1024 * 256) => 1024 * 2,
-            _ if file_size <= (1024 * 512) => 1024 * 4,
-            _ if file_size <= (1 * 1024 * 1024) => 1024 * 8,
-            _ if file_size <= (2 * 1024 * 1024) => 1024 * 16,
-            _ if file_size <= (4 * 1024 * 1024) => 1024 * 32,
-            _ if file_size <= (8 * 1024 * 1024) => 1024 * 64,
-            _ if file_size <= (16 * 1024 * 1024) => 1024 * 128,
-            _ if file_size <= (32 * 1024 * 1024) => 1024 * 192,
-            _ if file_size <= (64 * 1024 * 1024) => 1024 * 256,
-            _ if file_size <= (128 * 1024 * 1024) => 1024 * (256 + 64),
-            _ if file_size <= (256 * 1024 * 1024) => 1024 * (256 + 128),
-            _ if file_size <= (512 * 1024 * 1024) => 1024 * (256 + 256),
-            //
-            _ if file_size <= (1 * 1024 * 1024 * 1024) => 1024 * 256,
-            _ if file_size <= (2 * 1024 * 1024 * 1024) => 1024 * 256,
-            _ if file_size <= (4 * 1024 * 1024 * 1024) => 1024 * 512,
-            _ if file_size <= (8 * 1024 * 1024 * 1024) => 1024 * 1024 * 2,
-            _ if file_size <= (16 * 1024 * 1024 * 1024) => 1024 * 1024 * 2,
-            _ if file_size <= (22 * 1024 * 1024 * 1024) => 1024 * 1024 * 4,
-            _ if file_size <= (64 * 1024 * 1024 * 1024) => 1024 * 1024 * 8,
-
-            _ => 1024 * 1024 * 8,
-        };
-
         let page_size = std::cmp::min(1024 * 1024 * 8, file_size as usize / (4 * 1024));
         let page_size = std::cmp::max(32, page_size);
 
