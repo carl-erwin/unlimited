@@ -1716,13 +1716,12 @@ mod tests {
         use std::fs;
         use std::fs::File;
 
-        let start_size = 1024 * 60;
+        let start_size = 1024 * 1;
+        let max_size = 1024 * 8;
+        let max_insert_size = 64;
 
-        let max_size = 1024 * 100;
-
-        for test_size in (start_size..=max_size).step_by(128) {
-            let max_insert_size = 1024;
-            for insert_size in (128..=max_insert_size).step_by(128) {
+        for test_size in (start_size..=max_size).step_by(256) {
+            for insert_size in (1..=max_insert_size).step_by(1) {
                 let max_insert_offset = std::cmp::min::<u64>(1024, max_insert_size as u64);
 
                 for insert_offset in (32..=max_insert_offset).step_by(32) {
