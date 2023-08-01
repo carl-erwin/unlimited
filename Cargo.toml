@@ -15,7 +15,6 @@ path = "src/main.rs"
 doc = false
 name = "gen_lines"
 path = "test-tools/gen_lines.rs"
-install = false
 
 [[test]]
 doc = false
