@@ -51,8 +51,8 @@ pub struct Screen {
     // the maximum number of elements the screen can hold
     pub push_capacity: usize,
 
-    pub current_line_index: usize,
-    pub current_line_remain: usize,
+    current_line_index: usize,
+    current_line_remain: usize,
 
     pub is_off_screen: bool, // Hints
     pub has_eof: bool,       // Hints
@@ -208,6 +208,10 @@ impl Screen {
 
     pub fn push_capacity(&self) -> usize {
         self.push_capacity
+    }
+
+    pub fn current_line_index(&mut self) -> usize {
+        self.current_line_index
     }
 
     pub fn select_next_line_index(&mut self) -> usize {

@@ -202,6 +202,7 @@ pub fn linenum_input_event(
                 button: _,
             } => {
                 set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                // TODO: move mark to selected line and start selection
             }
         },
 
@@ -218,6 +219,7 @@ pub fn linenum_input_event(
                 button: _,
             } => {
                 set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                // TODO: move mark to selected line and update selection
             }
         },
 
@@ -305,6 +307,9 @@ impl<'a> Mode for LineNumberMode {
         view: &mut View<'static>,
     ) {
         dbg_println!("mode '{}' on_buffer_event: event {:?}", self.name(), _event);
+
+        // TODO: match event  : BufferEvent::BufferFullyIndexed { buffer_id }
+        // TODO: view revision != 0
 
         if let Some(buffer) = view.buffer() {
             let max_offset = buffer.read().size() as u64;
@@ -423,13 +428,13 @@ impl<'a> Mode for LineNumberMode {
                 let max_offset = buffer.size() as u64 + 1;
                 let width = if !buffer.indexed {
                     // '@offset '
-                    1 + num_digit(max_offset) + 1
+                    1 + num_digit(max_offset)
                 } else {
                     let ret = get_byte_count(&buffer, '\n' as usize).unwrap_or(0);
                     let n = num_digit(ret + 1); // nb line = line count + 1
 
                     // 'xxxx '
-                    n + 1
+                    n
                 };
 
                 let width = match std::env::var("SINGLE_VIEW") {
@@ -560,6 +565,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         }
 
         let mut line_number = self.line_number[0].1 .0;
+
         let screen = src.screen.as_ref().read();
         for i in 0..screen.line_index.len() {
             let mut offset = 0;
@@ -574,6 +580,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     }
                 }
             }
+
             self.line_number.push((offset, (line_number as u64, None)));
         }
     }
@@ -600,18 +607,24 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 };
                 prev_line = e.1 .0;
 
-                let padding = w - s.len() - 1;
+                let padding = w - s.len();
+
+                // left-pad
                 for _ in 0..padding {
                     env.screen.push(CodepointInfo::new());
                 }
 
+                let cur_line_idx = env.screen.current_line_index();
                 for c in s.chars() {
                     let mut cpi = CodepointInfo::new();
                     cpi.displayed_cp = c;
                     cpi.style.color = color;
                     env.screen.push(cpi);
                 }
-                env.screen.select_next_line_index();
+                if cur_line_idx == env.screen.current_line_index() {
+                    // NB screen.push selects next line automatically
+                    env.screen.select_next_line_index();
+                }
             }
             return;
         }
@@ -619,13 +632,17 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         // show offsets
         for e in self.line_offsets.iter() {
             let s = format!("@{}", e.0);
+            let cur_line_idx = env.screen.current_line_index();
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
                 cpi.style.color = color;
                 env.screen.push(cpi);
             }
-            env.screen.select_next_line_index();
+            if cur_line_idx == env.screen.current_line_index() {
+                // NB screen.push selects next line automatically
+                env.screen.select_next_line_index();
+            }
         }
     }
 

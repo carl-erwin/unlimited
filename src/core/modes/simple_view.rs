@@ -51,7 +51,7 @@ impl<'a> Mode for SimpleViewMode {
         //        let buffer_sz = buffer.as_ref().unwrap().read().size();
         let line_number_view_width = match std::env::var("SINGLE_VIEW") {
             Ok(_) => 0,
-            _ => 13 + 2,
+            _ => 12,
         };
 
         // children_layout_and_modes
@@ -71,6 +71,12 @@ impl<'a> Mode for SimpleViewMode {
                 }, // TODO(ceg): adjust size based on screen content
                 buffer.clone(),
                 vec!["line-number-mode".to_owned()], // TODO(ceg): "line-number-mode" in screen overlay pass
+            ),
+            // empty column
+            (
+                LayoutOperation::Fixed { size: 1 },
+                buffer.clone(),
+                vec!["".to_owned()],
             ),
             /*
                         // line changed
@@ -138,8 +144,10 @@ impl<'a> Mode for SimpleViewMode {
         // TODO(ceg): set focus
         // set focus on text view
         let line_numbers_view_idx = 0;
-        let text_view_idx = 1;
-        let scroll_bar_idx = 2;
+        let _empty_bar = 1;
+
+        let text_view_idx = 2;
+        let scroll_bar_idx = 3;
 
         v.focus_to = Some(v.children[text_view_idx].id); // TODO(ceg):
 
