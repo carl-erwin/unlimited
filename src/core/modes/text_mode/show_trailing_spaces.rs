@@ -18,7 +18,7 @@ impl ShowTrailingSpaces {
     pub fn new() -> Self {
         ShowTrailingSpaces {
             accum: vec![],
-            trailing_color: (255, 0, 0), // red
+            trailing_color: (178, 24, 24), // red
         }
     }
 
