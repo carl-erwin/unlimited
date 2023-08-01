@@ -1503,6 +1503,7 @@ mod tests {
     use rand::Rng;
 
     #[test]
+    #[cfg(not(windows))]
     fn buffer_read() {
         use std::io::prelude::*;
         use std::os::unix::prelude::FileExt;
