@@ -1207,7 +1207,7 @@ impl<'a> MappedFile<'a> {
             if let Some(index) = index {
                 return Some(base_offset + index as u64);
             } else {
-                from_offset = base_offset.saturating_sub(chunk.capacity() as u64);
+                from_offset = base_offset.saturating_sub((chunk.capacity() - rd_size) as u64);
 
                 // TODO: data[0] not found in chunk ->  from_offset = base_offset.saturating_sub(1);
                 // from_offset = from_offset.saturating_sub(data.len() as u64);
