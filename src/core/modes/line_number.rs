@@ -570,19 +570,12 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
-        let mut line_number = 0;
-        let mut has_new_line = false;
         for i in 0..screen.line_index.len() {
-            if has_new_line {
-                line_number += 1;
-                has_new_line = false;
-            }
-
-            if i == 0 {
-                let offset = &self.line_offsets[0];
+            let line_number = {
+                let offset = &self.line_offsets[i];
                 let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
-                line_number = n.0 + 1;
-            }
+                1 + n.0
+            };
 
             let mut offset = 0;
             let mut end_offset = 0;
@@ -594,10 +587,6 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
                 if let Some(cell) = l.last() {
                     end_offset = cell.cpi.offset.unwrap();
-                    if !cell.cpi.metadata && cell.cpi.cp == '\n' {
-                        // TODO: move this to line metadata ?
-                        has_new_line = true;
-                    }
                 }
 
                 end_offset = std::cmp::max(offset, end_offset);
@@ -640,7 +629,6 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
                 // show relative lines (add keyboard toggle)
                 let s = if false {
-
                     if self.mark_line > cur_line_num {
                         format!("{}", self.mark_line - cur_line_num)
                     } else if self.mark_line < cur_line_num {
