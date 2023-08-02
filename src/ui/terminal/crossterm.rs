@@ -279,6 +279,9 @@ enum ScreenOp {
     SetBgColor(u8, u8, u8),
     SetNormal,
     SetInverse,
+    SetNoInverse,
+    SetBold,
+    SetNoBold,
     PrintText(char),
 }
 
@@ -292,6 +295,7 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
     let mut prev_fg = (0, 0, 0);
     let mut prev_bg = (0, 0, 0);
     let mut is_inverse = false;
+    let mut is_bold = false;
 
     // reset Style
     queue!(stdout, SetAttribute(Attribute::NoReverse))?;
@@ -336,10 +340,20 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
                 if cpi.style.is_inverse {
                     ops.push(ScreenOp::SetInverse);
                 } else {
-                    ops.push(ScreenOp::SetNormal);
+                    ops.push(ScreenOp::SetNoInverse);
                 }
             }
             is_inverse = cpi.style.is_inverse;
+
+            // bold
+            if cpi.style.is_bold != is_bold {
+                if cpi.style.is_bold {
+                    ops.push(ScreenOp::SetBold);
+                } else {
+                    ops.push(ScreenOp::SetNoBold);
+                }
+            }
+            is_bold = cpi.style.is_bold;
 
             ops.push(ScreenOp::PrintText(cpi.displayed_cp));
         }
@@ -356,8 +370,15 @@ fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result
             ScreenOp::SetBgColor(r, g, b) => {
                 queue!(stdout, SetBackgroundColor(Color::Rgb { r, g, b }))?
             }
-            ScreenOp::SetNormal => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetNormal => {
+                queue!(stdout, SetAttribute(Attribute::NoReverse))?;
+                queue!(stdout, SetAttribute(Attribute::NormalIntensity))?
+            }
             ScreenOp::SetInverse => queue!(stdout, SetAttribute(Attribute::Reverse))?,
+            ScreenOp::SetNoInverse => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetBold => queue!(stdout, SetAttribute(Attribute::Bold))?,
+            ScreenOp::SetNoBold => queue!(stdout, SetAttribute(Attribute::NormalIntensity))?,
+
             ScreenOp::PrintText(c) => queue!(stdout, Print(c))?,
         }
     }
@@ -421,6 +442,7 @@ fn draw_screen(
     let mut prev_fg = (0, 0, 0);
 
     let mut is_inverse = false;
+    let mut is_bold = false;
 
     let mut l = 0;
     while l < height {
@@ -489,6 +511,16 @@ fn draw_screen(
             }
             is_inverse = cpi.style.is_inverse;
 
+            // bold
+            if cpi.style.is_bold != is_bold {
+                if cpi.style.is_bold {
+                    ops.push(ScreenOp::SetBold);
+                } else {
+                    ops.push(ScreenOp::SetNoBold);
+                }
+            }
+            is_bold = cpi.style.is_bold;
+
             // fg color
             if prev_fg != cpi.style.color {
                 ops.push(ScreenOp::SetFgColor(
@@ -527,8 +559,15 @@ fn draw_screen(
             ScreenOp::SetBgColor(r, g, b) => {
                 queue!(stdout, SetBackgroundColor(Color::Rgb { r, g, b }))?
             }
-            ScreenOp::SetNormal => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetNormal => {
+                queue!(stdout, SetAttribute(Attribute::NoReverse))?;
+                queue!(stdout, SetAttribute(Attribute::NormalIntensity))?
+            }
             ScreenOp::SetInverse => queue!(stdout, SetAttribute(Attribute::Reverse))?,
+            ScreenOp::SetNoInverse => queue!(stdout, SetAttribute(Attribute::NoReverse))?,
+            ScreenOp::SetBold => queue!(stdout, SetAttribute(Attribute::Bold))?,
+            ScreenOp::SetNoBold => queue!(stdout, SetAttribute(Attribute::NormalIntensity))?,
+
             ScreenOp::PrintText(c) => queue!(stdout, Print(c))?,
         }
     }
