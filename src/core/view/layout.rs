@@ -608,17 +608,22 @@ fn run_content_filters(
         let filters = v.compose_content_filters.clone();
         (filters, filter_in, filter_out)
     };
-    for f in filters.borrow_mut().iter_mut() {
+
+    time_spent.resize(filters.borrow().len(), 0);
+
+    for (idx, f) in filters.borrow_mut().iter_mut().enumerate() {
         //dbg_println!("setup {}", f.name());
+        let t0 = std::time::Instant::now();
         f.setup(editor, layout_env, view, parent_view);
+        let t1 = std::time::Instant::now();
+        let diff = (t1 - t0).as_micros();
+        time_spent[idx] += diff;
     }
 
     let mut filters = filters.borrow_mut();
     if filters.is_empty() {
         layout_env.quit = true;
     }
-
-    time_spent.resize(filters.len(), 0);
 
     let mut filter_in = filter_in.borrow_mut();
     let mut filter_out = filter_out.borrow_mut();
@@ -716,17 +721,22 @@ fn run_screen_overlay_filters(
         let v = view.read();
         v.compose_screen_overlay_filters.clone()
     };
-    for f in filters.borrow_mut().iter_mut() {
+
+    time_spent.resize(filters.borrow().len(), 0);
+
+    for (idx, f) in filters.borrow_mut().iter_mut().enumerate() {
         //dbg_println!("setup {}", f.name());
+        let t0 = std::time::Instant::now();
         f.setup(editor, layout_env, view, parent_view);
+        let t1 = std::time::Instant::now();
+        let diff = (t1 - t0).as_micros();
+        time_spent[idx] += diff;
     }
 
     let mut filters = filters.borrow_mut();
     if filters.is_empty() {
         layout_env.quit = true;
     }
-
-    time_spent.resize(filters.len(), 0);
 
     // is interactive rendering possible ?
 
