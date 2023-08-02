@@ -511,14 +511,19 @@ impl BufferEventCb for LineNumberModeBufferEventHandler {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct LineNumberOverlayFilter {
+    mark_offset: u64,
+    mark_line: u64,
     line_offsets: Vec<(u64, u64)>,
-    line_number: Vec<(u64, (u64, Option<usize>))>, // (offset, (line_num, node_index))
+    line_number: Vec<(u64, u64, (u64, Option<usize>))>, // (offset, end_offset, (line_num, node_index))
 }
 
 impl LineNumberOverlayFilter {
     pub fn new() -> Self {
         LineNumberOverlayFilter {
+            mark_offset: 0,
+            mark_line: 0,
             line_offsets: vec![],
             line_number: vec![],
         }
@@ -544,44 +549,62 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let src = src.read();
         self.line_offsets = src.screen.read().line_offset.clone();
 
-        self.line_number.clear();
+        // get main mark offset
+        let tm = src.mode_ctx::<TextModeContext>("text-mode");
+        self.mark_offset = tm.marks[tm.mark_index].offset;
 
         let buffer = src.buffer();
         let buffer = buffer.as_ref().unwrap().read();
+
+        let mark_info = get_byte_count_at_offset(&buffer, '\n' as usize, self.mark_offset);
+        self.mark_line = 1 + mark_info.0;
 
         if !buffer.indexed {
             return;
         }
 
-        // call to get_byte_count_at_offset are SLOW : compute only the first line
-        // and read the target screen to compute relative line count
-        for offset in self.line_offsets.iter().take(1) {
-            let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
-            self.line_number.push((offset.0, n));
-        }
+        self.line_number.clear();
+        let screen = src.screen.as_ref().read();
 
-        if self.line_number.is_empty() {
+        if self.line_offsets.is_empty() {
             return;
         }
 
-        let mut line_number = self.line_number[0].1 .0;
-
-        let screen = src.screen.as_ref().read();
+        let mut line_number = 0;
+        let mut has_new_line = false;
         for i in 0..screen.line_index.len() {
-            let mut offset = 0;
-            if let Some(l) = screen.get_used_line(i) {
-                for (idx, cell) in l.iter().enumerate() {
-                    if idx == 0 {
-                        offset = cell.cpi.offset.unwrap();
-                    }
-                    if !cell.cpi.metadata && cell.cpi.cp == '\n' {
-                        line_number += 1;
-                        break;
-                    }
-                }
+            if has_new_line {
+                line_number += 1;
+                has_new_line = false;
             }
 
-            self.line_number.push((offset, (line_number as u64, None)));
+            if i == 0 {
+                let offset = &self.line_offsets[0];
+                let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
+                line_number = n.0 + 1;
+            }
+
+            let mut offset = 0;
+            let mut end_offset = 0;
+
+            if let Some(l) = screen.get_used_line(i) {
+                if let Some(cell) = l.first() {
+                    offset = cell.cpi.offset.unwrap();
+                }
+
+                if let Some(cell) = l.last() {
+                    end_offset = cell.cpi.offset.unwrap();
+                    if !cell.cpi.metadata && cell.cpi.cp == '\n' {
+                        // TODO: move this to line metadata ?
+                        has_new_line = true;
+                    }
+                }
+
+                end_offset = std::cmp::max(offset, end_offset);
+
+                let v = (offset, end_offset, (line_number as u64, None));
+                self.line_number.push(v);
+            }
         }
     }
 
@@ -590,35 +613,67 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
 
         let w = env.screen.width();
 
+        // TODO(ceg): move to init
         let mut color = CodepointInfo::new().style.color;
         color.0 = color.0.saturating_sub(70);
         color.1 = color.1.saturating_sub(70);
         color.2 = color.2.saturating_sub(70);
 
+        let mut has_mark_color = CodepointInfo::new().style.color;
+        has_mark_color.0 = has_mark_color.0.saturating_sub(40);
+        has_mark_color.1 = has_mark_color.1.saturating_sub(40);
+        has_mark_color.2 = has_mark_color.2.saturating_sub(40);
+
         // show line numbers
         if !self.line_number.is_empty() {
             let mut prev_line = 0;
             for (idx, e) in self.line_number.iter().enumerate() {
-                let s = if idx > 0 && e.1 .0 == prev_line {
-                    // clear line
-                    format!("") // AFTER DEBUG ENABLE THIS
-                } else {
-                    format!("{}", e.1 .0 + 1)
-                };
-                prev_line = e.1 .0;
+                let cur_line_num = e.2 .0;
 
-                let padding = w - s.len();
-
-                // left-pad
-                for _ in 0..padding {
-                    env.screen.push(CodepointInfo::new());
+                if idx > 0 && cur_line_num == prev_line {
+                    // skip wrapped line
+                    env.screen.select_next_line_index();
+                    continue;
                 }
+
+                let mut enable_padding = true;
+
+                // show relative lines (add keyboard toggle)
+                let s = if false {
+
+                    if self.mark_line > cur_line_num {
+                        format!("{}", self.mark_line - cur_line_num)
+                    } else if self.mark_line < cur_line_num {
+                        format!("{}", cur_line_num - self.mark_line)
+                    } else {
+                        enable_padding = false;
+                        format!("{}", self.mark_line)
+                    }
+                } else {
+                    // absolute
+                    format!("{}", cur_line_num)
+                };
+
+                prev_line = cur_line_num;
+
+                if enable_padding {
+                    let padding = w.saturating_sub(s.len());
+                    // left-pad
+                    for _ in 0..padding {
+                        env.screen.push(CodepointInfo::new());
+                    }
+                }
+
+                let has_mark = self.mark_line == cur_line_num;
+
+                let final_color = if has_mark { has_mark_color } else { color };
 
                 let cur_line_idx = env.screen.current_line_index();
                 for c in s.chars() {
                     let mut cpi = CodepointInfo::new();
                     cpi.displayed_cp = c;
-                    cpi.style.color = color;
+                    cpi.style.color = final_color;
+                    cpi.style.is_bold = has_mark;
                     env.screen.push(cpi);
                 }
                 if cur_line_idx == env.screen.current_line_index() {
@@ -632,11 +687,15 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         // show offsets
         for e in self.line_offsets.iter() {
             let s = format!("@{}", e.0);
+            let has_mark = self.mark_offset >= e.0 && self.mark_offset <= e.1;
+            let final_color = if has_mark { has_mark_color } else { color };
+
             let cur_line_idx = env.screen.current_line_index();
             for c in s.chars() {
                 let mut cpi = CodepointInfo::new();
                 cpi.displayed_cp = c;
-                cpi.style.color = color;
+                cpi.style.color = final_color;
+                cpi.style.is_bold = has_mark;
                 env.screen.push(cpi);
             }
             if cur_line_idx == env.screen.current_line_index() {
