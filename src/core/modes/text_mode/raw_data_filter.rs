@@ -27,7 +27,7 @@ pub struct RawDataFilter {
 impl RawDataFilter {
     pub fn new() -> Self {
         RawDataFilter {
-            debug: !true,
+            debug: true,
             pos: 0,
             max_pos: 0,
             read_max: 0,
@@ -63,7 +63,7 @@ impl ContentFilter<'_> for RawDataFilter {
         //
         self.read_count = 0;
         self.read_max = env.screen.width() * env.screen.height() * 4;
-        self.read_size = env.screen.width(); // * env.screen.height() / 4; // 4: max utf8 encode size
+        self.read_size = env.screen.width() * env.screen.height() / 2; // 4: max utf8 encode size
 
         // EOF
         self.max_pos = view.read().buffer().unwrap().read().size() as u64;
