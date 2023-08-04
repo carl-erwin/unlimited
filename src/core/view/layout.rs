@@ -310,11 +310,12 @@ fn compose_children(
     // non floating children
     // cache size ?
     let layout_ops = view.children.iter().map(|e| e.layout_op.clone()).collect();
-    let sizes = if layout_dir_is_vertical {
-        view::compute_layout_sizes(height, &layout_ops)
+    let total_size = if layout_dir_is_vertical {
+        height
     } else {
-        view::compute_layout_sizes(width, &layout_ops)
+        width
     };
+    let sizes = view::compute_layout_sizes(total_size, &layout_ops);
     assert_eq!(view.children.len(), sizes.len());
 
     #[derive(Debug)]
