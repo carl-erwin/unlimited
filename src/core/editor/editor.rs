@@ -1341,11 +1341,18 @@ fn run_all_stages(
         dbg_println!("pointer_over_view_id {:?}", pointer_over_view_id);
         dbg_println!("new_clicked {:?}", new_clicked);
 
+        // process input
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
-        // render intermediate screen
-        assert_ne!(target_id, env.root_view_id);
-        run_stages(Stage::Compositing, &mut editor, &mut env, target_id);
+        // target_id pre compositing
+        // assert_ne!(target_id, env.root_view_id);
+        run_stage(
+            StagePosition::Pre,
+            Stage::Compositing,
+            &mut editor,
+            &mut env,
+            target_id,
+        );
 
         // update active view (no root change)
         if prev_root_index == env.root_view_index {
@@ -1369,18 +1376,27 @@ fn run_all_stages(
             }
         }
 
+        // must render root view once
+        let id = env.root_view_id;
+        run_stages(Stage::Compositing, &mut editor, &mut env, id);
+
+        // target_id post compositing
+        run_stage(
+            StagePosition::Post,
+            Stage::Compositing,
+            &mut editor,
+            &mut env,
+            target_id,
+        );
+
+        // send screen to ui
+        run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
+
         //
         if env.pending_events > 0 {
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
     }
-
-    // must render root view once
-    let id = env.root_view_id;
-    run_stages(Stage::Compositing, &mut editor, &mut env, id);
-
-    // send screen to ui
-    run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
 }
 
 fn process_input_events(
