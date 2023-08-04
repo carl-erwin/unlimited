@@ -45,7 +45,8 @@ impl<'a> ScreenFilter {
         }
     }
 
-    pub fn add_text_to_screen(
+    #[inline(always)]
+    fn add_text_to_screen(
         &mut self,
         env: &mut LayoutEnv,
         cpi: CodepointInfo,
