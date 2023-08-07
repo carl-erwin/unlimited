@@ -64,6 +64,7 @@ pub fn main_loop(
 ) -> Result<()> {
     let mut draw_req = 0;
     let mut fps = 0;
+    let mut drop = 0;
     let mut fps_t0 = Instant::now();
 
     let mut seq: usize = 0;
@@ -160,20 +161,26 @@ pub fn main_loop(
                     draw_req += 1;
 
                     let start = Instant::now();
-                    crate::core::event::pending_render_event_dec(1);
+
+
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
                     let mut draw = force_draw;
 
-                    if p_rdr < 1 {
-                        draw = true;
-                    }
-
                     if crate::core::no_ui_render() {
                         draw = false;
                         fps += 1;
+                    } else {
+
+                        // force draw ?
+                        if p_rdr <= 1 {
+                            draw = true;
+                        } else {
+                            drop += 1;
+                        }
                     }
+
 
                     let mut first_offset = 0;
                     if draw {
@@ -195,9 +202,10 @@ pub fn main_loop(
 
                         let end = Instant::now();
 
-                        eprintln!("DRAW: crossterm : time spent to draw view = {} µs | fps: {}| p_input {}|p_rdr {}| draw:{}\r",
+                        eprintln!("DRAW: crossterm : time spent to draw view = {} µs | fps: {} | drop:{}| p_input {}|p_rdr {}| draw:{}\r",
                         (end - start).as_micros(),
                         fps,
+                        drop,
                         p_input,
                         p_rdr, draw
                     );
@@ -205,26 +213,31 @@ pub fn main_loop(
 
                     if (start - fps_t0).as_millis() >= 1000 {
                         dbg_println!(
-                                 "DRAW: crossterm | offset {:?} | req {} | fps {} | p_rdr {} | p_input {}",
+                                 "DRAW: crossterm | offset {:?} | req {} | fps {} | drop {} | p_rdr {} | p_input {}",
                                  first_offset,
                                  draw_req,
                                  fps,
+                                 drop,
                                  p_rdr,
                                  p_input
                              );
 
                         fps = 0;
+                        drop = 0;
                         draw_req = 0;
                         fps_t0 = Instant::now();
                     }
 
                     let ts_now = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
                     dbg_println!(
                         "input latency: ts_now {} - input_ts {} = {}",
                         ts_now,
                         evt.input_ts,
                         ts_now - evt.input_ts
                     );
+
+                    crate::core::event::pending_render_event_dec(1);
                 }
 
                 _ => {}
