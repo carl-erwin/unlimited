@@ -238,7 +238,9 @@ impl Screen {
         UnicodeWidthChar::width(c).unwrap_or(1)
     }
 
-    /// append
+    /// Append CodepoinInfo tu the current line if it fits.
+    /// filters basic blanks '\r' '\n' '\t' 0x0..0x1f and replace them by space ' '
+    //#[inline(always)]
     pub fn push(&mut self, mut cpi: CodepointInfo) -> (bool, usize) {
         // self.check_invariants();
 
