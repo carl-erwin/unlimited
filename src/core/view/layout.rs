@@ -677,7 +677,8 @@ fn run_content_filters(
                 );
             }
 
-            if true {
+            // TODO(ceg): only in debug mode
+            if false {
                 for i in filter_out.iter() {
                     i.check_invariants();
                 }
