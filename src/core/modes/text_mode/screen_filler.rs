@@ -52,11 +52,9 @@ impl<'a> ScreenFilter {
         cpi: CodepointInfo,
         offset: Option<u64>,
     ) -> bool {
-        // always transform displayed '\n' in ' '
-        // (fix redraw if char map filter is disabled)
-
         let ret = env.screen.push(cpi);
         if !ret.0 {
+
             if bench_to_eof() {
                 let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
                 let new_screen = env.screen.clone();
@@ -69,8 +67,6 @@ impl<'a> ScreenFilter {
                     },
                 );
 
-                //let p_rdr = crate::core::event::pending_render_event_count();
-                //if p_rdr < 1
                 {
                     crate::core::event::pending_render_event_inc(1);
                     self.ui_tx.clone().unwrap().send(msg).unwrap_or(());
@@ -83,6 +79,7 @@ impl<'a> ScreenFilter {
                 self.first_offset = offset;
                 self.last_offset = offset;
             } else {
+                // screen full ? stop here
                 dbg_println!("env.screen.push -> false, cpi {:?}", cpi);
                 env.quit = true;
                 return false;
