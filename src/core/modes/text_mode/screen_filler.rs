@@ -54,7 +54,6 @@ impl<'a> ScreenFilter {
     ) -> bool {
         let ret = env.screen.push(cpi);
         if !ret.0 {
-
             if bench_to_eof() {
                 let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
                 let new_screen = env.screen.clone();

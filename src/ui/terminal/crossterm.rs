@@ -162,7 +162,6 @@ pub fn main_loop(
 
                     let start = Instant::now();
 
-
                     let p_rdr = crate::core::event::pending_render_event_count();
                     let p_input = crate::core::event::pending_input_event_count();
 
@@ -172,7 +171,6 @@ pub fn main_loop(
                         draw = false;
                         fps += 1;
                     } else {
-
                         // force draw ?
                         if p_rdr <= 1 {
                             draw = true;
@@ -180,7 +178,6 @@ pub fn main_loop(
                             drop += 1;
                         }
                     }
-
 
                     let mut first_offset = 0;
                     if draw {
