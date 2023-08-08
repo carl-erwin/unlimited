@@ -81,6 +81,8 @@ use crate::core::view::ViewEventSource;
 use crate::core::modes::text_mode::mark::Mark;
 use crate::core::modes::text_mode::TextModeContext;
 
+use crate::core::editor::config_var_get;
+
 fn num_digit(v: u64) -> u64 {
     match v {
         _ if v < 10 => 1,
@@ -181,65 +183,84 @@ pub fn linenum_input_event(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View>>,
 ) {
-    let v = view.read();
+    let display_mode = {
+        let v = view.read();
 
-    // explicit focus on text view
-    let mode_ctx = v.mode_ctx::<LineNumberModeContext>("line-number-mode");
-    env.focus_locked_on_view_id = None;
+        // explicit focus on text view
+        let mode_ctx = v.mode_ctx::<LineNumberModeContext>("line-number-mode");
+        let mut display_mode = mode_ctx.display_mode;
+        env.focus_locked_on_view_id = None;
 
-    let evt = v.input_ctx.trigger.last();
-    match evt {
-        Some(InputEvent::ButtonPress(ref button_event)) => match button_event {
-            ButtonEvent {
-                mods:
-                    KeyModifiers {
-                        ctrl: _,
-                        alt: _,
-                        shift: _,
-                    },
+        let evt = v.input_ctx.trigger.last();
+        match evt {
+            Some(InputEvent::ButtonPress(ref button_event)) => match button_event {
+                ButtonEvent {
+                    mods:
+                        KeyModifiers {
+                            ctrl: _,
+                            alt: _,
+                            shift: _,
+                        },
+                    x: _,
+                    y: _,
+                    button,
+                } => {
+                    if *button == 0 {
+                        set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                    }
+                    if *button == 1 {
+                        // set mode
+                        display_mode += 1;
+                        display_mode %= 3;
+                    }
+
+                    // TODO: move mark to selected line and start selection
+                }
+            },
+
+            Some(InputEvent::ButtonRelease(ref button_event)) => match button_event {
+                ButtonEvent {
+                    mods:
+                        KeyModifiers {
+                            ctrl: _,
+                            alt: _,
+                            shift: _,
+                        },
+                    x: _,
+                    y: _,
+                    button: _,
+                } => {
+                    set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                    // TODO: move mark to selected line and update selection
+                }
+            },
+
+            Some(InputEvent::PointerMotion(PointerEvent {
                 x: _,
                 y: _,
-                button: _,
-            } => {
-                set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
-                // TODO: move mark to selected line and start selection
+                mods: _,
+            })) => {}
+
+            _ => {
+                dbg_println!("LINENUM unhandled event {:?}", evt);
+                return;
             }
-        },
+        };
 
-        Some(InputEvent::ButtonRelease(ref button_event)) => match button_event {
-            ButtonEvent {
-                mods:
-                    KeyModifiers {
-                        ctrl: _,
-                        alt: _,
-                        shift: _,
-                    },
-                x: _,
-                y: _,
-                button: _,
-            } => {
-                set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
-                // TODO: move mark to selected line and update selection
-            }
-        },
-
-        Some(InputEvent::PointerMotion(PointerEvent {
-            x: _,
-            y: _,
-            mods: _,
-        })) => {}
-
-        _ => {
-            dbg_println!("LINENUM unhandled event {:?}", evt);
-            return;
-        }
+        display_mode
     };
+
+    // save
+    let mut v = view.write();
+    let mode_ctx = v.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+    mode_ctx.display_mode = display_mode;
 }
 
 pub struct LineNumberModeContext {
     // add per view fields
     linenum_view_id: view::Id,
     text_view_id: view::Id,
+    display_mode: usize, // 0: absolute, 1:relative, 2:hybrid
 
     pub start_line: Option<u64>,
     pub start_col: Option<u64>,
@@ -262,9 +283,11 @@ impl<'a> Mode for LineNumberMode {
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc line-number-mode ctx");
+
         let ctx = LineNumberModeContext {
             linenum_view_id: view::Id(0),
             text_view_id: view::Id(0),
+            display_mode: 0,
             start_line: None,
             start_col: None,
         };
@@ -353,29 +376,45 @@ impl<'a> Mode for LineNumberMode {
 
     fn configure_view(
         &mut self,
-        _editor: &mut Editor<'static>,
+        editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        // setup input map for core actions
-        let input_map = build_input_event_map(LINENUM_INPUT_MAP).unwrap();
-        let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.push((self.name(), input_map));
+        {
+            // setup input map for core actions
+            let input_map = build_input_event_map(LINENUM_INPUT_MAP).unwrap();
+            let mut input_map_stack = view.input_ctx.input_map.as_ref().borrow_mut();
+            input_map_stack.push((self.name(), input_map));
 
-        view.compose_screen_overlay_filters
-            .borrow_mut()
-            .push(Box::new(LineNumberOverlayFilter::new()));
+            view.compose_screen_overlay_filters
+                .borrow_mut()
+                .push(Box::new(LineNumberOverlayFilter::new()));
 
-        let buffer_id = view.buffer().unwrap().read().id;
-        let view_id = view.id;
+            let buffer_id = view.buffer().unwrap().read().id;
+            let view_id = view.id;
 
-        // move to core ?
-        BUFFER_ID_TO_VIEW_ID_MAP
-            .as_ref()
-            .write()
-            .entry(buffer_id)
-            .or_insert_with(HashSet::new)
-            .insert(view_id);
+            // move to core ?
+            BUFFER_ID_TO_VIEW_ID_MAP
+                .as_ref()
+                .write()
+                .entry(buffer_id)
+                .or_insert_with(HashSet::new)
+                .insert(view_id);
+        }
+        {
+            // config var
+
+            let mode_ctx = view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
+
+            let v = if let Some(display_mode) = config_var_get(&editor, "line-number-mode:display")
+            {
+                display_mode.trim_end().parse::<usize>().unwrap_or(0)
+            } else {
+                0
+            };
+
+            mode_ctx.display_mode = std::cmp::min(v, 2);
+        }
     }
 
     fn on_view_event(
@@ -597,7 +636,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         }
     }
 
-    fn run(&mut self, _view: &View, env: &mut LayoutEnv) {
+    fn run(&mut self, view: &View, env: &mut LayoutEnv) {
         env.screen.clear();
 
         let w = env.screen.width();
@@ -612,6 +651,9 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         has_mark_color.0 = has_mark_color.0.saturating_sub(40);
         has_mark_color.1 = has_mark_color.1.saturating_sub(40);
         has_mark_color.2 = has_mark_color.2.saturating_sub(40);
+
+        let mode_ctx = view.mode_ctx::<LineNumberModeContext>("line-number-mode");
+        let display_mode = mode_ctx.display_mode;
 
         // show line numbers
         if !self.line_number.is_empty() {
@@ -628,14 +670,18 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 let mut enable_padding = true;
 
                 // show relative lines (add keyboard toggle)
-                let s = if false {
+                let s = if display_mode > 0 {
                     if self.mark_line > cur_line_num {
                         format!("{}", self.mark_line - cur_line_num)
                     } else if self.mark_line < cur_line_num {
                         format!("{}", cur_line_num - self.mark_line)
                     } else {
                         enable_padding = false;
-                        format!("{}", self.mark_line)
+                        if display_mode == 1 {
+                            format!("0")
+                        } else {
+                            format!("{}", self.mark_line)
+                        }
                     }
                 } else {
                     // absolute

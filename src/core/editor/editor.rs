@@ -251,7 +251,7 @@ pub fn config_var_is_set(editor: &Editor<'static>, var_name: &str, default: bool
     }
 }
 
-pub fn config_var_get<'a>(editor: &'a Editor<'a>, var_name: &str) -> Option<&'a String> {
+pub fn config_var_get<'a>(editor: &'a Editor<'static>, var_name: &str) -> Option<&'a String> {
     editor.config.vars.get(var_name)
 }
 
