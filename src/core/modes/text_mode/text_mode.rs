@@ -2254,75 +2254,91 @@ pub fn transpose_char(
     tm.pre_compose_action.push(PostInputAction::CancelSelection);
 }
 
-pub fn paste(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>) {
-    let v = &mut view.write();
-
-    // buffer read only ?
+pub fn paste(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
     {
-        let buffer = v.buffer().unwrap();
-        let buffer = buffer.read();
-        if buffer.is_syncing {
+        let v = &mut view.write();
+
+        // buffer read only ?
+        {
+            let buffer = v.buffer().unwrap();
+            let buffer = buffer.read();
+            if buffer.is_syncing {
+                return;
+            }
+        }
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+        let marks = &mut tm.marks;
+        let marks_len = marks.len();
+
+        dbg_println!("mark_len {}", marks_len);
+
+        dbg_println!("copy_buffer.len() {}", tm.copy_buffer.len());
+        if tm.copy_buffer.is_empty() {
             return;
         }
     }
 
-    let mut buffer = v.buffer.clone();
-    let buffer = buffer.as_mut().unwrap();
-    let mut buffer = buffer.write();
+    // save marks
+    run_text_mode_actions_vec(
+        &mut editor,
+        &mut env,
+        &view,
+        &vec![PostInputAction::SaveMarks { caller: &"paste" }],
+    );
 
-    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+    {
+        let v = &mut view.write();
 
-    let marks = &mut tm.marks;
-    let marks_len = marks.len();
+        let mut buffer = v.buffer.clone();
+        let buffer = buffer.as_mut().unwrap();
+        let mut buffer = buffer.write();
 
-    dbg_println!("mark_len {}", marks_len);
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-    dbg_println!("copy_buffer.len() {}", tm.copy_buffer.len());
-    if tm.copy_buffer.is_empty() {
-        return;
-    }
+        let marks = &mut tm.marks;
+        let marks_len = marks.len();
 
-    let mut grow = 0;
-    for (midx, m) in marks.iter_mut().enumerate() {
-        m.offset += grow;
+        let mut grow = 0;
+        for (midx, m) in marks.iter_mut().enumerate() {
+            m.offset += grow;
 
-        if tm.copy_buffer.len() != marks_len {
-            // TODO(ceg): insert each tm.copy_buffer transaction + '\n'
-            // grow += each tr
-        } else {
-            let copy = &tm.copy_buffer[midx];
-            let data = match copy {
-                CopyData::BufferLogIndex(tridx) => {
-                    let tr = buffer.buffer_log.data[*tridx].clone();
-                    if let Some(ref data) = tr.data {
-                        data.as_ref().clone()
-                    } else {
-                        panic!("wrong transaction index");
+            if tm.copy_buffer.len() != marks_len {
+                // TODO(ceg): insert each tm.copy_buffer transaction + '\n'
+                // grow += each tr
+            } else {
+                let copy = &tm.copy_buffer[midx];
+                let data = match copy {
+                    CopyData::BufferLogIndex(tridx) => {
+                        let tr = buffer.buffer_log.data[*tridx].clone();
+                        if let Some(ref data) = tr.data {
+                            data.as_ref().clone()
+                        } else {
+                            panic!("wrong transaction index");
+                        }
                     }
-                }
-                CopyData::InnerBuffer(data) => data.clone(),
-            };
+                    CopyData::InnerBuffer(data) => data.clone(),
+                };
 
-            dbg_println!("paste @ offset {} data.len {}", m.offset, data.len());
+                dbg_println!("paste @ offset {} data.len {}", m.offset, data.len());
 
-            let nr_in = buffer.insert(m.offset, data.len(), data.as_slice());
-            assert_eq!(nr_in, data.len());
-            grow += nr_in as u64;
-            m.offset += nr_in as u64;
+                let nr_in = buffer.insert(m.offset, data.len(), data.as_slice());
+                assert_eq!(nr_in, data.len());
+                grow += nr_in as u64;
+                m.offset += nr_in as u64;
+            }
         }
+
+        tm.pre_compose_action.push(PostInputAction::CancelSelection);
+        tm.pre_compose_action.push(PostInputAction::CheckMarks);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
     }
-
-    tm.pre_compose_action.push(PostInputAction::CheckMarks);
-    tm.pre_compose_action.push(PostInputAction::CancelSelection);
-
-    // // mark off_screen ?
-    // let screen = v.screen.read();
-    // screen.contains_offset(offset) == false || array.len() > screen.width() * screen.height()
-    // };
-    //
-    // if center {
-    // tm.pre_compose_action.push(PostInputAction::CenterAroundMainMark);
-    // };
 }
 
 pub fn set_selection_points_at_marks(
