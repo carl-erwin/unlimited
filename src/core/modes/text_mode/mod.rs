@@ -1,7 +1,8 @@
 pub mod char_map;
 pub mod draw_mark;
 pub mod highlight_keywords;
-pub mod highlight_selection;
+pub mod highlight_selection_overlay;
+
 pub mod mark;
 pub mod raw_data_filter;
 pub mod screen_filler;
@@ -20,7 +21,8 @@ mod text_mode;
 pub use char_map::*;
 pub use draw_mark::*;
 pub use highlight_keywords::*;
-pub use highlight_selection::*;
+pub use highlight_selection_overlay::*;
+
 pub use raw_data_filter::*;
 pub use screen_filler::*;
 pub use show_trailing_spaces::*;

@@ -163,7 +163,6 @@ use super::super::Mode;
 // Text mode content filters
 use crate::core::modes::text_mode::CharMapFilter;
 use crate::core::modes::text_mode::HighlightKeywords;
-use crate::core::modes::text_mode::HighlightSelectionFilter;
 use crate::core::modes::text_mode::RawDataFilter;
 use crate::core::modes::text_mode::ScreenFilter;
 use crate::core::modes::text_mode::TabFilter;
@@ -174,6 +173,8 @@ use crate::core::modes::text_mode::WordWrapFilter;
 
 // Text mode screen overlay filters
 use crate::core::modes::text_mode::DrawMarks;
+use crate::core::modes::text_mode::HighlightSelectionOverlay;
+
 use crate::core::modes::text_mode::ShowTrailingSpaces;
 
 use crate::core::view::ContentFilter;
@@ -292,12 +293,6 @@ fn build_text_mode_content_filters_map() -> HashMap<&'static str, ContentFilterI
         });
 
     content_filter_map
-        .entry("text/highlight-selection")
-        .or_insert(ContentFilterInfo {
-            allocator: || Box::new(HighlightSelectionFilter::new()),
-        });
-
-    content_filter_map
         .entry("text/tab-expansion")
         .or_insert(ContentFilterInfo {
             allocator: || Box::new(TabFilter::new()),
@@ -338,6 +333,12 @@ fn build_text_mode_screen_overlay_filters_map(
         .entry("text/draw-marks")
         .or_insert(ScreenOverlayFilterInfo {
             allocator: || Box::new(DrawMarks::new()),
+        });
+
+    screen_overlay_filter_map
+        .entry("text/highlight-selection-overlay")
+        .or_insert(ScreenOverlayFilterInfo {
+            allocator: || Box::new(HighlightSelectionOverlay::new()),
         });
 
     screen_overlay_filter_map
@@ -566,9 +567,9 @@ impl<'a> Mode for TextMode {
                 v.push("text/highlight-keywords"); // TODO: move to overlay
             }
 
-            if config_var_is_set(&editor, "text-mode:highlight-selection", true) {
-                v.push("text/highlight-selection"); // TODO: move to overlay
-            }
+            // if config_var_is_set(&editor, "text-mode:highlight-selection", false) {
+            //     v.push("text/highlight-selection"); // TODO: move to overlay
+            // }
 
             if config_var_is_set(&editor, "text-mode:tabs", true) {
                 v.push("text/tab-expansion");
@@ -604,7 +605,7 @@ impl<'a> Mode for TextMode {
         let use_draw_marks = true; // mandatory
 
         let screen_overlay_filters_pipeline = if use_draw_marks {
-            vec!["text/draw-marks"]
+            vec!["text/draw-marks", "text/highlight-selection-overlay"]
         } else {
             vec![]
         };
