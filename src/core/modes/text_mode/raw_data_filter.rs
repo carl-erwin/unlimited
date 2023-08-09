@@ -27,7 +27,7 @@ pub struct RawDataFilter {
 impl RawDataFilter {
     pub fn new() -> Self {
         RawDataFilter {
-            debug: true,
+            debug: false,
             pos: 0,
             max_pos: 0,
             read_max: 0,
