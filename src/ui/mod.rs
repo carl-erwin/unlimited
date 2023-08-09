@@ -4,9 +4,11 @@ mod terminal;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
+use crate::core::config::ConfigVariables;
 use crate::core::event::Message;
 
 pub fn main_loop(
+    config_vars: &ConfigVariables,
     ui_name: &str,
     ui_rx: &Receiver<Message<'static>>,
     ui_tx: &Sender<Message<'static>>,
@@ -15,7 +17,7 @@ pub fn main_loop(
     // TODO(ceg): switch ui here
     match ui_name {
         "crossterm" => {
-            terminal::crossterm::main_loop(ui_rx, ui_tx, core_tx).ok();
+            terminal::crossterm::main_loop(config_vars, ui_rx, ui_tx, core_tx).ok();
         }
 
         #[cfg(feature = "gfx-sdl")]
@@ -29,7 +31,7 @@ pub fn main_loop(
         }
 
         _ => {
-            terminal::crossterm::main_loop(ui_rx, ui_tx, core_tx).ok();
+            terminal::crossterm::main_loop(config_vars, ui_rx, ui_tx, core_tx).ok();
         }
     }
 

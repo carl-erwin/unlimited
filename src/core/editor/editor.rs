@@ -1344,6 +1344,11 @@ fn run_all_stages(
         // process input
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
+        //
+        if env.pending_events > 0 {
+            env.pending_events = crate::core::event::pending_input_event_dec(1);
+        }
+
         // target_id pre compositing
         // assert_ne!(target_id, env.root_view_id);
         run_stage(
@@ -1376,7 +1381,7 @@ fn run_all_stages(
             }
         }
 
-        // must render root view once
+        // must render root view
         let id = env.root_view_id;
         run_stages(Stage::Compositing, &mut editor, &mut env, id);
 
@@ -1388,15 +1393,13 @@ fn run_all_stages(
             &mut env,
             target_id,
         );
-
-        // send screen to ui
-        run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
-
-        //
-        if env.pending_events > 0 {
-            env.pending_events = crate::core::event::pending_input_event_dec(1);
-        }
     }
+
+    // send root view once
+    let id = env.root_view_id;
+
+    // send screen to ui
+    run_stages(Stage::UpdateUi, &mut editor, &mut env, id);
 }
 
 fn process_input_events(
@@ -1483,6 +1486,7 @@ pub fn main_loop(
 ) {
     while !env.quit {
         if let Ok(msg) = core_rx.recv() {
+            let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
             env.input_ts = msg.ts;
 
             match msg.event {
@@ -1516,6 +1520,9 @@ pub fn main_loop(
 
                 _ => {}
             }
+
+            let ts1 = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+            dbg_println!("EDITOR: event handling time {}", ts1 - ts);
         }
     }
 

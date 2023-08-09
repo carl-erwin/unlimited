@@ -27,6 +27,8 @@ use std::sync::Arc;
 
 //
 //
+use crate::core::config::ConfigVariables;
+
 use crate::core::event::ButtonEvent;
 use crate::core::event::Event;
 use crate::core::event::Event::*;
@@ -49,8 +51,10 @@ fn stdin_thread(core_tx: &Sender<Message>, ui_tx: &Sender<Message>) {
     //    let v = autotest_0001();
     //    send_input_events(&v, &tx);
 
+    let force_input = std::env::var("UNLIMITED_CROSSTERM_FORCE_INPUT").is_ok();
+
     loop {
-        get_input_events(core_tx, ui_tx).unwrap();
+        get_input_events(core_tx, ui_tx, force_input).unwrap();
     }
 }
 
@@ -58,6 +62,7 @@ fn stdin_thread(core_tx: &Sender<Message>, ui_tx: &Sender<Message>) {
 // }
 
 pub fn main_loop(
+    config_vars: &ConfigVariables,
     ui_rx: &Receiver<Message<'static>>,
     ui_tx: &Sender<Message<'static>>,
     core_tx: &Sender<Message<'static>>,
@@ -68,6 +73,11 @@ pub fn main_loop(
     let mut fps_t0 = Instant::now();
 
     let mut seq: usize = 0;
+
+    let debug = config_vars
+        .get(&"crossterm:debug".to_owned())
+        .unwrap_or(&"".to_owned())
+        == "1";
 
     fn get_next_seq(seq: &mut usize) -> usize {
         *seq += 1;
@@ -135,10 +145,10 @@ pub fn main_loop(
     let force_draw = std::env::var("UNLIMITED_CROSSTERM_FORCE_DRAW").is_ok();
 
     loop {
-        if let Ok(evt) = ui_rx.recv() {
+        if let Ok(msg) = ui_rx.recv() {
             let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
-            match evt.event {
+            match msg.event {
                 Event::ApplicationQuit => {
                     let msg = Message::new(get_next_seq(&mut seq), 0, ts, Event::ApplicationQuit);
                     crate::core::event::pending_input_event_inc(1);
@@ -172,10 +182,12 @@ pub fn main_loop(
                         fps += 1;
                     } else {
                         // force draw ?
-                        if p_rdr <= 1 {
-                            draw = true;
-                        } else {
-                            drop += 1;
+                        if !force_draw {
+                            if p_rdr <= 1 {
+                                draw = true;
+                            } else {
+                                drop += 1;
+                            }
                         }
                     }
 
@@ -194,22 +206,9 @@ pub fn main_loop(
                         last_screen = screen;
                     }
 
-                    if false {
-                        let p_rdr = crate::core::event::pending_render_event_count();
-
-                        let end = Instant::now();
-
-                        eprintln!("DRAW: crossterm : time spent to draw view = {} µs | fps: {} | drop:{}| p_input {}|p_rdr {}| draw:{}\r",
-                        (end - start).as_micros(),
-                        fps,
-                        drop,
-                        p_input,
-                        p_rdr, draw
-                    );
-                    }
-
                     if (start - fps_t0).as_millis() >= 1000 {
-                        dbg_println!(
+                        if debug {
+                            eprintln!(
                                  "DRAW: crossterm | offset {:?} | req {} | fps {} | drop {} | p_rdr {} | p_input {}",
                                  first_offset,
                                  draw_req,
@@ -218,6 +217,7 @@ pub fn main_loop(
                                  p_rdr,
                                  p_input
                              );
+                        }
 
                         fps = 0;
                         drop = 0;
@@ -227,17 +227,24 @@ pub fn main_loop(
 
                     let ts_now = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
-                    dbg_println!(
-                        "input latency: ts_now {} - input_ts {} = {}",
-                        ts_now,
-                        evt.input_ts,
-                        ts_now - evt.input_ts
-                    );
+                    if debug {
+                        eprintln!(
+                            "CROSSTERM: input latency: ts_now {} - input_ts {} = {}",
+                            ts_now,
+                            msg.input_ts,
+                            ts_now - msg.input_ts
+                        );
+                    }
 
                     crate::core::event::pending_render_event_dec(1);
                 }
 
                 _ => {}
+            }
+
+            if debug {
+                let ts1 = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+                eprintln!("CROSSTERM: event handling time {}", ts1 - ts);
             }
         }
     }
@@ -962,7 +969,11 @@ fn send_input_events(
        *) An other solution (hack) (my fork on github)
         change input fd from blocking to non-blocking mode, do read loop and restore mode on exit.
 */
-fn get_input_events(tx: &Sender<Message>, ui_tx: &Sender<Message>) -> ::crossterm::Result<()> {
+fn get_input_events(
+    tx: &Sender<Message>,
+    ui_tx: &Sender<Message>,
+    force_input: bool,
+) -> ::crossterm::Result<()> {
     let mut accum = Vec::<InputEvent>::with_capacity(255);
     let mut wait_ms = 60_000;
     let max_wait_ms = 150;
@@ -980,6 +991,9 @@ fn get_input_events(tx: &Sender<Message>, ui_tx: &Sender<Message>) -> ::crosster
                 prev_len = accum.len();
                 let evt = translate_crossterm_event(cross_evt);
                 accum.push(evt);
+                if force_input {
+                    break;
+                }
             }
         }
 
@@ -1008,7 +1022,7 @@ fn get_input_events(tx: &Sender<Message>, ui_tx: &Sender<Message>) -> ::crosster
 
     // TODO(ceg): --limit-input-rate
     let p_input = crate::core::event::pending_input_event_count();
-    if p_input > 0 {
+    if p_input > 16 && !force_input {
         return Ok(());
     }
 

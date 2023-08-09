@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-#[derive(Debug)]
+pub type ConfigVariables = HashMap<String, String>;
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub files_list: Vec<String>,
     pub ui_frontend: String,
-    pub vars: HashMap<String, String>,
+    pub vars: ConfigVariables,
 }

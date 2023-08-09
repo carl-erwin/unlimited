@@ -34,15 +34,17 @@ fn main() {
 
     let config = parse_command_line();
 
+    let config_vars = config.vars.clone();
+
     // build core/ui communication channels
     let ui_name = config.ui_frontend.clone();
     let (ui_tx, ui_rx) = channel();
     let (core_tx, core_rx) = channel();
     // create core thread
-    let core_th = start_core_thread(config, core_tx.clone(), core_rx, ui_tx.clone());
+    let core_th = start_core_thread(config.clone(), core_tx.clone(), core_rx, ui_tx.clone());
 
     // run the ui loop in the main thread
-    ui::main_loop(&ui_name, &ui_rx, &ui_tx, &core_tx);
+    ui::main_loop(&config_vars, &ui_name, &ui_rx, &ui_tx, &core_tx);
 
     // wait for core thread
     if let Some(core_handle) = core_th {
