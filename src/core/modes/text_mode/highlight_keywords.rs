@@ -128,7 +128,7 @@ enum TokenType {
     Dollar, // $
 }
 
-pub struct HighlightFilter {
+pub struct HighlightKeywords {
     token_io: Vec<FilterIo>,
     prev_token_type: TokenType,
     utf8_token: Vec<u8>,
@@ -138,9 +138,9 @@ pub struct HighlightFilter {
     max_token_size: usize,
 }
 
-impl HighlightFilter {
+impl HighlightKeywords {
     pub fn new() -> Self {
-        HighlightFilter {
+        HighlightKeywords {
             token_io: Vec::new(),
             prev_token_type: TokenType::Unknown,
             utf8_token: Vec::new(),
@@ -299,9 +299,9 @@ fn get_token_type(c: char) -> TokenType {
 
 // TODO(ceg): monitor env.quit
 // to flush
-impl ContentFilter<'_> for HighlightFilter {
+impl ContentFilter<'_> for HighlightKeywords {
     fn name(&self) -> &'static str {
-        &"HighlightFilter"
+        &"HighlightKeywords"
     }
 
     fn setup(

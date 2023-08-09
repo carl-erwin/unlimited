@@ -162,7 +162,7 @@ use super::super::Mode;
 
 // Text mode content filters
 use crate::core::modes::text_mode::CharMapFilter;
-use crate::core::modes::text_mode::HighlightFilter;
+use crate::core::modes::text_mode::HighlightKeywords;
 use crate::core::modes::text_mode::HighlightSelectionFilter;
 use crate::core::modes::text_mode::RawDataFilter;
 use crate::core::modes::text_mode::ScreenFilter;
@@ -288,7 +288,7 @@ fn build_text_mode_content_filters_map() -> HashMap<&'static str, ContentFilterI
     content_filter_map
         .entry("text/highlight-keywords")
         .or_insert(ContentFilterInfo {
-            allocator: || Box::new(HighlightFilter::new()),
+            allocator: || Box::new(HighlightKeywords::new()),
         });
 
     content_filter_map
