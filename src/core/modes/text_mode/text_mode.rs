@@ -705,6 +705,7 @@ impl TextMode {
                 "text-mode:remove-until-end-of-word",
                 remove_until_end_of_word,
             ),
+            ("text-mode:join-lines", join_lines),
             // undo/redo
             ("text-mode:undo", undo),
             ("text-mode:redo", redo),
@@ -1377,6 +1378,96 @@ pub fn remove_previous_codepoint(
                 .push(PostInputAction::ScrollUp { n: 1 });
         }
         tm.pre_compose_action.push(PostInputAction::CheckMarks);
+    }
+}
+
+pub fn join_lines(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    // compute offsets
+    let (eol1, startl2, eol2) = {
+        let v = &mut view.write();
+
+        let mut buffer = v.buffer.clone();
+        let buffer = buffer.as_mut().unwrap();
+        let buffer = buffer.write();
+
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+
+        // - count(marks) > 1: ignore
+        if tm.marks.len() > 1 {
+            return;
+        }
+
+        let codec = tm.text_codec.as_ref();
+        let mut m = tm.marks[0];
+
+        // - go to beginning of line : save s_offset
+        m.move_to_end_of_line(&buffer, codec);
+        let eol1 = m.offset;
+
+        // skip line
+        m.move_forward(&buffer, codec);
+
+        m.skip_blanks_forward_until_end_of_line(&buffer, codec);
+        let startl2 = m.offset;
+
+        // TODO(ceg): just read the next char
+        // if cp != \n set insert_space_flag
+        m.move_to_end_of_line(&buffer, codec);
+        let eol2 = m.offset;
+
+        (eol1, startl2, eol2)
+    };
+
+    if eol1 == startl2 {
+        return;
+    }
+
+    // save marks FIXME(ceg): check undo/redo duplicates ops
+    {
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"join_lines",
+            }],
+        );
+    }
+
+    // "\n\n" -> " \n"
+
+    // apply
+    {
+        let v = &mut view.write();
+
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let mut buffer = buffer.write();
+
+        let sz1 = (startl2 - eol1) as usize;
+        buffer.remove(eol1, sz1, None);
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        let mut utf8 = vec![];
+        let mut data: &mut [u8] = &mut [0, 0, 0, 0];
+        let data_size = codec.encode(' ' as u32, &mut data);
+        for d in data.iter().take(data_size) {
+            utf8.push(*d);
+        }
+
+        if startl2 != eol2 {
+            buffer.insert(eol1, data_size, &utf8);
+        }
+        tm.marks[0].offset = eol1;
+
+        tm.pre_compose_action.push(PostInputAction::CheckMarks);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
     }
 }
 

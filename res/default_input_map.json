@@ -68,6 +68,8 @@
        { "in": [{ "key": "alt+Up" }],                          "action": "text-mode:move-line-up" },
        { "in": [{ "key": "alt+Down" }],                        "action": "text-mode:move-line-down" },
 
+       { "in": [{ "key": "ctrl+j" }],                          "action": "text-mode:join-lines" },
+
        { "cut/paste/selection": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },
