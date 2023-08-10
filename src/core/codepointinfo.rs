@@ -77,7 +77,9 @@ impl TextStyle {
             // (49, 58, 94)
             // (37, 54, 130)
             // (29, 42, 102)
-            (23, 34, 81)
+            // (23, 34, 81)
+
+            (28, 43, 100)
         } else {
             // light theme
             let c = Self::default_bg_color();
