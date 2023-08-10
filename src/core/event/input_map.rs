@@ -495,6 +495,7 @@ pub fn eval_input_event(
 
     let event_hash = compute_input_event_hash(ev);
 
+    dbg_println!("ev = {:?}", *ev);
     dbg_println!("event_hash = {}", event_hash);
 
     if let Some(node) = in_node.clone() {
