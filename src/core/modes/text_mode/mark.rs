@@ -53,7 +53,7 @@ pub fn read_char_raw_forward(
     }
 
     let r = codec.decode(SyncDirection::Forward, &data, 0);
-    unsafe { data.set_len(r.2) }
+    data.drain(r.2..);
     (r.0, r.1, r.2, data)
 }
 
@@ -81,6 +81,54 @@ pub fn read_char_forward(
     }
 
     codec.decode(SyncDirection::Forward, &data, 0)
+}
+
+// TODO(ceg): codec..., remove temporary vec -> slice
+// from_offset must be sync
+pub fn read_char_raw_backward(
+    buffer: &Buffer,
+    from_offset: u64,
+    codec: &dyn TextCodec,
+) -> (char, u64, usize, Vec<u8>) {
+    if from_offset == 0 {
+        // return None;
+        return ('\u{0}', 0, 0, vec![]);
+    }
+
+    if DEBUG {
+        dbg_println!("mark :: read_char_backward from_offset {}", from_offset);
+    }
+
+    let rewind_offset = from_offset.saturating_sub(4);
+    let rewind_size = from_offset - rewind_offset;
+
+    if DEBUG {
+        dbg_println!("mark :: rewind_offset {}", rewind_offset);
+        dbg_println!("mark :: rewind_size {}", rewind_size);
+    }
+
+    // fill buf
+    let mut data = Vec::with_capacity(4);
+    let rd = buffer.read(rewind_offset, data.capacity(), &mut data) as u64;
+
+    if DEBUG {
+        dbg_println!("mark :: read_char_backward rd {} data {:?}", rd, data);
+    }
+
+    //
+    let ret = codec.decode(SyncDirection::Backward, &data, rewind_size);
+
+    if DEBUG {
+        dbg_println!("code.decode = {:?}", ret);
+    }
+
+    dbg_println!("CEG data before drain = {:?}", data);
+
+    // keep trailer
+    data.drain(0..(4 - ret.2));
+
+    /* result are always relative to from_offset/direction */
+    (ret.0, from_offset - ret.2 as u64, ret.2, data)
 }
 
 // TODO(ceg): codec..., remove temporary vec -> slice

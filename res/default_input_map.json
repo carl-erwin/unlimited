@@ -70,6 +70,9 @@
 
        { "in": [{ "key": "ctrl+j" }],                          "action": "text-mode:join-lines" },
 
+       { "in": [{ "key": "alt+Right" }],                       "action": "text-mode:move-selection-forward" },
+       { "in": [{ "key": "alt+Left" }],                        "action": "text-mode:move-selection-backward" },
+
        { "cut/paste/selection": "---------------------------------------------------------------------------------"},
 
        { "in": [{ "key": "ctrl+y" }],                          "action": "text-mode:paste" },

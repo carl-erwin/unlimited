@@ -121,6 +121,7 @@ use crate::core::view::View;
 use crate::core::event::input_map::build_input_event_map;
 use crate::core::event::input_map::DEFAULT_INPUT_MAP;
 
+use crate::core::modes::text_mode::mark::read_char_raw_backward;
 use crate::core::modes::text_mode::mark::read_char_raw_forward;
 
 use super::movement::*;
@@ -707,6 +708,8 @@ impl TextMode {
                 remove_until_end_of_word,
             ),
             ("text-mode:join-lines", join_lines),
+            ("text-mode:move-selection-forward", move_selection_forward),
+            ("text-mode:move-selection-backward", move_selection_backward),
             // undo/redo
             ("text-mode:undo", undo),
             ("text-mode:redo", redo),
@@ -2011,6 +2014,150 @@ pub fn remove_until_end_of_word(
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
     tm.pre_compose_action.push(PostInputAction::CancelSelection); //TODO register last optype
                                                                   // if buffer changes cancel selection ?
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_selections(view: &Rc<RwLock<View<'static>>>) -> Vec<(u64, u64)> {
+    let v = &mut view.read();
+    let tm = v.mode_ctx::<TextModeContext>("text-mode");
+
+    // multiple selection not supported yet
+    if tm.marks.len() != tm.select_point.len() {
+        return vec![];
+    }
+
+    // get selection
+    let mut range = Vec::with_capacity(tm.marks.len());
+    for i in 0..tm.marks.len() {
+        let min = tm.marks[i].offset;
+        let max = tm.select_point[i].offset;
+        let (min, max) = sort_pair((min, max));
+        range.push((min, max));
+    }
+
+    range
+}
+
+pub fn move_selection_forward(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let range = {
+        let range = get_selections(view);
+        if range.len() != 1 {
+            return;
+        }
+
+        if range[0].0 == range[0].1 {
+            return;
+        }
+
+        let v = view.read();
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let buffer = buffer.read();
+        if range[0].1 == buffer.size() as u64 {
+            return;
+        }
+
+        range[0]
+    };
+
+    // save marks FIXME(ceg): check undo/redo duplicates ops
+    {
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"move_selection_forward",
+            }],
+        );
+    }
+
+    //
+    {
+        let v = &mut view.write();
+
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let mut buffer = buffer.write();
+        // decode + extract raw data
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        let (_cp, _off, sz, data) = read_char_raw_forward(&buffer, range.1, codec);
+
+        buffer.remove(range.1, sz, None);
+        buffer.insert(range.0, sz, &data);
+
+        tm.marks[0].offset += sz as u64;
+        tm.select_point[0].offset += sz as u64;
+
+        tm.pre_compose_action.push(PostInputAction::CheckMarks);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+    }
+}
+
+pub fn move_selection_backward(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+) {
+    let range = {
+        let range = get_selections(view);
+        if range.len() != 1 {
+            return;
+        }
+
+        if range[0].0 == 0 {
+            return;
+        }
+
+        if range[0].0 == range[0].1 {
+            return;
+        }
+
+        range[0]
+    };
+
+    // save marks FIXME(ceg): check undo/redo duplicates ops
+    {
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::SaveMarks {
+                caller: &"move_selection_backward",
+            }],
+        );
+    }
+
+    //
+    {
+        let v = &mut view.write();
+
+        let buffer = editor.buffer_by_id(v.buffer_id);
+        let mut buffer = buffer.write();
+        // decode + extract raw data
+
+        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+        let codec = tm.text_codec.as_ref();
+
+        let (_cp, off, sz, data) = read_char_raw_backward(&buffer, range.0, codec);
+
+        buffer.insert(range.1, sz, &data);
+        buffer.remove(off, sz, None);
+
+        tm.marks[0].offset -= sz as u64;
+        tm.select_point[0].offset -= sz as u64;
+
+        tm.pre_compose_action.push(PostInputAction::CheckMarks);
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
