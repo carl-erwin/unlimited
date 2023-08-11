@@ -37,6 +37,8 @@ use crate::core::view::LayoutOperation;
 
 use crate::core::buffer::find_nth_byte_offset;
 
+use super::text_mode::run_text_mode_actions_vec;
+
 static GOTO_LINE_TRIGGER_MAP: &str = r#"
 [
   {
@@ -304,7 +306,7 @@ fn goto_line_show_controller_view(
 
 pub fn goto_line_controller_add_char(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let mut array = vec![];
@@ -401,14 +403,14 @@ pub fn goto_line_controller_add_char(
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
         let text_view = get_view_by_id(editor, text_view_id);
-        goto_line_set_target_line(&text_view, target_line);
+        goto_line_set_target_line(editor, env, &text_view, target_line);
     }
 }
 
 // refactor add+del (Some(array))
 pub fn goto_line_controller_del_char(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // compute target line number
@@ -457,7 +459,7 @@ pub fn goto_line_controller_del_char(
     let v = view.read();
     if let Some(text_view_id) = v.controlled_view {
         let text_view = get_view_by_id(editor, text_view_id);
-        goto_line_set_target_line(&text_view, target_line);
+        goto_line_set_target_line(editor, env, &text_view, target_line);
     }
 }
 
@@ -499,38 +501,47 @@ pub fn goto_line_controller_stop(
     }
 }
 
-pub fn goto_line_set_target_line(view: &Rc<RwLock<View<'static>>>, target_line: u64) {
-    let buffer = view.read().buffer().unwrap();
-    let buffer = buffer.read();
-
-    let max_offset = buffer.size();
-
-    let mut v = view.write();
-
-    let offset = if target_line <= 1 {
-        0
-    } else {
-        let line_number = target_line.saturating_sub(1);
-        if let Some(offset) = find_nth_byte_offset(&buffer, '\n' as u8, line_number) {
-            offset + 1
+pub fn goto_line_set_target_line(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    view: &Rc<RwLock<View<'static>>>,
+    target_line: u64,
+) {
+    {
+        let buffer = view.read().buffer().unwrap();
+        let buffer = buffer.read();
+        let max_offset = buffer.size();
+        let mut v = view.write();
+        let offset = if target_line <= 1 {
+            0
         } else {
-            max_offset as u64
+            let line_number = target_line.saturating_sub(1);
+            if let Some(offset) = find_nth_byte_offset(&buffer, '\n' as u8, line_number) {
+                offset + 1
+            } else {
+                max_offset as u64
+            }
+        };
+
+        {
+            // if offscreen // user option goto-line-mode:always-center-around-line = true ?
+            if !v.screen.read().contains_offset(offset) {
+                v.start_offset = offset;
+            }
+
+            let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks.clear();
+            tm.marks.push(Mark { offset });
+            tm.mark_index = 0;
         }
-    };
+    }
 
     {
-        // if offscreen // user option goto-line-mode:always-center-around-line = true ?
-        if !v.screen.read().contains_offset(offset) {
-            v.start_offset = offset;
-        }
-
-        let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
-
-        tm.marks.clear();
-        tm.marks.push(Mark { offset });
-        tm.mark_index = 0;
-
-        tm.pre_compose_action
-            .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+        run_text_mode_actions_vec(
+            &mut editor,
+            &mut env,
+            &view,
+            &vec![PostInputAction::CenterAroundMainMark],
+        );
     }
 }
