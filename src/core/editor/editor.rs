@@ -325,6 +325,20 @@ pub fn update_view_and_send_draw_event(
     // check size
     check_view_dimension(editor, env);
 
+    let mut recompose = false;
+    let ev = InputEvent::NoInputEvent;
+
+    // update focused view
+    let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
+    run_stage(
+        StagePosition::Pre,
+        Stage::Compositing,
+        &mut editor,
+        &mut env,
+        target_id,
+    );
+
+    // redraw root
     let view_id = env.root_view_id;
     run_stages(Stage::Compositing, &mut editor, &mut env, view_id);
     run_stages(Stage::UpdateUi, &mut editor, &mut env, view_id);

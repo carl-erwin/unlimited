@@ -83,6 +83,9 @@ use crate::core::modes::text_mode::TextModeContext;
 
 use crate::core::editor::config_var_get;
 
+use super::text_mode::PostInputAction;
+use crate::core::event::InputEvent;
+
 fn num_digit(v: u64) -> u64 {
     match v {
         _ if v < 10 => 1,
@@ -353,7 +356,6 @@ impl<'a> Mode for LineNumberMode {
                         max_offset as u64
                     }
                 };
-
                 dbg_println!("goto line {:?} offset : {}", target_line, offset);
 
                 let lnm = view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
@@ -370,6 +372,14 @@ impl<'a> Mode for LineNumberMode {
 
                 tm.marks.clear();
                 tm.marks.push(Mark { offset });
+
+                // TODO(ceg): ignore if view was change by user
+                tm.pre_compose_action
+                    .push(PostInputAction::CenterAroundMainMark);
+
+                let msg = Message::new(0, 0, 0, Event::RefreshView);
+                crate::core::event::pending_input_event_inc(1);
+                editor.core_tx.send(msg).unwrap_or(());
             }
         }
     }
