@@ -209,7 +209,7 @@ pub fn linenum_input_event(
                     button,
                 } => {
                     if *button == 0 {
-                        set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                        // TODO(ceg): start selection
                     }
                     if *button == 1 {
                         // set mode
@@ -230,11 +230,40 @@ pub fn linenum_input_event(
                             shift: _,
                         },
                     x: _,
-                    y: _,
+                    y,
                     button: _,
                 } => {
                     set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
                     // TODO: move mark to selected line and update selection
+
+                    // select line
+                    let lnm = v.mode_ctx::<LineNumberModeContext>("line-number-mode");
+                    let text_view_id = lnm.text_view_id;
+
+                    let text_view = get_view_by_id(editor, text_view_id);
+                    let mut text_view = text_view.write();
+
+                    // check offscreen
+                    let idx = *y as usize;
+                    let offset = {
+                        let screen = text_view.screen.read();
+                        if let Some(l) = screen.get_used_line(idx) {
+                            l[0].cpi.offset
+                        } else {
+                            None
+                        }
+                    };
+                    if let Some(offset) = offset {
+                        // update marks
+                        let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
+                        tm.marks.clear();
+                        tm.marks.push(Mark { offset });
+
+                        // TODO(ceg): ignore if view was change by user
+                        let msg = Message::new(0, 0, 0, Event::RefreshView);
+                        crate::core::event::pending_input_event_inc(1);
+                        editor.core_tx.send(msg).unwrap_or(());
+                    }
                 }
             },
 
@@ -242,7 +271,7 @@ pub fn linenum_input_event(
                 x: _,
                 y: _,
                 mods: _,
-            })) => {}
+            })) => { /* TODO(ceg): update selection */ }
 
             _ => {
                 dbg_println!("LINENUM unhandled event {:?}", evt);
