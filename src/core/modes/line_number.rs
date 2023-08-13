@@ -619,13 +619,9 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
+        let mut prev_end_cpi: Option<CodepointInfo> = None;
+        let mut line_number = 0;
         for i in 0..screen.line_index.len() {
-            let line_number = {
-                let offset = &self.line_offsets[i];
-                let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
-                1 + n.0
-            };
-
             let mut offset = 0;
             let mut end_offset = 0;
 
@@ -634,7 +630,24 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     offset = cell.cpi.offset.unwrap();
                 }
 
+                line_number = {
+                    // avoid slow call to get_byte_count_at_offset
+                    if let Some(prev_cpi) = prev_end_cpi {
+                        let n = if prev_cpi.cp == '\n' && prev_cpi.metadata == false {
+                            1
+                        } else {
+                            0
+                        };
+                        line_number + n
+                    } else {
+                        let offset = &self.line_offsets[i];
+                        let n = get_byte_count_at_offset(&buffer, '\n' as usize, offset.0);
+                        1 + n.0
+                    }
+                };
+
                 if let Some(cell) = l.last() {
+                    prev_end_cpi = Some(cell.cpi.clone());
                     end_offset = cell.cpi.offset.unwrap();
                 }
 
