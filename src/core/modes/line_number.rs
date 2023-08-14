@@ -231,8 +231,13 @@ pub fn linenum_input_event(
                         },
                     x: _,
                     y,
-                    button: _,
+                    button,
                 } => {
+                    if *button == 1 {
+                        // ignore right button release
+                        return;
+                    }
+
                     set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
                     // TODO: move mark to selected line and update selection
 
@@ -260,9 +265,9 @@ pub fn linenum_input_event(
                         tm.marks.push(Mark { offset });
 
                         // TODO(ceg): ignore if view was change by user
-                        let msg = Message::new(0, 0, 0, Event::RefreshView);
-                        crate::core::event::pending_input_event_inc(1);
-                        editor.core_tx.send(msg).unwrap_or(());
+                        // let msg = Message::new(0, 0, 0, Event::RefreshView);
+                        // crate::core::event::pending_input_event_inc(1);
+                        // editor.core_tx.send(msg).unwrap_or(());
                     }
                 }
             },
