@@ -215,7 +215,7 @@ pub fn linenum_input_event(
                     if *button == 1 {
                         // set mode
                         display_mode += 1;
-                        display_mode %= 3;
+                        display_mode %= 4;
 
                         set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
                     }
@@ -298,7 +298,7 @@ pub struct LineNumberModeContext {
     // add per view fields
     linenum_view_id: view::Id,
     text_view_id: view::Id,
-    display_mode: usize, // 0: absolute, 1:relative, 2:hybrid
+    display_mode: usize, // 0: absolute, 1:relative, 2:hybrid 4:offset
 
     pub start_line: Option<u64>,
     pub start_col: Option<u64>,
@@ -458,7 +458,7 @@ impl<'a> Mode for LineNumberMode {
                 0
             };
 
-            mode_ctx.display_mode = std::cmp::min(v, 2);
+            mode_ctx.display_mode = std::cmp::min(v, 3);
         }
     }
 
@@ -502,6 +502,15 @@ impl<'a> Mode for LineNumberMode {
                     return;
                 }
 
+                let display_mode = {
+                    let linenum_view = get_view_by_id(editor, dst.id);
+                    let linenum_view = linenum_view.read();
+
+                    let mode_ctx =
+                        linenum_view.mode_ctx::<LineNumberModeContext>("line-number-mode");
+                    mode_ctx.display_mode
+                };
+
                 let text_view = src_view;
                 let linenum_view = get_view_by_id(editor, dst.id);
                 let linenum_view = linenum_view.read();
@@ -510,7 +519,7 @@ impl<'a> Mode for LineNumberMode {
                 let buffer = text_view.buffer();
                 let buffer = buffer.as_ref().unwrap().read();
                 let max_offset = buffer.size() as u64 + 1;
-                let width = if !buffer.indexed {
+                let width = if !buffer.indexed || display_mode == 3 {
                     // '@offset '
                     1 + num_digit(max_offset)
                 } else {
@@ -714,7 +723,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let display_mode = mode_ctx.display_mode;
 
         // show line numbers
-        if !self.line_number.is_empty() {
+        if !self.line_number.is_empty() && display_mode != 3 {
             let mut prev_line = 0;
             for (idx, e) in self.line_number.iter().enumerate() {
                 let cur_line_num = e.2 .0;
