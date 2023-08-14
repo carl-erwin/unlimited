@@ -653,9 +653,6 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
             return;
         }
 
-        let mark_info = get_byte_count_at_offset(&buffer, '\n' as usize, self.mark_offset);
-        self.mark_line = 1 + mark_info.0;
-
         self.line_number.clear();
         let screen = src.screen.as_ref().read();
 
@@ -696,6 +693,10 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 }
 
                 end_offset = std::cmp::max(offset, end_offset);
+
+                if offset <= self.mark_offset && self.mark_offset <= end_offset {
+                    self.mark_line = line_number;
+                }
 
                 let v = (offset, end_offset, (line_number as u64, None));
                 self.line_number.push(v);
