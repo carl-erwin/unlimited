@@ -1285,7 +1285,7 @@ pub fn build_index(buffer: &Arc<RwLock<Buffer>>) -> bool {
         // yield some cpu time
         if user_is_active() {
             dbg_println!("user_is_active pause indexing");
-            wait = std::cmp::min(wait * 2, 250);
+            wait = std::cmp::min(wait * 2, 50);
             std::thread::sleep(std::time::Duration::from_millis(wait));
         } else {
             //std::thread::sleep(std::time::Duration::from_millis(1));
