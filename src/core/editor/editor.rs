@@ -1519,6 +1519,7 @@ pub fn main_loop(
                 }
 
                 Event::RefreshView => {
+                    env.pending_events = crate::core::event::pending_input_event_dec(1);
                     update_view_and_send_draw_event(&mut editor, &mut env);
                 }
 

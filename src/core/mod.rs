@@ -245,6 +245,7 @@ pub fn worker(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<'
                     let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
                     let msg = Message::new(0, 0, ts, Event::RefreshView);
+                    crate::core::event::pending_input_event_inc(1);
                     core_tx.send(msg).unwrap_or(());
                 }
 
@@ -303,6 +304,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
 
                         // send ui refresh event
                         let msg = Message::new(0, 0, ts, Event::RefreshView);
+                        crate::core::event::pending_input_event_inc(1);
                         core_tx.send(msg).unwrap_or(());
 
                         refresh_ui = true;
@@ -312,6 +314,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
 
                             let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
                             let msg = Message::new(0, 0, ts, Event::RefreshView);
+                            crate::core::event::pending_input_event_inc(1);
                             core_tx.send(msg).unwrap_or(());
 
                             refresh_ui = false;
@@ -323,6 +326,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                     if refresh_ui {
                         let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
                         let msg = Message::new(0, 0, ts, Event::RefreshView);
+                        crate::core::event::pending_input_event_inc(1);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }
