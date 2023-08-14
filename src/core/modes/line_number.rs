@@ -209,15 +209,16 @@ pub fn linenum_input_event(
                     button,
                 } => {
                     if *button == 0 {
-                        // TODO(ceg): start selection
+                        // TODO(ceg): move mark to selected line and start selection
                     }
+
                     if *button == 1 {
                         // set mode
                         display_mode += 1;
                         display_mode %= 3;
-                    }
 
-                    // TODO: move mark to selected line and start selection
+                        set_focus_on_view_id(&mut editor, &mut env, mode_ctx.text_view_id);
+                    }
                 }
             },
 
