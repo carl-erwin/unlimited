@@ -639,12 +639,12 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let buffer = src.buffer();
         let buffer = buffer.as_ref().unwrap().read();
 
-        let mark_info = get_byte_count_at_offset(&buffer, '\n' as usize, self.mark_offset);
-        self.mark_line = 1 + mark_info.0;
-
         if !buffer.indexed {
             return;
         }
+
+        let mark_info = get_byte_count_at_offset(&buffer, '\n' as usize, self.mark_offset);
+        self.mark_line = 1 + mark_info.0;
 
         self.line_number.clear();
         let screen = src.screen.as_ref().read();
