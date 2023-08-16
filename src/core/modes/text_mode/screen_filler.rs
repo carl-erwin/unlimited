@@ -216,6 +216,47 @@ impl ContentFilter<'_> for ScreenFilter {
 
                 //////////
                 &FilterIo {
+                    data: FilterData::UnicodeArray { vec },
+                    offset,
+                    ..
+                } => {
+                    let default_style = TextStyle::new();
+
+                    let mut cur_offset = offset.unwrap();
+
+                    // dbg_println!("FilterData::ByteArray {{ vec {:?} }} ", vec);
+
+                    for u in vec.iter() {
+                        // share with TextInfo
+
+                        let cp = char::from_u32(u.cp).unwrap();
+                        let cpi = CodepointInfo {
+                            used: true,
+                            metadata: io.metadata,
+                            cp,
+                            displayed_cp: cp,
+                            offset: Some(cur_offset),
+                            size: 1,
+                            skip_render: false,
+                            style: default_style.clone(),
+                        };
+
+                        let ret = self.add_text_to_screen(env, cpi, Some(cur_offset));
+                        if !ret {
+                            // return enum ScreenFull, etc ...
+                            dbg_println!("self.add_text_to_screen -> false, cpi {:?}", cpi);
+                            break;
+                        }
+
+                        cur_offset += 1;
+                    }
+
+                    // save last offset for next pass ?
+                    self.last_offset = Some(cur_offset);
+                }
+
+                //////////
+                &FilterIo {
                     data: FilterData::ByteArray { vec },
                     offset,
                     ..
@@ -252,10 +293,6 @@ impl ContentFilter<'_> for ScreenFilter {
 
                     // save last offset for next pass ?
                     self.last_offset = Some(cur_offset);
-                }
-
-                _ => {
-                    panic!("unexpected io {:?}", io);
                 }
             }
         }

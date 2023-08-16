@@ -354,18 +354,17 @@ fn build_text_mode_char_map() -> HashMap<char, String> {
     if true {
         for i in 0..0x9 {
             let fmt = format!("\\x{i:02x}");
-
-            let c = unsafe { char::from_u32_unchecked(i) };
+            let c = char::from_u32(i).unwrap();
             char_map.insert(c, fmt);
         }
         for i in 0xb..0x1f {
             let fmt = format!("\\x{i:02x}");
-            let c = unsafe { char::from_u32_unchecked(i) };
+            let c = char::from_u32(i).unwrap();
             char_map.insert(c, fmt);
         }
         for i in 0x07f..0x80 {
             let fmt = format!("\\x{i:02x}");
-            let c = unsafe { char::from_u32_unchecked(i) };
+            let c = char::from_u32(i).unwrap();
             char_map.insert(c, fmt);
         }
     }
@@ -521,7 +520,7 @@ impl<'a> Mode for TextMode {
         );
 
         // Config input map
-        dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
+        // dbg_println!("DEFAULT_INPUT_MAP\n{}", DEFAULT_INPUT_MAP);
         // TODO(ceg): user define
         // let input_map = mode.build_input_map(); TODO
         {
@@ -549,7 +548,8 @@ impl<'a> Mode for TextMode {
         // NB: build pipeline in this strict order
         let content_filters_pipeline = if crate::core::raw_data_filter_to_screen() {
             vec![
-                "binary/raw",  // mandatory
+                "binary/raw", // mandatory
+                "text/codec",
                 "text/screen", // mandatory
             ]
         } else {
@@ -651,6 +651,8 @@ impl TextMode {
             ),
             ("text-mode:move-to-token-start", move_to_token_start),
             ("text-mode:move-to-token-end", move_to_token_end),
+            ("text-mode:move-to-prev-char-class", move_to_prev_char_class),
+            ("text-mode:move-to-next-char-class", move_to_next_char_class),
             (
                 "text-mode:move-marks-to-start-of-line",
                 move_marks_to_start_of_line,
@@ -2531,7 +2533,7 @@ pub fn copy_maybe_remove_selection_symmetric(
     copy: bool,
     remove: bool,
 ) -> (usize, usize) {
-    let v = &mut view.as_ref().clone().write();
+    let v = &mut view.as_ref().write();
 
     // doc
     let buffer = v.buffer.clone();
@@ -2614,7 +2616,7 @@ pub fn copy_maybe_remove_selection(
     remove: bool,
 ) -> usize {
     let symmetric = {
-        let mut v = view.as_ref().clone().write();
+        let mut v = view.as_ref().write();
         let _start_offset = v.start_offset;
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
         let symmetric = tm.marks.len() == tm.select_point.len();

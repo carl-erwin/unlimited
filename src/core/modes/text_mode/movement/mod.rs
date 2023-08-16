@@ -1502,3 +1502,87 @@ pub fn move_to_token_end(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<R
 
     tm.prev_action = TextModeAction::MarksMove;
 }
+
+pub fn move_to_prev_char_class(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    view: &Rc<RwLock<View>>,
+) {
+    // TODO(ceg): factorize mark action
+    // mark.apply(fn); where fn=m.move_to_token_end(&buffer, codec);
+    //
+
+    let mut center = false;
+
+    let v = &mut view.write();
+    let screen = v.screen.clone();
+    let screen = screen.read();
+
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    let codec = tm.text_codec.as_ref();
+
+    let midx = tm.mark_index;
+
+    let marks = &mut tm.marks;
+
+    for (idx, m) in marks.iter_mut().enumerate() {
+        m.move_to_prev_char_class(&buffer, codec);
+
+        // main mark ?
+        if idx == midx && !screen.contains_offset(m.offset) {
+            // TODO(ceg): push to post action queue
+            // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+            //
+            center = true;
+        }
+    }
+
+    if center {
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
+    }
+    tm.prev_action = TextModeAction::MarksMove;
+}
+
+pub fn move_to_next_char_class(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+    view: &Rc<RwLock<View>>,
+) {
+    let mut sync = false;
+
+    let mut v = view.write();
+    let screen = v.screen.clone();
+    let screen = screen.read();
+
+    let buffer = v.buffer().unwrap();
+    let buffer = buffer.read();
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+    let codec = tm.text_codec.as_ref();
+
+    let marks = &mut tm.marks;
+
+    for m in marks.iter_mut() {
+        m.move_to_next_char_class(&buffer, codec);
+
+        // main mark ?
+        if !screen.contains_offset(m.offset) {
+            // TODO(ceg): push to post action queue
+            // {SYNC_VIEW, CLEAR_VIEW, SCROLL_N }
+            //
+            sync = true;
+        }
+    }
+
+    if sync {
+        tm.pre_compose_action
+            .push(PostInputAction::CenterAroundMainMark);
+    }
+
+    tm.prev_action = TextModeAction::MarksMove;
+}

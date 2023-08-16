@@ -263,6 +263,7 @@ fn notify_children(
     }
 }
 
+#[inline(always)]
 fn compose_children(
     editor: &mut Editor<'static>,
     editor_env: &mut EditorEnv<'static>,
@@ -426,6 +427,8 @@ fn compose_children(
 
         let vid = info.view_id;
 
+        dbg_println!("compose child view {:?}", vid);
+
         let child_view_rc = get_view_by_id(editor, vid);
 
         let start_offset = {
@@ -477,6 +480,14 @@ fn compose_children(
                 let mut child_v = child_view_rc.write();
                 let last_offset = {
                     let child_screen = child_v.screen.as_ref().read();
+
+                    dbg_println!("copy child {:?} screen at x({}) y({})", vid, x, y);
+                    dbg_println!(
+                        " child screen w({}) h({})",
+                        child_screen.width(),
+                        child_screen.height()
+                    );
+
                     screen.copy_screen_at_xy(&child_screen, x, y);
                     child_screen.last_offset
                 };
@@ -544,25 +555,12 @@ pub fn run_compositing_stage_direct(
         return;
     }
 
-    // (recursive) children compositing
-    let draw = compose_children(
-        editor,
-        editor_env,
-        view,
-        base_offset,
-        max_offset,
-        screen,
-        pass_mask,
-    );
-    if draw {
-        return;
-    }
-
     {
         dbg_println!("[START] COMPOSE VID {:?}, ", view.read().id);
     }
 
-    // Draw Leaf View
+    // Render parent before children
+    // if no filter configured, will do nothing
     let mut layout_env = LayoutEnv {
         graphic_display: editor_env.graphic_display,
         quit: false,
@@ -588,6 +586,22 @@ pub fn run_compositing_stage_direct(
     if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ScreenContentAndOverlay {
         run_screen_overlay_filters(editor, &mut layout_env, &mut time_spent, view, None);
     }
+
+    {
+        dbg_println!("[START] RENDER CHILDREN of VID {:?}, ", view.read().id);
+    }
+
+    // Render children/View
+    // (recursive) children compositing
+    compose_children(
+        editor,
+        editor_env,
+        view,
+        base_offset,
+        max_offset,
+        screen,
+        pass_mask,
+    );
 
     {
         dbg_println!("[END] COMPOSE VID {:?}, ", view.read().id);

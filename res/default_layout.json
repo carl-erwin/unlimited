@@ -1,0 +1,77 @@
+{
+    "dir-view": {
+        "leader": true,
+        "tags": [ "root" ],
+        "modes": [ "core-mode", "dir-mode" ],
+        "size": { "percent": 100 }
+    },
+
+    "file-view": {
+        "leader": false,
+        "tags": [ "root" ],
+        "modes": [ ],
+        "children_layout_values": "vertical|horizontal",
+        "size_values": "percent, fixed, remain, remain_minus, remain_percent",
+        "floating": false,
+
+        "size": { "percent": 100 },
+
+        "children_layout": "vertical",
+        "children": [
+            {
+                "tags": [ "title-bar" ],
+                "modes": [ "title-bar" ],
+                "size": { "fixed": 1 }
+            },
+
+            {
+                "leader": true,
+                "tags": [ "text" ],
+                "size": { "remain_minus": 1 },
+                "allow-split": true,
+                "allow-destroy": true,
+                "children_layout": "horizontal",
+                "children": [
+                    {
+                        "tags": [ "line-number" ],
+                        "modes": [ "line-number-mode" ],
+                        "internal-buffer": "line-number",
+                        "size": { "fixed": 12 }
+                    },
+                    {
+                        "tags": [ "empty-column" ],
+                        "modes": [ "" ],
+                        "internal-buffer": "empty-col",
+                        "size": { "fixed": 1 }
+                    },
+                    {
+                        "leader": true,
+                        "tags": [ "text" ],
+                        "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
+                        "size": { "remain_minus": 1 }
+                    },
+                    {
+                        "tags": [ "vscrollbar" ],
+                        "modes": [ "vscrollbar-mode" ],
+                        "internal-buffer": "vscrollbar",
+                        "size": { "fixed": 1 }
+                    }
+                ],
+                "children-subscribe": [ { "mode": "line-number-mode", "src": 2, "dst": 0 },
+                                        { "mode": "vscrollbar-mode", "src": 2, "dst": 3 } ],
+
+                "focus_idx": 2
+            },
+            {
+                "tags": [ "status-bar" ],
+                "modes": [ "status-mode" ],
+                "internal-buffer": "status-bar",
+                "size": { "fixed": 1 }
+            }
+        ],
+
+        "focus_idx": 1,
+        "status_idx": 2
+    }
+
+}

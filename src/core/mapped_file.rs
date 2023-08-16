@@ -571,15 +571,42 @@ impl<'a> MappedFile<'a> {
 
         let file_size = metadata.len();
 
-        let page_size = std::cmp::min(1024 * 1024 * 8, file_size as usize / (4 * 1024));
-        let page_size = std::cmp::max(32, page_size);
+        // let file_size = 255 * 1024 * 1024 * 1024 * 1024; TODO(ceg): test
+
+        let page_size = std::cmp::min(1024 * 1024 * 4, (file_size / (4 * 1024)) as usize);
+        let mut page_size = std::cmp::max(32, page_size);
+        if file_size >= (2 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 6;
+        }
+        if file_size >= (4 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 8;
+        }
+        if file_size >= (8 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 8;
+        }
+        if file_size >= (16 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 16;
+        }
+        if file_size >= (32 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 32;
+        }
+        if file_size >= (64 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 32;
+        }
+        if file_size >= (128 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * (64 + 32);
+        }
+        if file_size >= (256 * 1024 * 1024 * 1024 * 1024) {
+            page_size = 1024 * 1024 * 128;
+        }
 
         let sub_page_size = 1024 * 2;
         let sub_page_reserve = 128;
 
+        dbg_println!("MappedFile::new() : sub_page_reserve {}", sub_page_reserve);
         dbg_println!("MappedFile::new() : file_size        {}", file_size);
         dbg_println!("MappedFile::new() : page_size        {}", page_size);
-        dbg_println!("MappedFile::new() : sub_page_reserve {}", sub_page_reserve);
+        dbg_println!("MappedFile::new() : page_size >> 20  {}", page_size >> 20);
 
         let mut file = MappedFile {
             phantom: PhantomData,
@@ -867,7 +894,7 @@ impl<'a> MappedFile<'a> {
         if DEBUG {
             dbg_println!("find_sub_node_by_offset Ndi({}) off({})", n, offset);
         }
-        let node = &self.pool[n as usize];
+        let node = &self.pool[n];
 
         assert!(node.used);
 
@@ -1567,6 +1594,7 @@ impl<'a> MappedFile<'a> {
                     dbg_println!("MAPPED FILE: v.capacity() = {}", v.capacity());
                 }
 
+                // TODO(ceg): SLOW: use ptr copy
                 for _ in 0..n.size {
                     if let Some(b) = input_data_iter.next() {
                         v.push(*b);

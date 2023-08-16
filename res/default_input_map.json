@@ -36,8 +36,9 @@
 
        { "in": [{ "key": "ctrl+l" }],                          "action": "text-mode:center-around-mark" },
 
-       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-token-start" },
-       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-token-end" },
+       { "in": [{ "key": "ctrl+Left"  }],                      "action": "text-mode:move-to-prev-char-class" },
+
+       { "in": [{ "key": "ctrl+Right" }],                      "action": "text-mode:move-to-next-char-class" },
 
        { "in": [{ "key": "ctrl+Up"    }],                      "action": "text-mode:scroll-up" },
        { "in": [{ "key": "ctrl+Down"  }],                      "action": "text-mode:scroll-down" },

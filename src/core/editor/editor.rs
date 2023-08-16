@@ -263,6 +263,7 @@ pub fn get_view_map(
 }
 
 pub fn get_view_by_id(editor: &Editor<'static>, vid: view::Id) -> Rc<RwLock<View<'static>>> {
+    dbg_println!("get_view_by_id {:?}", vid);
     editor.view_map.read().get(&vid).unwrap().clone()
 }
 

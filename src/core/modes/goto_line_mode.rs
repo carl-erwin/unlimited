@@ -235,6 +235,8 @@ fn create_goto_line_controller_view(
         buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
+        LayoutDirection::NotSet,
+        LayoutSize::Percent { p: 100.0 },
     );
 
     controller_view.ignore_focus = false;

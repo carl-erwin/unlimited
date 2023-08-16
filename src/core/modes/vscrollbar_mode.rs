@@ -22,8 +22,8 @@ use crate::core::view::ContentFilter;
 use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 
+use crate::core::view::Id;
 use crate::core::view::View;
-
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
@@ -121,6 +121,14 @@ impl<'a> Mode for VscrollbarMode {
             ViewEvent::Subscribe => {
                 // we subscribe to src events
                 if src.id == dst.id {
+                    return;
+                }
+
+                if src.id == Id(0) {
+                    return;
+                }
+
+                if dst.id == Id(0) {
                     return;
                 }
 

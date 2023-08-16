@@ -452,7 +452,12 @@ impl Screen {
 
     pub fn get_line_mut(&mut self, index: usize) -> Option<&mut [ScreenCell]> {
         if index >= self.height() {
-            dbg_println!("index {} >= self.height {}", index, self.height);
+            dbg_println!(
+                "index {} >= self.height {} (self.width {})",
+                index,
+                self.height,
+                self.width
+            );
             return None;
         }
 

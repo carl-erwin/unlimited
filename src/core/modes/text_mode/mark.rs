@@ -557,6 +557,102 @@ impl Mark {
         self
     }
 
+    pub fn move_to_prev_char_class(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        if self.at_start_of_buffer(buffer) {
+            return self;
+        }
+
+        let (cp0, _, _sz) = read_char_forward(&buffer, self.offset, codec);
+
+        let (cp, off, _sz) = read_char_backward(&buffer, self.offset, codec);
+        if cp0 == '\n' {
+            self.offset = off;
+            return self;
+        }
+
+        let is_alpha = cp.is_alphabetic(); // is_ascii_graphic();
+        let is_blank = cp.is_ascii_whitespace();
+
+        if !is_alpha && !is_blank {
+            self.offset = off;
+            return self;
+        }
+
+        let mut count: u64 = 0;
+
+        while self.offset > 0 {
+            count += 1;
+            let (cp, off, _sz) = read_char_backward(&buffer, self.offset, codec);
+            if count > 1 && cp == '\n' {
+                return self;
+            }
+
+            if is_blank {
+                if count > 1 && !cp.is_ascii_whitespace() {
+                    return self;
+                }
+
+                self.offset = off;
+
+                continue;
+            }
+
+            if is_alpha {
+                if count > 1 && !cp.is_alphabetic() {
+                    return self;
+                }
+                self.offset = off;
+                continue;
+            }
+        }
+
+        self
+    }
+
+    pub fn move_to_next_char_class(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        if self.at_end_of_buffer(buffer) {
+            return self;
+        }
+
+        let offset = self.offset;
+
+        let (cp, _off, sz) = read_char_forward(&buffer, offset, codec);
+
+        let is_blank = cp.is_ascii_whitespace();
+
+        if is_blank && cp != '\n' {
+            self.skip_blanks_forward_until_end_of_line(buffer, codec);
+            return self;
+        }
+
+        let is_alpha = cp.is_alphabetic(); // is_ascii_graphic();
+
+        // skip current
+        self.offset += sz as u64;
+
+        loop {
+            let offset = self.offset;
+
+            let (cp, off, sz) = read_char_forward(&buffer, offset, codec);
+            if self.offset == off {
+                break;
+            }
+
+            if self.at_end_of_buffer(buffer) {
+                return self;
+            }
+
+            if is_alpha && cp.is_alphabetic() {
+                self.offset += sz as u64;
+                continue;
+            }
+
+            break;
+        }
+
+        self
+    }
+
     pub fn move_to_token_end(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
         if self.at_end_of_buffer(buffer) {
             return self;

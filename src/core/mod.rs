@@ -8,9 +8,9 @@ use std::thread;
 
 use parking_lot::RwLock;
 
-use std::sync::Arc;
-
 use regex::Regex;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -41,7 +41,15 @@ use crate::core::editor::EditorEnv;
 use crate::core::event::Event;
 use crate::core::event::Message;
 
+use crate::core::view::ChildView;
+use crate::core::view::LayoutDirection;
+use crate::core::view::LayoutSize;
 use crate::core::view::View;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
+
+use crate::core::editor::get_view_by_id;
+use crate::core::view::register_view_subscriber;
 
 //use crate::core::error::Error;
 //type UnlResult<T> = Result<T, Error>;
@@ -209,13 +217,29 @@ pub fn run(
         Some(thread::spawn(move || indexer(&indexer_rx, &core_tx)))
     };
 
-    editor.worker_tx = worker_tx.clone();
+    load_buffers(&mut editor, &mut env);
 
     load_modes(&mut editor, &mut env);
 
-    load_files(&mut editor, &mut env);
+    configure_modes(&mut editor, &mut env);
 
-    create_views(&mut editor, &mut env);
+    create_layout(&mut editor, &mut env);
+
+    // TODO(ceg): send one event per
+    // index buffers,
+    {
+        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
+
+        let msg = Message {
+            seq: 0,
+            input_ts: 0,
+            ts,
+            event: Event::IndexTask {
+                buffer_map: Arc::clone(&editor.buffer_map),
+            },
+        };
+        editor.indexer_tx.send(msg).unwrap_or(());
+    }
 
     editor::main_loop(&mut editor, &mut env, core_rx, ui_tx);
 
@@ -361,6 +385,20 @@ fn filesystem_entry_exists(path: String) -> bool {
             // permission etc ..
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod test_regex {
+
+    #[test]
+    fn test_buffer_position_regex() {
+        use super::*;
+
+        Regex::new(OFFSET_PREFIX_REGEX).unwrap();
+        Regex::new(LINE_COLUMN_PREFIX_REGEX).unwrap();
+        Regex::new(OFFSET_SUFFIX_REGEX).unwrap();
+        Regex::new(FILE_LINE_COLUMN_REGEX).unwrap();
     }
 }
 
@@ -524,7 +562,7 @@ pub fn path_to_buffer_kind(path: &String) -> BufferKind {
 
 /// TODO(ceg): replace this by load/unload buffer functions
 /// the ui will open the buffers on demand
-pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
+pub fn load_buffers(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     let arg_info = build_buffer_options(editor);
 
     let arg_info = filter_arg_list(arg_info);
@@ -599,8 +637,11 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
             editor.buffer_map.write().insert(buffer_id, b);
         }
     }
+}
 
+pub fn configure_modes(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     // configure buffer
+    // TODO(ceg): use this for per mode config ? runtime configuration ?
 
     let file_modes = editor.modes.clone();
     let dir_modes = editor.dir_modes.clone();
@@ -625,64 +666,13 @@ pub fn load_files(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     }
 }
 
-pub fn create_views(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
-    let buffer_map = editor.buffer_map.clone();
-    let buffer_map = buffer_map.read();
-
-    // create default views
-    // sort by arg pos first
-    let mut buffers_id: Vec<buffer::Id> = buffer_map.iter().map(|(k, _v)| *k).collect();
-    buffers_id.sort();
-    let mut buffers: Vec<Arc<RwLock<Buffer>>> = vec![];
-    for id in buffers_id.iter() {
-        if let Some(buffer) = buffer_map.get(id) {
-            buffers.push(Arc::clone(buffer));
-        }
-    }
-
-    // create views
-    for buffer in buffers {
-        let modes = match buffer.as_ref().read().kind {
-            BufferKind::File => match std::env::var("SINGLE_VIEW") {
-                Ok(_) => vec!["simple-view".to_owned()],
-                _ => vec!["basic-editor".to_owned()],
-            },
-            BufferKind::Directory => vec!["core-mode".to_owned(), "dir-mode".to_owned()],
-        };
-
-        let view = View::new(editor, env, None, (0, 0), (1, 1), Some(buffer), &modes, 0);
-        dbg_println!("create {:?}", view.id);
-
-        // top level views
-        editor.root_views.push(view.id);
-        editor.add_view(view.id, view);
-    }
-
-    // index buffers
-    // TODO(ceg): send one event per doc
-    if true {
-        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
-
-        let msg = Message {
-            seq: 0,
-            input_ts: 0,
-            ts,
-            event: Event::IndexTask {
-                buffer_map: Arc::clone(&editor.buffer_map),
-            },
-        };
-        editor.indexer_tx.send(msg).unwrap_or(());
-    }
-}
-
-use crate::core::modes::BasicEditorMode;
-use crate::core::modes::SimpleViewMode;
-
 use crate::core::modes::CoreMode;
 use crate::core::modes::FindMode;
 use crate::core::modes::TextMode;
 
 use crate::core::modes::StatusMode;
+
+use crate::core::modes::TitleBarMode;
 
 use crate::core::modes::HsplitMode;
 use crate::core::modes::VsplitMode;
@@ -699,13 +689,13 @@ use crate::core::modes::DirMode;
 pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
     editor.register_mode(Box::new(CoreMode::new()));
-    editor.register_mode(Box::new(BasicEditorMode::new()));
-    editor.register_mode(Box::new(SimpleViewMode::new()));
 
     editor.register_mode(Box::new(VsplitMode::new()));
     editor.register_mode(Box::new(HsplitMode::new()));
 
     editor.register_mode(Box::new(VscrollbarMode::new()));
+
+    editor.register_mode(Box::new(TitleBarMode::new()));
 
     editor.register_mode(Box::new(TextMode::new()));
     editor.register_mode(Box::new(StatusMode::new()));
@@ -720,16 +710,438 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_directory_mode(Box::new(DirMode::new()));
 }
 
-#[cfg(test)]
-mod tests {
+pub static DEFAULT_LAYOUT_JSON: &str = std::include_str!("../../res/default_layout.json");
 
-    #[test]
-    fn test_buffer_position_regex() {
-        use super::*;
+use serde_json::Value;
 
-        Regex::new(OFFSET_PREFIX_REGEX).unwrap();
-        Regex::new(LINE_COLUMN_PREFIX_REGEX).unwrap();
-        Regex::new(OFFSET_SUFFIX_REGEX).unwrap();
-        Regex::new(FILE_LINE_COLUMN_REGEX).unwrap();
+pub fn parse_layout_str(json: &str) -> Result<serde_json::Value, serde_json::error::Error> {
+    // Parse the string of data into serde_json::Value.
+    let json: Value = serde_json::from_str(json)?;
+    // dbg_println!("layout json {:?}", json);
+    //dbg_println!("parsing {:?}", json);
+
+    Ok(json)
+}
+
+pub fn build_view_layout_from_json_str(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    buffer: Option<Arc<RwLock<Buffer<'static>>>>,
+    attr: &str,
+    _depth: usize,
+) -> Option<view::Id> {
+    let json = serde_json::from_str(attr);
+    if json.is_err() {
+        dbg_print!("json parse error {:?}", json);
+        return None;
+    }
+
+    let attr = json.unwrap();
+
+    build_view_layout_from_attr(&mut editor, &mut env, buffer.clone(), &attr, 0)
+}
+
+fn build_view_layout_from_attr(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    buffer: Option<Arc<RwLock<Buffer<'static>>>>,
+    attr: &Value,
+    depth: usize,
+) -> Option<view::Id> {
+    dbg_println!(
+        "build_view_layout_from_attr [{depth}] parsing attrs {:?}",
+        attr
+    );
+
+    let mut dir = view::LayoutDirection::Horizontal;
+    let mut leader = false;
+    let mut modes: Vec<String> = vec![];
+
+    let mut sub_views_id = Vec::<Option<view::Id>>::new();
+
+    let mut view_size = LayoutSize::Percent { p: 100.0 };
+
+    let mut focus_idx = None;
+    let mut status_idx = None;
+
+    let mut internal_buffer_name: Option<String> = None;
+
+    let mut allow_split = false;
+    let mut allow_destroy = false;
+
+    if let Value::Object(obj) = attr {
+        if let Some(val) = obj.get("internal-buffer") {
+            if let Value::String(val) = val {
+                internal_buffer_name = Some(val.clone());
+            } else {
+                // invalid type
+            }
+        }
+
+        if let Some(sz_obj) = obj.get("size") {
+            if let Some(n) = sz_obj.get("percent") {
+                if n.is_f64() {
+                    let p = n.as_f64().unwrap() as f32;
+                    view_size = LayoutSize::Percent { p: f32::from(p) }
+                } else {
+                    // syntax error
+                }
+            }
+
+            if let Some(n) = sz_obj.get("fixed") {
+                if n.is_u64() {
+                    let size = n.as_u64().unwrap() as usize;
+                    view_size = LayoutSize::Fixed { size };
+                } else {
+                    // syntax error
+                }
+            }
+
+            if let Some(n) = sz_obj.get("remain") {
+                if n.is_u64() {
+                    let p = n.as_f64().unwrap() as f32;
+                    view_size = LayoutSize::Percent { p }
+                } else {
+                    // syntax error
+                }
+            }
+
+            if let Some(n) = sz_obj.get("remain_percent") {
+                if n.is_f64() {
+                    let p = n.as_f64().unwrap() as f32;
+                    view_size = LayoutSize::RemainPercent { p }
+                } else {
+                    // syntax error
+                }
+            }
+
+            if let Some(n) = sz_obj.get("remain_minus") {
+                if n.is_u64() {
+                    let minus = n.as_u64().unwrap() as usize;
+                    view_size = LayoutSize::RemainMinus { minus }
+                } else {
+                    // syntax error
+                }
+            }
+        }
+
+        if let Some(val) = obj.get("leader") {
+            if let Value::Bool(val) = val {
+                leader = *val;
+            } else {
+                // invalid type
+            }
+        }
+
+        if let Some(val) = obj.get("allow-split") {
+            if let Value::Bool(val) = val {
+                allow_split = *val;
+            } else {
+                // invalid type
+            }
+        }
+
+        if let Some(val) = obj.get("allow-destroy") {
+            if let Value::Bool(val) = val {
+                allow_destroy = *val;
+            } else {
+                // invalid type
+            }
+        }
+
+        if let Some(modes_array) = obj.get("modes") {
+            if modes_array.is_array() {
+                if let Value::Array(ref vec) = modes_array {
+                    for m in vec {
+                        if let Value::String(s) = m {
+                            dbg_println!(" --- found mode  = {}", m);
+                            modes.push(s.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(val) = obj.get("children_layout") {
+            dir = if let Value::String(val) = val {
+                if *val == "vertical" {
+                    LayoutDirection::Vertical
+                } else {
+                    LayoutDirection::Horizontal
+                }
+            } else {
+                // invalid type
+                LayoutDirection::Horizontal
+            };
+        }
+
+        if let Some(Value::Number(ref n)) = obj.get("focus_idx") {
+            if n.is_u64() {
+                focus_idx = Some(n.as_u64().unwrap() as usize);
+            } else {
+                // syntax error
+            }
+        }
+
+        if let Some(Value::Number(ref n)) = obj.get("status_idx") {
+            if n.is_u64() {
+                status_idx = Some(n.as_u64().unwrap() as usize);
+            } else {
+                // syntax error
+            }
+        }
+    }
+
+    dbg_println!(
+        "build_view_layout_from_attr [{depth}] create view: buffer: {:?}, view_size {:?}",
+        buffer,
+        view_size
+    );
+
+    dbg_println!(
+        "build_view_layout_from_attr [{depth}] create view: leader: {:?}",
+        leader
+    );
+
+    let buffer = if let Some(internal_buffer_name) = internal_buffer_name {
+        BufferBuilder::new(BufferKind::File)
+            .buffer_name(&internal_buffer_name)
+            .internal(true)
+            //           .use_buffer_log(false)
+            .finalize()
+    } else {
+        buffer
+    };
+
+    let mut view = View::new(
+        editor,
+        env,
+        None,
+        (0, 0),
+        (1, 1),
+        buffer.clone(),
+        &modes,
+        0,
+        dir,
+        view_size,
+    );
+
+    view.json_attr = Some(attr.to_string());
+    dbg_println!("view.json_attr {:?}", view.json_attr);
+
+    // FIXME(ceg): split core is not up to date
+    view.is_splittable = allow_split; // Nb: do not remove , allow recursive splitting
+
+    view.destroyable = allow_destroy;
+
+    view.is_leader = leader;
+
+    dbg_println!(
+        "build_view_layout_from_attr [{depth}] setup view modes: {:?}",
+        modes
+    );
+
+    // parse children
+    if let Value::Object(obj) = attr {
+        // look for children first
+        if let Some(children) = obj.get("children") {
+            if let Value::Array(ref vec) = children {
+                for child_layout in vec {
+                    dbg_println!(" >>>> recursive call");
+                    let child_view = build_view_layout_from_attr(
+                        &mut editor,
+                        &mut env,
+                        buffer.clone(),
+                        &child_layout,
+                        depth + 1,
+                    );
+                    sub_views_id.push(child_view);
+                }
+            }
+        }
+    }
+
+    // add children
+    for (idx, vid) in sub_views_id.iter().enumerate() {
+        if let Some(vid) = vid {
+            // set parent link
+            {
+                let child = get_view_by_id(editor, *vid);
+                let mut child = child.write();
+                child.parent_id = Some(view.id);
+                child.layout_index = Some(idx);
+
+                let id = *vid;
+                let op = child.layout_size.clone();
+                view.children.push(ChildView {
+                    layout_op: op.clone(),
+                    id,
+                });
+            }
+        }
+    }
+
+    struct RegisterParam {
+        pub mode: Option<String>,
+        pub src_idx: Option<usize>,
+        pub dst_idx: Option<usize>,
+    }
+
+    impl RegisterParam {
+        pub fn new() -> Self {
+            RegisterParam {
+                mode: None,
+                src_idx: None,
+                dst_idx: None,
+            }
+        }
+
+        fn is_valid(&self) -> bool {
+            self.mode.is_some() && self.src_idx.is_some() && self.dst_idx.is_some()
+        }
+    }
+
+    // parse children
+    let mut links = vec![];
+
+    if let Value::Object(obj) = attr {
+        // look for children first
+        if let Some(subscribe) = obj.get("children-subscribe") {
+            if let Value::Array(ref vec) = subscribe {
+                for sub in vec {
+                    let mut p = RegisterParam::new();
+                    if let Some(Value::String(ref s)) = sub.get("mode") {
+                        p.mode = Some(s.clone());
+                    }
+
+                    if let Some(Value::Number(ref n)) = sub.get("src") {
+                        if n.is_u64() {
+                            p.src_idx = Some(n.as_u64().unwrap() as usize);
+                        } else {
+                            // syntax error
+                        }
+                    }
+
+                    if let Some(Value::Number(ref n)) = sub.get("dst") {
+                        if n.is_u64() {
+                            p.dst_idx = Some(n.as_u64().unwrap() as usize);
+                        } else {
+                            // syntax error
+                        }
+                    }
+
+                    if p.is_valid() {
+                        links.push(p);
+                    }
+                }
+            }
+        }
+    }
+
+    for l in links {
+        let mode_name = l.mode.unwrap();
+        if let Some(mode) = editor.get_mode(&mode_name) {
+            register_view_subscriber(
+                editor,
+                env,
+                Rc::clone(&mode),
+                // publisher
+                ViewEventSource {
+                    id: view.children[l.src_idx.unwrap()].id,
+                },
+                // subscriber
+                ViewEventDestination {
+                    id: view.children[l.dst_idx.unwrap()].id,
+                },
+            );
+        }
+    }
+
+    if let Some(focus_idx) = focus_idx {
+        view.focus_to = Some(view.children[focus_idx].id); // TODO(ceg):
+    }
+
+    if let Some(status_idx) = status_idx {
+        view.status_view_id = Some(view.children[status_idx].id);
+        env.status_view_id = Some(view.children[status_idx].id);
+    }
+
+    // insert in global map
+    let id = view.id;
+    let view = Rc::new(RwLock::new(view));
+    editor.view_map.write().insert(id, Rc::clone(&view));
+
+    dbg_println!(" <<<< return");
+
+    Some(id)
+}
+
+pub fn build_view_layout_typed(
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
+    buffer: Option<Arc<RwLock<Buffer<'static>>>>,
+    json: &Value,
+    view_type: &str,
+) -> Option<view::Id> {
+    // 1st level is object["view-type"]
+    let depth = 0;
+    if let Value::Object(ref root) = *json {
+        if let Some((_view_type, view_layout)) = root.get_key_value(view_type) {
+            //dbg_println!("view_type = {:?}, v = {:?}", view_type, view_layout);
+            return build_view_layout_from_attr(
+                &mut editor,
+                &mut env,
+                buffer.clone(),
+                &view_layout,
+                depth,
+            );
+        }
+    }
+
+    return None;
+}
+
+pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
+    let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
+
+    if json.is_err() {
+        dbg_print!("json parse error {:?}", json);
+        return;
+    }
+    let json = json.unwrap();
+
+    let buffer_map = editor.buffer_map.clone();
+    let buffer_map = buffer_map.read();
+
+    // create default views
+    // sort by arg pos first
+    let mut buffers_id: Vec<buffer::Id> = buffer_map.iter().map(|(k, _v)| *k).collect();
+    buffers_id.sort();
+    let mut buffers: Vec<Arc<RwLock<Buffer>>> = vec![];
+    for id in buffers_id.iter() {
+        if let Some(buffer) = buffer_map.get(id) {
+            buffers.push(Arc::clone(buffer));
+        }
+    }
+
+    // create views
+    for buffer in buffers {
+        dbg_println!("-------------");
+
+        dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
+        let kind = buffer.as_ref().read().kind;
+        let id = match kind {
+            BufferKind::File => {
+                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
+            }
+            BufferKind::Directory => {
+                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+            }
+        };
+        if let Some(vid) = id {
+            // top level views
+            dbg_println!("add top level view {:?}", vid);
+            editor.root_views.push(vid);
+        }
     }
 }

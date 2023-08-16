@@ -37,6 +37,10 @@ use crate::core::view::LayoutSize;
 use crate::core::modes::text_mode::center_around_mark_if_offscreen;
 use crate::core::modes::text_mode::TextModeContext;
 
+use crate::core::build_view_layout_typed;
+use crate::core::parse_layout_str;
+use crate::core::DEFAULT_LAYOUT_JSON;
+
 static OPEN_DOC_TRIGGER_MAP: &str = r#"
 [
   {
@@ -86,8 +90,7 @@ impl<'a> Mode for OpenDocMode {
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc open-doc-mode ctx");
-        let ctx = OpenDocModeContext::new();
-        Box::new(ctx)
+        Box::new(OpenDocModeContext::new())
     }
 
     fn configure_view(
@@ -259,7 +262,7 @@ fn create_open_doc_controller_view(
     let (w, h) = (1, 1);
 
     let buffer = BufferBuilder::new(BufferKind::File)
-        .buffer_name("goto-controller")
+        .buffer_name("open-doc-controller")
         .internal(true)
         .use_buffer_log(false)
         .finalize();
@@ -274,6 +277,8 @@ fn create_open_doc_controller_view(
         buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
+        LayoutDirection::NotSet,
+        LayoutSize::Percent { p: 100.0 },
     );
 
     controller_view.ignore_focus = false;
@@ -440,6 +445,8 @@ fn create_open_doc_completion_view(
         command_buffer,
         &modes,
         0,
+        LayoutDirection::NotSet,
+        LayoutSize::Percent { p: 100.0 },
     );
     popup_view.ignore_focus = true;
 
@@ -514,27 +521,23 @@ pub fn open_doc_controller_add_char(
         odm.completion_view_id
     };
 
-    {
-        open_doc_do_completion(editor, env, view, auto_complete);
-    }
+    open_doc_do_completion(editor, env, view, auto_complete);
 
-    {
-        let mut controller_view = view.write();
-        let text_view_view_id = controller_view.controlled_view.unwrap();
+    let mut controller_view = view.write();
+    let text_view_view_id = controller_view.controlled_view.unwrap();
 
-        let text_view = get_view_by_id(editor, text_view_view_id);
-        let mut text_view = text_view.write();
+    let text_view = get_view_by_id(editor, text_view_view_id);
+    let mut text_view = text_view.write();
+    {
+        let completion_view = get_view_by_id(editor, completion_view_id);
         {
-            let completion_view = get_view_by_id(editor, completion_view_id);
-            {
-                let mut completion_view = completion_view.write();
-                let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
-                tm.marks[0].offset = 0;
-            }
-            center_around_mark_if_offscreen(editor, env, &completion_view);
+            let mut completion_view = completion_view.write();
+            let tm = completion_view.mode_ctx_mut::<TextModeContext>("text-mode");
+            tm.marks[0].offset = 0;
         }
-        open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+        center_around_mark_if_offscreen(editor, env, &completion_view);
     }
+    open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
 }
 
 pub fn open_doc_controller_del_char(
@@ -621,7 +624,7 @@ pub fn open_doc_do_completion(
 
         dbg_println!("open file : do completion: prompt '{}'", s);
 
-        let path = PathBuf::from(prefix.clone());
+        let path = PathBuf::from(prefix);
         dbg_println!("do completion: for '{:?}'", path);
         match fs::read_dir(&path) {
             Ok(path) => {
@@ -675,7 +678,8 @@ pub fn open_doc_do_completion(
         }
 
         odm.completion_list.sort(); // list.sort_unstable_by(|a, b| (b.0).cmp(&a.0));
-        !odm.completion_list.is_empty()
+        let has_item = !odm.completion_list.is_empty();
+        has_item
     };
 
     if let Some(_id) = show_completion_popup(editor, env, view) {
@@ -1049,9 +1053,10 @@ pub fn open_doc_controller_show_buffer(
     env.root_view_id = new_root_view_id;
 }
 
+// FIXME(ceg): core::open-new-buffer(path)
 fn open_doc_controller_load_buffer(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    mut editor: &mut Editor<'static>,
+    mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) -> (usize, view::Id, bool) {
     // walk through buffer list/view
@@ -1098,6 +1103,7 @@ fn open_doc_controller_load_buffer(
 
     // configure buffer
 
+    // TODO(ceg): move this to core:: as setup_buffer_modes(buffer)
     // per mode buffer metadata
     {
         let file_modes = editor.modes.clone();
@@ -1128,20 +1134,29 @@ fn open_doc_controller_load_buffer(
     let buffer = buffer_map.get(&buffer_id).unwrap();
     let buffer = buffer.clone();
 
-    // create views
-    let modes = match kind {
-        BufferKind::File => vec!["basic-editor".to_owned()],
-        BufferKind::Directory => vec!["core-mode".to_owned(), "dir-mode".to_owned()],
+    // FIXME(ceg): there is a lot of copy paste from core::
+    let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
+    if json.is_err() {
+        dbg_print!("json parse error {:?}", json);
+        return (0, view::Id(0), false);
+    }
+    let json = json.unwrap();
+
+    let id = match kind {
+        BufferKind::File => {
+            build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
+        }
+        BufferKind::Directory => {
+            build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+        }
     };
 
-    let view = View::new(editor, env, None, (0, 0), (1, 1), Some(buffer), &modes, 0);
-    dbg_println!("open-doc : create view id {:?}", view.id);
+    dbg_println!("open-doc : create view id {:?}", id);
 
     // a new top level view
     let idx = editor.root_views.len();
-    let new_root_view_id = view.id;
-    editor.root_views.push(view.id);
-    editor.add_view(view.id, view);
+    let new_root_view_id = id.unwrap();
+    editor.root_views.push(id.unwrap());
 
     let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 

@@ -1,6 +1,5 @@
 use std::any::Any;
 
-pub mod basic_editor;
 pub mod core_mode;
 pub mod dir_fetch;
 pub mod dir_mode;
@@ -10,8 +9,9 @@ pub mod goto_line_mode;
 pub mod hsplit_mode;
 pub mod line_number;
 pub mod open_doc;
-pub mod simple_view;
 pub mod status_mode;
+pub mod title_bar_mode;
+
 pub mod text_mode;
 pub mod vscrollbar_mode;
 pub mod vsplit_mode;
@@ -22,15 +22,16 @@ use crate::core::editor::EditorEnv;
 use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
 
-pub use basic_editor::BasicEditorMode;
 pub use core_mode::CoreMode;
 pub use find_mode::FindMode;
 pub use goto_line_mode::GotoLineMode;
 pub use hsplit_mode::HsplitMode;
 pub use line_number::LineNumberMode;
 pub use open_doc::OpenDocMode;
-pub use simple_view::SimpleViewMode;
+
 pub use status_mode::StatusMode;
+pub use title_bar_mode::TitleBarMode;
+
 pub use text_mode::TextMode;
 pub use vscrollbar_mode::VscrollbarMode;
 pub use vsplit_mode::VsplitMode;

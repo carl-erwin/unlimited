@@ -24,8 +24,6 @@ pub mod layout;
 
 pub use self::layout::*;
 
-use crate::core::view::run_compositing_stage_direct;
-
 use std::collections::HashMap;
 
 use crate::core::editor::InputStageActionMap;
@@ -112,7 +110,7 @@ pub enum LayoutDirection {
     Horizontal,
 }
 // store this in parent and reuse in resize
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum LayoutSize {
     // Child at View::{.x, .y}
     Floating,
@@ -272,7 +270,7 @@ pub enum ViewEvent {
 // the notification should be done in post input, before composition
 //
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ChildView {
     pub id: Id,
     pub layout_op: LayoutSize,
@@ -303,7 +301,10 @@ pub type SubscriberInfo = (
 // TODO(ceg): add view.next_content_view_id
 pub struct View<'a> {
     pub id: Id,
+    pub json_attr: Option<String>,
     pub destroyable: bool,
+    pub is_group: bool,
+    pub is_leader: bool,
     pub is_splittable: bool, // This flags marks a view that can be cloned when doing split views
     pub ignore_focus: bool,  // never set focus on this view
 
@@ -358,6 +359,8 @@ pub struct View<'a> {
     pub layout_index: Option<usize>,
 
     pub layout_direction: LayoutDirection,
+
+    pub layout_size: LayoutSize,
 
     pub children: Vec<ChildView>,
 
@@ -440,11 +443,15 @@ impl<'a> View<'a> {
         modes: &[String],
     ) {
         // setup modes/input map/etc..
+        view.modes.clear();
+
         for mode_name in modes.iter() {
             if mode_name.is_empty() {
                 // TODO(ceg): log error
                 continue;
             }
+
+            view.modes.push(mode_name.to_owned());
 
             let mode = editor.get_mode(mode_name);
             if mode.is_none() {
@@ -487,6 +494,8 @@ impl<'a> View<'a> {
         buffer: Option<Arc<RwLock<Buffer<'static>>>>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
+        layout_direction: LayoutDirection,
+        layout_size: LayoutSize,
     ) -> View<'static> {
         let screen = Arc::new(RwLock::new(Box::new(Screen::new(w_h.0, w_h.1))));
 
@@ -501,9 +510,18 @@ impl<'a> View<'a> {
 
         dbg_println!("CREATE new VIEW {id}, modes {modes:?}");
 
+        if let Some(parent_id) = parent_id {
+            if parent_id == Id(0) {
+                panic!();
+            }
+        }
+
         let mut v = View {
             parent_id,
-            destroyable: true,
+            json_attr: None,
+            destroyable: false,
+            is_leader: false,
+            is_group: false,
             is_splittable: false,
             ignore_focus: true,
             focus_to: None,
@@ -530,7 +548,8 @@ impl<'a> View<'a> {
             height: w_h.1,
             //
             layout_index: None,
-            layout_direction: LayoutDirection::NotSet,
+            layout_direction,
+            layout_size,
 
             children: vec![],
             floating_children: vec![],
@@ -551,7 +570,7 @@ impl<'a> View<'a> {
             subscribers: vec![], // list of other views to notify when this view changes
         };
 
-        View::setup_modes(editor, env, &mut v, modes);
+        View::setup_modes(editor, env, &mut v, &modes);
 
         v
     }
@@ -562,6 +581,7 @@ impl<'a> View<'a> {
 
     pub fn set_mode_ctx(&mut self, name: &'static str, ctx: Box<dyn Any>) -> bool {
         let res = self.mode_ctx.insert(name, ctx);
+        dbg_println!("set_mode_ctx name {}", name);
         assert!(res.is_none());
         true
     }
@@ -629,6 +649,7 @@ pub fn get_status_view(
         if pv.status_view_id.is_some() {
             return pv.status_view_id;
         }
+        break; // FIXME(ceg)
     }
 
     None

@@ -313,7 +313,7 @@ impl ContentFilter<'_> for WordWrapFilter {
                             };
 
                             let mut next_line = vec![];
-                            let next_elms = right.clone();
+                            let next_elms = right;
                             for e in next_elms {
                                 next_line.push(WordWrapElement::from_elm(&e));
                             }

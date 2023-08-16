@@ -261,7 +261,17 @@ fn create_find_controller_view(
         buffer,
         &vec!["status-mode".to_owned()], // TODO(ceg): find-controller
         0,
+        LayoutDirection::NotSet,
+        LayoutSize::Percent { p: 100.0 },
     );
+
+    /* View::setup_modes(
+        editor,
+        env,
+        &mut controller_view,
+        &vec!["status-mode".to_owned()],
+    );
+    */
 
     controller_view.ignore_focus = false;
 

@@ -72,6 +72,7 @@ use crate::core::view::LayoutEnv;
 use crate::core::view::ScreenOverlayFilter;
 
 use crate::core::view;
+use crate::core::view::Id;
 use crate::core::view::LayoutSize;
 use crate::core::view::View;
 use crate::core::view::ViewEvent;
@@ -487,6 +488,14 @@ impl<'a> Mode for LineNumberMode {
                     return;
                 }
 
+                if src.id == Id(0) {
+                    return;
+                }
+
+                if dst.id == Id(0) {
+                    return;
+                }
+
                 let linenum_view = get_view_by_id(editor, dst.id);
                 let mut linenum_view = linenum_view.write();
 
@@ -638,6 +647,11 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         let view = view.read();
         let mode_ctx = view.mode_ctx::<LineNumberModeContext>("line-number-mode");
         let text_view_id = mode_ctx.text_view_id;
+
+        if text_view_id == Id(0) {
+            return;
+        }
+
         let src = get_view_by_id(editor, text_view_id);
         let src = src.read();
         self.line_offsets = src.screen.read().line_offset.clone();

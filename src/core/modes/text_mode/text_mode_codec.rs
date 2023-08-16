@@ -44,22 +44,11 @@ impl ContentFilter<'_> for TextCodecFilter {
 
             match &d.data {
                 FilterData::ByteArray { vec } => {
-                    //let mut decoded = vec![];
-                    let mut decoded = Vec::with_capacity(vec.len());
-                    unsafe {
-                        decoded.set_len(vec.len());
-                    }
-                    for (idx, val) in vec.iter().enumerate() {
-                        let new_io = Unicode {
-                            size: 1,
-                            cp: *val as u32,
-                        };
-                        // decoded.push(new_io);
-                        // decoded[idx] = new_io;
-                        unsafe {
-                            *decoded.get_unchecked_mut(idx) = new_io;
-                        }
-                    }
+                    let mut decoded = vec![];
+                    decoded.extend(vec.iter().map(|&val| Unicode {
+                        size: 1,
+                        cp: val as u32,
+                    }));
 
                     // single bloc with base offset
                     filter_out.push(FilterIo {

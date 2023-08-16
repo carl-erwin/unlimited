@@ -6,7 +6,7 @@ macro_rules! dbg_println {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis() ,file!(), line!());
+            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!());
             eprintln!($($arg)*)
         }
     }};
@@ -20,7 +20,7 @@ macro_rules! dbg_print {
         use std::sync::atomic::Ordering;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis() ,file!(), line!());
+            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!());
             eprint!($($arg)*)
         }
     }};
@@ -41,7 +41,7 @@ macro_rules! trace_block {
 
 
         if crate::core::DBG_PRINTLN_FLAG.load(std::sync::atomic::Ordering::Relaxed) != 0 {
-            eprintln!("-- trace_block [{} ms] {} ({}:{}) ", now.elapsed().unwrap().as_millis(), $trace_label,  file!(), line!());
+            eprintln!("-- trace_block [{} ms] {} ({}:{}) ", now.elapsed().unwrap().as_millis(), $trace_label, file!(), line!());
         }
 
     };
