@@ -9,7 +9,7 @@ use crate::core::Editor;
 use crate::core::EditorEnv;
 
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 
 use crate::core::view::register_view_subscriber;
 
@@ -59,14 +59,14 @@ impl<'a> Mode for SimpleViewMode {
             /*
                         // fs tree changed
                         (
-                            LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
+                            LayoutSize::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
                             buffer.clone(),
                             vec!["fstree-mode".to_owned()],
                         ),
             */
             // line numbers
             (
-                LayoutOperation::Fixed {
+                LayoutSize::Fixed {
                     size: line_number_view_width,
                 }, // TODO(ceg): adjust size based on screen content
                 buffer.clone(),
@@ -74,27 +74,27 @@ impl<'a> Mode for SimpleViewMode {
             ),
             // empty column
             (
-                LayoutOperation::Fixed { size: 1 },
+                LayoutSize::Fixed { size: 1 },
                 buffer.clone(),
                 vec!["".to_owned()],
             ),
             /*
                         // line changed
                         (
-                            LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
+                            LayoutSize::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
                             buffer.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "line-change-mode" in screen overlay pass
                         ),
                         // fold
                         (
-                            LayoutOperation::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
+                            LayoutSize::Fixed { size: 0 }, // TODO(ceg): adjust size based on screen content
                             buffer.clone(),
                             vec!["vscrollbar-mode".to_owned()], // TODO(ceg): "fold-mode" in screen overlay pass
                         ),
             */
             // text
             (
-                LayoutOperation::RemainMinus { minus: 1 },
+                LayoutSize::RemainMinus { minus: 1 },
                 buffer.clone(),
                 vec![
                     "core-mode".to_owned(),
@@ -106,7 +106,7 @@ impl<'a> Mode for SimpleViewMode {
             ),
             // scrollbar
             (
-                LayoutOperation::Fixed { size: 1 },
+                LayoutSize::Fixed { size: 1 },
                 buffer.clone(),
                 vec!["vscrollbar-mode".to_owned()],
             ),

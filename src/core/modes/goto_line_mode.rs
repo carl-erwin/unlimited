@@ -33,7 +33,7 @@ use crate::core::view::View;
 
 use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 
 use crate::core::buffer::find_nth_byte_offset;
 
@@ -300,7 +300,7 @@ fn goto_line_show_controller_view(
     status_view.children.pop(); // replace previous child
     status_view.children.push(ChildView {
         id: gtm.controller_view_id,
-        layout_op: LayoutOperation::Percent { p: 100.0 },
+        layout_op: LayoutSize::Percent { p: 100.0 },
     });
 }
 

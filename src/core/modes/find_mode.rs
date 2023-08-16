@@ -28,7 +28,7 @@ use crate::core::view::View;
 
 use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 
 use crate::core::modes::text_mode::center_view_around_offset;
 
@@ -316,7 +316,7 @@ fn find_show_controller_view(
     status_view.children.pop(); // replace previous child
     status_view.children.push(ChildView {
         id: fm.controller_view_id,
-        layout_op: LayoutOperation::Percent { p: 100.0 },
+        layout_op: LayoutSize::Percent { p: 100.0 },
     });
 }
 

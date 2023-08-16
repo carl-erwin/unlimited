@@ -113,7 +113,7 @@ pub enum LayoutDirection {
 }
 // store this in parent and reuse in resize
 #[derive(Debug, Clone)]
-pub enum LayoutOperation {
+pub enum LayoutSize {
     // Child at View::{.x, .y}
     Floating,
 
@@ -139,7 +139,7 @@ pub enum LayoutOperation {
 }
 
 // MOVE TO Layout code
-pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usize> {
+pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
     let mut sizes = vec![];
 
     dbg_println!("start = {}", start);
@@ -157,21 +157,21 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
         }
 
         match op {
-            LayoutOperation::Floating => {}
+            LayoutSize::Floating => {}
 
-            LayoutOperation::Fixed { size } => {
+            LayoutSize::Fixed { size } => {
                 remain = remain.saturating_sub(*size);
                 sizes.push(*size);
             }
 
-            LayoutOperation::Percent { p } => {
+            LayoutSize::Percent { p } => {
                 let used = (*p * start as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
                 sizes.push(used);
             }
 
-            LayoutOperation::RemainPercent { p } => {
+            LayoutSize::RemainPercent { p } => {
                 let used = (*p * remain as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
@@ -181,7 +181,7 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutOperation>) -> Vec<usi
             // We want a fixed percentage of sz cells vertically/horizontally
             // used = minus
             // (remain <- remain - minus))
-            LayoutOperation::RemainMinus { minus } => {
+            LayoutSize::RemainMinus { minus } => {
                 let used = remain.saturating_sub(*minus);
                 remain = remain.saturating_sub(used);
                 sizes.push(used);
@@ -275,7 +275,7 @@ pub enum ViewEvent {
 #[derive(Debug, Clone)]
 pub struct ChildView {
     pub id: Id,
-    pub layout_op: LayoutOperation,
+    pub layout_op: LayoutSize,
 }
 
 pub struct ControllerView {

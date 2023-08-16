@@ -32,7 +32,7 @@ use crate::core::view::View;
 
 use crate::core::view::ControllerView;
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 
 use crate::core::modes::text_mode::center_around_mark_if_offscreen;
 use crate::core::modes::text_mode::TextModeContext;
@@ -371,7 +371,7 @@ fn open_doc_show_controller_view(
         status_view.children.pop(); // replace previous child
         status_view.children.push(ChildView {
             id: ctrl_view_id,
-            layout_op: LayoutOperation::Percent { p: 100.0 },
+            layout_op: LayoutSize::Percent { p: 100.0 },
         });
 
         ctrl_view_id
@@ -752,7 +752,7 @@ fn show_completion_popup(
     if p_view.floating_children.is_empty() {
         p_view.floating_children.push(ChildView {
             id: completion_view.id,
-            layout_op: LayoutOperation::Floating,
+            layout_op: LayoutSize::Floating,
         })
     }
 

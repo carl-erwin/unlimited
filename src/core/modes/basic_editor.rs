@@ -21,7 +21,7 @@ use crate::core::view::ContentFilter;
 use crate::core::view::FilterIo;
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutEnv;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 
 use crate::core::view::View;
 
@@ -72,7 +72,7 @@ impl<'a> Mode for BasicEditorMode {
         let ops_modes = vec![
             // title
             (
-                LayoutOperation::Fixed {
+                LayoutSize::Fixed {
                     size: 1 + 0, /* nano-like */
                 },
                 buffer.clone(),
@@ -80,20 +80,20 @@ impl<'a> Mode for BasicEditorMode {
             ),
             // main text view
             (
-                LayoutOperation::RemainMinus { minus: 1 },
+                LayoutSize::RemainMinus { minus: 1 },
                 buffer.clone(),
                 vec!["simple-view".to_owned()],
             ),
             /*
             (
-                LayoutOperation::Fixed { size: 1 },
+                LayoutSize::Fixed { size: 1 },
                 None,
                 vec!["hsplit-mode".to_owned()],
             ),
             */
             // status bar
             (
-                LayoutOperation::RemainPercent { p: 100.0 },
+                LayoutSize::RemainPercent { p: 100.0 },
                 status_buffer,
                 vec!["status-mode".to_owned()],
             ),

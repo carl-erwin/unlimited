@@ -72,7 +72,7 @@ use crate::core::view::LayoutEnv;
 use crate::core::view::ScreenOverlayFilter;
 
 use crate::core::view;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 use crate::core::view::View;
 use crate::core::view::ViewEvent;
 use crate::core::view::ViewEventDestination;
@@ -537,7 +537,7 @@ impl<'a> Mode for LineNumberMode {
 
                 if let Some(p_view) = parent {
                     p_view.children[linenum_view.layout_index.unwrap()].layout_op =
-                        LayoutOperation::Fixed {
+                        LayoutSize::Fixed {
                             size: width as usize,
                         };
                 } else {

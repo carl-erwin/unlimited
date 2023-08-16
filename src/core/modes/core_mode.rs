@@ -28,7 +28,7 @@ use crate::core::event::input_map::build_input_event_map;
 use crate::core::view;
 use crate::core::view::ChildView;
 use crate::core::view::LayoutDirection;
-use crate::core::view::LayoutOperation;
+use crate::core::view::LayoutSize;
 use crate::core::view::View;
 
 static CORE_INPUT_MAP: &str = r#"
@@ -313,7 +313,7 @@ pub fn split_with_direction(
     width: usize,
     height: usize,
     dir: view::LayoutDirection,
-    layout_ops: &Vec<LayoutOperation>,
+    layout_ops: &Vec<LayoutSize>,
     buffer: &Vec<Option<Arc<RwLock<Buffer<'static>>>>>,
     modes: &Vec<Vec<String>>,
 ) {
@@ -400,7 +400,7 @@ pub fn layout_view_ids_with_direction(
     width: usize,
     height: usize,
     dir: view::LayoutDirection,
-    layout_ops: &Vec<LayoutOperation>,
+    layout_ops: &Vec<LayoutSize>,
     view_ids: &Vec<view::Id>,
 ) {
     let parent = get_view_by_id(editor, parent_id);
@@ -623,9 +623,9 @@ pub fn split_view_with_direction(
 
     // children_layout_and_modes
     let layout_ops = vec![
-        LayoutOperation::Percent { p: 50.0 }, // left (view_to_split)
-        LayoutOperation::Fixed { size: 1 },   // splitter
-        LayoutOperation::RemainPercent { p: 100.0 }, // right (view_clone)
+        LayoutSize::Percent { p: 50.0 },        // left (view_to_split)
+        LayoutSize::Fixed { size: 1 },          // splitter
+        LayoutSize::RemainPercent { p: 100.0 }, // right (view_clone)
     ];
 
     // new parent replaces view_to_split i parent(view_to_split)
@@ -730,11 +730,11 @@ pub fn split_horizontally(
 
 // quick hack ignoring other children
 pub fn increase_layout_op(
-    op: &LayoutOperation,
+    op: &LayoutSize,
     max_size: usize,
     cur_size: usize,
     diff: usize,
-) -> LayoutOperation {
+) -> LayoutSize {
     dbg_println!(
         "INC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
         op,
@@ -744,29 +744,27 @@ pub fn increase_layout_op(
     );
 
     let new_op = match *op {
-        LayoutOperation::Fixed { size } if size < max_size => {
-            LayoutOperation::Fixed { size: size + 1 }
-        }
-        LayoutOperation::Percent { p } => {
+        LayoutSize::Fixed { size } if size < max_size => LayoutSize::Fixed { size: size + 1 },
+        LayoutSize::Percent { p } => {
             if cur_size + diff >= max_size {
                 return op.clone();
             }
             let expect_p = ((cur_size + diff) as f32 * p) / cur_size as f32;
             dbg_println!("LAYOUT expect_p = {}", expect_p);
-            LayoutOperation::Percent { p: expect_p }
+            LayoutSize::Percent { p: expect_p }
         }
-        LayoutOperation::RemainPercent { p } if p < 99.0 => {
+        LayoutSize::RemainPercent { p } if p < 99.0 => {
             let unit = max_size as f32 / 100.0;
-            LayoutOperation::RemainPercent { p: p + unit }
+            LayoutSize::RemainPercent { p: p + unit }
         }
-        LayoutOperation::RemainMinus { minus } => {
+        LayoutSize::RemainMinus { minus } => {
             dbg_println!(
                 "LAYOUT = max_size{} - minus*100{} / 100 = {}",
                 minus * 100,
                 max_size,
                 max_size.saturating_sub(minus * 100) / 100
             );
-            LayoutOperation::RemainMinus {
+            LayoutSize::RemainMinus {
                 minus: ((minus * 100 + max_size) / 100) - 1,
             }
         }
@@ -780,12 +778,12 @@ pub fn increase_layout_op(
 
 // quick hack ignoring other children
 pub fn decrease_layout_op(
-    op: &LayoutOperation,
+    op: &LayoutSize,
     // TODO(ceg): min_size: usize,
     max_size: usize,
     cur_size: usize,
     diff: usize, // decrease amount
-) -> LayoutOperation {
+) -> LayoutSize {
     dbg_println!(
         "DEC LAYOUT OP {:?}, max_size = {} max_size, cur_size {} diff {}",
         op,
@@ -795,24 +793,22 @@ pub fn decrease_layout_op(
     );
 
     let new_op = match *op {
-        LayoutOperation::Fixed { size } if size > diff => {
-            LayoutOperation::Fixed { size: size - diff }
-        }
-        LayoutOperation::Percent { p } => {
+        LayoutSize::Fixed { size } if size > diff => LayoutSize::Fixed { size: size - diff },
+        LayoutSize::Percent { p } => {
             if cur_size <= diff {
                 return op.clone();
             }
 
             let expect_p = ((cur_size - diff) as f32 * p) / cur_size as f32;
             dbg_println!("LAYOUT expect_p = {}", expect_p);
-            LayoutOperation::Percent { p: expect_p }
+            LayoutSize::Percent { p: expect_p }
         }
 
-        LayoutOperation::RemainPercent { p } if p > 2.0 => {
+        LayoutSize::RemainPercent { p } if p > 2.0 => {
             let unit = (max_size as f32) / 100.0;
-            LayoutOperation::RemainPercent { p: p - unit }
+            LayoutSize::RemainPercent { p: p - unit }
         }
-        LayoutOperation::RemainMinus { minus } => {
+        LayoutSize::RemainMinus { minus } => {
             dbg_println!(
                 "LAYOUT = minus * 100 {} + max_size {} / 100 = {}",
                 minus * 100,
@@ -822,7 +818,7 @@ pub fn decrease_layout_op(
             if ((minus * 100 + max_size) / 100) + 1 > 100 {
                 return op.clone();
             }
-            LayoutOperation::RemainMinus {
+            LayoutSize::RemainMinus {
                 minus: ((minus * 100 + max_size) / 100) + 1,
             }
         }
@@ -1235,7 +1231,7 @@ pub fn help_popup(
 
         main.floating_children.push(ChildView {
             id: p_view.id,
-            layout_op: LayoutOperation::Floating,
+            layout_op: LayoutSize::Floating,
         });
     }
 
