@@ -390,6 +390,13 @@ pub fn register_view_subscriber(
     src: ViewEventSource,
     dst: ViewEventDestination,
 ) -> Option<()> {
+    dbg_println!(
+        "register_view_subscriber: mode[{}] src {:?} dst {:?}",
+        mode.borrow().name(),
+        src,
+        dst
+    );
+
     let src_view = get_view_by_id(editor, src.id);
     let ctx = (mode.clone(), src, dst);
 

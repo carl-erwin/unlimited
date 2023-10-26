@@ -73,7 +73,7 @@ pub trait Mode {
         _src_view: &mut View<'static>,
     ) {
         dbg_println!(
-            "(default) mode '{}' on_buffer_event: event {:?}",
+            "(default) mode '{}' on_buffer_event: event {:?} IGNORE",
             self.name(),
             _event
         );

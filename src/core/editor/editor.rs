@@ -1478,6 +1478,11 @@ fn process_buffer_event(
                             let map = editor.modes.borrow_mut().clone();
                             if let Some(mode) = map.get(&mode_name) {
                                 let mode = mode.borrow_mut();
+                                dbg_println!(
+                                    "mode '{}' on_buffer_event: event {:?}",
+                                    mode_name,
+                                    event
+                                );
                                 mode.on_buffer_event(editor, env, event, &mut view);
                             }
                         }

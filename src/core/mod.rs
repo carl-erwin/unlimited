@@ -981,6 +981,7 @@ fn build_view_layout_from_attr(
         }
     }
 
+    #[derive(Debug)]
     struct RegisterParam {
         pub mode: Option<String>,
         pub src_idx: Option<usize>,
