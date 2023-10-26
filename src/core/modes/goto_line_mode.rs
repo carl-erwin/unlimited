@@ -37,6 +37,10 @@ use crate::core::view::LayoutSize;
 
 use crate::core::buffer::find_nth_byte_offset;
 
+use crate::core::buffer::Buffer;
+use crate::core::buffer::BufferEvent;
+use crate::core::buffer::BufferEventCb;
+
 use super::text_mode::run_text_mode_actions_vec;
 
 static GOTO_LINE_TRIGGER_MAP: &str = r#"
@@ -96,6 +100,60 @@ impl<'a> Mode for GotoLineMode {
 
         // add controller
         create_goto_line_controller_view(editor, env, view);
+    }
+
+    fn on_buffer_event(
+        &self,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        _event: &BufferEvent,
+        view: &mut View<'static>,
+    ) {
+        dbg_println!(
+            "(NEW) mode '{}' on_buffer_event: event {:?} src_view {:?}",
+            self.name(),
+            _event,
+            view.id
+        );
+
+        if let Some(buffer) = view.buffer() {
+            let max_offset = buffer.read().size() as u64;
+
+            let position = buffer.read().start_position;
+            if let Some(target_line) = position.line {
+                dbg_println!("goto line {:?} ?", target_line);
+
+                let offset = if target_line <= 1 {
+                    0
+                } else {
+                    let line_number = target_line.saturating_sub(1);
+                    if let Some(offset) =
+                        find_nth_byte_offset(&buffer.read(), '\n' as u8, line_number)
+                    {
+                        offset + 1
+                    } else {
+                        max_offset as u64
+                    }
+                };
+                dbg_println!("goto line {:?} offset : {}", target_line, offset);
+
+                // check offscreen
+                view.start_offset = offset;
+
+                // update marks ?
+                let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
+
+                tm.marks.clear();
+                tm.marks.push(Mark { offset });
+
+                tm.pre_compose_action
+                    .push(PostInputAction::CenterAroundMainMark);
+
+                let msg = Message::new(0, 0, 0, Event::RefreshView);
+                crate::core::event::pending_input_event_inc(1);
+                editor.core_tx.send(msg).unwrap_or(());
+            }
+        }
     }
 }
 

@@ -361,65 +361,6 @@ impl<'a> Mode for LineNumberMode {
         }
     }
 
-    fn on_buffer_event(
-        &self,
-        editor: &mut Editor<'static>,
-        _env: &mut EditorEnv<'static>,
-        _event: &BufferEvent,
-        view: &mut View<'static>,
-    ) {
-        dbg_println!("mode '{}' on_buffer_event: event {:?}", self.name(), _event);
-
-        // TODO: match event  : BufferEvent::BufferFullyIndexed { buffer_id }
-        // TODO: view revision != 0
-
-        if let Some(buffer) = view.buffer() {
-            let max_offset = buffer.read().size() as u64;
-
-            let position = buffer.read().start_position;
-            if let Some(target_line) = position.line {
-                dbg_println!("goto line {:?} ?", target_line);
-
-                let offset = if target_line <= 1 {
-                    0
-                } else {
-                    let line_number = target_line.saturating_sub(1);
-                    if let Some(offset) =
-                        find_nth_byte_offset(&buffer.read(), '\n' as u8, line_number)
-                    {
-                        offset + 1
-                    } else {
-                        max_offset as u64
-                    }
-                };
-                dbg_println!("goto line {:?} offset : {}", target_line, offset);
-
-                let lnm = view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
-                let text_view_id = lnm.text_view_id;
-
-                let text_view = get_view_by_id(editor, text_view_id);
-                let mut text_view = text_view.write();
-
-                // check offscreen
-                text_view.start_offset = offset;
-
-                // update marks ?
-                let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
-
-                tm.marks.clear();
-                tm.marks.push(Mark { offset });
-
-                // TODO(ceg): ignore if view was change by user
-                tm.pre_compose_action
-                    .push(PostInputAction::CenterAroundMainMark);
-
-                let msg = Message::new(0, 0, 0, Event::RefreshView);
-                crate::core::event::pending_input_event_inc(1);
-                editor.core_tx.send(msg).unwrap_or(());
-            }
-        }
-    }
-
     fn configure_view(
         &mut self,
         editor: &mut Editor<'static>,
@@ -498,6 +439,8 @@ impl<'a> Mode for LineNumberMode {
 
                 let linenum_view = get_view_by_id(editor, dst.id);
                 let mut linenum_view = linenum_view.write();
+
+                dbg_println!("setup line_number ctx for view {:?}", dst.id);
 
                 let mode_ctx =
                     linenum_view.mode_ctx_mut::<LineNumberModeContext>("line-number-mode");
