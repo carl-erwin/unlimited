@@ -223,7 +223,7 @@ impl<'a> Editor<'a> {
     }
 
     pub fn get_mode<'e>(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn Mode>>>> {
-        let h = self.modes.clone();
+        let h = Rc::clone(&self.modes);
         let h = h.borrow();
         let m = h.get(&name.to_owned());
         if m.is_none() {
@@ -1453,12 +1453,14 @@ fn process_buffer_event(
     match event {
         //
         BufferEvent::BufferFullyIndexed { buffer_id } => {
+            // TODO: remove this add explicit subscriber trait ? to buffer
+
             let mut view_ids = vec![];
 
             let map = get_view_map(editor);
             let map = map.read();
             for (view_id, v) in map.iter() {
-                let view = v.write();
+                let view = v.read();
                 if let Some(buffer) = view.buffer() {
                     let buffer = buffer.read();
                     if buffer.id == *buffer_id {

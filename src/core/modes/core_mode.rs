@@ -475,10 +475,10 @@ fn build_split_info(view: &Rc<RwLock<View<'static>>>, dir: view::LayoutDirection
     TODO(ceg): build split-vertical-layout.json
 
         1 - clone view, set clone offset to view offset
-        2 - create split-group layout (empty_view + splitter + empty_view )
+        2 - create split-group layout (empty_view(1) + splitter + empty_view(2) )
         3 - replace view by split-group (in view's parent)
-        4 - move view to left leaf
-        5 - move clone to right leaf
+        4 - move view  to left  leaf empty_view(1)
+        5 - move clone to right leaf empty_view(2)
 
         replace view's parent index with split group
 */
@@ -1059,7 +1059,7 @@ pub fn help_popup(
     _view: &Rc<RwLock<View>>,
 ) {
     let root_view_id = editor.root_views[env.root_view_index];
-    let (root_width, root_height) = { get_view_by_id(editor, root_view_id).read().dimension() };
+    let (root_width, root_height) = get_view_by_id(editor, root_view_id).read().dimension();
 
     // destroy previous
     {
