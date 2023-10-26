@@ -10,54 +10,41 @@ Unlimited design will evolve at will. Suggestions are welcomed.
      1. The ui : another process/thread that presents the documents to the user<br/>
      <br/>
 
-     These two threads communicate through standard channels (mpsc).<br/>
-     The data sent/received is call an **Message**.<br/>
+     These two threads communicate through standard channels (mpsc) using **Message**.<br/>
 
 ------
 
 ### Editor primitives
 
 - **Message**<br/>
-An **Message** main purpose is to encapsulate user inputs.<br/>
-TODO(ceg): add time info/ sequence / etc.<br/>
-
-- **Event**<br/>
-An **Event** TODO(ceg): describe event sub types.<br/>
-
-- **Document**<br/>
-A **Document** represents a **Buffer** PLUS it's configuration.<br/>
-There is one and only one **Document** per **Buffer**.<br/>
-A **Document** is always bound to a **Buffer**.<br/>
-A **Document** encapsulates:
-  - a **Buffer**<br/>
-  - the **View**(s)
-  - the "shared" **Marks** (the cursor is a mark)
-  - the font configuration (will be moved in the ui)
-  - the selections
-  - the internal regions
+The **Message** main purpose is to encapsulate user inputs and internal communication between threads.<br/>
+TODO(ceg): add timestamp info/ sequence / etc.<br/>
 
 
 - **Buffer**<br/>
-A **Buffer** represents a memory snapshot of a given **File**.<br/>
+A **Buffer** represents a memory snapshot.<br/>
+a **Buffer** can be created without any file attached to it.<br/>
 a **Buffer** can be loaded from a file.<br/>
 a **Buffer** can be saved to a file.<br/>
-a **Buffer** can be dettached from file.<br/>
-a **Buffer** can be created whitout any file.<br/>
+a **Buffer** can be detached from file.<br/>
 
 - **BufferId** <br/>
-An unsigned 64 bits integer that represents a given **Buffer** instance<br/>
+A unique (unsigned 64 bits) integer that represents a given **Buffer** instance<br/>
 
 - **File**<br/>
 A regular on disk file
 
 - **View**<br/>
 a View contains:
-   - BufferId
+   - BufferId and/or reference to **Buffer**
    - ViewId
-   - Codec
-   - CodecCtx
    - InputMap
    - local Marks
+
+- **Mode**<br/>
+
+- **ModeContext**<br/>
+
 
 - **Event**<br/>
 Messages sent between the ui and the core
