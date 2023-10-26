@@ -37,9 +37,7 @@ use crate::core::view::LayoutSize;
 
 use crate::core::buffer::find_nth_byte_offset;
 
-use crate::core::buffer::Buffer;
 use crate::core::buffer::BufferEvent;
-use crate::core::buffer::BufferEventCb;
 
 use super::text_mode::run_text_mode_actions_vec;
 

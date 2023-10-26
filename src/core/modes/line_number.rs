@@ -84,7 +84,6 @@ use crate::core::modes::text_mode::TextModeContext;
 
 use crate::core::editor::config_var_get;
 
-use super::text_mode::PostInputAction;
 use crate::core::event::InputEvent;
 
 fn num_digit(v: u64) -> u64 {
