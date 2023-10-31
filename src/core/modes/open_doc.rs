@@ -277,7 +277,7 @@ fn create_open_doc_controller_view(
         (w, h),
         buffer,
         &vec![],                         // tags
-        &vec!["status-mode".to_owned()], // modes: TODO(ceg): -controller
+        &vec!["empty-line-mode".to_owned()], // modes: TODO(ceg): -controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },

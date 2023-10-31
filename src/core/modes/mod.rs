@@ -4,12 +4,13 @@ pub mod core_mode;
 pub mod dir_fetch;
 pub mod dir_mode;
 
+pub mod empty_line_mode;
 pub mod find_mode;
 pub mod goto_line_mode;
 pub mod hsplit_mode;
 pub mod line_number;
 pub mod open_doc;
-pub mod status_mode;
+
 pub mod title_bar_mode;
 
 pub mod text_mode;
@@ -29,7 +30,8 @@ pub use hsplit_mode::HsplitMode;
 pub use line_number::LineNumberMode;
 pub use open_doc::OpenDocMode;
 
-pub use status_mode::StatusMode;
+pub use empty_line_mode::EmptyLineMode;
+
 pub use title_bar_mode::TitleBarMode;
 
 pub use text_mode::TextMode;

@@ -290,7 +290,7 @@ fn create_goto_line_controller_view(
         (w, h),
         buffer,
         &vec![],                         // tags
-        &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
+        &vec!["empty-line-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },

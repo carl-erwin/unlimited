@@ -676,7 +676,7 @@ use crate::core::modes::CoreMode;
 use crate::core::modes::FindMode;
 use crate::core::modes::TextMode;
 
-use crate::core::modes::StatusMode;
+use crate::core::modes::EmptyLineMode;
 
 use crate::core::modes::TitleBarMode;
 
@@ -696,6 +696,8 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
     editor.register_mode(Box::new(CoreMode::new()));
 
+    editor.register_mode(Box::new(EmptyLineMode::new()));
+
     editor.register_mode(Box::new(VsplitMode::new()));
     editor.register_mode(Box::new(HsplitMode::new()));
 
@@ -704,7 +706,6 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(TitleBarMode::new()));
 
     editor.register_mode(Box::new(TextMode::new()));
-    editor.register_mode(Box::new(StatusMode::new()));
 
     editor.register_mode(Box::new(FindMode::new()));
 

@@ -574,7 +574,7 @@ impl<'a> View<'a> {
             global_y: None,
             x: x_y.0,
             y: x_y.1,
-                width: w_h.0,
+            width: w_h.0,
             height: w_h.1,
             //
             layout_index: None,

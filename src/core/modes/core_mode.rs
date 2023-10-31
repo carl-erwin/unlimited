@@ -1079,7 +1079,7 @@ pub fn help_popup(
         (pop_width, pop_height),
         command_buffer,
         &vec![], // tags
-        &vec!["status-mode".to_owned()],
+        &vec!["empty-line-mode".to_owned()],
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -1105,7 +1105,7 @@ pub fn help_popup(
         (2, 1),
         corner_buffer,
         &vec![], // tags
-        &vec!["status-mode".to_owned()],
+        &vec!["empty-line-mode".to_owned()],
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
