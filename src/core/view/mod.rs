@@ -657,8 +657,8 @@ impl<'a> View<'a> {
 } // impl View
 
 //
-pub fn get_status_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'static>) -> Option<Id> {
-    let v = get_view_ids_by_tags(&editor, "status-line")?;
+pub fn get_command_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'static>) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, "command-line")?;
     if v.len() == 1 {
         return Some(v[0]);
     }

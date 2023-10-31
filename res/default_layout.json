@@ -46,7 +46,7 @@
                     },
                     {
                         "leader": true,
-                        "tags": [ "text" ],
+                        "tags": [ "target-view" ],
                         "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
                         "size": { "remain_minus": 1 }
                     },
@@ -63,15 +63,15 @@
                 "focus_idx": 2
             },
             {
-                "tags": [ "status-line" ],
-                "modes": [ "empty-line-mode" ],
-                "internal-buffer": "status-bar",
-                "size": { "fixed": 1 }
-            },
-            {
                 "tags": [ "command-line" ],
                 "modes": [ "empty-line-mode" ],
                 "internal-buffer": "command-line",
+                "size": { "fixed": 1 }
+            },
+            {
+                "tags": [ "status-line" ],
+                "modes": [ "status-line-mode" ],
+                "internal-buffer": "status-line-buffer",
                 "size": { "fixed": 1 }
             }
         ],

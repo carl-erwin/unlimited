@@ -251,7 +251,7 @@ impl ContentFilter<'_> for HsplitModeComposeFilter {
 
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        if env.focus_view_id == view.id && mod_ctx.selected {
+        if env.active_view_id == view.id && mod_ctx.selected {
             cpi.style.bg_color = (113, 114, 123);
         }
         cpi.style.color = (45 + 25, 49 + 25, 54 + 25);

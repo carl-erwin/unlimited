@@ -5,6 +5,9 @@ pub mod dir_fetch;
 pub mod dir_mode;
 
 pub mod empty_line_mode;
+
+pub mod status_line_mode;
+
 pub mod find_mode;
 pub mod goto_line_mode;
 pub mod hsplit_mode;
@@ -32,6 +35,7 @@ pub use open_doc::OpenDocMode;
 
 pub use empty_line_mode::EmptyLineMode;
 
+pub use status_line_mode::StatusLineMode;
 pub use title_bar_mode::TitleBarMode;
 
 pub use text_mode::TextMode;

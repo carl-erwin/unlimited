@@ -17,6 +17,7 @@ use crate::core::buffer::BufferKind;
 
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
+
 use crate::core::editor::set_focus_on_view_id;
 
 use crate::core::editor::InputStageActionMap;
@@ -200,7 +201,7 @@ pub fn goto_line_start(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view_id(editor, env);
+    let status_view_id = view::get_command_view_id(editor, env);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -242,7 +243,7 @@ pub fn goto_line_stop(
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view_id(editor, env);
+    let status_view_id = view::get_command_view_id(editor, env);
     if let Some(status_view_id) = status_view_id {
         let status_view = get_view_by_id(editor, status_view_id);
         let buffer = status_view.read().buffer().unwrap();
@@ -289,7 +290,7 @@ fn create_goto_line_controller_view(
         (x, y),
         (w, h),
         buffer,
-        &vec![],                         // tags
+        &vec![],                             // tags
         &vec!["empty-line-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
         LayoutDirection::NotSet,
@@ -356,7 +357,7 @@ fn goto_line_show_controller_view(
     let text_view = text_view.read();
     let gtm = text_view.mode_ctx::<GotoLineModeContext>("goto-line-mode");
 
-    status_view.children.pop(); // replace previous child
+    status_view.children.pop(); // replace previous child // clear ?
     status_view.children.push(ChildView {
         id: gtm.controller_view_id,
         layout_op: LayoutSize::Percent { p: 100.0 },

@@ -678,6 +678,8 @@ use crate::core::modes::TextMode;
 
 use crate::core::modes::EmptyLineMode;
 
+use crate::core::modes::StatusLineMode;
+
 use crate::core::modes::TitleBarMode;
 
 use crate::core::modes::HsplitMode;
@@ -704,6 +706,8 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(VscrollbarMode::new()));
 
     editor.register_mode(Box::new(TitleBarMode::new()));
+
+    editor.register_mode(Box::new(StatusLineMode::new()));
 
     editor.register_mode(Box::new(TextMode::new()));
 
@@ -958,6 +962,13 @@ fn build_view_layout_from_attr(
     view.destroyable = allow_destroy;
 
     view.is_leader = leader;
+
+    // select first target view
+    if env.target_view.is_none() {
+        if view.tags.get("target-view").is_some() {
+            env.target_view = Some(view.id);
+        }
+    }
 
     dbg_println!(
         "build_view_layout_from_attr [{depth}] setup view modes: {:?}",
