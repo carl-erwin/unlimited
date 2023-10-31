@@ -64,13 +64,13 @@
             },
             {
                 "tags": [ "status-line" ],
-                "modes": [ "status-mode" ],
+                "modes": [ "empty-line-mode" ],
                 "internal-buffer": "status-bar",
                 "size": { "fixed": 1 }
             },
             {
                 "tags": [ "command-line" ],
-                "modes": [ "status-mode" ],
+                "modes": [ "empty-line-mode" ],
                 "internal-buffer": "command-line",
                 "size": { "fixed": 1 }
             }

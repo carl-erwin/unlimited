@@ -23,26 +23,26 @@ use crate::core::view::LayoutEnv;
 
 use crate::core::codepointinfo::TextStyle;
 
-pub struct StatusModeContext {}
+pub struct EmptyLineModeContext {}
 
-pub struct StatusMode {}
+pub struct EmptyLineMode {}
 
-impl StatusMode {
+impl EmptyLineMode {
     pub fn new() -> Self {
-        dbg_println!("StatusMode");
-        StatusMode {}
+        dbg_println!("EmptyLineMode");
+        EmptyLineMode {}
     }
 
     pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
 }
 
-impl<'a> Mode for StatusMode {
+impl<'a> Mode for EmptyLineMode {
     fn name(&self) -> &'static str {
-        &"status-mode"
+        &"empty-line-mode"
     }
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
-        let ctx = StatusModeContext {};
+        let ctx = EmptyLineModeContext {};
         Box::new(ctx)
     }
 
@@ -58,7 +58,7 @@ impl<'a> Mode for StatusMode {
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        // let ctx = view.mode_ctx_mut::<StatusModeContext>("status-mode");
+        // let ctx = view.mode_ctx_mut::<EmptyLineModeContext>(self.name());
 
         //
         let use_utf8_codec = true;
@@ -102,26 +102,26 @@ impl<'a> Mode for StatusMode {
 
         view.compose_content_filters
             .borrow_mut()
-            .push(Box::new(StatusModeCompose::new()));
+            .push(Box::new(EmptyLineModeCompose::new()));
     }
 }
 
-pub struct StatusModeCompose {
+pub struct EmptyLineModeCompose {
     // add common fields
 }
 
-impl StatusModeCompose {
+impl EmptyLineModeCompose {
     pub fn new() -> Self {
-        dbg_println!("StatusMode");
-        StatusModeCompose {}
+        dbg_println!("EmptyLineMode");
+        EmptyLineModeCompose {}
     }
 
     pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
 }
 
-impl ContentFilter<'_> for StatusModeCompose {
+impl ContentFilter<'_> for EmptyLineModeCompose {
     fn name(&self) -> &'static str {
-        &"StatusModeCompose"
+        &"EmptyLineModeCompose"
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {

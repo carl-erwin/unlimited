@@ -260,7 +260,7 @@ fn create_find_controller_view(
         (w, h),
         buffer,
         &vec![],                         // tags
-        &vec!["status-mode".to_owned()], // TODO(ceg): find-controller
+        &vec!["empty-line-mode".to_owned()], // TODO(ceg): find-controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -270,7 +270,7 @@ fn create_find_controller_view(
         editor,
         env,
         &mut controller_view,
-        &vec!["status-mode".to_owned()],
+        &vec!["empty-line-mode".to_owned()],
     );
     */
 
