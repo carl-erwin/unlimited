@@ -7,6 +7,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use std::collections::HashSet;
+
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
 
@@ -16,7 +18,9 @@ use crate::core::editor::Stage;
 use crate::core::editor::StageFunction;
 use crate::core::editor::StagePosition;
 
+use crate::core::editor::add_view_tag;
 use crate::core::editor::get_view_by_id;
+use crate::core::editor::get_view_ids_by_tags;
 
 use crate::core::screen::Screen;
 
@@ -36,6 +40,8 @@ use crate::core::modes::Mode;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(pub usize);
+
+pub type Tags = HashSet<String>;
 
 // TODO(ceg):
 //
@@ -331,6 +337,8 @@ pub struct View<'a> {
     pub buffer_id: buffer::Id,
     pub buffer: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
 
+    pub tags: Tags,
+
     pub modes: Vec<String>, // TODO: add Arc<dyn Modes>
 
     pub mode_ctx: HashMap<&'static str, Box<dyn Any>>,
@@ -499,6 +507,7 @@ impl<'a> View<'a> {
         x_y: Position,
         w_h: Dimension,
         buffer: Option<Arc<RwLock<Buffer<'static>>>>,
+        tags: &Vec<String>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
         layout_direction: LayoutDirection,
@@ -523,6 +532,19 @@ impl<'a> View<'a> {
             }
         }
 
+        for tag in tags {
+            dbg_println!("tag {} -> view {:?}", tag, Id(id));
+            add_view_tag(editor, &tag, Id(id));
+        }
+
+        let tags = {
+            let mut hset = HashSet::new();
+            for t in tags {
+                hset.insert(t.clone());
+            }
+            hset
+        };
+
         let mut v = View {
             parent_id,
             json_attr: None,
@@ -544,14 +566,15 @@ impl<'a> View<'a> {
             //
             start_offset,
             end_offset: start_offset, // will be recomputed later
-            modes: modes.clone(),     // use this to clone the view
+            tags,
+            modes: modes.clone(), // use this to clone the view
             mode_ctx,
             //
             global_x: None,
             global_y: None,
             x: x_y.0,
             y: x_y.1,
-            width: w_h.0,
+                width: w_h.0,
             height: w_h.1,
             //
             layout_index: None,
@@ -634,32 +657,12 @@ impl<'a> View<'a> {
 } // impl View
 
 //
-pub fn get_status_view(
-    editor: &mut Editor<'static>,
-    env: &EditorEnv<'static>,
-    view: &Rc<RwLock<View<'static>>>,
-) -> Option<Id> {
-    if env.status_view_id.is_some() {
-        return env.status_view_id;
+pub fn get_status_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'static>) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, "status-line")?;
+    if v.len() == 1 {
+        return Some(v[0]);
     }
-
-    let view = view.read();
-
-    if view.status_view_id.is_some() {
-        return view.status_view_id;
-    }
-
-    let v = view;
-    while let Some(pvid) = v.parent_id {
-        let pv = get_view_by_id(editor, pvid);
-        let pv = pv.read();
-        if pv.status_view_id.is_some() {
-            return pv.status_view_id;
-        }
-        break; // FIXME(ceg)
-    }
-
-    None
+    return None;
 }
 
 /// TODO(ceg): rename

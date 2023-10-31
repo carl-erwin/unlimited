@@ -178,7 +178,7 @@ pub fn application_quit_abort_setup(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_status_view_id(editor, env);
 
     dbg_println!("DOC CHANGED !\n");
     dbg_println!("STATUS VID = {:?}", status_view_id);
@@ -237,7 +237,7 @@ pub fn application_quit_abort_no(
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_status_view_id(editor, env);
     if let Some(status_view_id) = status_view_id {
         let status_view = get_view_by_id(editor, status_view_id);
         let buffer = status_view.read().buffer().unwrap();
@@ -518,6 +518,7 @@ pub fn split_view_with_direction(
         (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
         (split_info.width, split_info.height),
         None,
+        &vec![], // tags
         &vec![], // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         0,
         LayoutDirection::NotSet,
@@ -596,6 +597,7 @@ pub fn split_view_with_direction(
             (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
             (split_info.width, split_info.height),
             None,
+            &vec![], // tags
             &splitter_mode,
             0,
             LayoutDirection::NotSet,
@@ -1076,6 +1078,7 @@ pub fn help_popup(
         (x, y),
         (pop_width, pop_height),
         command_buffer,
+        &vec![], // tags
         &vec!["status-mode".to_owned()],
         0,
         LayoutDirection::NotSet,
@@ -1101,6 +1104,7 @@ pub fn help_popup(
         (pop_width.saturating_sub(2 /* char width */), pop_height - 1),
         (2, 1),
         corner_buffer,
+        &vec![], // tags
         &vec!["status-mode".to_owned()],
         0,
         LayoutDirection::NotSet,

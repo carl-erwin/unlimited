@@ -1,6 +1,7 @@
 // std
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use std::cell::RefCell;
@@ -172,6 +173,9 @@ pub struct Editor<'a> {
     pub buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'static>>>>>>,
     pub root_views: Vec<view::Id>,
     pub view_map: Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'a>>>>>>,
+    pub tagged_view: Arc<RwLock<HashMap<String, HashSet<view::Id>>>>,
+    /// "tag" -> view::Id ... view::Id  -> view::Id<br/>
+    /// Some tags should be unique (ex: "status-line", command-line)
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub dir_modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub core_tx: Sender<Message<'a>>,
@@ -195,6 +199,9 @@ impl<'a> Editor<'a> {
             buffer_map: Arc::new(RwLock::new(HashMap::new())),
             root_views: vec![],
             view_map: Arc::new(RwLock::new(HashMap::new())),
+
+            tagged_view: Arc::new(RwLock::new(HashMap::new())),
+
             modes: Rc::new(RefCell::new(HashMap::new())),
             dir_modes: Rc::new(RefCell::new(HashMap::new())),
             ui_tx,
@@ -265,6 +272,19 @@ pub fn get_view_map(
 pub fn get_view_by_id(editor: &Editor<'static>, vid: view::Id) -> Rc<RwLock<View<'static>>> {
     dbg_println!("get_view_by_id {:?}", vid);
     editor.view_map.read().get(&vid).unwrap().clone()
+}
+
+pub fn get_view_ids_by_tags(editor: &Editor<'static>, tag: &str) -> Option<Vec<view::Id>> {
+    let map = editor.tagged_view.read();
+    let v = map.get(&tag.to_owned())?.iter().copied().collect();
+    Some(v)
+}
+
+pub fn add_view_tag(editor: &Editor<'static>, tag: &str, id: view::Id) {
+    let mut map = editor.tagged_view.write();
+    map.entry(tag.to_owned())
+        .or_insert_with(HashSet::new)
+        .insert(id);
 }
 
 pub fn remove_view_by_id(

@@ -154,7 +154,7 @@ pub fn find_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_status_view_id(editor, env);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -259,6 +259,7 @@ fn create_find_controller_view(
         (x, y),
         (w, h),
         buffer,
+        &vec![],                         // tags
         &vec!["status-mode".to_owned()], // TODO(ceg): find-controller
         0,
         LayoutDirection::NotSet,
@@ -684,7 +685,7 @@ pub fn find_start_reverse(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_status_view_id(editor, env);
 
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode
