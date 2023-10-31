@@ -761,6 +761,8 @@ fn build_view_layout_from_attr(
 
     let mut dir = view::LayoutDirection::Horizontal;
     let mut leader = false;
+    let mut tags: Vec<String> = vec![];
+
     let mut modes: Vec<String> = vec![];
 
     let mut sub_views_id = Vec::<Option<view::Id>>::new();
@@ -855,6 +857,19 @@ fn build_view_layout_from_attr(
             }
         }
 
+        if let Some(tags_array) = obj.get("tags") {
+            if tags_array.is_array() {
+                if let Value::Array(ref vec) = tags_array {
+                    for m in vec {
+                        if let Value::String(s) = m {
+                            dbg_println!(" --- found tag  = {}", m);
+                            tags.push(s.clone());
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(modes_array) = obj.get("modes") {
             if modes_array.is_array() {
                 if let Value::Array(ref vec) = modes_array {
@@ -926,6 +941,7 @@ fn build_view_layout_from_attr(
         (0, 0),
         (1, 1),
         buffer.clone(),
+        &tags,
         &modes,
         0,
         dir,

@@ -27,7 +27,7 @@
             {
                 "leader": true,
                 "tags": [ "text" ],
-                "size": { "remain_minus": 1 },
+                "size": { "remain_minus": 2 },
                 "allow-split": true,
                 "allow-destroy": true,
                 "children_layout": "horizontal",
@@ -63,9 +63,15 @@
                 "focus_idx": 2
             },
             {
-                "tags": [ "status-bar" ],
+                "tags": [ "status-line" ],
                 "modes": [ "status-mode" ],
                 "internal-buffer": "status-bar",
+                "size": { "fixed": 1 }
+            },
+            {
+                "tags": [ "command-line" ],
+                "modes": [ "status-mode" ],
+                "internal-buffer": "command-line",
                 "size": { "fixed": 1 }
             }
         ],

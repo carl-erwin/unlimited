@@ -28,6 +28,7 @@ use crate::core::event::input_map::build_input_event_map;
 
 use crate::core::view;
 use crate::core::view::ChildView;
+
 use crate::core::view::View;
 
 use crate::core::view::ControllerView;
@@ -173,7 +174,7 @@ pub fn open_doc_start(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = view::get_status_view(editor, env, view);
+        let status_view_id = view::get_status_view_id(editor, env);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
             dbg_println!("status view is missing");
@@ -275,7 +276,8 @@ fn create_open_doc_controller_view(
         (x, y),
         (w, h),
         buffer,
-        &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
+        &vec![],                         // tags
+        &vec!["status-mode".to_owned()], // modes: TODO(ceg): -controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -435,6 +437,7 @@ fn create_open_doc_completion_view(
         .use_buffer_log(false)
         .finalize();
 
+    let tags = vec![]; // todo: menu-list
     let modes = vec!["text-mode".to_owned()]; // todo: menu-list
     let mut popup_view = View::new(
         &mut editor,
@@ -443,6 +446,7 @@ fn create_open_doc_completion_view(
         (0, 0),
         (1, 1),
         command_buffer,
+        &tags,
         &modes,
         0,
         LayoutDirection::NotSet,
@@ -719,10 +723,7 @@ fn show_completion_popup(
 
     // update position size
     let (st_gx, st_gy, st_w, _st_h) = {
-        let text_view_view_id = controller_view.read().controlled_view.unwrap();
-        let text_view = get_view_by_id(editor, text_view_view_id);
-
-        let status_view_id = view::get_status_view(editor, &env, &text_view).unwrap();
+        let status_view_id = view::get_status_view_id(editor, &env).unwrap();
         let status_view = get_view_by_id(editor, status_view_id);
         let status_view = status_view.read();
         (
