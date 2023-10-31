@@ -928,6 +928,11 @@ fn clip_coordinates_xy(
                         env.local_y = Some(*y);
 
                         id = child_v.id;
+
+                        if child_v.tags.get("target-view").is_some() {
+                            env.target_view = Some(id);
+                        }
+
                         break 'inner;
                     } else {
                         dbg_println!("CLIPPING        not found @ idx {}", idx);

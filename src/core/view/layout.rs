@@ -37,7 +37,8 @@ pub struct LayoutEnv<'a> {
     pub base_offset: u64,
     pub max_offset: u64,
     pub screen: &'a mut Screen,
-    pub focus_view_id: view::Id,
+    pub active_view_id: view::Id,
+    pub target_view_id: view::Id,
 }
 
 // TODO(ceg): add ?
@@ -561,13 +562,17 @@ pub fn run_compositing_stage_direct(
 
     // Render parent before children
     // if no filter configured, will do nothing
+    let active_view_id = editor_env.active_view.unwrap_or(view::Id(0));
+    let target_view_id = editor_env.target_view.unwrap_or(active_view_id);
+
     let mut layout_env = LayoutEnv {
         graphic_display: editor_env.graphic_display,
         quit: false,
         base_offset,
         max_offset,
         screen,
-        focus_view_id: editor_env.active_view.unwrap_or(view::Id(0)),
+        active_view_id,
+        target_view_id,
     };
 
     // screen must be cleared by caller

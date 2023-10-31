@@ -100,6 +100,7 @@ pub struct EditorEnv<'a> {
     pub root_view_id: view::Id,
     //
     pub active_view: Option<view::Id>,
+    pub target_view: Option<view::Id>,
 
     pub pointer_over_view_id: view::Id,
     pub last_selected_view_id: view::Id,
@@ -149,6 +150,7 @@ impl<'a> EditorEnv<'a> {
             root_view_id: view::Id(1), // NB
             center_offset: None,
             active_view: None,
+            target_view: None,
             pointer_over_view_id: view::Id(0),
             last_selected_view_id: view::Id(0),
             focus_locked_on_view_id: None,

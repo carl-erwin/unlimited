@@ -264,7 +264,7 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         let mod_ctx = view.mode_ctx::<VsplitModeContext>("vsplit-mode");
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        if env.focus_view_id == view.id && mod_ctx.selected {
+        if env.active_view_id == view.id && mod_ctx.selected {
             cpi.style.bg_color = (113, 114, 123);
         }
         cpi.cp = '│';
