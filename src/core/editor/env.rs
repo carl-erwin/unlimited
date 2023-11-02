@@ -118,9 +118,13 @@ pub struct EditorEnv<'a> {
 
 impl<'a> EditorEnv<'a> {
     pub fn new() -> Self {
-        // X11 session
-        let graphic_display = match std::env::var("DISPLAY") {
-            Ok(_) => true,
+        // FIXME:
+        let graphic_display = match std::env::var("TERM") {
+            Ok(name) => match name.as_ref() {
+                "linux" => false,
+                "vt100" | "xterm-256color" => true,
+                _ => false,
+            },
             Err(_) => false,
         };
 
