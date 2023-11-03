@@ -129,7 +129,8 @@ impl ContentFilter<'_> for EditorTitle {
 
         if env.target_view_id != view::Id(0) {
             if let Some(_v) = check_view_by_id(editor, env.target_view_id) {
-                buffer_info.push_str(&format!(" (focus vid: {:?})", env.target_view_id));
+                buffer_info.push_str(&format!(" (target vid: {:?})", env.target_view_id));
+                buffer_info.push_str(&format!(" (active vid: {:?})", env.active_view_id));
             }
         }
 

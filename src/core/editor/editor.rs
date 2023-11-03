@@ -929,10 +929,6 @@ fn clip_coordinates_xy(
 
                         id = child_v.id;
 
-                        if child_v.tags.get("target-view").is_some() {
-                            env.target_view = Some(id);
-                        }
-
                         break 'inner;
                     } else {
                         dbg_println!("CLIPPING        not found @ idx {}", idx);
@@ -945,6 +941,32 @@ fn clip_coordinates_xy(
         } // 'inner
     } // 'outer
 }
+
+/*
+    possible state
+
+    pointer_state {
+        over(Vid) <-- last on ?
+        select(Option<vid>)
+    }
+
+    no_active_view
+
+        pointer over view
+        pointer select view
+        pointer move while view clicked/selected
+        pointer unselect view
+
+    active_view
+        the active view handles everything
+
+        when releasing active view check pointer coords ?
+
+        last target ?
+
+        target circular list ?
+
+*/
 
 fn clip_coordinates_and_get_view_id(
     mut editor: &mut Editor<'static>,
@@ -976,6 +998,17 @@ fn clip_coordinates_and_get_view_id(
         InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
     };
+
+    // input locked ?
+    match (env.active_view, env.target_view) {
+        (Some(ida), Some(idt)) => {
+            if ida != idt {
+                // some view as locked the inputs
+                return (ida, ev);
+            }
+        },
+        _ => {} /* fall-through */
+    }
 
     (vid, ev)
 }
