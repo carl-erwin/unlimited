@@ -104,7 +104,7 @@ fn main() -> std::io::Result<()> {
                     cpi.cp = *c as char;
                     cpi.displayed_cp = *c as char;
                     'retry: loop {
-                        let (ok, _line_index) = screen.push(cpi);
+                        let (ok, _line_index) = screen.push(&cpi);
                         if !ok {
                             screen.clear();
                             fps += 1;

@@ -187,7 +187,7 @@ impl ContentFilter<'_> for StatusLineModeCompose {
             cpi.displayed_cp = c;
             cpi.style.color = color;
             cpi.style.bg_color = bg_color;
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }
@@ -199,7 +199,7 @@ impl ContentFilter<'_> for StatusLineModeCompose {
         cpi.style.color = color;
         cpi.style.bg_color = bg_color;
         for _i in count..width {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }

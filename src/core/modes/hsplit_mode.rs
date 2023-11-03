@@ -260,7 +260,7 @@ impl ContentFilter<'_> for HsplitModeComposeFilter {
         cpi.displayed_cp = '─';
 
         loop {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 env.quit = true;
                 break;
