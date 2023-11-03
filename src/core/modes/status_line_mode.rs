@@ -161,7 +161,8 @@ impl ContentFilter<'_> for StatusLineModeCompose {
                 let f = f.read();
                 let b = f.buffer().unwrap();
                 let n = &b.read().name;
-                buffer_info.push_str(&format!("[{}]", n));
+                buffer_info.push_str(&format!("{}", n));
+                buffer_info.push_str(&format!(" vid({})", env.target_view_id.0));
             }
         }
 
@@ -177,8 +178,8 @@ impl ContentFilter<'_> for StatusLineModeCompose {
     ) {
         env.screen.clear();
 
-        let color = TextStyle::title_color();
-        let bg_color = TextStyle::title_bg_color();
+        let color = TextStyle::default_color();
+        let bg_color = TextStyle::default_bg_color();
 
         let width = env.screen.width();
         let mut count = 0;
