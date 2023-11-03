@@ -241,8 +241,11 @@ impl Screen {
     /// Append CodepoinInfo tu the current line if it fits.
     /// filters basic blanks '\r' '\n' '\t' 0x0..0x1f and replace them by space ' '
     //#[inline(always)]
-    pub fn push(&mut self, mut cpi: CodepointInfo) -> (bool, usize) {
+    pub fn push(&mut self, cpi: &CodepointInfo) -> (bool, usize) {
         // self.check_invariants();
+
+        // internal cpi
+        let mut cpi = *cpi;
 
         // TODO(ceg):  cpi.check_invariants();
         if false {
@@ -403,7 +406,7 @@ impl Screen {
 
     pub fn append(&mut self, cpi_vec: &Vec<CodepointInfo>) -> (usize, usize, Option<u64>) {
         for (idx, cpi) in cpi_vec.iter().enumerate() {
-            let ret = self.push(*cpi);
+            let ret = self.push(&cpi);
             if !ret.0 {
                 // cannot push screen full
                 return (idx, ret.1, self.last_offset);

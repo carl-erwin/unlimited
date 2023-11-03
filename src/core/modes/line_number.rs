@@ -718,7 +718,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     let padding = w.saturating_sub(s.len());
                     // left-pad
                     for _ in 0..padding {
-                        env.screen.push(CodepointInfo::new());
+                        env.screen.push(&CodepointInfo::new());
                     }
                 }
 
@@ -732,7 +732,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     cpi.displayed_cp = c;
                     cpi.style.color = final_color;
                     cpi.style.is_bold = has_mark;
-                    env.screen.push(cpi);
+                    env.screen.push(&cpi);
                 }
                 if cur_line_idx == env.screen.current_line_index() {
                     // NB screen.push selects next line automatically
@@ -754,7 +754,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 cpi.displayed_cp = c;
                 cpi.style.color = final_color;
                 cpi.style.is_bold = has_mark;
-                env.screen.push(cpi);
+                env.screen.push(&cpi);
             }
             if cur_line_idx == env.screen.current_line_index() {
                 // NB screen.push selects next line automatically

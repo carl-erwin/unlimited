@@ -52,7 +52,7 @@ impl<'a> ScreenFilter {
         cpi: CodepointInfo,
         offset: Option<u64>,
     ) -> bool {
-        let ret = env.screen.push(cpi);
+        let ret = env.screen.push(&cpi);
         if !ret.0 {
             if bench_to_eof() {
                 let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
@@ -73,7 +73,7 @@ impl<'a> ScreenFilter {
 
                 // TO EOF
                 env.screen.clear();
-                env.screen.push(cpi);
+                env.screen.push(&cpi);
                 env.screen.first_offset = offset; // restart
                 self.first_offset = offset;
                 self.last_offset = offset;
@@ -169,7 +169,7 @@ impl ContentFilter<'_> for ScreenFilter {
                         style,
                     };
                     dbg_println!("add EOF to stream {:?}", io.offset);
-                    let ret = env.screen.push(eof_cpi.clone());
+                    let ret = env.screen.push(&eof_cpi);
                     env.screen.check_invariants();
                     if !ret.0 {
                         env.quit = true;

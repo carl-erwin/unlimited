@@ -378,7 +378,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
         loop {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }

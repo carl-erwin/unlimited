@@ -271,7 +271,7 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         cpi.displayed_cp = '│';
 
         loop {
-            let (b, _) = env.screen.push(cpi);
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 env.quit = true;
                 break;
