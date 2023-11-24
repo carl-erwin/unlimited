@@ -1951,15 +1951,20 @@ pub fn remove_until_end_of_word(
 
     let codec = tm.text_codec.as_ref();
 
-    let size = buffer.size() as u64;
+    let max_size = buffer.size() as u64;
 
-    if size == 0 {
+    if max_size == 0 {
         return;
     }
 
     let mut shrink: u64 = 0;
 
     for m in tm.marks.iter_mut() {
+
+        if m.offset == max_size {
+            continue;
+        }
+
         if m.offset >= shrink {
             m.offset -= shrink;
         }
@@ -1989,6 +1994,10 @@ pub fn remove_until_end_of_word(
 
         // skip until blank or end-of-line
         loop {
+            if m.offset == max_size {
+                break;
+            }
+
             data.clear();
             buffer.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
@@ -2007,6 +2016,8 @@ pub fn remove_until_end_of_word(
                     continue;
                 }
             }
+
+
         }
 
         // remove [start, m[
