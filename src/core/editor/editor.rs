@@ -1006,7 +1006,7 @@ fn clip_coordinates_and_get_view_id(
                 // some view as locked the inputs
                 return (ida, ev);
             }
-        },
+        }
         _ => {} /* fall-through */
     }
 
