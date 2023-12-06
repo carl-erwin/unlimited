@@ -1960,7 +1960,6 @@ pub fn remove_until_end_of_word(
     let mut shrink: u64 = 0;
 
     for m in tm.marks.iter_mut() {
-
         if m.offset == max_size {
             continue;
         }
@@ -2016,8 +2015,6 @@ pub fn remove_until_end_of_word(
                     continue;
                 }
             }
-
-
         }
 
         // remove [start, m[
