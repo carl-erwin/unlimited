@@ -401,7 +401,7 @@ fn open_doc_display_prompt(
     let mut buffer = buffer.as_ref().unwrap().write();
 
     buffer.delete_content(None);
-    buffer.append("Open: ".as_bytes());
+    buffer.append(b"Open: ");
 
     // setup working directory
     {

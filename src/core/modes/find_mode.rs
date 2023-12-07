@@ -221,7 +221,7 @@ pub fn find_controller_stop(
                 let buffer = v.buffer().unwrap();
                 let mut buffer = buffer.write();
                 buffer.delete_content(None);
-                buffer.append("Find: ".as_bytes());
+                buffer.append(b"Find: ");
             }
         }
 
@@ -248,7 +248,7 @@ fn create_find_controller_view(
         .finalize();
 
     {
-        buffer.as_ref().unwrap().write().append("Find: ".as_bytes());
+        buffer.as_ref().unwrap().write().append(b"Find: ");
     }
 
     // create view at mode creation
@@ -670,7 +670,7 @@ pub fn display_find_string(
         let buffer = v.buffer().unwrap();
         let mut buffer = buffer.write();
         buffer.delete_content(None);
-        buffer.append("Find: ".as_bytes());
+        buffer.append(b"Find: ");
 
         let s: String = fm.find_str.iter().collect();
         buffer.append(s.as_bytes());
@@ -720,7 +720,7 @@ pub fn find_start_reverse(
     buffer.delete_content(None);
 
     // set status text
-    buffer.append("Find: ".as_bytes());
+    buffer.append(b"Find: ");
 
     // push new input map for y/n
     let mut v = view.write();

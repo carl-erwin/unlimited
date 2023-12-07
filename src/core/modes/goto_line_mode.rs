@@ -279,7 +279,7 @@ fn create_goto_line_controller_view(
         .finalize();
 
     {
-        buffer.as_ref().unwrap().write().append("Goto: ".as_bytes());
+        buffer.as_ref().unwrap().write().append(b"Goto: ");
     }
 
     // create view at mode creation
@@ -449,7 +449,7 @@ pub fn goto_line_controller_add_char(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
 
             let s: String = gtm.goto_line_str.iter().collect();
             buffer.append(s.as_bytes());
@@ -503,7 +503,7 @@ pub fn goto_line_controller_del_char(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
 
             let s: String = gtm.goto_line_str.iter().collect();
             buffer.append(s.as_bytes());
@@ -553,7 +553,7 @@ pub fn goto_line_controller_stop(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
         }
 
         // set input focus to
