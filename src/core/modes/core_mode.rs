@@ -1101,7 +1101,7 @@ pub fn help_popup(
         &mut editor,
         &mut env,
         Some(root_view_id),
-        (pop_width.saturating_sub(2 /* char width */), pop_height - 1),
+        (pop_width.saturating_sub(1 /* char width */), pop_height - 1),
         (2, 1),
         corner_buffer,
         &vec![], // tags
