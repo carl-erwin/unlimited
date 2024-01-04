@@ -665,6 +665,17 @@ pub fn get_command_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'stati
     return None;
 }
 
+pub fn get_text_area_view_id(
+    editor: &mut Editor<'static>,
+    _env: &EditorEnv<'static>,
+) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, "text-area")?;
+    if v.len() == 1 {
+        return Some(v[0]);
+    }
+    return None;
+}
+
 /// TODO(ceg): rename
 pub fn run_stage(
     editor: &mut Editor<'static>,

@@ -174,7 +174,7 @@ pub fn open_doc_start(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = view::get_command_view_id(editor, env);
+        let status_view_id = view::get_text_area_view_id(editor, env);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
             dbg_println!("status view is missing");
@@ -226,8 +226,9 @@ pub fn open_doc_controller_stop(
         status_view.children.pop(); // discard child
     }
     {
-        let root_view_id = env.root_view_id;
-        get_view_by_id(editor, root_view_id)
+        let parent_id = view::get_text_area_view_id(editor, &env).unwrap();
+
+        get_view_by_id(editor, parent_id)
             .write()
             .floating_children
             .pop(); // discard child
@@ -375,6 +376,7 @@ fn open_doc_show_controller_view(
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
         let ctrl_view_id = odm.controller_view_id;
+
         status_view.children.pop(); // replace previous child
         status_view.children.push(ChildView {
             id: ctrl_view_id,
@@ -427,8 +429,6 @@ fn create_open_doc_completion_view(
     mut env: &mut EditorEnv<'static>,
     text_view: &mut View,
 ) {
-    let parent_id = env.root_view_id;
-
     dbg_print!("create_open_doc_completion_view");
 
     let command_buffer = BufferBuilder::new(BufferKind::File)
@@ -442,7 +442,7 @@ fn create_open_doc_completion_view(
     let mut popup_view = View::new(
         &mut editor,
         &mut env,
-        Some(parent_id),
+        None, // non parent yet
         (0, 0),
         (1, 1),
         command_buffer,
@@ -735,14 +735,14 @@ fn show_completion_popup(
     };
 
     // TODO: get view global coordinates, update on  resize
-    let parent_id = env.root_view_id;
+    let parent_id = view::get_text_area_view_id(editor, &env).unwrap();
+
     let (x, y, pop_width, pop_height) = {
         let dim = get_view_by_id(editor, parent_id).read().dimension();
-        let w = st_w;
-        //        let h = std::cmp::min(list.len(), dim.1 / 2);
-        let h = dim.1.saturating_sub(_st_h); // / 3 + dim.1 / 3;
-        let x = st_gx;
-        let y = st_gy.saturating_sub(h);
+        let w = dim.0;
+        let h = dim.1;
+        let x = 0;
+        let y = 0;
         (x, y, w, h)
     };
 

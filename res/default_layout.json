@@ -26,7 +26,7 @@
 
             {
                 "leader": true,
-                "tags": [ "text" ],
+                "tags": [ "text", "text-area" ],
                 "size": { "remain_minus": 2 },
                 "allow-split": true,
                 "allow-destroy": true,
