@@ -1,4 +1,4 @@
-unlimitED! is an experimental text editor. (WITH ABSOLUTELY NO WARRANTY)
+Welcome to unlimitED! an experimental text editor. (WITH ABSOLUTELY NO WARRANTY)
 
 USAGE: unlimited [OPTIONS] [--] [FILES]...    ( -h for help )
 
