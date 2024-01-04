@@ -55,24 +55,24 @@ static OPEN_DOC_CONTROLLER_MAP: &str = r#"
 [
   {
     "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "open-doc:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "open-doc:show-buffer" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "open-doc:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
-     { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
-     { "in": [{ "key": "Up" } ],        "action": "open-doc:select-prev-completion" },
-     { "in": [{ "key": "alt+i" } ],    "action": "open-doc:select-prev-completion" },
-     { "in": [{ "key": "Down" } ],      "action": "open-doc:select-next-completion" },
-     { "in": [{ "key": "alt+k" } ],    "action": "open-doc:select-next-completion" },
-     { "in": [{ "key": "Left" } ],      "action": "open-doc:discard-prompt-suffix" },
-     { "in": [{ "key": "alt+j" } ],    "action": "open-doc:discard-prompt-suffix" },
-     { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "ctrl+Space" } ],"action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "ctrl+Enter" } ],"action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "alt+l" } ],    "action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "Home" } ],      "action": "open-doc:select-first-completion" },
-     { "in": [{ "key": "End" } ],       "action": "open-doc:select-last-completion" },
-     { "default": [],                   "action": "open-doc:add-char" }
+     { "in": [{ "key": "Escape" } ],     "action": "open-doc:stop" },
+     { "in": [{ "key": "\n" } ],         "action": "open-doc:show-buffer" },
+     { "in": [{ "key": "ctrl+q" } ],     "action": "open-doc:stop" },
+     { "in": [{ "key": "BackSpace" } ],  "action": "open-doc:del-char" },
+     { "in": [{ "key": "Delete" } ],     "action": "open-doc:do-nothing" },
+     { "in": [{ "key": "Up" } ],         "action": "open-doc:select-prev-completion" },
+     { "in": [{ "key": "alt+i" } ],      "action": "open-doc:select-prev-completion" },
+     { "in": [{ "key": "Down" } ],       "action": "open-doc:select-next-completion" },
+     { "in": [{ "key": "alt+k" } ],      "action": "open-doc:select-next-completion" },
+     { "in": [{ "key": "Left" } ],       "action": "open-doc:discard-prompt-suffix" },
+     { "in": [{ "key": "alt+j" } ],      "action": "open-doc:discard-prompt-suffix" },
+     { "in": [{ "key": "Right" } ],      "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+Space" } ], "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "ctrl+Enter" } ], "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "alt+l" } ],      "action": "open-doc:apply-current-completion" },
+     { "in": [{ "key": "Home" } ],       "action": "open-doc:select-first-completion" },
+     { "in": [{ "key": "End" } ],        "action": "open-doc:select-last-completion" },
+     { "default": [],                    "action": "open-doc:add-char" }
    ]
   }
 
