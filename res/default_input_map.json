@@ -65,7 +65,7 @@
        { "in": [{ "key": "Delete" }],                          "action": "text-mode:remove-codepoint" },
        { "in": [{ "key": "BackSpace" }],                       "action": "text-mode:remove-previous-codepoint" },
 
-       { "in": [{ "key": "alt+d" }],                           "action": "text-mode:remove-until-end-of-word" },
+       { "in": [{ "key": "alt+d" }],                           "action": "text-mode:remove-until-char-class-change" },
        { "in": [{ "key": "ctrl+Delete" }],                     "action": "text-mode:remove-until-end-of-word" },
 
        { "in": [{ "key": "ctrl+k" }],                          "action": "text-mode:cut-to-end-of-line" },

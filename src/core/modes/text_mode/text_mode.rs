@@ -709,6 +709,11 @@ impl TextMode {
                 "text-mode:remove-until-end-of-word",
                 remove_until_end_of_word,
             ),
+            (
+                "text-mode:remove-until-char-class-change",
+                remove_until_char_class_change,
+            ),
+
             ("text-mode:join-lines", join_lines),
             ("text-mode:move-selection-forward", move_selection_forward),
             ("text-mode:move-selection-backward", move_selection_backward),
@@ -2010,6 +2015,163 @@ pub fn remove_until_end_of_word(
 
         shrink += nr_removed as u64;
 
+        m.offset = start.offset;
+    }
+
+    tm.pre_compose_action.push(PostInputAction::CheckMarks);
+    tm.pre_compose_action.push(PostInputAction::CancelSelection); //TODO register last optype
+                                                                  // if buffer changes cancel selection ?
+}
+
+// TODO(ceg): see high light keyword
+// add per language/lang ctx TokenType/class
+
+// ugly cut/paste
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum TokenType {
+    Unknown,
+    InvalidUnicode,
+    Blank,            // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
+    Identifier,       // _a-zA-Z unicode // default ?
+    ParenOpen,        // (
+    ParenClose,       // )
+    BraceOpen,        // {
+    BraceClose,       // }
+    BracketOpen,      // [
+    BracketClose,     // ]
+    SingleQuote,      // '
+    DoubleQuote,      // "
+    Comma,            // ,
+    Colon,            // :
+    Semicolon,        // ;
+    Ampersand,        // &
+    VerticalBar,      // |
+    Tilde,            // ~
+    CircumflexAccent, // ^
+    Dot,              // .
+    ExclamationPoint, // !
+    Equal,
+    Different, // ≠
+    Plus,
+    Minus,
+    Mul,
+    Div,
+    Mod,
+    LowerThan,
+    GreaterThan,
+    Dollar, // $
+}
+
+// ugly cut/paste
+fn get_token_type(c: char) -> TokenType {
+    match c {
+        '�' => TokenType::InvalidUnicode,
+        ' ' | '\n' | '\t' => TokenType::Blank,
+        '(' => TokenType::ParenOpen,
+        ')' => TokenType::ParenClose,
+        '{' => TokenType::BraceOpen,
+        '}' => TokenType::BraceClose,
+        '[' => TokenType::BracketOpen,
+        ']' => TokenType::BracketClose,
+        '\'' => TokenType::SingleQuote,
+        '"' => TokenType::DoubleQuote,
+        '=' => TokenType::Equal,
+        '≠' => TokenType::Different,
+        '*' => TokenType::Mul,
+        '+' => TokenType::Plus,
+        '-' => TokenType::Minus,
+        '/' => TokenType::Div,
+        '<' => TokenType::LowerThan,
+        '>' => TokenType::GreaterThan,
+        ',' => TokenType::Comma,
+        ':' => TokenType::Colon,
+        ';' => TokenType::Semicolon,
+        '&' => TokenType::Ampersand,
+        '%' => TokenType::Mod,
+        '|' => TokenType::VerticalBar,
+        '~' => TokenType::Tilde,
+        '^' => TokenType::CircumflexAccent,
+        '.' => TokenType::Dot,
+        '!' => TokenType::ExclamationPoint,
+        '$' => TokenType::Dollar,
+
+        // '0'...'9' => TokenType::NUM,
+        _ => TokenType::Identifier,
+    }
+}
+
+
+
+pub fn remove_until_char_class_change(
+    _editor: &mut Editor,
+    _env: &mut EditorEnv,
+
+    view: &Rc<RwLock<View>>,
+) {
+    let v = &mut view.write();
+
+    let mut buffer = v.buffer.clone();
+    let buffer = buffer.as_mut().unwrap();
+    let mut buffer = buffer.write();
+
+    let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
+
+    let codec = tm.text_codec.as_ref();
+
+    let max_size = buffer.size() as u64;
+
+    if max_size == 0 {
+        return;
+    }
+
+    let mut shrink: u64 = 0;
+
+    let mut prev_class: Option<TokenType> = None;
+
+    for m in tm.marks.iter_mut() {
+        if m.offset == max_size {
+            continue;
+        }
+
+        if m.offset >= shrink {
+            m.offset -= shrink;
+        }
+
+        let start = m.clone();
+        let mut data = Vec::with_capacity(4);
+
+        loop {
+            // 1 - read current char, save class/start_offset
+            data.clear();
+            buffer.read(m.offset, data.capacity(), &mut data);
+            let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
+
+            if size == 0 {
+                break;
+            }
+
+            let current_class = get_token_type(cp);
+            match (prev_class, current_class) {
+                (Some(prev), cur) => {
+                    if prev != cur {
+                        break;
+                    }
+                }
+                (None, cur) => {
+                    prev_class = Some(cur);
+                }
+            }
+
+            // 2 - skip chars until eol/eof or char class change
+            m.offset += size as u64;
+        }
+
+        // 3 - delete range [ start_offset, end_offset [
+        let nr_removed = buffer.remove(start.offset, (m.offset - start.offset) as usize, None);
+
+        shrink += nr_removed as u64;
+
+        // 4 - update mark
         m.offset = start.offset;
     }
 
