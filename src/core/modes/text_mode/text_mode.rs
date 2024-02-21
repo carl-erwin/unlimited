@@ -713,7 +713,6 @@ impl TextMode {
                 "text-mode:remove-until-char-class-change",
                 remove_until_char_class_change,
             ),
-
             ("text-mode:join-lines", join_lines),
             ("text-mode:move-selection-forward", move_selection_forward),
             ("text-mode:move-selection-backward", move_selection_backward),
@@ -2021,6 +2020,10 @@ pub fn remove_until_end_of_word(
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
     tm.pre_compose_action.push(PostInputAction::CancelSelection); //TODO register last optype
                                                                   // if buffer changes cancel selection ?
+
+    tm.pre_compose_action.push(PostInputAction::SaveMarks {
+        caller: "remove_until_end_of_word",
+    });
 }
 
 // TODO(ceg): see high light keyword
@@ -2100,8 +2103,6 @@ fn get_token_type(c: char) -> TokenType {
     }
 }
 
-
-
 pub fn remove_until_char_class_change(
     _editor: &mut Editor,
     _env: &mut EditorEnv,
@@ -2178,6 +2179,10 @@ pub fn remove_until_char_class_change(
     tm.pre_compose_action.push(PostInputAction::CheckMarks);
     tm.pre_compose_action.push(PostInputAction::CancelSelection); //TODO register last optype
                                                                   // if buffer changes cancel selection ?
+
+    tm.pre_compose_action.push(PostInputAction::SaveMarks {
+        caller: "remove_until_char_class_change",
+    });
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
