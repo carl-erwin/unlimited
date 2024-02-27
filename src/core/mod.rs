@@ -187,6 +187,8 @@ text-mode =
 
 pub static WELCOME_MESSAGE: &str = std::include_str!("../../res/welcome_screen.txt");
 
+pub static HELP_MESSAGE: &str = std::include_str!("../../res/help_screen.txt");
+
 /// This function is the core of the editor.
 /// It should be ran in an other thread than the main one (which is kept for ui)
 pub fn run(
@@ -628,6 +630,10 @@ pub fn load_buffers(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
                 // move 1st tag to ctor/buffer::new() ?
                 d.tag(env.current_time, 0, vec![0], vec![]); // TODO(ceg): rm this only if the buffer log is cleared
                 d.insert(0, s.len(), s);
+
+                let s = HELP_MESSAGE.as_bytes();
+                let dsz = d.size() as u64;
+                d.insert(dsz, s.len(), s);
 
                 // do not allow to go back to empty buffer
                 d.buffer_log_reset();

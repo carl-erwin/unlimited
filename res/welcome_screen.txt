@@ -2,39 +2,3 @@ unlimitED! is an experimental text editor. (WITH ABSOLUTELY NO WARRANTY)
 
 USAGE: unlimited [OPTIONS] [--] [FILES]...    ( -h for help )
 
-[Quit]
-    Quit:          => ctrl+x ctrl+q       (wait for file(s) sync)
-    Quit (no save) => ctrl+x ctrl+x ctrl+q
-
-[Cursor Moves]
-    move Left,Right,Up,Down         => Arrows
-    move to beginning of line       => ctrl+a
-    move to end of line             => ctrl+e
-    center view around main mark    => ctrl+l
-    scroll the current view Up/Down => PageUp,PageDown
-
-[Edit]
-    insert any character => type the character
-    Undo                 => ctrl+u
-    Redo                 => ctrl+r
-    move line Up         => alt+Up
-    move line Down       => alt+Down
-
-[Selection/Copy/Cut/Paste]
-    Keyboard:
-     start selection at main Mark      => ctrl+Space
-     exchange selection point and Mark => ctrl+x ctrl+x ctrl+x
-     copy current selection            => alt+w
-     cut  current selection            => ctrl+w
-     paste last cut                    => ctrl+y
-
-    Mouse:
-     move cursor to clicked area       => press button-1
-     select text with the mouse        => press and move button-1
-
-[Save]
-    Save file => ctrl+x ctrl+s   (read only operations allowed)
-
-[Buffer Selection/Navigation]
-    Open file           => ctrl+o            (wip)
-    Close current view  => ctrl+x ctrl+c

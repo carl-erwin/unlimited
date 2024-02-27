@@ -1024,34 +1024,7 @@ pub fn destroy_view(
     destroy_view_hierarchy(editor, to_destroy_id);
 }
 
-static HELP_MESSAGE: &str = r#"[Quit]
-    Quit:                       => ctrl+x ctrl+q (wait for file(s) saving)
-    Quit (discard changes)      => ctrl+x ctrl+x ctrl+q
-
-[Moves]
-    Left                        => move cursor to previous character
-    Right                       => move cursor to next character
-    Up                          => move cursor to previous screen line
-    Down                        => move cursor to next screen line
-
-[Edit]
-    ctrl+u                      => undo
-    ctrl+r                      => redo
-
-[Selection/Copy/Paste]
-    ctrl+space                  => start selection at cursor position
-
-    with the mouse (X11 terminal):
-
-    left button pres and hold   => start selection on clicked area
-
-[Save]
-    ctrl+x ctrl+s               => save (done in the background)
-
-[Buffer Selection]
-    ctrl+o                      => Open file (TODO)
-
-"#;
+pub static HELP_MESSAGE: &str = std::include_str!("../../../res/help_screen.txt");
 
 pub fn help_popup(
     mut editor: &mut Editor<'static>,
@@ -1088,7 +1061,7 @@ pub fn help_popup(
 
     let pop_height = HELP_MESSAGE.lines().count();
     let x = (root_width / 2).saturating_sub(pop_width / 2);
-    let y = (root_height / 2).saturating_sub(pop_height / 2);
+    let y = 3; //(root_height / 2).saturating_sub(pop_height / 2);
 
     {
         let mut d = command_buffer.as_ref().unwrap().write();
