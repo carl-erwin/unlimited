@@ -722,7 +722,7 @@ fn show_completion_popup(
     }
 
     // update position size
-    let (st_gx, st_gy, st_w, _st_h) = {
+    let (_st_gx, _st_gy, _st_w, _st_h) = {
         let status_view_id = view::get_command_view_id(editor, &env).unwrap();
         let status_view = get_view_by_id(editor, status_view_id);
         let status_view = status_view.read();
