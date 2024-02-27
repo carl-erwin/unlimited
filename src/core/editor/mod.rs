@@ -5,7 +5,6 @@ pub use editor::Editor;
 pub use env::EditorEnv;
 
 pub use editor::*;
-pub use env::*;
 
 pub fn user_is_idle() -> bool {
     !user_is_active()

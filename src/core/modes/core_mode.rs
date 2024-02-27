@@ -1032,7 +1032,7 @@ pub fn help_popup(
     _view: &Rc<RwLock<View>>,
 ) {
     let root_view_id = editor.root_views[env.root_view_index];
-    let (root_width, root_height) = get_view_by_id(editor, root_view_id).read().dimension();
+    let (root_width, _root_height) = get_view_by_id(editor, root_view_id).read().dimension();
 
     // destroy previous
     {

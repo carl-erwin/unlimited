@@ -2032,7 +2032,6 @@ pub fn remove_until_end_of_word(
 // ugly cut/paste
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TokenType {
-    Unknown,
     InvalidUnicode,
     Blank,            // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
     Identifier,       // _a-zA-Z unicode // default ?
