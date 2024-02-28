@@ -44,7 +44,7 @@ unlimited [FILE1] .. [FILEn]
 
   The keyboard/mouse shortcuts are currently hard-coded
 
-  (see res/default_input_map.json)
+  (see res/main-input-map.json)
 
 ---
 

@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::*;
 
-pub static DEFAULT_INPUT_MAP: &str = std::include_str!("../../../res/default_input_map.json");
+pub static DEFAULT_INPUT_MAP: &str = std::include_str!("../../../res/main-input-map.json");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DefaultActionMode {
