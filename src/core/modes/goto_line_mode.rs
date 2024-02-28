@@ -42,28 +42,10 @@ use crate::core::buffer::BufferEvent;
 
 use super::text_mode::run_text_mode_actions_vec;
 
-static GOTO_LINE_TRIGGER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line:start" }
-    ]
-  }
-]"#;
+static GOTO_LINE_TRIGGER_MAP: &str = std::include_str!("../../../res/goto-line-mode-trigger.json");
 
-static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "goto-line-controller:del-char" },
-     { "default": [],                   "action": "goto-line-controller:add-char" }
-   ]
-  }
-]"#;
+static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str =
+    std::include_str!("../../../res/goto-line-mode-input-map.json");
 
 impl<'a> Mode for GotoLineMode {
     fn name(&self) -> &'static str {
