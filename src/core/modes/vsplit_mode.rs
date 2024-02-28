@@ -8,7 +8,6 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
 
-
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
 

@@ -1,0 +1,18 @@
+[
+  {
+    "events": [
+     { "in": [{ "key": "Escape" } ],    "action": "find:stop" },
+     { "in": [{ "key": "\n" } ],        "action": "find:stop" },
+     { "in": [{ "key": "ctrl+q" } ],    "action": "find:stop" },
+     { "in": [{ "key": "BackSpace" } ], "action": "find:del-char" },
+     { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
+     { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },
+     { "in": [{ "key": "ctrl+r" } ],    "action": "find:prev" },
+     { "in": [{ "key": "Right" } ],     "action": "find:next" },
+     { "in": [{ "key": "Left" } ],      "action": "find:prev" },
+     { "in": [{ "key": "Down" } ],      "action": "find:next" },
+     { "in": [{ "key": "Up" } ],        "action": "find:prev" },
+     { "default": [],                   "action": "find:add-char" }
+   ]
+  }
+]
