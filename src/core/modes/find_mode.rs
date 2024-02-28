@@ -35,35 +35,9 @@ use crate::core::modes::text_mode::center_view_around_offset;
 use crate::core::modes::text_mode::cancel_selection;
 use crate::core::modes::text_mode::movement::cancel_marks;
 
-static FIND_TRIGGER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ],    "action": "find:start-reverse" }
-    ]
-  }
-]"#;
+static FIND_TRIGGER_MAP: &str = std::include_str!("../../../res/find-mode-trigger.json");
 
-static FIND_CONTROLLER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "find:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "find:stop" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "find:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "find:del-char" },
-     { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
-     { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },
-     { "in": [{ "key": "ctrl+r" } ],    "action": "find:prev" },
-     { "in": [{ "key": "Right" } ],     "action": "find:next" },
-     { "in": [{ "key": "Left" } ],      "action": "find:prev" },
-     { "in": [{ "key": "Down" } ],      "action": "find:next" },
-     { "in": [{ "key": "Up" } ],        "action": "find:prev" },
-     { "default": [],                   "action": "find:add-char" }
-   ]
-  }
-]"#;
+static FIND_CONTROLLER_MAP: &str = std::include_str!("../../../res/find-mode-input-map.json");
 
 impl<'a> Mode for FindMode {
     fn name(&self) -> &'static str {
