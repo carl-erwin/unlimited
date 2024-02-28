@@ -6,6 +6,8 @@ use std::rc::Rc;
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
@@ -264,9 +266,12 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         let mod_ctx = view.mode_ctx::<VsplitModeContext>("vsplit-mode");
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        if env.active_view_id == view.id && mod_ctx.selected {
-            cpi.style.bg_color = (113, 114, 123);
+        if mod_ctx.selected {
+            cpi.style.color = TextStyle::default_color();
+        } else {
+            cpi.style.color = (45 + 25, 49 + 25, 54 + 25);
         }
+
         cpi.cp = '│';
         cpi.displayed_cp = '│';
 
