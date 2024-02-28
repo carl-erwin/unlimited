@@ -1,0 +1,7 @@
+[
+  {
+    "events": [
+     { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line:start" }
+    ]
+  }
+]
