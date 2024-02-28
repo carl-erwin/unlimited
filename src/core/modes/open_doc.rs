@@ -42,10 +42,11 @@ use crate::core::build_view_layout_typed;
 use crate::core::parse_layout_str;
 use crate::core::DEFAULT_LAYOUT_JSON;
 
-static OPEN_DOC_TRIGGER_MAP: &str = std::include_str!("../../../res/open-doc-mode-trigger.json");
+static OPEN_DOC_TRIGGER_MAP: &str =
+    std::include_str!("../../../res/input-map/open-doc-mode-trigger.json");
 
 static OPEN_DOC_CONTROLLER_MAP: &str =
-    std::include_str!("../../../res/open-doc-mode-input-map.json");
+    std::include_str!("../../../res/input-map/open-doc-mode-input-map.json");
 
 impl<'a> Mode for OpenDocMode {
     fn name(&self) -> &'static str {
