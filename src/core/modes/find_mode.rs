@@ -35,9 +35,10 @@ use crate::core::modes::text_mode::center_view_around_offset;
 use crate::core::modes::text_mode::cancel_selection;
 use crate::core::modes::text_mode::movement::cancel_marks;
 
-static FIND_TRIGGER_MAP: &str = std::include_str!("../../../res/find-mode-trigger.json");
+static FIND_TRIGGER_MAP: &str = std::include_str!("../../../res/input-map/find-mode-trigger.json");
 
-static FIND_CONTROLLER_MAP: &str = std::include_str!("../../../res/find-mode-input-map.json");
+static FIND_CONTROLLER_MAP: &str =
+    std::include_str!("../../../res/input-map/find-mode-input-map.json");
 
 impl<'a> Mode for FindMode {
     fn name(&self) -> &'static str {
