@@ -993,26 +993,37 @@ fn clip_coordinates_xy(
         always dispatch to active_view
 
     pointer motion:
-       - if selected != None  -> forward to selected view with relative coords
+       - if selected_view != None  -> forward to selected_view with relative coords
            keep select global_x, global_y to build relative coords
            no enter/leave/motion events for other widget.(?? enable this ??)
              widget (special)register themselves to have all events ?
 
        - get view under motion
        - compare to previous_focus
-           if == : nothing
+           if == :
+              generate Motion(previous_focus)  event
 
            if != :
                 generate Leave(previous_focus) event
                 generate Enter(new_focus)      event
                 generate Motion(new_focus)     event
+                previous_focus <- nw focus
 
     button-press
-        - set focus_view as active_view
-                generate deactivated_event ?
+      - if grab_view ?
+
+      - compare to active_view
+           if == :
+              generate ButtonPress(active_view) event(local_x, local_y)
+
+           if != :
+              generate DeActivated(active_view)  event ?
+              set focus_view as active_view
+              generate Activated(active_view)  event ?
 
 
     button-release:
+              generate ButtonRelease(focus_view) event(local_x, local_y)
 
 
 
