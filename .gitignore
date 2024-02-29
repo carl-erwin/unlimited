@@ -11,3 +11,4 @@ perf*
 *.includes
 *.creator.user
 .vscode
+.cargo/config.toml
