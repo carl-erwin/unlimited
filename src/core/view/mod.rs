@@ -9,6 +9,8 @@ use std::sync::Arc;
 
 use std::collections::HashSet;
 
+use bitflags::bitflags;
+
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
 
@@ -293,6 +295,24 @@ pub type SubscriberInfo = (
     ViewEventDestination,
 );
 
+// The EventMask allows the dispatch of corresponding event(s)
+// The root view should be configured with EventMask::All
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct EventMask: u32 {
+        const None          = 0x0;
+        const All           = 0xffffffff;
+
+        const ButtonPress   = 0b00000001;
+        const ButtonRelease = 0b00000010;
+        const KeyPress      = 0b00000100;
+        const KeyRelease    = 0b00001000;
+        const EnterView     = 0b00010000;
+        const LeaveView     = 0b00100000;
+        const Motion        = 0b01000000;
+    }
+}
+
 /// The **View** is a way to present a given Buffer.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
@@ -308,11 +328,16 @@ pub type SubscriberInfo = (
 pub struct View<'a> {
     pub id: Id,
     pub json_attr: Option<String>,
+
     pub destroyable: bool,
     pub is_group: bool,
     pub is_leader: bool,
+
     pub is_splittable: bool, // This flags marks a view that can be cloned when doing split views
-    pub ignore_focus: bool,  // never set focus on this view
+
+    pub ignore_focus: bool, // never set focus on this view
+
+    pub event_mask: EventMask,
 
     pub parent_id: Option<Id>,
     pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
@@ -553,6 +578,9 @@ impl<'a> View<'a> {
             is_group: false,
             is_splittable: false,
             ignore_focus: true,
+
+            event_mask: EventMask::None,
+
             focus_to: None,
             status_view_id: None,
             controller: None,
