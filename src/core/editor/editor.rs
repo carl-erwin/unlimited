@@ -680,6 +680,28 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     }
 }
 
+
+// TODO(ceg): add event mask to allow finer behavior
+//
+// root.event_mask u32 ?
+//    button-pressed|button-released|key-pressed|key-released||enter|leave
+//    PointerMoves
+//
+// start at root (x,y, key|button)
+// ui_ctx:
+//  pointer over maybe != selected
+//  selected (view with select_mask_bit)
+//  keep track of pointer enter/leave event -> view.on_event(Enter|Leave)
+//
+// add struct to reset state and select the new active view
+// ie:scrollbar button when released -> active(text-view)
+// debug mode with special color to display state change
+//
+// active_view
+// event_receiver_view
+//
+
+
 fn get_focused_view_id(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
@@ -823,6 +845,8 @@ fn clip_locked_coordinates_xy(
     id
 }
 
+
+//
 // clips (x,y) to local view @ (x,y)
 // returns the view's id at
 fn clip_coordinates_xy(
