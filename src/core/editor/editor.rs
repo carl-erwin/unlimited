@@ -680,7 +680,6 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
     }
 }
 
-
 // TODO(ceg): add event mask to allow finer behavior
 //
 // root.event_mask u32 ?
@@ -700,7 +699,6 @@ fn flush_ui_event(mut editor: &mut Editor, mut env: &mut EditorEnv, ui_tx: &Send
 // active_view
 // event_receiver_view
 //
-
 
 fn get_focused_view_id(
     mut editor: &mut Editor<'static>,
@@ -845,7 +843,6 @@ fn clip_locked_coordinates_xy(
     id
 }
 
-
 //
 // clips (x,y) to local view @ (x,y)
 // returns the view's id at
@@ -967,7 +964,58 @@ fn clip_coordinates_xy(
 }
 
 /*
+    FocusType : ActiveOnClick|ActiveFollowPointer| ?
+
+    ActiveOnClick (default)
+
+    The active view is the last "selected" view
+    When the pointer move over a given view, this view is not automatically "activated"
+    unless ActiveFollowPointer mask is set
+
+    grab_view is a special state when a view get all keypress/key-release events
+
+    FIXME(ceg): move v.focus_to -> v.focus_to_index ?
+
     possible state
+
+    start:
+       keep a stack of previous focus/active/grab ?
+       - set active_view            to 1st text-view
+       - set previous_active_view   to 1st text-view  ? (conflicts with grab)
+       - set focus                  to 1st text-view
+       - set previous_focus         to 1st text-view
+       - (NEW) set grab_view        to None ?
+       - set selected_view          to None
+
+    TODO(ceg): Query mouse position at start to env.focus_view and update focus ?
+
+    keypress|key-release:
+        always dispatch to active_view
+
+    pointer motion:
+       - if selected != None  -> forward to selected view with relative coords
+           keep select global_x, global_y to build relative coords
+           no enter/leave/motion events for other widget.(?? enable this ??)
+             widget (special)register themselves to have all events ?
+
+       - get view under motion
+       - compare to previous_focus
+           if == : nothing
+
+           if != :
+                generate Leave(previous_focus) event
+                generate Enter(new_focus)      event
+                generate Motion(new_focus)     event
+
+    button-press
+        - set focus_view as active_view
+                generate deactivated_event ?
+
+
+    button-release:
+
+
+
 
     pointer_state {
         over(Vid) <-- last on ?
@@ -1237,6 +1285,7 @@ fn setup_focus_and_event(
         *compose = true;
     };
 
+    //
     let (vid, ev) = clip_coordinates_and_get_view_id(&mut editor, &mut env, ev, root_view_id, vid);
 
     set_focus_on_view_id(&mut editor, &mut env, vid);
