@@ -340,7 +340,7 @@ pub struct View<'a> {
     pub event_mask: EventMask,
 
     pub parent_id: Option<Id>,
-    pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
+    pub transfer_focus_to: Option<Id>, // child id TODO(ceg): redirect input ?
     pub status_view_id: Option<Id>, // TODO(ceg): remove this ?  or per view see env.status_view_id
 
     pub controller: Option<ControllerView>, // REMOVE this
@@ -581,7 +581,7 @@ impl<'a> View<'a> {
 
             event_mask: EventMask::None,
 
-            focus_to: None,
+            transfer_focus_to: None,
             status_view_id: None,
             controller: None,
             controlled_view: None,

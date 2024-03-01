@@ -1093,7 +1093,7 @@ fn build_view_layout_from_attr(
     }
 
     if let Some(focus_idx) = focus_idx {
-        view.focus_to = Some(view.children[focus_idx].id); // TODO(ceg):
+        view.transfer_focus_to = Some(view.children[focus_idx].id); // TODO(ceg):
     }
 
     if let Some(status_idx) = status_idx {

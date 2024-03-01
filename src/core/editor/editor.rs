@@ -720,7 +720,7 @@ fn get_focused_view_id(
         return vid;
     }
 
-    if let Some(focused_view_id) = v.focus_to {
+    if let Some(focused_view_id) = v.transfer_focus_to {
         return get_focused_view_id(&mut editor, &mut env, focused_view_id);
     }
 
@@ -781,7 +781,7 @@ pub fn set_active_view(
 
             if let Some(pview) = check_view_by_id(editor, pid) {
                 let mut pview = pview.write();
-                pview.focus_to = Some(vid);
+                pview.transfer_focus_to = Some(vid);
                 parent_id = pview.parent_id;
 
                 dbg_println!("set_active_view next parent_id {:?}", parent_id);
@@ -973,8 +973,6 @@ fn clip_coordinates_xy(
     unless ActiveFollowPointer mask is set
 
     grab_view is a special state when a view get all keypress/key-release events
-
-    FIXME(ceg): move v.focus_to -> v.focus_to_index ?
 
     possible state
 
