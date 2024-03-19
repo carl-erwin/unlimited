@@ -144,7 +144,7 @@ pub fn open_doc_start(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = view::get_text_area_view_id(editor, env);
+        let status_view_id = view::get_status_line_view_id(editor, env);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
             dbg_println!("status view is missing");
@@ -172,7 +172,11 @@ pub fn open_doc_start(
             controller_view_id
         };
 
-        open_doc_show_controller_view(editor, env, view);
+        let bret = open_doc_show_controller_view(editor, env, view);
+        if !bret {
+            return;
+        }
+
         set_focus_on_view_id(editor, env, controller_view_id);
 
         {
@@ -188,12 +192,13 @@ pub fn open_doc_controller_stop(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = env.status_view_id.unwrap();
-        let status_view = get_view_by_id(editor, status_view_id);
-        let mut status_view = status_view.write();
+        if let Some(status_view_id) = env.status_view_id {
+            let status_view = get_view_by_id(editor, status_view_id);
+            let mut status_view = status_view.write();
 
-        status_view.layout_direction = LayoutDirection::Horizontal;
-        status_view.children.pop(); // discard child
+            status_view.layout_direction = LayoutDirection::Horizontal;
+            status_view.children.pop(); // discard child
+        }
     }
     {
         let parent_id = view::get_text_area_view_id(editor, &env).unwrap();
@@ -333,10 +338,13 @@ fn open_doc_show_controller_view(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
-) {
+) -> bool {
     let ctrl_view_id = {
-        let status_view_id = env.status_view_id.unwrap();
+        if env.status_view_id.is_none() {
+            return false;
+        };
 
+        let status_view_id = env.status_view_id.unwrap();
         let status_view = get_view_by_id(editor, status_view_id);
         let mut status_view = status_view.write();
 
@@ -360,6 +368,8 @@ fn open_doc_show_controller_view(
     let mut controller_view = controller_view.write();
     let mut text_view = text_view.write();
     open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+
+    true
 }
 
 fn open_doc_display_prompt(
@@ -693,7 +703,8 @@ fn show_completion_popup(
 
     // update position size
     let (_st_gx, _st_gy, _st_w, _st_h) = {
-        let status_view_id = view::get_command_view_id(editor, &env).unwrap();
+        let status_view_id = view::get_command_view_id(editor, &env)?;
+
         let status_view = get_view_by_id(editor, status_view_id);
         let status_view = status_view.read();
         (
