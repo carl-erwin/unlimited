@@ -963,10 +963,19 @@ fn build_view_layout_from_attr(
 
     view.is_leader = leader;
 
-    // select first target view
-    if env.target_view.is_none() {
+    // select first active view
+    if env.active_view.is_none() {
         if view.tags.get("target-view").is_some() {
-            env.target_view = Some(view.id);
+            // TODO(ceg): find better naming for target view
+            env.active_view = Some(view.id);
+        }
+    }
+
+    // select first status view
+    if env.status_view_id.is_none() {
+        if view.tags.get("status-line").is_some() {
+            // TODO(ceg): find better naming
+            env.status_view_id = Some(view.id);
         }
     }
 

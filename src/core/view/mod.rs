@@ -693,6 +693,19 @@ pub fn get_command_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'stati
     return None;
 }
 
+//
+pub fn get_view_by_tag(
+    editor: &mut Editor<'static>,
+    _env: &EditorEnv<'static>,
+    tag: &str,
+) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, tag)?;
+    if v.len() == 1 {
+        return Some(v[0]);
+    }
+    return None;
+}
+
 pub fn get_text_area_view_id(
     editor: &mut Editor<'static>,
     _env: &EditorEnv<'static>,

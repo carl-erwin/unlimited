@@ -127,12 +127,15 @@ impl ContentFilter<'_> for EditorTitle {
         buffer_info.push_str(&format!(" {} bytes", d.size()));
         buffer_info.push_str(&format!(" (F1 for help)"));
 
+        buffer_info.push_str(&format!(" (active vid: {:?})", env.active_view_id));
+
+        /*
         if env.target_view_id != view::Id(0) {
             if let Some(_v) = check_view_by_id(editor, env.target_view_id) {
                 buffer_info.push_str(&format!(" (target vid: {:?})", env.target_view_id));
-                buffer_info.push_str(&format!(" (active vid: {:?})", env.active_view_id));
             }
         }
+        */
 
         self.title.push_str(&buffer_info);
     }

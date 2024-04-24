@@ -846,6 +846,8 @@ fn clip_locked_coordinates_xy(
 //
 // clips (x,y) to local view @ (x,y)
 // returns the view's id at
+// TODO(ceg): add event mask to allow traversal
+// TODO(ceg): build parent path at the same time
 fn clip_coordinates_xy(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
@@ -856,7 +858,10 @@ fn clip_coordinates_xy(
 ) -> view::Id {
     let mut id = root_view_id;
 
+    /*
     if env.focus_locked_on_view_id.is_some() {
+
+
         return clip_locked_coordinates_xy(
             &mut editor,
             &mut env,
@@ -866,6 +871,7 @@ fn clip_coordinates_xy(
             &mut y,
         );
     }
+    */
 
     let root_x = *x;
     let root_y = *y;
@@ -881,32 +887,39 @@ fn clip_coordinates_xy(
 
     loop {
         'inner: loop {
+            dbg_println!("         --------------------------- inner loop");
+
             if let Some(v) = check_view_by_id(editor, id) {
                 let v = v.read();
 
                 if v.children.is_empty() {
                     dbg_println!("CLIPPING        no more children");
-                    dbg_println!("CLIPPING ----------------------------------- END");
+                    dbg_println!(
+                        "CLIPPING -------id = {:?} --------------------------- END",
+                        id
+                    );
                     return id;
                 }
 
-                for child in v.children.iter() {
-                    let child_v = get_view_by_id(editor, child.id);
-                    let child_v = child_v.write();
+                /*
+                    for child in v.children.iter() {
+                        let child_v = get_view_by_id(editor, child.id);
+                        let child_v = child_v.write();
 
-                    let screen = child_v.screen.read();
+                        let screen = child_v.screen.read();
 
-                    dbg_println!(
-                    "CLIPPING dump child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
-                    child_v.id,
-                    child_v.x,
-                    child_v.y,
-                    screen.width(),
-                    screen.height(),
-                    child_v.x + screen.width(),
-                    child_v.y + screen.height()
-                );
+                        dbg_println!(
+                        "CLIPPING dump child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                        child_v.id,
+                        child_v.x,
+                        child_v.y,
+                        screen.width(),
+                        screen.height(),
+                        child_v.x + screen.width(),
+                        child_v.y + screen.height()
+                    );
                 }
+                */
 
                 dbg_println!("CLIPPING");
 
@@ -920,8 +933,9 @@ fn clip_coordinates_xy(
 
                     last_id = child_v.id;
 
+                    /*
                     dbg_println!(
-                    "CLIPPING checking child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
+                        "CLIPPING checking child  {:?} dim [x({}), y({})][w({}) h({})] [x+w({}) y+h({})]",
                     child_v.id,
                     child_v.x,
                     child_v.y,
@@ -929,6 +943,7 @@ fn clip_coordinates_xy(
                     screen.height(),
                     child_v.x+screen.width(),
                     child_v.y+screen.height());
+                    */
 
                     if *x >= child_v.x as i32
                         && *x < (child_v.x + screen.width()) as i32
@@ -942,14 +957,16 @@ fn clip_coordinates_xy(
                         }
 
                         // found
+                        dbg_println!("CLIPPING         found @ idx {}", idx);
+                        dbg_println!("CLIPPING         select  vid {:?}", child_v.id);
                         dbg_println!("CLIPPING         updated clipping coords ({},{})", *x, *y);
-                        dbg_println!("CLIPPING         select  {:?}", child_v.id);
 
                         env.local_x = Some(*x);
                         env.local_y = Some(*y);
 
                         id = child_v.id;
 
+                        // restart with id as new "root"
                         break 'inner;
                     } else {
                         dbg_println!("CLIPPING        not found @ idx {}", idx);
@@ -974,6 +991,12 @@ fn clip_coordinates_xy(
 
     grab_view is a special state when a view get all keypress/key-release events
 
+    generate global events for overs to register to
+       FocusChanged(Option<from>, to)
+       Deactivated(vid) ?
+       Activated(Option<from>, to)
+
+
     possible state
 
     start:
@@ -991,6 +1014,7 @@ fn clip_coordinates_xy(
         always dispatch to active_view
 
     pointer motion:
+       - grab == selected ?
        - if selected_view != None  -> forward to selected_view with relative coords
            keep select global_x, global_y to build relative coords
            no enter/leave/motion events for other widget.(?? enable this ??)
@@ -1008,45 +1032,35 @@ fn clip_coordinates_xy(
                 previous_focus <- nw focus
 
     button-press
-      - if grab_view ?
+      - if grab_view ?  forward to grab / ignore
 
       - compare to active_view
            if == :
               generate ButtonPress(active_view) event(local_x, local_y)
 
            if != :
-              generate DeActivated(active_view)  event ?
+              generate DeActivated(active_view)   event ?
+              generate Unfocused(previous_focus)  event ?
+              generate Focused(new_view)          event ?
+
               set focus_view as active_view
               generate Activated(active_view)  event ?
-
 
     button-release:
               generate ButtonRelease(focus_view) event(local_x, local_y)
 
 
-
-
-    pointer_state {
-        over(Vid) <-- last on ?
-        select(Option<vid>)
-    }
-
     no_active_view
-
         pointer over view
         pointer select view
         pointer move while view clicked/selected
         pointer unselect view
 
     active_view
-        the active view handles everything
 
         when releasing active view check pointer coords ?
 
         last target ?
-
-        target circular list ?
-
 */
 
 fn clip_coordinates_and_get_view_id(
@@ -1081,6 +1095,7 @@ fn clip_coordinates_and_get_view_id(
     };
 
     // input locked ?
+    /*
     match (env.active_view, env.target_view) {
         (Some(ida), Some(idt)) => {
             if ida != idt {
@@ -1090,6 +1105,7 @@ fn clip_coordinates_and_get_view_id(
         }
         _ => {} /* fall-through */
     }
+    */
 
     (vid, ev)
 }
@@ -1477,6 +1493,8 @@ fn run_all_stages(
             " before setup_focus_and_event -> active_view  env {:?}",
             env.active_view
         );
+
+        // TODO(ceg): remove env.root_view_index
 
         let prev_root_index = env.root_view_index;
 

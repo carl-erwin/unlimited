@@ -154,15 +154,13 @@ impl ContentFilter<'_> for StatusLineModeCompose {
 
         let mut buffer_info = String::new();
 
-        // TODO: add target_view == text-view  != controller
-
-        if env.target_view_id != view::Id(0) {
-            if let Some(f) = check_view_by_id(editor, env.target_view_id) {
+        if env.active_view_id != view::Id(0) {
+            if let Some(f) = check_view_by_id(editor, env.active_view_id) {
                 let f = f.read();
                 let b = f.buffer().unwrap();
                 let n = &b.read().name;
-                buffer_info.push_str(&format!("{}", n));
-                buffer_info.push_str(&format!(" vid({})", env.target_view_id.0));
+                buffer_info.push_str(&format!("buffer:[{}]", n));
+                buffer_info.push_str(&format!(" act vid({})", env.active_view_id.0));
             }
         }
 

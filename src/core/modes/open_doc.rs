@@ -1,3 +1,5 @@
+// use this ut8 char for directories/folders 📁
+
 use std::any::Any;
 use std::env;
 use std::fs;
@@ -143,6 +145,8 @@ pub fn open_doc_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
+    dbg_println!("open_doc_start");
+
     {
         let status_view_id = view::get_status_line_view_id(editor, env);
         if status_view_id.is_none() {
@@ -174,6 +178,7 @@ pub fn open_doc_start(
 
         let bret = open_doc_show_controller_view(editor, env, view);
         if !bret {
+            dbg_println!("cannot show controller view");
             return;
         }
 
@@ -700,20 +705,6 @@ fn show_completion_popup(
             }
         }
     }
-
-    // update position size
-    let (_st_gx, _st_gy, _st_w, _st_h) = {
-        let status_view_id = view::get_command_view_id(editor, &env)?;
-
-        let status_view = get_view_by_id(editor, status_view_id);
-        let status_view = status_view.read();
-        (
-            status_view.global_x.unwrap(),
-            status_view.global_y.unwrap(),
-            status_view.width,
-            status_view.height,
-        )
-    };
 
     // TODO: get view global coordinates, update on  resize
     let parent_id = view::get_text_area_view_id(editor, &env).unwrap();

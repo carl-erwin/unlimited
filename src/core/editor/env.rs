@@ -66,13 +66,17 @@ use crate::core::view;
 pub struct EditorEnv<'a> {
     phantom: PhantomData<&'a u8>,
 
+    /// set this if the editor runs in a graphical terminal emulator
     pub graphic_display: bool,
 
+    /// set this to qui th emulator (no checks)<br/>
     pub quit: bool,
 
+    /// the last received input event
     pub current_input_event: crate::core::event::InputEvent,
+
     /// This flag is set when an input event as triggered a change
-    /// and the ui must be refresh
+    /// and the ui must be refreshed
     pub refresh_ui: bool,
 
     pub pending_events: usize,
@@ -81,9 +85,11 @@ pub struct EditorEnv<'a> {
     pub process_input_start: Instant,
     pub process_input_end: Instant,
 
-    //
+    // the root view width
     pub width: usize,
+    // the root view height
     pub height: usize,
+    // TODO(ceg): maintain per view
     pub global_x: Option<i32>,
     pub global_y: Option<i32>,
     pub local_x: Option<i32>,
@@ -98,14 +104,21 @@ pub struct EditorEnv<'a> {
     //
     pub prev_view_id: view::Id,
     pub root_view_id: view::Id,
-    //
+    /// the view receiving the keyboard inputs
     pub active_view: Option<view::Id>,
-    pub target_view: Option<view::Id>,
 
+    /// the view the pointer is on
     pub pointer_over_view_id: view::Id,
+
     pub last_selected_view_id: view::Id,
 
+    /// the view the pointer is on
     pub focus_locked_on_view_id: Option<view::Id>,
+
+    /// this view takes all input events (pointer/key/button press/etc..)
+    pub grab_view: Option<view::Id>,
+
+    //
     pub status_view_id: Option<view::Id>,
 
     pub center_offset: Option<u64>,
@@ -154,7 +167,7 @@ impl<'a> EditorEnv<'a> {
             root_view_id: view::Id(1), // NB
             center_offset: None,
             active_view: None,
-            target_view: None,
+            grab_view: None,
             pointer_over_view_id: view::Id(0),
             last_selected_view_id: view::Id(0),
             focus_locked_on_view_id: None,
