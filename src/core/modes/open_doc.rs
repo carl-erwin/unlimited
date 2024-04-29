@@ -1014,16 +1014,14 @@ pub fn open_doc_controller_show_buffer(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let (root_view_idx, new_root_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
+    let (new_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
     if !ok {
         return;
     }
 
-    open_doc_controller_stop(editor, env, view);
+    return;
 
-    // switch
-    env.root_view_index = root_view_idx;
-    env.root_view_id = new_root_view_id;
+    open_doc_controller_stop(editor, env, view);
 }
 
 // FIXME(ceg): core::open-new-buffer(path)
@@ -1031,11 +1029,11 @@ fn open_doc_controller_load_buffer(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
-) -> (usize, view::Id, bool) {
+) -> (view::Id, bool) {
     // walk through buffer list/view
     // if ! already opened create new buffer + new view
+    // else return previous view
     // show view
-
     // split code and reuse in main loader
 
     let controller_view = view.write();
@@ -1071,7 +1069,7 @@ fn open_doc_controller_load_buffer(
         editor.buffer_map.write().insert(buffer_id, b);
         buffer_id
     } else {
-        return (env.root_view_index, env.root_view_id, false);
+        return (env.root_view_id, false);
     };
 
     // configure buffer
@@ -1111,7 +1109,7 @@ fn open_doc_controller_load_buffer(
     let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
     if json.is_err() {
         dbg_print!("json parse error {:?}", json);
-        return (0, view::Id(0), false);
+        return (view::Id(0), false);
     }
     let json = json.unwrap();
 
@@ -1127,7 +1125,6 @@ fn open_doc_controller_load_buffer(
     dbg_println!("open-doc : create view id {:?}", id);
 
     // a new top level view
-    let idx = editor.root_views.len();
     let new_root_view_id = id.unwrap();
     editor.root_views.push(id.unwrap());
 
@@ -1147,5 +1144,5 @@ fn open_doc_controller_load_buffer(
         editor.indexer_tx.send(msg).unwrap_or(());
     }
 
-    (idx, new_root_view_id, true)
+    (new_root_view_id, true)
 }

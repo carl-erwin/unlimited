@@ -99,9 +99,6 @@ pub struct EditorEnv<'a> {
     pub diff_y: i32,
 
     //
-    pub root_view_index: usize,
-
-    //
     pub prev_view_id: view::Id,
     pub root_view_id: view::Id,
     /// the view receiving the keyboard inputs
@@ -162,7 +159,6 @@ impl<'a> EditorEnv<'a> {
             diff_x: 0,
             diff_y: 0,
             //max
-            root_view_index: 0,
             prev_view_id: view::Id(1), // NB
             root_view_id: view::Id(1), // NB
             center_offset: None,

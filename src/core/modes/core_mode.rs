@@ -136,23 +136,7 @@ impl CoreMode {
 
         register_input_stage_action(&mut map, "increase-right", increase_right);
         register_input_stage_action(&mut map, "decrease-right", decrease_right);
-
-        register_input_stage_action(&mut map, "select-next-view", select_next_view);
-        register_input_stage_action(&mut map, "select-previous-view", select_previous_view);
     }
-}
-
-// Mode "core"
-pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
-}
-
-pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = env.root_view_index.saturating_sub(1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
 }
 
 pub fn application_quit(
@@ -1033,7 +1017,7 @@ pub fn help_popup(
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
 ) {
-    let root_view_id = editor.root_views[env.root_view_index];
+    let root_view_id = view::Id(1);
     let (root_width, _root_height) = get_view_by_id(editor, root_view_id).read().dimension();
 
     // destroy previous

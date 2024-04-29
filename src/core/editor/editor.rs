@@ -1496,8 +1496,6 @@ fn run_all_stages(
 
         // TODO(ceg): remove env.root_view_index
 
-        let prev_root_index = env.root_view_index;
-
         let prev_active_view = env.active_view;
 
         let pointer_over_view_id = env.pointer_over_view_id;
@@ -1533,7 +1531,7 @@ fn run_all_stages(
         );
 
         // update active view (no root change)
-        if prev_root_index == env.root_view_index {
+        {
             dbg_println!("update active view ?");
 
             if let Some(prev_active_view) = prev_active_view {
