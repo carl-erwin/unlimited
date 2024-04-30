@@ -737,6 +737,7 @@ pub fn parse_layout_str(json: &str) -> Result<serde_json::Value, serde_json::err
 pub fn build_view_layout_from_json_str(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
+    all_layouts: &serde_json::Value,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
     attr: &str,
     _depth: usize,
@@ -749,12 +750,13 @@ pub fn build_view_layout_from_json_str(
 
     let attr = json.unwrap();
 
-    build_view_layout_from_attr(&mut editor, &mut env, buffer.clone(), &attr, 0)
+    build_view_layout_from_attr(&mut editor, &mut env, all_layouts, buffer.clone(), &attr, 0)
 }
 
 fn build_view_layout_from_attr(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
+    json: &Value,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
     attr: &Value,
     depth: usize,
@@ -783,6 +785,12 @@ fn build_view_layout_from_attr(
     let mut allow_destroy = false;
 
     if let Value::Object(obj) = attr {
+        if let Some(val) = obj.get("sub-layout") {
+            if let Value::String(val) = val {
+                return build_view_layout_typed(&mut editor, &mut env, buffer.clone(), &json, val);
+            }
+        }
+
         if let Some(val) = obj.get("internal-buffer") {
             if let Value::String(val) = val {
                 internal_buffer_name = Some(val.clone());
@@ -994,6 +1002,7 @@ fn build_view_layout_from_attr(
                     let child_view = build_view_layout_from_attr(
                         &mut editor,
                         &mut env,
+                        json,
                         buffer.clone(),
                         &child_layout,
                         depth + 1,
@@ -1124,17 +1133,18 @@ pub fn build_view_layout_typed(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
-    json: &Value,
+    all_layouts: &Value, //
     view_type: &str,
 ) -> Option<view::Id> {
     // 1st level is object["view-type"]
     let depth = 0;
-    if let Value::Object(ref root) = *json {
+    if let Value::Object(ref root) = *all_layouts {
         if let Some((_view_type, view_layout)) = root.get_key_value(view_type) {
             //dbg_println!("view_type = {:?}, v = {:?}", view_type, view_layout);
             return build_view_layout_from_attr(
                 &mut editor,
                 &mut env,
+                all_layouts,
                 buffer.clone(),
                 &view_layout,
                 depth,

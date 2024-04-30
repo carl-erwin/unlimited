@@ -32,6 +32,9 @@ use crate::core::view::View;
 
 use crate::core::build_view_layout_from_json_str;
 
+use crate::core::parse_layout_str;
+use crate::core::DEFAULT_LAYOUT_JSON;
+
 static CORE_INPUT_MAP: &str = r#"
 [
   {
@@ -487,8 +490,11 @@ pub fn split_view_with_direction(
 
     let buffer = pview.read().buffer();
 
+    let all_layouts = parse_layout_str(DEFAULT_LAYOUT_JSON).unwrap();
+
     // create view clone
-    let view_clone_id = build_view_layout_from_json_str(editor, env, buffer, &json_attr, 0)?;
+    let view_clone_id =
+        build_view_layout_from_json_str(editor, env, &all_layouts, buffer, &json_attr, 0)?;
 
     dbg_println!("json attr {:?}", json_attr);
 
