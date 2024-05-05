@@ -7,55 +7,87 @@
     },
 
     "file-view": {
-    "tags": [ "root" ],
     "modes": [ ],
-    "size": { "percent": 100 },
     "children_layout": "vertical",
     "children": [
+        {
+            "tags": [ "title-bar" ],
+            "modes": [ "title-bar" ],
+            "size": { "fixed": 1 }
+        },
+
+        {
+            "size": { "remain_minus": 3 },
+            "children_layout": "horizontal",
+            "children": [
+                {
+                    "tags": [ "lateral-bar" ],
+                    "size": { "fixed": 10 }
+                },
+                {
+                    "modes": [ "vsplit-mode" ],
+                    "internal-buffer": "vscrollbar",
+                    "size": { "fixed": 1 }
+                },
+                {
+                    "sub-layout": "main-view"
+                }
+            ]
+        },
+        {
+            "modes": [ "hsplit-mode" ],
+            "size": { "fixed": 1 }
+        },
+        {
+            "tags": [ "status-line"  ],
+            "modes": [ "status-line-mode" ],
+            "internal-buffer": "status-line-buffer",
+            "size": { "fixed": 1 }
+        },
+        {
+            "tags": [ "command-line" ],
+            "modes": [ "empty-line-mode" ],
+            "internal-buffer": "command-line",
+            "size": { "fixed": 1 }
+        }
+    ]
+    },
+
+    "main-view":
     {
-        "tags": [ "root" ],
-        "modes": [ ],
-        "size": { "remain_minus": 3 },
-        "children_layout": "horizontal",
+        "leader": true,
+        "tags": [ "main" ],
+
+        "size": { "remain_percent": 100.0 },
+
+        "allow-split": false,
+        "allow-destroy": false,
+        "children_layout": "vertical",
         "children": [
             {
-                "tags": [ "lateral-bar" ],
-                "modes": [ "core-mode" ],
-                "size": { "fixed": 15 }
-            },
-            {
-                "modes": [ "vsplit-mode" ],
-                "internal-buffer": "vscrollbar",
+                "tags": [ "tab-bar" ],
+                "modes": [ "empty-line-mode" ],
+                "internal-buffer": "tab-bar",
                 "size": { "fixed": 1 }
             },
             {
                 "sub-layout": "single-file-view"
+            },
+            {
+                "tags": [ "terminal" ],
+                "modes": [ "empty-line-mode" ],
+                "internal-buffer": "terminal",
+                "size": { "fixed": 1 }
             }
         ]
-    },
-    {
-        "modes": [ "hsplit-mode" ],
-        "size": { "fixed": 1 }
-    },
-    {
-        "tags": [ "title-bar" ],
-        "modes": [ "title-bar" ],
-        "size": { "fixed": 1 }
-    },
-    {
-        "tags": [ "status-line" ],
-        "modes": [ "status-line-mode" ],
-        "internal-buffer": "status-line-buffer",
-        "size": { "fixed": 1 }
-    }
-    ]
     },
 
     "single-file-view":
     {
         "leader": true,
         "tags": [ "text", "text-area" ],
-        "size": { "remain_minus": 2 },
+
+        "size": { "remain_minus": 1 },
         "allow-split": true,
         "allow-destroy": true,
         "children_layout": "horizontal",
@@ -76,7 +108,7 @@
                 "leader": true,
                 "tags": [ "target-view" ],
                 "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
-                "size": { "remain_minus": 1 }
+                "size": { "remain_minus": 1      }
             },
             {
                 "tags": [ "vscrollbar" ],
@@ -89,81 +121,6 @@
                                 { "mode": "vscrollbar-mode", "src": 2, "dst": 3 } ],
 
         "focus_idx": 2
-    },
-
-
-    "old-file-view": {
-        "leader": false,
-        "tags": [ "root" ],
-        "modes": [ ],
-        "children_layout_values": "vertical|horizontal",
-        "size_values": "percent, fixed, remain, remain_minus, remain_percent",
-        "floating": false,
-
-        "size": { "percent": 100 },
-
-        "children_layout": "vertical",
-        "children": [
-            {
-                "tags": [ "title-bar" ],
-                "modes": [ "title-bar" ],
-                "size": { "fixed": 1 }
-            },
-
-            {
-                "leader": true,
-                "tags": [ "text", "text-area" ],
-                "size": { "remain_minus": 2 },
-                "allow-split": true,
-                "allow-destroy": true,
-                "children_layout": "horizontal",
-                "children": [
-                    {
-                        "tags": [ "line-number" ],
-                        "modes": [ "line-number-mode" ],
-                        "internal-buffer": "line-number",
-                        "size": { "fixed": 12 }
-                    },
-                    {
-                        "tags": [ "empty-column" ],
-                        "modes": [ "" ],
-                        "internal-buffer": "empty-col",
-                        "size": { "fixed": 1 }
-                    },
-                    {
-                        "leader": true,
-                        "tags": [ "target-view" ],
-                        "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
-                        "size": { "remain_minus": 1 }
-                    },
-                    {
-                        "tags": [ "vscrollbar" ],
-                        "modes": [ "vscrollbar-mode" ],
-                        "internal-buffer": "vscrollbar",
-                        "size": { "fixed": 1 }
-                    }
-                ],
-                "children-subscribe": [ { "mode": "line-number-mode", "src": 2, "dst": 0 },
-                                        { "mode": "vscrollbar-mode", "src": 2, "dst": 3 } ],
-
-                "focus_idx": 2
-            },
-            {
-                "tags": [ "command-line" ],
-                "modes": [ "empty-line-mode" ],
-                "internal-buffer": "command-line",
-                "size": { "fixed": 1 }
-            },
-            {
-                "tags": [ "status-line" ],
-                "modes": [ "status-line-mode" ],
-                "internal-buffer": "status-line-buffer",
-                "size": { "fixed": 1 }
-            }
-        ],
-
-        "focus_idx": 1,
-        "status_idx": 2
     }
 
 }

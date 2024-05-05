@@ -148,7 +148,9 @@ pub enum LayoutSize {
 pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
     let mut sizes = vec![];
 
-    dbg_println!("start = {}", start);
+    dbg_println!("compute_layout_sizes --------------------");
+
+    dbg_println!("compute_layout_sizes start = {}", start);
 
     if start == 0 {
         return sizes;
@@ -162,11 +164,16 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
             continue;
         }
 
+        dbg_println!("compute_layout_sizes op = {:?}", op);
+
         match op {
             LayoutSize::Floating => {}
 
             LayoutSize::Fixed { size } => {
                 remain = remain.saturating_sub(*size);
+
+                dbg_println!("compute_layout_sizes: give = {size}");
+
                 sizes.push(*size);
             }
 
@@ -174,6 +181,9 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
                 let used = (*p * start as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
 
@@ -181,6 +191,9 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
                 let used = (*p * remain as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
 
@@ -189,10 +202,16 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
             // (remain <- remain - minus))
             LayoutSize::RemainMinus { minus } => {
                 let used = remain.saturating_sub(*minus);
+
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
         }
+
+        dbg_println!("compute_layout_sizes: remain = {remain}");
     }
 
     sizes

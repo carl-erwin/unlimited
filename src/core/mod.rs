@@ -804,8 +804,12 @@ fn build_view_layout_from_attr(
                 if n.is_f64() {
                     let p = n.as_f64().unwrap() as f32;
                     view_size = LayoutSize::Percent { p: f32::from(p) }
+                } else if n.is_u64() {
+                    let p = n.as_u64().unwrap() as f32;
+                    view_size = LayoutSize::Percent { p: f32::from(p) }
                 } else {
                     // syntax error
+                    panic!("percent: invalid syntax")
                 }
             }
 
@@ -824,6 +828,7 @@ fn build_view_layout_from_attr(
                     view_size = LayoutSize::Percent { p }
                 } else {
                     // syntax error
+                    panic!("remain: invalid syntax")
                 }
             }
 
@@ -831,8 +836,12 @@ fn build_view_layout_from_attr(
                 if n.is_f64() {
                     let p = n.as_f64().unwrap() as f32;
                     view_size = LayoutSize::RemainPercent { p }
+                } else if n.is_u64() {
+                    let p = n.as_u64().unwrap() as f32;
+                    view_size = LayoutSize::RemainPercent { p }
                 } else {
                     // syntax error
+                    panic!("remain_percent: invalid syntax")
                 }
             }
 
@@ -842,6 +851,7 @@ fn build_view_layout_from_attr(
                     view_size = LayoutSize::RemainMinus { minus }
                 } else {
                     // syntax error
+                    panic!("remain_minus: invalid syntax")
                 }
             }
         }
