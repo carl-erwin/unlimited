@@ -1198,55 +1198,7 @@ fn run_stage(
                 }
                 StagePosition::Post => {
                     view::run_stage(&mut editor, &mut env, &view, pos, stage);
-
                     env.process_input_end = Instant::now();
-
-                    // root view changed ?
-                    if env.root_view_id != env.prev_view_id {
-                        env.refresh_ui = true;
-
-                        dbg_println!(
-                            "view change {:?} ->  {:?}",
-                            env.prev_view_id,
-                            env.root_view_id
-                        );
-
-                        check_view_dimension(editor, env);
-                        {
-                            // NB: resize previous view's screen to lower memory usage
-                            if let Some(view) = check_view_by_id(editor, env.prev_view_id) {
-                                view.write().screen.write().resize(1, 1);
-                            }
-
-                            // prepare next view input
-                            let view = editor
-                                .view_map
-                                .read()
-                                .get(&env.root_view_id)
-                                .unwrap()
-                                .clone();
-
-                            view::run_stage(
-                                &mut editor,
-                                &mut env,
-                                &view,
-                                StagePosition::Pre,
-                                Stage::Input,
-                            );
-
-                            let id = env.root_view_id;
-                            run_stages(Stage::Compositing, &mut editor, &mut env, id);
-
-                            // view changed -> call compositing stage
-                            // TODO(ceg): unique root view
-                            env.active_view = None;
-                            env.pointer_over_view_id = view::Id(0);
-                            env.last_selected_view_id = view::Id(0);
-                            env.focus_locked_on_view_id = None;
-
-                            env.prev_view_id = env.root_view_id;
-                        }
-                    }
                 }
             }
         }
