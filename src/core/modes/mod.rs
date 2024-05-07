@@ -5,6 +5,7 @@ pub mod dir_fetch;
 pub mod dir_mode;
 
 pub mod empty_line_mode;
+pub mod side_bar_mode;
 
 pub mod status_line_mode;
 
@@ -34,6 +35,7 @@ pub use line_number::LineNumberMode;
 pub use open_doc::OpenDocMode;
 
 pub use empty_line_mode::EmptyLineMode;
+pub use side_bar_mode::SideBarMode;
 
 pub use status_line_mode::StatusLineMode;
 pub use title_bar_mode::TitleBarMode;

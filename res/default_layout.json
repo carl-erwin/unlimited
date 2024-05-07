@@ -21,8 +21,13 @@
             "children_layout": "horizontal",
             "children": [
                 {
-                    "tags": [ "lateral-bar" ],
-                    "size": { "fixed": 10 }
+                    "modes": [ "side-bar-mode" ],
+                    "internal-buffer": "",
+                    "tags": [ "side-bar" ],
+                    "size": { "fixed": 10 },
+                    "bg": [ 0, 0, 0 ],
+                    "fg": [ 0, 0, 0 ]
+
                 },
                 {
                     "modes": [ "vsplit-mode" ],
@@ -70,6 +75,13 @@
                 "internal-buffer": "tab-bar",
                 "size": { "fixed": 1 }
             },
+            {
+                "tags": [ "file-bar" ],
+                "modes": [ "empty-line-mode" ],
+                "internal-buffer": "file-bar",
+                "size": { "fixed": 1 }
+            },
+
             {
                 "sub-layout": "single-file-view"
             },
