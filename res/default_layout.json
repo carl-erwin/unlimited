@@ -24,10 +24,7 @@
                     "modes": [ "side-bar-mode" ],
                     "internal-buffer": "",
                     "tags": [ "side-bar" ],
-                    "size": { "fixed": 10 },
-                    "bg": [ 0, 0, 0 ],
-                    "fg": [ 0, 0, 0 ]
-
+                    "size": { "fixed": 24 }
                 },
                 {
                     "modes": [ "vsplit-mode" ],
