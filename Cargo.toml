@@ -57,7 +57,7 @@ regex = "1.5.5"
 debug = true
 opt-level = 3
 panic = "abort"
-lto = "fat"
+#lto = "fat"
 
 
 [profile.dev]
