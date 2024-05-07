@@ -1763,6 +1763,8 @@ pub fn move_line_up(
 
         tm.pre_compose_action
             .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+
+        tm.prev_action = TextModeAction::BufferModification;
     }
 }
 
@@ -1926,6 +1928,7 @@ pub fn move_line_down(
                 tm.pre_compose_action
                 .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
+                tm.prev_action = TextModeAction::BufferModification;
         );
     });
 
