@@ -75,11 +75,16 @@ pub trait ContentFilter<'a> {
     fn run(
         &mut self,
         _view: &View,
-        _env: &mut LayoutEnv,
+        env: &mut LayoutEnv,
         _input: &[FilterIo],
         _output: &mut Vec<FilterIo>,
     ) {
-        //*output = input.clone();
+        // default: stop pipeline
+        if _input.is_empty() {
+            env.quit = true;
+        } else {
+            *_output = _input.to_vec();
+        }
     }
 
     fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {
