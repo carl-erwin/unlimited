@@ -39,12 +39,22 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
         map.insert(k, COLOR_RED);
     }
 
+    for k in &["public", "private"] {
+        map.insert(k, COLOR_RED);
+    }
+
+
     for k in &[
         "let", "ref", "mut", "fn", "impl", "trait", "type", "Option", "Some", "None", "Result",
         "borrow", "unwrap",
     ] {
         map.insert(k, (0, 128, 128));
     }
+
+    for k in &[ "var" ] {
+        map.insert(k, (0, 128, 128));
+    }
+
 
     // some C preprocessor tokens
     for k in &[
