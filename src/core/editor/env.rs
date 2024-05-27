@@ -113,7 +113,7 @@ pub struct EditorEnv<'a> {
     pub focus_locked_on_view_id: Option<view::Id>,
 
     /// this view takes all input events (pointer/key/button press/etc..)
-    pub grab_view: Option<view::Id>,
+    pub input_grab_view_id: Option<view::Id>,
 
     //
     pub status_view_id: Option<view::Id>,
@@ -163,7 +163,7 @@ impl<'a> EditorEnv<'a> {
             root_view_id: view::Id(1), // NB
             center_offset: None,
             active_view: None,
-            grab_view: None,
+            input_grab_view_id: None,
             pointer_over_view_id: view::Id(0),
             last_selected_view_id: view::Id(0),
             focus_locked_on_view_id: None,

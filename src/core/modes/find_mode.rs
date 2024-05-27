@@ -156,6 +156,7 @@ pub fn find_start(
 
     find_show_controller_view(editor, env, view);
     set_focus_on_view_id(editor, env, controller_id);
+    env.input_grab_view_id = Some(controller_id);
 }
 
 pub fn find_controller_stop(
@@ -202,6 +203,7 @@ pub fn find_controller_stop(
 
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
+        env.input_grab_view_id = None;
     }
 }
 
@@ -253,6 +255,8 @@ fn create_find_controller_view(
 
     controller_view.controlled_view = Some(view.id);
 
+    controller_view.tags.insert("find-controller".to_owned());
+
     // set controller target as view.id
     let fm = view.mode_ctx_mut::<FindModeContext>("find-mode");
 
@@ -298,6 +302,8 @@ fn find_show_controller_view(
 
     let text_view = text_view.read();
     let fm = text_view.mode_ctx::<FindModeContext>("find-mode");
+
+    dbg_println!("find-mode: status_view dim = {:?}", status_view.dimension());
 
     status_view.children.pop(); // replace previous child
     status_view.children.push(ChildView {
@@ -379,6 +385,11 @@ pub fn find_controller_del_char(
         if let Some(text_view_id) = v.controlled_view {
             let text_view = get_view_by_id(editor, text_view_id);
             let mut text_view = text_view.write();
+
+            dbg_println!(
+                "find-mode: controlled_view dim = {:?}",
+                text_view.dimension()
+            );
 
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.find_str.pop();
@@ -639,6 +650,8 @@ pub fn display_find_string(
         let text_view = get_view_by_id(editor, text_view_id);
         let mut text_view = text_view.write();
 
+        dbg_println!("find-mode: controller dim {:?}", text_view.dimension());
+
         let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
 
         // build find string
@@ -647,8 +660,16 @@ pub fn display_find_string(
         buffer.delete_content(None);
         buffer.append(b"Find: ");
 
+        dbg_println!("find-mode: fm.find_str.len() {}", fm.find_str.len());
+
+        let dbg = format!("v.dimension() = {:?} ", v.dimension());
+
+        buffer.append(dbg.as_bytes());
+
         let s: String = fm.find_str.iter().collect();
         buffer.append(s.as_bytes());
+
+        dbg_println!("find-mode : buffer size = {}", buffer.size());
     } else {
         // panic! ?
         return;

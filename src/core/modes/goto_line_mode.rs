@@ -212,36 +212,8 @@ pub fn goto_line_start(
 
     goto_line_show_controller_view(editor, env, view);
     set_focus_on_view_id(&mut editor, &mut env, controller_id);
-}
 
-pub fn goto_line_stop(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View<'static>>>,
-) {
-    {
-        let v = view.write();
-        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.pop();
-    }
-
-    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_command_view_id(editor, env);
-    if let Some(status_view_id) = status_view_id {
-        let status_view = get_view_by_id(editor, status_view_id);
-        let buffer = status_view.read().buffer().unwrap();
-        let mut buffer = buffer.write();
-        // clear buffer
-        let sz = buffer.size();
-        buffer.remove(0, sz, None);
-
-        {
-            let mut v = view.write();
-            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
-
-            gtm.reset();
-        }
-    }
+    env.input_grab_view_id = Some(controller_id);
 }
 
 fn create_goto_line_controller_view(
@@ -542,6 +514,9 @@ pub fn goto_line_controller_stop(
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
     }
+
+    // reset controller grab
+    env.input_grab_view_id = None;
 }
 
 pub fn goto_line_set_target_line(

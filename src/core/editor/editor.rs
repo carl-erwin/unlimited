@@ -803,11 +803,11 @@ fn clip_locked_coordinates_xy(
     _editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     _root_view_id: view::Id,
-    _view_id: view::Id,
+    view_id: view::Id,
     x: &mut i32,
     y: &mut i32,
 ) -> view::Id {
-    let id = env.focus_locked_on_view_id.unwrap();
+    let id = view_id;
 
     dbg_println!(
         "CLIPPING LOCKED  {:?} ----------------------------------BEGIN",
@@ -825,13 +825,13 @@ fn clip_locked_coordinates_xy(
         y
     );
 
-    env.diff_x = *x - env.global_x.unwrap();
-    env.diff_y = *y - env.global_y.unwrap();
+    env.diff_x = *x - env.global_x.unwrap_or(0);
+    env.diff_y = *y - env.global_y.unwrap_or(0);
 
     // update local coordinates
     // it is up to the mode to ignore negative values
-    *x = env.local_x.unwrap() + env.diff_x;
-    *y = env.local_y.unwrap() + env.diff_y;
+    *x = env.local_x.unwrap_or(0) + env.diff_x;
+    *y = env.local_y.unwrap_or(0) + env.diff_y;
 
     dbg_println!(
         "CLIPPING LOCKED ---------------------------------- DIFF X({}) Y({})",
@@ -847,7 +847,7 @@ fn clip_locked_coordinates_xy(
 // clips (x,y) to local view @ (x,y)
 // returns the view's id at
 // TODO(ceg): add event mask to allow traversal
-// TODO(ceg): build parent path at the same time
+// TODO(ceg): build parent path + parent (x/y) at the same time
 fn clip_coordinates_xy(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
@@ -858,10 +858,8 @@ fn clip_coordinates_xy(
 ) -> view::Id {
     let mut id = root_view_id;
 
-    /*
-    if env.focus_locked_on_view_id.is_some() {
-
-
+    // redirect every input event ot grabber
+    if let Some(vid) = env.input_grab_view_id {
         return clip_locked_coordinates_xy(
             &mut editor,
             &mut env,
@@ -871,7 +869,17 @@ fn clip_coordinates_xy(
             &mut y,
         );
     }
-    */
+
+    if let Some(vid) = env.focus_locked_on_view_id {
+        return clip_locked_coordinates_xy(
+            &mut editor,
+            &mut env,
+            root_view_id,
+            vid,
+            &mut x,
+            &mut y,
+        );
+    }
 
     let root_x = *x;
     let root_y = *y;
