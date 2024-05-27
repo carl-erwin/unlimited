@@ -284,7 +284,7 @@ fn compose_children(
         return false;
     }
 
-    dbg_println!("COMPOSE CHILDREN OF  {:?}", view.id);
+    dbg_println!("COMPOSE CHILDREN OF  {:?} tags {:?}", view.id, view.tags);
 
     // split direction
     let layout_dir_is_vertical = view.layout_direction == view::LayoutDirection::Vertical;
@@ -562,7 +562,11 @@ pub fn run_compositing_stage_direct(
     }
 
     {
-        dbg_println!("[START] COMPOSE VID {:?}, ", view.read().id);
+        dbg_println!(
+            "[START] COMPOSE VID {:?} tags {:?} ",
+            view.read().id,
+            view.read().tags
+        );
     }
 
     // Render parent before children
