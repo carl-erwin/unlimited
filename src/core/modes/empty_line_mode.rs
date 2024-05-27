@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::rc::Rc;
 
 use super::Mode;
 
@@ -13,6 +14,9 @@ use crate::core::modes::text_mode::UnicodeToTextFilter;
 use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::view::View;
 
+//use crate::core::view::FilterData;
+use crate::core::view::FilterIo;
+
 use crate::core::screen::screen_apply;
 
 use crate::dbg_println;
@@ -22,6 +26,8 @@ use crate::core::view::ContentFilter;
 use crate::core::view::LayoutEnv;
 
 use crate::core::codepointinfo::TextStyle;
+
+use parking_lot::RwLock;
 
 pub struct EmptyLineModeContext {}
 
@@ -62,37 +68,37 @@ impl<'a> Mode for EmptyLineMode {
 
         //
         let use_utf8_codec = true;
-        let use_tabulation_exp = true;
+        let use_tabulation_exp = !true; // char map ? with <tab>
 
         // mandatory data reader
         view.compose_content_filters
             .borrow_mut()
             .push(Box::new(RawDataFilter::new()));
         //
+        /*
+                if use_utf8_codec {
+                    //
+                    // DEBUG codec error
+                    view.compose_content_filters
+                        .borrow_mut()
+                        .push(Box::new(Utf8Filter::new()));
+                } else {
+                    view.compose_content_filters
+                        .borrow_mut()
+                        .push(Box::new(TextCodecFilter::new()));
+                }
+                //
+                view.compose_content_filters
+                    .borrow_mut()
+                    .push(Box::new(UnicodeToTextFilter::new()));
 
-        if use_utf8_codec {
-            //
-            // DEBUG codec error
-            view.compose_content_filters
-                .borrow_mut()
-                .push(Box::new(Utf8Filter::new()));
-        } else {
-            view.compose_content_filters
-                .borrow_mut()
-                .push(Box::new(TextCodecFilter::new()));
-        }
-        //
-        view.compose_content_filters
-            .borrow_mut()
-            .push(Box::new(UnicodeToTextFilter::new()));
-
-        // TODO: char map 0x9 -> "\t"
-        if use_tabulation_exp {
-            view.compose_content_filters
-                .borrow_mut()
-                .push(Box::new(TabFilter::new()));
-        }
-
+                // TODO: char map 0x9 -> "\t"
+                if use_tabulation_exp {
+                    view.compose_content_filters
+                        .borrow_mut()
+                        .push(Box::new(TabFilter::new()));
+                }
+        */
         let mut screen_filter = ScreenFilter::new();
         screen_filter.display_eof = false;
 
@@ -100,6 +106,7 @@ impl<'a> Mode for EmptyLineMode {
             .borrow_mut()
             .push(Box::new(screen_filter));
 
+        // move to overlay
         view.compose_content_filters
             .borrow_mut()
             .push(Box::new(EmptyLineModeCompose::new()));
@@ -124,8 +131,19 @@ impl ContentFilter<'_> for EmptyLineModeCompose {
         &"EmptyLineModeCompose"
     }
 
+    fn run(
+        &mut self,
+        _view: &View,
+        env: &mut LayoutEnv,
+        _input: &[FilterIo],
+        _output: &mut Vec<FilterIo>,
+    ) {
+        // FIXME move to overlay
+    }
+
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
         // fill the whole status bar
+
         screen_apply(&mut env.screen, |_, _, cpi| {
             cpi.style.color = TextStyle::title_color();
             cpi.style.bg_color = TextStyle::title_bg_color();
