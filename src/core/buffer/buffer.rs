@@ -68,11 +68,6 @@ pub struct BufferBuilder {
     start_position: BufferPosition,
 }
 
-#[derive(Debug)]
-struct BufferMappedFileEventHandler<'a> {
-    _buffer: Weak<RwLock<Buffer<'a>>>,
-}
-
 fn mapped_file_event_to_buffer_event(buffer_id: Id, evt: &MappedFileEvent) -> BufferEvent {
     match evt {
         MappedFileEvent::NodeChanged { node_index } => BufferEvent::BufferNodeChanged {
