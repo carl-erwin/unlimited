@@ -22,6 +22,10 @@ use crate::core::view::LayoutEnv;
 
 use crate::core::view::View;
 
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
+
 use crate::core::event::*;
 
 use crate::core::modes::core_mode::decrease_layout_op;
@@ -44,6 +48,7 @@ pub struct HsplitMode {
 pub struct HsplitModeContext {
     // add per view fields
     pub selected: bool,
+    pub hover: bool,
 }
 
 impl<'a> Mode for HsplitMode {
@@ -59,7 +64,10 @@ impl<'a> Mode for HsplitMode {
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc hsplit-mode ctx");
-        let ctx = HsplitModeContext { selected: false };
+        let ctx = HsplitModeContext {
+            selected: false,
+            hover: false,
+        };
         Box::new(ctx)
     }
 
@@ -77,6 +85,40 @@ impl<'a> Mode for HsplitMode {
         view.compose_content_filters
             .borrow_mut()
             .push(Box::new(HsplitModeComposeFilter::new()));
+    }
+
+    fn on_view_event(
+        &self,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        src: ViewEventSource,
+        dst: ViewEventDestination,
+        event: &ViewEvent,
+        src_view: &mut View<'static>,
+        _parent: Option<&mut View<'static>>,
+    ) {
+        dbg_println!(
+            "mode '{}' on_view_event src: {:?} dst: {:?}, event {:?} view.id {:?}",
+            self.name(),
+            src,
+            dst,
+            event,
+            src_view.id
+        );
+
+        match event {
+            ViewEvent::Enter => {
+                let mod_ctx = src_view.mode_ctx_mut::<HsplitModeContext>("hsplit-mode");
+                mod_ctx.hover = true;
+            }
+
+            ViewEvent::Leave => {
+                let mod_ctx = src_view.mode_ctx_mut::<HsplitModeContext>("hsplit-mode");
+                mod_ctx.hover = false;
+            }
+
+            _ => {}
+        }
     }
 }
 
@@ -252,10 +294,14 @@ impl ContentFilter<'_> for HsplitModeComposeFilter {
 
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
+
+        cpi.style.color = (45 + 25, 49 + 25, 54 + 25);
         if mod_ctx.selected {
-            cpi.style.color = TextStyle::default_color();
+            cpi.style.color = (0, 119, 184);
         } else {
-            cpi.style.color = (45 + 25, 49 + 25, 54 + 25);
+            if mod_ctx.hover {
+                cpi.style.color = TextStyle::default_color();
+            }
         }
 
         cpi.cp = '─';
