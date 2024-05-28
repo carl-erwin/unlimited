@@ -641,7 +641,7 @@ fn process_single_input_event<'a>(
     action(editor, env, &mut view);
     let end = Instant::now();
 
-    if debug_flag == 0 {
+    if debug_action && debug_flag == 0 {
         disable_dbg_println();
     }
 
