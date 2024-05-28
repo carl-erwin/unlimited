@@ -5,6 +5,7 @@ use crate::core::view::ContentFilter;
 use crate::core::view::FilterData;
 use crate::core::view::FilterIo;
 use crate::core::Editor;
+use crate::core::EditorEnv;
 
 use crate::core::view::LayoutEnv;
 
@@ -94,7 +95,7 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     }
 
     // shell
-    for k in &["esac", "done" ] {
+    for k in &["esac", "done"] {
         map.insert(k, (0, 128, 128));
     }
 
@@ -314,7 +315,8 @@ impl ContentFilter<'_> for HighlightKeywords {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

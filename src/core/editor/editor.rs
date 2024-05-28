@@ -168,20 +168,41 @@ pub type RenderStageFunction = fn(
 
 pub type RenderStageActionMap = HashMap<String, RenderStageFunction>;
 
+pub trait EditorEventCb {
+    fn cb(&mut self, event: &EditorEvent);
+}
+
+// PartialEq, Eq
+#[derive(Debug, Clone, Copy)]
+pub enum EditorEvent {
+    BufferAdded { id: buffer::Id },
+    BufferRemoved { id: buffer::Id },
+    ViewAdded { id: view::Id },
+    ViewRemoved { id: view::Id },
+}
+
 pub struct Editor<'a> {
     pub config: Config,
     pub buffer_map: Arc<RwLock<HashMap<buffer::Id, Arc<RwLock<Buffer<'static>>>>>>,
-    pub root_views: Vec<view::Id>,
+    //
+    pub active_views: Vec<view::Id>, // ordered ids from view_map // must rework main view
+    //
     pub view_map: Arc<RwLock<HashMap<view::Id, Rc<RwLock<View<'a>>>>>>,
     pub tagged_view: Arc<RwLock<HashMap<String, HashSet<view::Id>>>>,
     /// "tag" -> view::Id ... view::Id  -> view::Id<br/>
     /// Some tags should be unique (ex: "status-line", command-line)
     pub modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
     pub dir_modes: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn Mode>>>>>>,
+    //
     pub core_tx: Sender<Message<'a>>,
     pub ui_tx: Sender<Message<'a>>,
     pub worker_tx: Sender<Message<'a>>,
     pub indexer_tx: Sender<Message<'a>>,
+    //
+    pub event_subscribers:
+        Rc<RefCell<HashMap<String, (Rc<RefCell<Box<dyn Mode>>>, HashSet<view::Id>)>>>,
+
+    pub pending_editor_events: Rc<RefCell<Vec<EditorEvent>>>,
 }
 
 impl<'a> Editor<'a> {
@@ -197,7 +218,9 @@ impl<'a> Editor<'a> {
         Editor {
             config,
             buffer_map: Arc::new(RwLock::new(HashMap::new())),
-            root_views: vec![],
+
+            active_views: vec![],
+
             view_map: Arc::new(RwLock::new(HashMap::new())),
 
             tagged_view: Arc::new(RwLock::new(HashMap::new())),
@@ -208,11 +231,11 @@ impl<'a> Editor<'a> {
             core_tx,
             worker_tx,
             indexer_tx,
-        }
-    }
+            //
+            event_subscribers: Rc::new(RefCell::new(HashMap::new())),
 
-    pub fn is_root_view(&self, id: view::Id) -> bool {
-        self.root_views.iter().find(|&&x| x == id).is_some()
+            pending_editor_events: Rc::new(RefCell::new(vec![])),
+        }
     }
 
     pub fn register_mode<'e>(&mut self, mode: Box<dyn Mode>) {
@@ -292,6 +315,7 @@ pub fn remove_view_by_id(
     vid: view::Id,
 ) -> Option<Rc<RwLock<View<'static>>>> {
     let mut map = editor.view_map.write();
+    dbg_println!("REMOVE VIEW {:?}", vid);
     map.remove(&vid)
 }
 
@@ -1476,6 +1500,9 @@ fn run_all_stages(
         run_stages(Stage::Input, &mut editor, &mut env, target_id);
 
         //
+        process_editor_events(&mut editor, &mut env);
+
+        //
         if env.pending_events > 0 {
             env.pending_events = crate::core::event::pending_input_event_dec(1);
         }
@@ -1559,6 +1586,58 @@ fn process_input_events(
     );
 }
 
+pub fn register_editor_event_watcher(
+    editor: &mut Editor<'static>,
+    name: &str,
+    mode: Rc<RefCell<Box<dyn Mode>>>,
+    view_id: view::Id,
+) {
+    dbg_println!("register_editor_event_watcher {} {:?}", name, view_id);
+
+    let event_subscribers = editor.event_subscribers.clone();
+    let mut event_subscribers = event_subscribers.borrow_mut();
+
+    event_subscribers
+        .entry(name.to_owned())
+        .or_insert_with(move || {
+            let mut set = HashSet::new();
+            set.insert(view_id);
+            (mode, set)
+        })
+        .1
+        .insert(view_id);
+}
+
+pub fn push_editor_event(editor: &mut Editor<'static>, event: EditorEvent) {
+    editor.pending_editor_events.borrow_mut().push(event)
+}
+
+// TODO(ceg): publish subscribe to editor events
+// mode.subscribe to buffer events
+pub fn process_editor_events(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
+    let events = editor.pending_editor_events.clone();
+    let mut events = events.borrow_mut();
+
+    let event_subscribers = editor.event_subscribers.clone();
+    let event_subscribers = event_subscribers.borrow();
+
+    for event in events.iter() {
+        for (_key, (mode, view_ids)) in event_subscribers.iter() {
+            for view_id in view_ids.iter() {
+                let view = get_view_by_id(editor, *view_id);
+                let mut view = view.write();
+
+                let mode = mode.borrow_mut();
+                mode.on_editor_event(editor, env, &event, &mut view);
+            }
+        }
+    }
+
+    events.clear();
+}
+
+// TODO(ceg): publish subscribe to buffer events
+// mode.subscribe to buffer events
 fn process_buffer_event(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
@@ -1570,6 +1649,7 @@ fn process_buffer_event(
         //
         BufferEvent::BufferFullyIndexed { buffer_id } => {
             // TODO: remove this add explicit subscriber trait ? to buffer
+            // explicit subscriber list
 
             let mut view_ids = vec![];
 

@@ -26,6 +26,7 @@ use crate::core::event::input_map::build_input_event_map;
 
 use crate::core::view;
 use crate::core::view::ChildView;
+
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutSize;
 use crate::core::view::View;
@@ -676,7 +677,7 @@ pub fn increase_layout_op(
                 max_size.saturating_sub(minus * 100) / 100
             );
             LayoutSize::RemainMinus {
-                minus: ((minus * 100 + max_size) / 100) - 1,
+                minus: ((minus * 100 + max_size) / 100).saturating_sub(1),
             }
         }
         _ => op.clone(),
@@ -939,11 +940,13 @@ fn get_view_parent(editor: &Editor<'static>, view: &Rc<RwLock<View<'static>>>) -
 */
 pub fn destroy_view(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // TODO(ceg): get parents
     // vec<view::Id>
+
+    env.active_view = None;
 
     let parents = {
         let parents = get_view_parent(&editor, &view);

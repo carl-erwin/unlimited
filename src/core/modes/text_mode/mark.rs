@@ -122,7 +122,7 @@ pub fn read_char_raw_backward(
         dbg_println!("code.decode = {:?}", ret);
     }
 
-    dbg_println!("CEG data before drain = {:?}", data);
+    dbg_println!("data before drain = {:?}", data);
 
     // keep trailer
     data.drain(0..(4 - ret.2));

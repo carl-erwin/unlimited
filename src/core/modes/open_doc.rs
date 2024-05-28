@@ -31,6 +31,8 @@ use crate::core::event::input_map::build_input_event_map;
 use crate::core::view;
 use crate::core::view::ChildView;
 
+use crate::core::view::*;
+
 use crate::core::view::View;
 
 use crate::core::view::ControllerView;
@@ -206,7 +208,7 @@ pub fn open_doc_controller_stop(
         }
     }
     {
-        let parent_id = view::get_text_area_view_id(editor, &env).unwrap();
+        let parent_id = view::Id(1);
 
         get_view_by_id(editor, parent_id)
             .write()
@@ -707,12 +709,13 @@ fn show_completion_popup(
     }
 
     // TODO: get view global coordinates, update on  resize
-    let parent_id = view::get_text_area_view_id(editor, &env).unwrap();
+    let parent_id = view::get_view_by_tag(editor, env, "main").unwrap();
+    let parent_id = view::Id(1);
 
     let (x, y, pop_width, pop_height) = {
         let dim = get_view_by_id(editor, parent_id).read().dimension();
         let w = dim.0;
-        let h = dim.1;
+        let h = dim.1.saturating_sub(3);
         let x = 0;
         let y = 0;
         (x, y, w, h)
@@ -1019,8 +1022,6 @@ pub fn open_doc_controller_show_buffer(
         return;
     }
 
-    return;
-
     open_doc_controller_stop(editor, env, view);
 }
 
@@ -1080,6 +1081,12 @@ fn open_doc_controller_load_buffer(
         let file_modes = editor.modes.clone();
         let dir_modes = editor.dir_modes.clone();
 
+        use parking_lot::RwLock;
+        use std::collections::HashMap;
+
+        use crate::core::buffer;
+        use crate::core::buffer::Buffer;
+
         let map = editor.buffer_map.clone();
         let mut map = map.write();
 
@@ -1105,6 +1112,7 @@ fn open_doc_controller_load_buffer(
     let buffer = buffer_map.get(&buffer_id).unwrap();
     let buffer = buffer.clone();
 
+    // insert view to active view (no groups yet)
     // FIXME(ceg): there is a lot of copy paste from core::
     let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
     if json.is_err() {
@@ -1124,9 +1132,9 @@ fn open_doc_controller_load_buffer(
 
     dbg_println!("open-doc : create view id {:?}", id);
 
-    // a new top level view
-    let new_root_view_id = id.unwrap();
-    editor.root_views.push(id.unwrap());
+    if let Some(id) = id {
+        editor.active_views.push(id);
+    }
 
     let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
@@ -1144,5 +1152,5 @@ fn open_doc_controller_load_buffer(
         editor.indexer_tx.send(msg).unwrap_or(());
     }
 
-    (new_root_view_id, true)
+    return (view::Id(0), true);
 }

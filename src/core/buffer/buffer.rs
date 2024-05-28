@@ -3,7 +3,6 @@ use std::fmt;
 use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::sync::Arc;
-use std::sync::Weak;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -222,10 +221,6 @@ pub trait BufferEventCb {
 // PartialEq, Eq
 #[derive(Debug, Clone)]
 pub enum BufferEvent {
-    BufferAdded { buffer_id: Id },
-    BufferOpened { buffer_id: Id },
-    BufferClosed { buffer_id: Id },
-    BufferRemoved { buffer_id: Id },
     BufferFullyIndexed { buffer_id: Id },
     BufferNodeAdded { buffer_id: Id, node_index: usize },
     BufferNodeChanged { buffer_id: Id, node_index: usize },
@@ -235,10 +230,6 @@ pub enum BufferEvent {
 
 fn buffer_event_to_string(evt: &BufferEvent) -> String {
     match evt {
-        BufferEvent::BufferAdded { .. } => "Added".to_owned(),
-        BufferEvent::BufferOpened { .. } => "Opened".to_owned(),
-        BufferEvent::BufferClosed { .. } => "Closed".to_owned(),
-        BufferEvent::BufferRemoved { .. } => "Removed".to_owned(),
         BufferEvent::BufferFullyIndexed { .. } => "FullyIndexed".to_owned(),
 
         BufferEvent::BufferNodeAdded {
@@ -270,7 +261,7 @@ fn buffer_event_to_string(evt: &BufferEvent) -> String {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BufferKind {
     File,
     Directory,

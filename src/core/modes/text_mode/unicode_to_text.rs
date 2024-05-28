@@ -4,6 +4,8 @@ use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 use crate::core::view::View;
 use crate::core::Editor;
+use crate::core::EditorEnv;
+
 use parking_lot::RwLock;
 use std::rc::Rc;
 
@@ -26,7 +28,9 @@ impl ContentFilter<'_> for UnicodeToTextFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        _editor_env: &mut EditorEnv<'static>,
+
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

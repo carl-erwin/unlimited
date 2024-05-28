@@ -7,6 +7,8 @@ use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 use crate::core::view::View;
 use crate::core::Editor;
+use crate::core::EditorEnv;
+
 use parking_lot::RwLock;
 use std::rc::Rc;
 
@@ -98,7 +100,9 @@ impl ContentFilter<'_> for ScreenFilter {
 
     fn setup(
         &mut self,
-        editor: &Editor<'static>,
+        editor: &mut Editor<'static>,
+        editor_env: &mut EditorEnv<'static>,
+
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

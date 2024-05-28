@@ -38,7 +38,7 @@ pub struct LayoutEnv<'a> {
     pub max_offset: u64,
     pub screen: &'a mut Screen,
     pub active_view_id: view::Id,
-    //    pub target_view_id: view::Id,
+    pub current_view_id: view::Id,
 }
 
 // TODO(ceg): add ?
@@ -53,7 +53,8 @@ pub trait ContentFilter<'a> {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        mut _editor: &mut Editor<'static>,
+        mut _editor_env: &mut EditorEnv<'static>,
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -299,6 +300,9 @@ fn compose_children(
     // add: flag to allow resize ?
     // View::self_resize_allowed: bool
     let mut all_children = view.children.clone();
+
+    dbg_println!("all_children {:?}", all_children);
+
     let mut floating_children = view.floating_children.clone();
     all_children.append(&mut floating_children);
 
@@ -561,13 +565,15 @@ pub fn run_compositing_stage_direct(
         return;
     }
 
-    {
+    let current_view_id = {
         dbg_println!(
             "[START] COMPOSE VID {:?} tags {:?} ",
             view.read().id,
             view.read().tags
         );
-    }
+
+        view.read().id
+    };
 
     // Render parent before children
     // if no filter configured, will do nothing
@@ -581,7 +587,7 @@ pub fn run_compositing_stage_direct(
         max_offset,
         screen,
         active_view_id,
-        //target_view_id,
+        current_view_id,
     };
 
     // screen must be cleared by caller
@@ -594,11 +600,25 @@ pub fn run_compositing_stage_direct(
     let mut time_spent: Vec<u128> = vec![];
 
     if pass_mask == LayoutPass::ScreenContent || pass_mask == LayoutPass::ScreenContentAndOverlay {
-        run_content_filters(editor, &mut layout_env, &mut time_spent, view, None);
+        run_content_filters(
+            editor,
+            editor_env,
+            &mut layout_env,
+            &mut time_spent,
+            view,
+            None,
+        );
     }
 
     if pass_mask == LayoutPass::ScreenOverlay || pass_mask == LayoutPass::ScreenContentAndOverlay {
-        run_screen_overlay_filters(editor, &mut layout_env, &mut time_spent, view, None);
+        run_screen_overlay_filters(
+            editor,
+            editor_env,
+            &mut layout_env,
+            &mut time_spent,
+            view,
+            None,
+        );
     }
 
     {
@@ -623,7 +643,9 @@ pub fn run_compositing_stage_direct(
 }
 
 fn run_content_filters(
-    editor: &Editor<'static>,
+    editor: &mut Editor<'static>,
+    editor_env: &mut EditorEnv<'static>,
+
     layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,
@@ -643,7 +665,7 @@ fn run_content_filters(
     for (idx, f) in filters.borrow_mut().iter_mut().enumerate() {
         //dbg_println!("setup {}", f.name());
         let t0 = std::time::Instant::now();
-        f.setup(editor, layout_env, view, parent_view);
+        f.setup(editor, editor_env, layout_env, view, parent_view);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;
@@ -741,6 +763,7 @@ fn run_content_filters(
 
 fn run_screen_overlay_filters(
     editor: &Editor<'static>,
+    editor_env: &EditorEnv<'static>,
     layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,

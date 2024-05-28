@@ -6,10 +6,10 @@
         "size": { "percent": 100 }
     },
 
-    "file-view": {
-    "modes": [ ],
-    "children_layout": "vertical",
-    "children": [
+    "main-view": {
+        "modes": [ "core-mode" ],
+        "children_layout": "vertical",
+        "children": [
         {
             "tags": [ "title-bar" ],
             "modes": [ "title-bar" ],
@@ -21,18 +21,36 @@
             "children_layout": "horizontal",
             "children": [
                 {
-                    "modes": [ "side-bar-mode" ],
                     "internal-buffer": "",
                     "tags": [ "side-bar" ],
-                    "size": { "fixed": 24 }
+                    "size": { "percent": 10 },
+                    "children": [
+                        {
+                            "modes": [ "side-bar-mode" ],
+                            "internal-buffer": "",
+                            "size": { "remain_minus": 1 }
+                        },
+                        {
+                            "tags": [ "vscrollbar" ],
+                            "modes": [ "vscrollbar-mode" ],
+                            "internal-buffer": "vscrollbar",
+                            "size": { "fixed": 1 }
+                        }
+                    ],
+                    "children-subscribe": [ { "mode": "vscrollbar-mode", "src": 0, "dst": 1 } , { "mode": "side-bar-mode", "src": 1, "dst": 0 } ]
                 },
                 {
                     "modes": [ "vsplit-mode" ],
-                    "internal-buffer": "vscrollbar",
+                    "internal-buffer": "left-split",
                     "size": { "fixed": 1 }
                 },
                 {
-                    "sub-layout": "main-view"
+                    "sub-layout":  "work-space-view"
+                },
+                {
+                    "modes": [ "vsplit-mode" ],
+                    "internal-buffer": "right-split",
+                    "size": { "fixed": 1 }
                 }
             ]
         },
@@ -55,10 +73,31 @@
     ]
     },
 
-    "main-view":
+    "work-space-view":
     {
         "leader": true,
-        "tags": [ "main" ],
+        "tags": [ "work-space" ],
+        "modes": [ "core-mode", "open-doc-mode" ],
+
+        "size": { "percent": 80 },
+
+        "allow-split": false,
+        "allow-destroy": false
+    },
+
+    "empty-group-view":
+    {
+        "leader": true,
+        "tags": [ "group" ],
+
+        "size": { "remain_percent": 100.0 }
+    },
+
+
+    "group-view":
+    {
+        "leader": true,
+        "tags": [ "group" ],
 
         "size": { "remain_percent": 100.0 },
 
@@ -68,7 +107,7 @@
         "children": [
             {
                 "tags": [ "tab-bar" ],
-                "modes": [ "empty-line-mode" ],
+                "modes": [ "tab-bar-mode" ],
                 "internal-buffer": "tab-bar",
                 "size": { "fixed": 1 }
             },
@@ -86,7 +125,7 @@
                 "tags": [ "terminal" ],
                 "modes": [ "empty-line-mode" ],
                 "internal-buffer": "terminal",
-                "size": { "fixed": 1 }
+                "size": { "fixed": 0 }
             }
         ]
     },
@@ -94,9 +133,9 @@
     "single-file-view":
     {
         "leader": true,
-        "tags": [ "text", "text-area" ],
+        "tags": [ "file-view" ],
 
-        "size": { "remain_minus": 1 },
+        "size": { "percent": 100 },
         "allow-split": true,
         "allow-destroy": true,
         "children_layout": "horizontal",
@@ -115,7 +154,7 @@
             },
             {
                 "leader": true,
-                "tags": [ "target-view" ],
+                "tags": [ "text-view", "target-view" ],
                 "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
                 "size": { "remain_minus": 1      }
             },

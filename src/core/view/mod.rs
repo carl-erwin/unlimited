@@ -24,6 +24,8 @@ use crate::core::editor::add_view_tag;
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::get_view_ids_by_tags;
 
+use crate::core::editor::register_editor_event_watcher;
+
 use crate::core::screen::Screen;
 
 pub mod layout;
@@ -531,6 +533,9 @@ impl<'a> View<'a> {
                 view.set_mode_ctx(m.name(), ctx);
                 dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
                 m.configure_view(editor, env, view);
+                if m.watch_editor_event() {
+                    register_editor_event_watcher(editor, m.name(), mode_rc.clone(), view.id);
+                }
                 view_self_subscribe(editor, env, mode_rc.clone(), view);
             }
         }
@@ -674,7 +679,9 @@ impl<'a> View<'a> {
                 let any = box_any.as_mut();
                 match any.downcast_mut::<T>() {
                     Some(m) => m,
-                    None => panic!("internal error: wrong type registered : mode name {}", name),
+                    None => {
+                        panic!("internal error: wrong type registered : mode name '{}' | view tags {:?}", name, self.tags)
+                    }
                 }
             }
 
@@ -719,17 +726,6 @@ pub fn get_view_by_tag(
     tag: &str,
 ) -> Option<Id> {
     let v = get_view_ids_by_tags(&editor, tag)?;
-    if v.len() == 1 {
-        return Some(v[0]);
-    }
-    return None;
-}
-
-pub fn get_text_area_view_id(
-    editor: &mut Editor<'static>,
-    _env: &EditorEnv<'static>,
-) -> Option<Id> {
-    let v = get_view_ids_by_tags(&editor, "text-area")?;
     if v.len() == 1 {
         return Some(v[0]);
     }

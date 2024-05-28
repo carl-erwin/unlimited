@@ -8,6 +8,7 @@ use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 use crate::core::view::View;
 use crate::core::Editor;
+use crate::core::EditorEnv;
 
 pub struct ShowTrailingSpaces {
     accum: Vec<FilterIo>,
@@ -41,7 +42,9 @@ impl ContentFilter<'_> for ShowTrailingSpaces {
 
     fn setup(
         &mut self,
-        _editor: &Editor,
+        _editor: &mut Editor,
+        _editor_env: &mut EditorEnv,
+
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

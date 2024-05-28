@@ -137,9 +137,9 @@ pub fn main_loop_sdl(
             rects_color.clear();
             for y in (0..height).step_by(font_h as usize) {
                 for x in (0..width).step_by(font_w as usize) {
-                    let r =  (x + y) % 255 as u32;
-                    let g =  (x as u32) % 255 as u32;
-                    let b =  (y as u32) % 255 as u32;
+                    let r = (x + y) % 255 as u32;
+                    let g = (x as u32) % 255 as u32;
+                    let b = (y as u32) % 255 as u32;
 
                     rects_color.push((r, g, b));
                 }
@@ -163,7 +163,7 @@ pub fn main_loop_sdl(
             fps = 0;
         }
 
-        let wait = std::time::Duration::from_millis(1000/120);
+        let wait = std::time::Duration::from_millis(1000 / 120);
         std::thread::sleep(wait);
     }
 

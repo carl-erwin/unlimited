@@ -38,6 +38,8 @@ use crate::core::buffer::BufferPosition;
 use crate::core::config::Config;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
+use crate::core::editor::EditorEvent;
+
 use crate::core::event::Event;
 use crate::core::event::Message;
 
@@ -50,6 +52,9 @@ use crate::core::view::ViewEventSource;
 
 use crate::core::editor::get_view_by_id;
 use crate::core::view::register_view_subscriber;
+
+use crate::core::editor::process_editor_events;
+use crate::core::editor::push_editor_event;
 
 //use crate::core::error::Error;
 //type UnlResult<T> = Result<T, Error>;
@@ -226,6 +231,9 @@ pub fn run(
     configure_modes(&mut editor, &mut env);
 
     create_layout(&mut editor, &mut env);
+
+    //
+    process_editor_events(&mut editor, &mut env);
 
     // TODO(ceg): send one event per
     // index buffers,
@@ -679,6 +687,8 @@ use crate::core::modes::TextMode;
 use crate::core::modes::EmptyLineMode;
 use crate::core::modes::SideBarMode;
 
+use crate::core::modes::TabBarMode;
+
 use crate::core::modes::StatusLineMode;
 
 use crate::core::modes::TitleBarMode;
@@ -702,6 +712,8 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     editor.register_mode(Box::new(EmptyLineMode::new()));
 
     editor.register_mode(Box::new(SideBarMode::new()));
+
+    editor.register_mode(Box::new(TabBarMode::new()));
 
     editor.register_mode(Box::new(VsplitMode::new()));
     editor.register_mode(Box::new(HsplitMode::new()));
@@ -1191,24 +1203,62 @@ pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'
         }
     }
 
-    // create views
-    for buffer in buffers {
-        dbg_println!("-------------");
+    // TODO(ceg): handle ctor with no buffer
+    let root_buf = BufferBuilder::new(BufferKind::File)
+        .buffer_name("root")
+        .internal(true)
+        .use_buffer_log(false)
+        //.read_only(true) // TODO
+        .finalize();
 
-        dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
-        let kind = buffer.as_ref().read().kind;
-        let id = match kind {
-            BufferKind::File => {
-                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
+    let root_id = build_view_layout_typed(&mut editor, &mut env, root_buf, &json, "main-view");
+    dbg_println!("root_id {:?}", root_id);
+
+    // TODO: implement side bar click to create groups
+    // create a default group and attach it to "work-space-view":
+
+    if false {
+        // create views
+        // TODO: add (default) group in main view
+        for buffer in buffers {
+            dbg_println!("-------------");
+
+            dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
+            let kind = buffer.as_ref().read().kind;
+            let vid = match kind {
+                BufferKind::File => build_view_layout_typed(
+                    &mut editor,
+                    &mut env,
+                    Some(buffer),
+                    &json,
+                    "single-file-view",
+                ),
+                BufferKind::Directory => {
+                    build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+                }
+            };
+            if let Some(id) = vid {
+                //editor.active_views.push(id);
             }
-            BufferKind::Directory => {
-                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+        }
+    }
+
+    // populate active views (file)
+    // default behavior / no session restore yet
+    {
+        let map = editor.view_map.clone();
+        for (id, v) in map.read().iter() {
+            let v = v.read();
+            if !v.tags.contains("file-view") {
+                continue;
             }
-        };
-        if let Some(vid) = id {
-            // top level views
-            dbg_println!("add top level view {:?}", vid);
-            editor.root_views.push(vid);
+
+            if let Some(b) = v.buffer() {
+                if b.read().kind == BufferKind::File {
+                    editor.active_views.push(*id);
+                    push_editor_event(&mut editor, EditorEvent::ViewAdded { id: *id });
+                }
+            }
         }
     }
 }

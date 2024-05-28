@@ -111,7 +111,9 @@ impl ContentFilter<'_> for SideBarModeCompose {
 
     fn setup(
         &mut self,
-        editor: &Editor<'static>,
+        editor: &mut Editor<'static>,
+        _editor_env: &mut EditorEnv<'static>,
+
         _env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

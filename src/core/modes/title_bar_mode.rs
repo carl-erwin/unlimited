@@ -7,13 +7,11 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
 
-use crate::core::editor::check_view_by_id;
 use crate::core::editor::InputStageActionMap;
 
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::view;
 use crate::core::view::ContentFilter;
 
 use crate::core::view::FilterIo;
@@ -91,7 +89,9 @@ impl ContentFilter<'_> for EditorTitle {
 
     fn setup(
         &mut self,
-        editor: &Editor<'static>,
+        editor: &mut Editor<'static>,
+
+        editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

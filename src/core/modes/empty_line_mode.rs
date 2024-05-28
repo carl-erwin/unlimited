@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::rc::Rc;
 
 use super::Mode;
 
@@ -26,8 +25,6 @@ use crate::core::view::ContentFilter;
 use crate::core::view::LayoutEnv;
 
 use crate::core::codepointinfo::TextStyle;
-
-use parking_lot::RwLock;
 
 pub struct EmptyLineModeContext {}
 
@@ -75,30 +72,30 @@ impl<'a> Mode for EmptyLineMode {
             .borrow_mut()
             .push(Box::new(RawDataFilter::new()));
         //
-        /*
-                if use_utf8_codec {
-                    //
-                    // DEBUG codec error
-                    view.compose_content_filters
-                        .borrow_mut()
-                        .push(Box::new(Utf8Filter::new()));
-                } else {
-                    view.compose_content_filters
-                        .borrow_mut()
-                        .push(Box::new(TextCodecFilter::new()));
-                }
-                //
-                view.compose_content_filters
-                    .borrow_mut()
-                    .push(Box::new(UnicodeToTextFilter::new()));
 
-                // TODO: char map 0x9 -> "\t"
-                if use_tabulation_exp {
-                    view.compose_content_filters
-                        .borrow_mut()
-                        .push(Box::new(TabFilter::new()));
-                }
-        */
+        if use_utf8_codec {
+            //
+            // DEBUG codec error
+            view.compose_content_filters
+                .borrow_mut()
+                .push(Box::new(Utf8Filter::new()));
+        } else {
+            view.compose_content_filters
+                .borrow_mut()
+                .push(Box::new(TextCodecFilter::new()));
+        }
+        //
+        view.compose_content_filters
+            .borrow_mut()
+            .push(Box::new(UnicodeToTextFilter::new()));
+
+        // TODO: char map 0x9 -> "\t"
+        if use_tabulation_exp {
+            view.compose_content_filters
+                .borrow_mut()
+                .push(Box::new(TabFilter::new()));
+        }
+
         let mut screen_filter = ScreenFilter::new();
         screen_filter.display_eof = false;
 

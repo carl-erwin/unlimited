@@ -6,6 +6,7 @@ pub mod dir_mode;
 
 pub mod empty_line_mode;
 pub mod side_bar_mode;
+pub mod tab_bar_mode;
 
 pub mod status_line_mode;
 
@@ -23,6 +24,7 @@ pub mod vsplit_mode;
 
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
+use crate::core::editor::EditorEvent;
 
 use crate::core::editor::InputStageActionMap;
 use crate::core::view::View;
@@ -36,6 +38,8 @@ pub use open_doc::OpenDocMode;
 
 pub use empty_line_mode::EmptyLineMode;
 pub use side_bar_mode::SideBarMode;
+
+pub use tab_bar_mode::TabBarMode;
 
 pub use status_line_mode::StatusLineMode;
 pub use title_bar_mode::TitleBarMode;
@@ -71,6 +75,24 @@ pub trait Mode {
         _env: &mut EditorEnv<'static>,
         _buffer: &mut Buffer<'static>,
     ) {
+    }
+
+    fn watch_editor_event(&self) -> bool {
+        false
+    }
+
+    fn on_editor_event(
+        &self,
+        _editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        _event: &EditorEvent,
+        _watcher_view: &mut View<'static>,
+    ) {
+        dbg_println!(
+            "(default) mode '{}' on_editor_event: event {:?} IGNORE",
+            self.name(),
+            _event
+        );
     }
 
     fn on_buffer_event(
