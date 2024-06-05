@@ -96,7 +96,7 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     }
 
     // shell
-    for k in &["esac"] {
+    for k in &["esac", "done" ] {
         map.insert(k, (0, 128, 128));
     }
 
