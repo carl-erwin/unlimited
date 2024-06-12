@@ -315,9 +315,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                 Event::IndexTask { buffer_map } => {
                     dbg_println!("[receive index task ]");
 
-                    let mut refresh_ui = false;
                     let map = buffer_map.read();
-                    let mut t0 = std::time::Instant::now();
                     for (id, buffer) in map.iter() {
                         let is_indexed = buffer::build_index(buffer);
                         if !is_indexed {
@@ -335,35 +333,6 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                                 event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
                             },
                         );
-                        core_tx.send(msg).unwrap_or(());
-
-                        // TODO: remove this: let the ui decide if the refresh is needed base on buffer_id
-
-                        // send ui refresh event
-                        let msg = Message::new(0, 0, ts, Event::RefreshView);
-                        crate::core::event::pending_input_event_inc(1);
-                        core_tx.send(msg).unwrap_or(());
-
-                        refresh_ui = true;
-                        let t1 = std::time::Instant::now();
-                        if (t1 - t0).as_millis() > 1000 {
-                            // send ui refresh event
-
-                            let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
-                            let msg = Message::new(0, 0, ts, Event::RefreshView);
-                            crate::core::event::pending_input_event_inc(1);
-                            core_tx.send(msg).unwrap_or(());
-
-                            refresh_ui = false;
-                            t0 = t1;
-                        }
-                    }
-
-                    // last ui refresh
-                    if refresh_ui {
-                        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
-                        let msg = Message::new(0, 0, ts, Event::RefreshView);
-                        crate::core::event::pending_input_event_inc(1);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }

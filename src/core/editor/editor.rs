@@ -1661,7 +1661,9 @@ fn process_buffer_event(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     event: &BufferEvent,
-) {
+) -> bool {
+    let mut refresh = false;
+
     dbg_println!("{:?}", event);
 
     match event {
@@ -1680,6 +1682,11 @@ fn process_buffer_event(
                     let buffer = buffer.read();
                     if buffer.id == *buffer_id {
                         view_ids.push(view_id);
+                        if let Some(active) = env.active_view {
+                            if active == *view_id {
+                                refresh = true;
+                            }
+                        }
                     }
                 }
             }
@@ -1713,6 +1720,8 @@ fn process_buffer_event(
             panic!("{:?}", event);
         }
     }
+
+    refresh
 }
 
 pub fn main_loop(
@@ -1753,7 +1762,11 @@ pub fn main_loop(
                 }
 
                 Event::Buffer { event } => {
-                    process_buffer_event(&mut editor, &mut env, &event);
+                    let refresh = process_buffer_event(&mut editor, &mut env, &event);
+                    if refresh {
+                        // TODO(ceg): check if buffer is displayed in any visible view
+                        update_view_and_send_draw_event(&mut editor, &mut env);
+                    }
                 }
 
                 _ => {}

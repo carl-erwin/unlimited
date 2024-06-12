@@ -32,8 +32,6 @@ use crate::core::event::input_map::build_input_event_map;
 use crate::core::view;
 use crate::core::view::ChildView;
 
-use crate::core::view::*;
-
 use crate::core::view::View;
 
 use crate::core::view::ControllerView;
@@ -1078,9 +1076,7 @@ fn open_doc_controller_load_buffer(
         return (env.root_view_id, false);
     };
 
-
     return (view::Id(0), true);
-
 
     // move to new core func
     // configure buffer
@@ -1090,12 +1086,6 @@ fn open_doc_controller_load_buffer(
     {
         let file_modes = editor.modes.clone();
         let dir_modes = editor.dir_modes.clone();
-
-        use parking_lot::RwLock;
-        use std::collections::HashMap;
-
-        use crate::core::buffer;
-        use crate::core::buffer::Buffer;
 
         let map = editor.buffer_map.clone();
         let mut map = map.write();
@@ -1132,9 +1122,13 @@ fn open_doc_controller_load_buffer(
     let json = json.unwrap();
 
     let id = match kind {
-        BufferKind::File => {
-            build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
-        }
+        BufferKind::File => build_view_layout_typed(
+            &mut editor,
+            &mut env,
+            Some(buffer),
+            &json,
+            "single-file-view",
+        ),
         BufferKind::Directory => {
             build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
         }
