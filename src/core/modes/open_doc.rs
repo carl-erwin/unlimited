@@ -1,5 +1,6 @@
 // use this ut8 char for directories/folders 📁
 
+use core::panic;
 use std::any::Any;
 use std::env;
 use std::fs;
@@ -185,6 +186,7 @@ pub fn open_doc_start(
         }
 
         set_focus_on_view_id(editor, env, controller_view_id);
+        env.input_grab_view_id = Some(controller_view_id);
 
         {
             let controller_view = get_view_by_id(editor, controller_view_id);
@@ -207,6 +209,7 @@ pub fn open_doc_controller_stop(
             status_view.children.pop(); // discard child
         }
     }
+
     {
         let parent_id = view::get_view_by_tag(editor, env, "work-space").unwrap();
 
@@ -235,6 +238,9 @@ pub fn open_doc_controller_stop(
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
     }
+
+    // reset controller grab
+    env.input_grab_view_id = None;
 }
 
 fn create_open_doc_controller_view(
@@ -673,8 +679,8 @@ pub fn open_doc_do_completion(
         has_item
     };
 
-    if let Some(_id) = show_completion_popup(editor, env, view) {
-        // set_focus_on_view_id(editor, env, id);
+    if let Some(id) = show_completion_popup(editor, env, view) {
+        set_focus_on_view_id(editor, env, id);
     }
 }
 
@@ -1017,9 +1023,9 @@ pub fn open_doc_controller_show_buffer(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     let (new_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
-    if !ok {
-        return;
-    }
+    //if !ok {
+    //    //return;
+    //}
 
     open_doc_controller_stop(editor, env, view);
 }
@@ -1072,6 +1078,11 @@ fn open_doc_controller_load_buffer(
         return (env.root_view_id, false);
     };
 
+
+    return (view::Id(0), true);
+
+
+    // move to new core func
     // configure buffer
 
     // TODO(ceg): move this to core:: as setup_buffer_modes(buffer)

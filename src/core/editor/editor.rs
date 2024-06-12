@@ -513,6 +513,8 @@ fn process_single_input_event<'a>(
     env: &'a mut EditorEnv<'static>,
     view_id: view::Id,
 ) -> bool {
+    dbg_println!("process_single_input_event");
+
     let mut view = get_view_by_id(editor, view_id);
     {
         let v = view.read();
@@ -537,6 +539,8 @@ fn process_single_input_event<'a>(
     let action_name = {
         let mut v = view.write();
 
+        dbg_println!("v.input_ctx.stack_pos {:?}", v.input_ctx.stack_pos);
+
         let stack_pos = if let Some(stack_pos) = v.input_ctx.stack_pos {
             // current map
             dbg_println!("reuse stack level {}", stack_pos + 1);
@@ -545,6 +549,12 @@ fn process_single_input_event<'a>(
             // top
             let pos = v.input_ctx.input_map.as_ref().borrow().len();
             dbg_println!("start from stack top level {}", pos);
+
+            if pos > 0 {
+                let name = v.input_ctx.input_map.as_ref().borrow()[0].0;
+                dbg_println!("map name {}", name);
+            }
+
             pos
         };
 
@@ -1129,27 +1139,24 @@ fn clip_coordinates_and_get_view_id(
             clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
         }
         InputEvent::WheelUp { x, y, .. } => {
-            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
+            let vid = clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y);
+            env.last_selected_view_id = vid;
+            vid
         }
         InputEvent::WheelDown { x, y, .. } => {
-            clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y)
+            let vid = clip_coordinates_xy(&mut editor, &mut env, root_view_id, vid, x, y);
+            env.last_selected_view_id = vid;
+            vid
         }
         InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
     };
 
     // input locked ?
-    /*
-    match (env.active_view, env.target_view) {
-        (Some(ida), Some(idt)) => {
-            if ida != idt {
-                // some view as locked the inputs
-                return (ida, ev);
-            }
-        }
-        _ => {} /* fall-through */
+    // TODO: fix floting window clipping
+    if let Some(id) = env.input_grab_view_id {
+        return (id, ev);
     }
-    */
 
     (vid, ev)
 }

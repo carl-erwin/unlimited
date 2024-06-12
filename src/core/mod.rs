@@ -1184,7 +1184,6 @@ pub fn build_view_layout_typed(
 }
 
 pub fn get_view_parents(editor: &mut Editor<'static>, id: view::Id) -> Option<Vec<view::Id>> {
-
     dbg_println!("get_view_parents {:?}", id);
 
     let mut ids = vec![];
