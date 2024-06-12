@@ -714,7 +714,7 @@ fn show_completion_popup(
     let (x, y, pop_width, pop_height) = {
         let dim = get_view_by_id(editor, parent_id).read().dimension();
         let w = dim.0;
-        let h = dim.1.saturating_sub(3);
+        let h = dim.1;
         let x = 0;
         let y = 0;
         (x, y, w, h)
