@@ -50,7 +50,10 @@ use crate::core::view::View;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
+use crate::core::editor::get_checked_view_by_id;
 use crate::core::editor::get_view_by_id;
+use crate::core::editor::get_view_ids_by_tags;
+
 use crate::core::view::register_view_subscriber;
 
 use crate::core::editor::process_editor_events;
@@ -1000,7 +1003,7 @@ fn build_view_layout_from_attr(
     if env.active_view.is_none() {
         if view.tags.get("target-view").is_some() {
             // TODO(ceg): find better naming for target view
-            env.active_view = Some(view.id);
+            // env.active_view = Some(view.id);
         }
     }
 
@@ -1180,6 +1183,33 @@ pub fn build_view_layout_typed(
     return None;
 }
 
+pub fn get_view_parents(editor: &mut Editor<'static>, id: view::Id) -> Option<Vec<view::Id>> {
+
+    dbg_println!("get_view_parents {:?}", id);
+
+    let mut ids = vec![];
+
+    let mut id = id;
+    loop {
+        if let Some(v) = get_checked_view_by_id(editor, id) {
+            if let Some(pid) = v.read().parent_id {
+                id = pid;
+                ids.push(id);
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if ids.is_empty() {
+        None
+    } else {
+        Some(ids)
+    }
+}
+
 pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
     let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
 
@@ -1216,16 +1246,33 @@ pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'
 
     // TODO: implement side bar click to create groups
     // create a default group and attach it to "work-space-view":
+    if let Some(workspace_id) = view::get_view_by_tag(editor, env, "work-space") {
+        let group_buf = BufferBuilder::new(BufferKind::File)
+            .buffer_name("group")
+            .internal(true)
+            .use_buffer_log(false)
+            .finalize();
 
-    if false {
+        // add (default) group
+        if let Some(group_id) =
+            build_view_layout_typed(&mut editor, &mut env, group_buf, &json, "group-view")
+        {
+            get_view_by_id(editor, workspace_id)
+                .write()
+                .children
+                .push(ChildView {
+                    id: group_id,
+                    layout_op: LayoutSize::Percent { p: 100.0 },
+                });
+        }
+
         // create views
-        // TODO: add (default) group in main view
         for buffer in buffers {
             dbg_println!("-------------");
 
             dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
             let kind = buffer.as_ref().read().kind;
-            let vid = match kind {
+            let _vid = match kind {
                 BufferKind::File => build_view_layout_typed(
                     &mut editor,
                     &mut env,
@@ -1237,26 +1284,66 @@ pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'
                     build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
                 }
             };
-            if let Some(id) = vid {
-                //editor.active_views.push(id);
-            }
         }
-    }
 
-    // populate active views (file)
-    // default behavior / no session restore yet
-    {
-        let map = editor.view_map.clone();
-        for (id, v) in map.read().iter() {
-            let v = v.read();
-            if !v.tags.contains("file-view") {
-                continue;
+        // populate active views (file)
+        // default behavior / no session restore yet
+        {
+            let map = editor.view_map.clone();
+            for (id, v) in map.read().iter() {
+                let v = v.read();
+                if !v.tags.contains("file-view") {
+                    continue;
+                }
+
+                if let Some(b) = v.buffer() {
+                    if b.read().kind == BufferKind::File {
+                        editor.active_views.push(*id);
+                        push_editor_event(&mut editor, EditorEvent::ViewAdded { id: *id });
+                    }
+                }
             }
 
-            if let Some(b) = v.buffer() {
-                if b.read().kind == BufferKind::File {
-                    editor.active_views.push(*id);
-                    push_editor_event(&mut editor, EditorEvent::ViewAdded { id: *id });
+            // show 1st view
+            if !editor.active_views.is_empty() {
+                dbg_println!("active views {:?}", editor.active_views);
+
+                let id = editor.active_views[0];
+
+                env.active_view = Some(id);
+
+                dbg_println!("active view {:?}", id);
+
+                // find inner child
+                if let Some(target_ids) = get_view_ids_by_tags(&editor, "target-view") {
+                    dbg_println!("target_ids {:?}", target_ids);
+
+                    for target_id in &target_ids {
+                        // check it active view contains target-view
+                        if let Some(parents) = get_view_parents(editor, *target_id) {
+                            dbg_println!("parents {:?}", parents);
+
+                            for pid in &parents {
+                                dbg_println!("pid {:?} == id {:?}", pid, id);
+                                if *pid == id {
+                                    env.active_view = Some(*target_id);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // find in id the target-view
+                // TODO: exchange with file slot ?
+                if let Some(ids) = get_view_ids_by_tags(&editor, "file-slot") {
+                    let parent_id = ids[0];
+                    get_view_by_id(editor, parent_id)
+                        .write()
+                        .children
+                        .push(ChildView {
+                            id: id,
+                            layout_op: LayoutSize::Percent { p: 100.0 },
+                        });
                 }
             }
         }

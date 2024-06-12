@@ -117,9 +117,8 @@
                 "internal-buffer": "file-bar",
                 "size": { "fixed": 1 }
             },
-
             {
-                "sub-layout": "single-file-view"
+                "sub-layout": "file-slot"
             },
             {
                 "tags": [ "terminal" ],
@@ -128,6 +127,12 @@
                 "size": { "fixed": 0 }
             }
         ]
+    },
+
+    "file-slot":
+    {
+        "tags": [ "file-slot" ],
+        "size": { "remain_percent": 100.0 }
     },
 
     "single-file-view":

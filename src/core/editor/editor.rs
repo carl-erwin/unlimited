@@ -297,10 +297,22 @@ pub fn get_view_by_id(editor: &Editor<'static>, vid: view::Id) -> Rc<RwLock<View
     editor.view_map.read().get(&vid).unwrap().clone()
 }
 
+pub fn get_checked_view_by_id(
+    editor: &Editor<'static>,
+    vid: view::Id,
+) -> Option<Rc<RwLock<View<'static>>>> {
+    dbg_println!("get_view_by_id {:?}", vid);
+    Some(editor.view_map.read().get(&vid)?.clone())
+}
+
 pub fn get_view_ids_by_tags(editor: &Editor<'static>, tag: &str) -> Option<Vec<view::Id>> {
     let map = editor.tagged_view.read();
-    let v = map.get(&tag.to_owned())?.iter().copied().collect();
-    Some(v)
+    let v: Vec<view::Id> = map.get(&tag.to_owned())?.iter().copied().collect();
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
 }
 
 pub fn add_view_tag(editor: &Editor<'static>, tag: &str, id: view::Id) {
