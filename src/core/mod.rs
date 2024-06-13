@@ -312,12 +312,30 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                 }
 
                 // TODO(ceg): split in sub-threads/async task
+                // better: Event::IndexTask { buffer_map , Vec<id> }
+                // get buffers(Vec<id>) -> Vec<Option<Arc<Rw<Buffer>>>>
                 Event::IndexTask { buffer_map } => {
                     dbg_println!("[receive index task ]");
 
-                    let map = buffer_map.read();
-                    for (id, buffer) in map.iter() {
-                        let is_indexed = buffer::build_index(buffer);
+                    // NB: lock contention on buffer_map.read()
+
+                    // put buffer+id in a special list
+                    let mut buffers = vec![];
+                    {
+                        let map = buffer_map.read();
+                        for (id, buffer) in map.iter() {
+                            {
+                                let buffer = buffer.read();
+                                if buffer.indexed {
+                                    continue;
+                                }
+                            }
+                            buffers.push((buffer.clone(), *id));
+                        }
+                    }
+
+                    for (buffer, id) in buffers {
+                        let is_indexed = buffer::build_index(&buffer);
                         if !is_indexed {
                             continue;
                         }
@@ -330,7 +348,7 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                             0,
                             ts,
                             Event::Buffer {
-                                event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
+                                event: BufferEvent::BufferFullyIndexed { buffer_id: id },
                             },
                         );
                         core_tx.send(msg).unwrap_or(());
