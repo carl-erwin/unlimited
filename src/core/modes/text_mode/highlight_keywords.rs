@@ -36,7 +36,7 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     let mut map: HashMap<&str, (u8, u8, u8)> = HashMap::new();
 
     // some Rust keywords
-    for k in &["use", "crate", "pub", "unsafe", "panic"] {
+    for k in &["mod", "use", "crate", "pub", "unsafe", "panic"] {
         map.insert(k, COLOR_RED);
     }
 
