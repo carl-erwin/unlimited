@@ -22,8 +22,11 @@ use once_cell::sync::Lazy;
 //
 static COLOR_DEFAULT: (u8, u8, u8) = (192, 192, 192);
 static COLOR_RED: (u8, u8, u8) = (195, 75, 0);
-static COLOR_GREEN: (u8, u8, u8) = (85, 170, 127);
+static COLOR_RED_BRIGHT: (u8, u8, u8) = (247, 2, 13);
 static COLOR_ORANGE: (u8, u8, u8) = (247, 104, 38);
+static COLOR_ORANGE2: (u8, u8, u8) = (255, 128, 0);
+static COLOR_ORANGE3: (u8, u8, u8) = (247, 128, 50);
+static COLOR_GREEN: (u8, u8, u8) = (85, 170, 127);
 static COLOR_CYAN: (u8, u8, u8) = (86, 182, 185);
 static COLOR_BLUE: (u8, u8, u8) = (35, 168, 242);
 static COLOR_BRACE: (u8, u8, u8) = (0, 185, 163);
@@ -36,9 +39,13 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     let mut map: HashMap<&str, (u8, u8, u8)> = HashMap::new();
 
     // some Rust keywords
-    for k in &["mod", "use", "crate", "pub", "unsafe", "panic"] {
+    for k in &["mod", "use", "crate", "pub", "unsafe"] {
         map.insert(k, COLOR_RED);
     }
+    for k in &["panic"] {
+        map.insert(k, COLOR_RED_BRIGHT);
+    }
+
 
     for k in &["public", "private"] {
         map.insert(k, COLOR_RED);
@@ -90,13 +97,13 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
         map.insert(k, COLOR_BRACE);
     }
 
-    for k in &["export", "return", "goto", "true", "false"] {
-        map.insert(k, COLOR_BLUE);
-    }
-
     // shell
     for k in &["esac", "done"] {
         map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["#", "##"] {
+        map.insert(k, COLOR_BLUE);
     }
 
     map
@@ -182,7 +189,7 @@ impl HighlightKeywords {
 
         self.new_color = match self.prev_token_type {
             TokenType::Unknown => COLOR_DEFAULT,
-            TokenType::InvalidUnicode => COLOR_DEFAULT,
+            TokenType::InvalidUnicode => COLOR_ORANGE2,
             TokenType::Blank => COLOR_DEFAULT, // ' ' | '\n' | '\t' : TODO(ceg): specific END_OF_LINE ?
             TokenType::ParenOpen => COLOR_GREEN, // (
             TokenType::ParenClose => COLOR_GREEN, // )
@@ -190,7 +197,7 @@ impl HighlightKeywords {
             TokenType::BraceClose => COLOR_BRACE, // }
             TokenType::BracketOpen => COLOR_BRACE, // [
             TokenType::BracketClose => COLOR_BRACE, // ]
-            TokenType::SingleQuote => COLOR_ORANGE, // '
+            TokenType::SingleQuote => COLOR_ORANGE3, // '
             TokenType::DoubleQuote => COLOR_ORANGE, // "
             TokenType::Comma => COLOR_GREEN,   // ,
             TokenType::Colon => COLOR_GREEN,   // :
