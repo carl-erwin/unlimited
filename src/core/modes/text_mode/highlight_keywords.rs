@@ -46,7 +46,6 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
         map.insert(k, COLOR_RED_BRIGHT);
     }
 
-
     for k in &["public", "private"] {
         map.insert(k, COLOR_RED);
     }
