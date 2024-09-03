@@ -209,7 +209,7 @@ pub fn open_doc_controller_stop(
     }
 
     {
-        let parent_id = view::get_view_by_tag(editor, env, "work-space").unwrap();
+        let parent_id = view::get_view_by_tag(editor, env, "workspace").unwrap();
 
         get_view_by_id(editor, parent_id)
             .write()
@@ -713,7 +713,7 @@ fn show_completion_popup(
     }
 
     // TODO: get view global coordinates, update on  resize
-    let parent_id = view::get_view_by_tag(editor, env, "work-space").unwrap();
+    let parent_id = view::get_view_by_tag(editor, env, "workspace").unwrap();
 
     let (x, y, pop_width, pop_height) = {
         let dim = get_view_by_id(editor, parent_id).read().dimension();

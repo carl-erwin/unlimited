@@ -45,7 +45,7 @@
                     "size": { "fixed": 1 }
                 },
                 {
-                    "sub-layout":  "work-space-view"
+                    "sub-layout":  "workspace-view"
                 },
                 {
                     "modes": [ "vsplit-mode" ],
@@ -73,10 +73,10 @@
     ]
     },
 
-    "work-space-view":
+    "workspace-view":
     {
         "leader": true,
-        "tags": [ "work-space" ],
+        "tags": [ "workspace" ],
         "modes": [ "core-mode", "open-doc-mode" ],
 
         "size": { "percent": 80 },

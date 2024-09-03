@@ -1231,8 +1231,8 @@ pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'
     dbg_println!("root_id {:?}", root_id);
 
     // TODO: implement side bar click to create groups
-    // create a default group and attach it to "work-space-view":
-    if let Some(workspace_id) = view::get_view_by_tag(editor, env, "work-space") {
+    // create a default group and attach it to "workspace-view":
+    if let Some(workspace_id) = view::get_view_by_tag(editor, env, "workspace") {
         let group_buf = BufferBuilder::new(BufferKind::File)
             .buffer_name("group")
             .internal(true)
