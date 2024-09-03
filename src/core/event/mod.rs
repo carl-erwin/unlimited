@@ -183,6 +183,7 @@ pub enum InputEvent {
     PointerMotion(PointerEvent),
     WheelUp { mods: KeyModifiers, x: i32, y: i32 },
     WheelDown { mods: KeyModifiers, x: i32, y: i32 },
+    Paste(String),
 }
 
 /// List of supported keyboard keys
