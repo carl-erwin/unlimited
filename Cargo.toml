@@ -42,7 +42,7 @@ once_cell = "1.18.0"
 bitflags = "2.4.2"
 
 #crossterm = { git = "https://github.com/crossterm-rs/crossterm" , branch = "0.20" }
-crossterm = { git = "https://github.com/carl-erwin/crossterm" , branch = "sigterm-handler" }
+crossterm = { git = "https://github.com/carl-erwin/crossterm" , tag = "0.23.2-for-unlimited" }
 
 
 sdl2 = { version = "0.35.2", optional = true }
