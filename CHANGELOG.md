@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.6]
+ - run cargo update
+ - fix remove_until_end_of_word/remove_until_char_class_change : add missing undo/redo  operation
+ - rework alt+d: (now delete until char class changes)
+
 ## [0.0.5]
 
 ### Added
