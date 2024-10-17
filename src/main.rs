@@ -12,7 +12,7 @@ use std::thread;
 extern crate clap;
 extern crate unlimited;
 
-use clap::{arg, Arg, Command};
+use clap::{arg, Arg, ArgAction, Command};
 
 // crate
 use unlimited::core;
@@ -81,123 +81,120 @@ fn parse_command_line() -> Config {
         .version(VERSION)
         .author("Carl-Erwin Griffith <carl.erwin@gmail.com>")
         .about("unlimited is an experimental editor")
-        .args(&[arg!(--ui [UI] "user interface frontend: crossterm")])
+        .arg(arg!(--ui <UI_NAME> "user interface frontend: crossterm"))
+        .arg(arg!(--debug "enable debug logs on stderr (use redirection to file)"))
         .arg(
-            Arg::new("DEBUG")
-                .short('d')
-                .long("--debug")
-                .help("enable debug logs on stderr (use redirection to file)"), // TODO(ceg): isatty ?
+            Arg::new("no-read-cache")
+                .long("no-read-cache")
+                .help("disable read cache (debug)")
+                .value_name(""),
         )
         .arg(
-            Arg::new("NO_READ_CACHE")
-                .long("--no-read-cache")
-                .help("disable read cache (debug purpose)"),
+            Arg::new("no-byte-index")
+                .long("no-byte-index")
+                .help("disable byte index (wip)")
+                .value_name(""),
         )
         .arg(
-            Arg::new("NO_BYTE_INDEX")
-                .short('n')
-                .long("--no-byte-index")
-                .help("disable byte index (wip)"),
-        )
-        .arg(
-            Arg::new("BENCH_TO_EOF")
+            Arg::new("bench-to-eof")
                 .short('b')
-                .long("--bench-to-eof")
-                .help("render all screen until EOF is reached and quit (wip: no proper quit yet)"),
+                .long("bench-to-eof")
+                .help("render all screen until EOF is reached and quit (wip: no proper quit yet)")
+                .value_name(""),
         )
         .arg(
-            Arg::new("NO_UI_RENDER")
-                .long("--no-ui-render")
-                .help("disable screen output"),
+            Arg::new("no-ui-render")
+                .long("no-ui-render")
+                .help("disable screen output")
+                .value_name(""),
         )
         .arg(
-            Arg::new("RAW_FILTER_TO_SCREEN")
+            Arg::new("raw-data-to-screen")
                 .short('r')
-                .long("--raw-data-to-screen")
-                .help("disable all filters and put the file's bytes directly to screen"),
+                .long("raw-data-to-screen")
+                .help("disable all filters and put the file's bytes directly to screen")
+                .value_name(""),
         )
         .arg(
-            Arg::new("CONFIG_VARS")
+            Arg::new("CONFIG_VAR")
+                .value_name("CONFIG_VAR")
                 .short('c')
-                .long("--cfg-var")
-                .help("configuration variables")
-                .takes_value(true)
-                .multiple_values(true),
+                .long("cfg-var")
+                .action(ArgAction::Append)
+                .help("configuration variables"),
         )
         .arg(
-            Arg::new("FILES")
-                .help("list of the files to open")
+            arg!(<FILES> ... "file to edit")
                 .required(false)
-                .multiple_values(true),
+                .trailing_var_arg(true),
         )
         .get_matches();
 
-    let mut ui_frontend = String::new();
-    if matches.is_present("ui") {
-        ui_frontend = matches.values_of("ui").unwrap().collect::<String>();
-    }
+    let ui_frontend = matches
+        .get_one::<String>("ui")
+        .map_or("".to_owned(), |v| v.to_owned());
 
-    let mut files_list = Vec::new();
-    if matches.is_present("FILES") {
-        files_list = matches
-            .values_of("FILES")
-            .unwrap()
-            .map(|x| x.to_owned())
-            .collect();
-    }
+    let files_list = matches
+        .get_many::<String>("FILES")
+        .map_or(vec![], |v| v.map(|e| e.clone()).collect());
 
-    if matches.is_present("DEBUG") {
+    if matches.get_one::<bool>("debug").is_some() {
         core::enable_dbg_println();
         core::screen::enable_screen_checks();
     }
 
-    if matches.is_present("NO_READ_CACHE") {
+    if matches.get_one::<bool>("no-read-cache").is_some() {
         core::disable_read_cache();
     }
 
-    if matches.is_present("NO_BYTE_INDEX") {
+    if matches.get_one::<bool>("no-byte-index").is_some() {
         core::disable_byte_index();
     }
 
-    if matches.is_present("BENCH_TO_EOF") {
+    if matches.get_one::<bool>("bench-to-eof").is_some() {
         core::enable_bench_to_eof();
     }
 
-    if matches.is_present("RAW_FILTER_TO_SCREEN") {
+    if matches.get_one::<bool>("raw-data-to-screen").is_some() {
         core::enable_raw_data_filter_to_screen();
     }
 
-    if matches.is_present("NO_UI_RENDER") {
+    if matches.get_one::<String>("no-ui-render").is_some() {
         core::set_no_ui_render(true);
     }
 
     // configuration variables
     let mut vars: HashMap<String, String> = HashMap::new();
-    if matches.is_present("CONFIG_VARS") {
-        let v = matches
-            .values_of("CONFIG_VARS")
-            .unwrap()
-            .map(|x| {
-                let split: Vec<_> = x.split('=').collect();
-                if split.len() != 2 {
-                    fatal_error = true;
-                    eprintln!("error: invalid configuration variable: {x}");
-                    ("".to_owned(), "".to_owned())
-                } else {
-                    (split[0].to_owned(), split[1].to_owned())
+
+    match matches.get_many::<String>("CONFIG_VAR") {
+        Some(s) => {
+            let v = s
+                .map(|x| {
+                    let split: Vec<_> = x.split('=').collect();
+                    if split.len() != 2 {
+                        fatal_error = true;
+                        eprintln!("error: invalid configuration variable: {x}");
+                        ("".to_owned(), "".to_owned())
+                    } else {
+                        (split[0].to_owned(), split[1].to_owned())
+                    }
+                })
+                .collect::<Vec<(String, String)>>();
+
+            for e in v {
+                if e.0.is_empty() {
+                    continue;
                 }
-            })
-            .collect::<Vec<(String, String)>>();
-        for e in v {
-            if e.0.is_empty() {
-                continue;
+                vars.insert(e.0, e.1);
             }
-            vars.insert(e.0, e.1);
         }
+        _ => {}
     }
 
     // debug
     dbg_println!("config vars = \n{:?}", vars);
+    dbg_println!("ui_frontend = \n{:?}", ui_frontend);
+    dbg_println!("files_list = \n{:?}", files_list);
 
     if fatal_error {
         std::process::exit(1);
