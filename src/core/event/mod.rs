@@ -178,6 +178,7 @@ pub enum InputEvent {
     FallbackEvent, // use to map default action in input table
     RefreshUi { width: usize, height: usize }, // resize
     KeyPress { key: Key, mods: KeyModifiers },
+    KeyRelease { key: Key, mods: KeyModifiers },
     ButtonPress(ButtonEvent),
     ButtonRelease(ButtonEvent),
     PointerMotion(PointerEvent),
