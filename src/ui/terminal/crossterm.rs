@@ -13,7 +13,8 @@ use crossterm::{
 };
 
 use crossterm::event::{
-    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+    PushKeyboardEnhancementFlags,
 };
 
 use std::vec::Vec;
@@ -662,10 +663,22 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
 }
 
 fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
-    //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
+    dbg_println!("CROSSTERM EVENT : {:?}", evt);
+
+    // TODO(ceg): return InputEvent::KeyRelease
+    if let ::crossterm::event::Event::Key(ke) = evt {
+        if ke.kind == KeyEventKind::Release {
+            return InputEvent::NoInputEvent;
+        }
+    }
+
+    // builder patter to return InputEvent::KeyPress  || InputEvent::KeyRelease
+    // repeat is KeyPress
+
 
     match evt {
         ::crossterm::event::Event::Key(ke) => match ke.code {
+
             ::crossterm::event::KeyCode::Char(c) => {
                 return InputEvent::KeyPress {
                     mods: key_modifiers_no_shift(ke.modifiers),
