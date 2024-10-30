@@ -138,9 +138,11 @@ fn parse_command_line() -> Config {
         .get_many::<String>("FILES")
         .map_or(vec![], |v| v.map(|e| e.clone()).collect());
 
-    if matches.get_one::<bool>("debug").is_some() {
-        core::enable_dbg_println();
-        core::screen::enable_screen_checks();
+    if let Some(debug) = matches.get_one::<bool>("debug") {
+        if *debug {
+            core::enable_dbg_println();
+            core::screen::enable_screen_checks();
+        }
     }
 
     if matches.get_one::<bool>("no-read-cache").is_some() {
