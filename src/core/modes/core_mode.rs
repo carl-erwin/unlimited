@@ -26,11 +26,15 @@ use crate::core::event::input_map::build_input_event_map;
 
 use crate::core::view;
 use crate::core::view::ChildView;
+
 use crate::core::view::LayoutDirection;
 use crate::core::view::LayoutSize;
 use crate::core::view::View;
 
 use crate::core::build_view_layout_from_json_str;
+
+use crate::core::parse_layout_str;
+use crate::core::DEFAULT_LAYOUT_JSON;
 
 static CORE_INPUT_MAP: &str = r#"
 [
@@ -136,23 +140,7 @@ impl CoreMode {
 
         register_input_stage_action(&mut map, "increase-right", increase_right);
         register_input_stage_action(&mut map, "decrease-right", decrease_right);
-
-        register_input_stage_action(&mut map, "select-next-view", select_next_view);
-        register_input_stage_action(&mut map, "select-previous-view", select_previous_view);
     }
-}
-
-// Mode "core"
-pub fn select_next_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = std::cmp::min(env.root_view_index + 1, editor.root_views.len() - 1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
-}
-
-pub fn select_previous_view(editor: &mut Editor, env: &mut EditorEnv, _view: &Rc<RwLock<View>>) {
-    env.root_view_index = env.root_view_index.saturating_sub(1);
-    env.root_view_id = editor.root_views[env.root_view_index];
-    dbg_println!("select {:?}", env.root_view_id);
 }
 
 pub fn application_quit(
@@ -178,7 +166,7 @@ pub fn application_quit_abort_setup(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_command_view_id(editor, env);
 
     dbg_println!("DOC CHANGED !\n");
     dbg_println!("STATUS VID = {:?}", status_view_id);
@@ -237,7 +225,7 @@ pub fn application_quit_abort_no(
     }
 
     // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_command_view_id(editor, env);
     if let Some(status_view_id) = status_view_id {
         let status_view = get_view_by_id(editor, status_view_id);
         let buffer = status_view.read().buffer().unwrap();
@@ -503,8 +491,11 @@ pub fn split_view_with_direction(
 
     let buffer = pview.read().buffer();
 
+    let all_layouts = parse_layout_str(DEFAULT_LAYOUT_JSON).unwrap();
+
     // create view clone
-    let view_clone_id = build_view_layout_from_json_str(editor, env, buffer, &json_attr, 0)?;
+    let view_clone_id =
+        build_view_layout_from_json_str(editor, env, &all_layouts, buffer, &json_attr, 0)?;
 
     dbg_println!("json attr {:?}", json_attr);
 
@@ -518,6 +509,7 @@ pub fn split_view_with_direction(
         (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
         (split_info.width, split_info.height),
         None,
+        &vec![], // tags
         &vec![], // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         0,
         LayoutDirection::NotSet,
@@ -596,6 +588,7 @@ pub fn split_view_with_direction(
             (split_info.x, split_info.y), // relative to parent, i32 allow negative moves?
             (split_info.width, split_info.height),
             None,
+            &vec![], // tags
             &splitter_mode,
             0,
             LayoutDirection::NotSet,
@@ -684,7 +677,7 @@ pub fn increase_layout_op(
                 max_size.saturating_sub(minus * 100) / 100
             );
             LayoutSize::RemainMinus {
-                minus: ((minus * 100 + max_size) / 100) - 1,
+                minus: ((minus * 100 + max_size) / 100).saturating_sub(1),
             }
         }
         _ => op.clone(),
@@ -947,11 +940,13 @@ fn get_view_parent(editor: &Editor<'static>, view: &Rc<RwLock<View<'static>>>) -
 */
 pub fn destroy_view(
     editor: &mut Editor<'static>,
-    _env: &mut EditorEnv<'static>,
+    env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // TODO(ceg): get parents
     // vec<view::Id>
+
+    env.active_view = None;
 
     let parents = {
         let parents = get_view_parent(&editor, &view);
@@ -1031,7 +1026,7 @@ pub fn help_popup(
     mut env: &mut EditorEnv<'static>,
     _view: &Rc<RwLock<View>>,
 ) {
-    let root_view_id = editor.root_views[env.root_view_index];
+    let root_view_id = view::Id(1);
     let (root_width, _root_height) = get_view_by_id(editor, root_view_id).read().dimension();
 
     // destroy previous
@@ -1076,7 +1071,8 @@ pub fn help_popup(
         (x, y),
         (pop_width, pop_height),
         command_buffer,
-        &vec!["status-mode".to_owned()],
+        &vec![], // tags
+        &vec!["empty-line-mode".to_owned()],
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -1098,10 +1094,11 @@ pub fn help_popup(
         &mut editor,
         &mut env,
         Some(root_view_id),
-        (pop_width.saturating_sub(2 /* char width */), pop_height - 1),
+        (pop_width.saturating_sub(1 /* char width */), pop_height - 1),
         (2, 1),
         corner_buffer,
-        &vec!["status-mode".to_owned()],
+        &vec![], // tags
+        &vec!["empty-line-mode".to_owned()],
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },

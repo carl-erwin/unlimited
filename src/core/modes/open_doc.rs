@@ -1,3 +1,6 @@
+// use this ut8 char for directories/folders 📁
+
+use core::panic;
 use std::any::Any;
 use std::env;
 use std::fs;
@@ -28,6 +31,7 @@ use crate::core::event::input_map::build_input_event_map;
 
 use crate::core::view;
 use crate::core::view::ChildView;
+
 use crate::core::view::View;
 
 use crate::core::view::ControllerView;
@@ -41,41 +45,11 @@ use crate::core::build_view_layout_typed;
 use crate::core::parse_layout_str;
 use crate::core::DEFAULT_LAYOUT_JSON;
 
-static OPEN_DOC_TRIGGER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "ctrl+o" } ],   "action": "open-doc:start" }
-     ]
-  }
-]"#;
+static OPEN_DOC_TRIGGER_MAP: &str =
+    std::include_str!("../../../res/input-map/open-doc-mode-trigger.json");
 
-static OPEN_DOC_CONTROLLER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "open-doc:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "open-doc:show-buffer" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "open-doc:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "open-doc:del-char" },
-     { "in": [{ "key": "Delete" } ],    "action": "open-doc:do-nothing" },
-     { "in": [{ "key": "Up" } ],        "action": "open-doc:select-prev-completion" },
-     { "in": [{ "key": "ctrl+k" } ],    "action": "open-doc:select-prev-completion" },
-     { "in": [{ "key": "Down" } ],      "action": "open-doc:select-next-completion" },
-     { "in": [{ "key": "ctrl+j" } ],    "action": "open-doc:select-next-completion" },
-     { "in": [{ "key": "Left" } ],      "action": "open-doc:discard-prompt-suffix" },
-     { "in": [{ "key": "ctrl+h" } ],    "action": "open-doc:discard-prompt-suffix" },
-     { "in": [{ "key": "Right" } ],     "action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "ctrl+Space" } ],"action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "ctrl+Enter" } ],"action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "ctrl+l" } ],    "action": "open-doc:apply-current-completion" },
-     { "in": [{ "key": "Home" } ],      "action": "open-doc:select-first-completion" },
-     { "in": [{ "key": "End" } ],       "action": "open-doc:select-last-completion" },
-     { "default": [],                   "action": "open-doc:add-char" }
-   ]
-  }
-
-]"#;
+static OPEN_DOC_CONTROLLER_MAP: &str =
+    std::include_str!("../../../res/input-map/open-doc-mode-input-map.json");
 
 impl<'a> Mode for OpenDocMode {
     fn name(&self) -> &'static str {
@@ -172,8 +146,10 @@ pub fn open_doc_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
+    dbg_println!("open_doc_start");
+
     {
-        let status_view_id = view::get_status_view(editor, env, view);
+        let status_view_id = view::get_status_line_view_id(editor, env);
         if status_view_id.is_none() {
             // TODO(ceg): log missing status mode
             dbg_println!("status view is missing");
@@ -201,8 +177,14 @@ pub fn open_doc_start(
             controller_view_id
         };
 
-        open_doc_show_controller_view(editor, env, view);
+        let bret = open_doc_show_controller_view(editor, env, view);
+        if !bret {
+            dbg_println!("cannot show controller view");
+            return;
+        }
+
         set_focus_on_view_id(editor, env, controller_view_id);
+        env.input_grab_view_id = Some(controller_view_id);
 
         {
             let controller_view = get_view_by_id(editor, controller_view_id);
@@ -217,16 +199,19 @@ pub fn open_doc_controller_stop(
     view: &Rc<RwLock<View<'static>>>,
 ) {
     {
-        let status_view_id = env.status_view_id.unwrap();
-        let status_view = get_view_by_id(editor, status_view_id);
-        let mut status_view = status_view.write();
+        if let Some(status_view_id) = env.status_view_id {
+            let status_view = get_view_by_id(editor, status_view_id);
+            let mut status_view = status_view.write();
 
-        status_view.layout_direction = LayoutDirection::Horizontal;
-        status_view.children.pop(); // discard child
+            status_view.layout_direction = LayoutDirection::Horizontal;
+            status_view.children.pop(); // discard child
+        }
     }
+
     {
-        let root_view_id = env.root_view_id;
-        get_view_by_id(editor, root_view_id)
+        let parent_id = view::get_view_by_tag(editor, env, "workspace").unwrap();
+
+        get_view_by_id(editor, parent_id)
             .write()
             .floating_children
             .pop(); // discard child
@@ -251,6 +236,9 @@ pub fn open_doc_controller_stop(
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
     }
+
+    // reset controller grab
+    env.input_grab_view_id = None;
 }
 
 fn create_open_doc_controller_view(
@@ -275,7 +263,8 @@ fn create_open_doc_controller_view(
         (x, y),
         (w, h),
         buffer,
-        &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
+        &vec![],                             // tags
+        &vec!["empty-line-mode".to_owned()], // modes: TODO(ceg): -controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -360,10 +349,13 @@ fn open_doc_show_controller_view(
     editor: &mut Editor<'static>,
     env: &mut EditorEnv<'static>,
     text_view: &Rc<RwLock<View<'static>>>,
-) {
+) -> bool {
     let ctrl_view_id = {
-        let status_view_id = env.status_view_id.unwrap();
+        if env.status_view_id.is_none() {
+            return false;
+        };
 
+        let status_view_id = env.status_view_id.unwrap();
         let status_view = get_view_by_id(editor, status_view_id);
         let mut status_view = status_view.write();
 
@@ -373,6 +365,7 @@ fn open_doc_show_controller_view(
         let odm = text_view.mode_ctx_mut::<OpenDocModeContext>("open-doc-mode");
 
         let ctrl_view_id = odm.controller_view_id;
+
         status_view.children.pop(); // replace previous child
         status_view.children.push(ChildView {
             id: ctrl_view_id,
@@ -386,6 +379,8 @@ fn open_doc_show_controller_view(
     let mut controller_view = controller_view.write();
     let mut text_view = text_view.write();
     open_doc_display_prompt(editor, env, &mut controller_view, &mut text_view);
+
+    true
 }
 
 fn open_doc_display_prompt(
@@ -399,7 +394,7 @@ fn open_doc_display_prompt(
     let mut buffer = buffer.as_ref().unwrap().write();
 
     buffer.delete_content(None);
-    buffer.append("Open: ".as_bytes());
+    buffer.append(b"Open: ");
 
     // setup working directory
     {
@@ -425,8 +420,6 @@ fn create_open_doc_completion_view(
     mut env: &mut EditorEnv<'static>,
     text_view: &mut View,
 ) {
-    let parent_id = env.root_view_id;
-
     dbg_print!("create_open_doc_completion_view");
 
     let command_buffer = BufferBuilder::new(BufferKind::File)
@@ -435,14 +428,16 @@ fn create_open_doc_completion_view(
         .use_buffer_log(false)
         .finalize();
 
+    let tags = vec![]; // todo: menu-list
     let modes = vec!["text-mode".to_owned()]; // todo: menu-list
     let mut popup_view = View::new(
         &mut editor,
         &mut env,
-        Some(parent_id),
+        None, // non parent yet
         (0, 0),
         (1, 1),
         command_buffer,
+        &tags,
         &modes,
         0,
         LayoutDirection::NotSet,
@@ -682,8 +677,8 @@ pub fn open_doc_do_completion(
         has_item
     };
 
-    if let Some(_id) = show_completion_popup(editor, env, view) {
-        // set_focus_on_view_id(editor, env, id);
+    if let Some(id) = show_completion_popup(editor, env, view) {
+        set_focus_on_view_id(editor, env, id);
     }
 }
 
@@ -717,31 +712,15 @@ fn show_completion_popup(
         }
     }
 
-    // update position size
-    let (st_gx, st_gy, st_w, _st_h) = {
-        let text_view_view_id = controller_view.read().controlled_view.unwrap();
-        let text_view = get_view_by_id(editor, text_view_view_id);
-
-        let status_view_id = view::get_status_view(editor, &env, &text_view).unwrap();
-        let status_view = get_view_by_id(editor, status_view_id);
-        let status_view = status_view.read();
-        (
-            status_view.global_x.unwrap(),
-            status_view.global_y.unwrap(),
-            status_view.width,
-            status_view.height,
-        )
-    };
-
     // TODO: get view global coordinates, update on  resize
-    let parent_id = env.root_view_id;
+    let parent_id = view::get_view_by_tag(editor, env, "workspace").unwrap();
+
     let (x, y, pop_width, pop_height) = {
         let dim = get_view_by_id(editor, parent_id).read().dimension();
-        let w = st_w;
-        //        let h = std::cmp::min(list.len(), dim.1 / 2);
-        let h = dim.1.saturating_sub(_st_h); // / 3 + dim.1 / 3;
-        let x = st_gx;
-        let y = st_gy.saturating_sub(h);
+        let w = dim.0;
+        let h = dim.1;
+        let x = 0;
+        let y = 0;
         (x, y, w, h)
     };
 
@@ -1041,16 +1020,12 @@ pub fn open_doc_controller_show_buffer(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let (root_view_idx, new_root_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
-    if !ok {
-        return;
-    }
+    let (new_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
+    //if !ok {
+    //    //return;
+    //}
 
     open_doc_controller_stop(editor, env, view);
-
-    // switch
-    env.root_view_index = root_view_idx;
-    env.root_view_id = new_root_view_id;
 }
 
 // FIXME(ceg): core::open-new-buffer(path)
@@ -1058,11 +1033,11 @@ fn open_doc_controller_load_buffer(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
-) -> (usize, view::Id, bool) {
+) -> (view::Id, bool) {
     // walk through buffer list/view
     // if ! already opened create new buffer + new view
+    // else return previous view
     // show view
-
     // split code and reuse in main loader
 
     let controller_view = view.write();
@@ -1098,9 +1073,12 @@ fn open_doc_controller_load_buffer(
         editor.buffer_map.write().insert(buffer_id, b);
         buffer_id
     } else {
-        return (env.root_view_index, env.root_view_id, false);
+        return (env.root_view_id, false);
     };
 
+    return (view::Id(0), true);
+
+    // move to new core func
     // configure buffer
 
     // TODO(ceg): move this to core:: as setup_buffer_modes(buffer)
@@ -1134,18 +1112,23 @@ fn open_doc_controller_load_buffer(
     let buffer = buffer_map.get(&buffer_id).unwrap();
     let buffer = buffer.clone();
 
+    // insert view to active view (no groups yet)
     // FIXME(ceg): there is a lot of copy paste from core::
     let json = parse_layout_str(DEFAULT_LAYOUT_JSON);
     if json.is_err() {
         dbg_print!("json parse error {:?}", json);
-        return (0, view::Id(0), false);
+        return (view::Id(0), false);
     }
     let json = json.unwrap();
 
     let id = match kind {
-        BufferKind::File => {
-            build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
-        }
+        BufferKind::File => build_view_layout_typed(
+            &mut editor,
+            &mut env,
+            Some(buffer),
+            &json,
+            "single-file-view",
+        ),
         BufferKind::Directory => {
             build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
         }
@@ -1153,10 +1136,9 @@ fn open_doc_controller_load_buffer(
 
     dbg_println!("open-doc : create view id {:?}", id);
 
-    // a new top level view
-    let idx = editor.root_views.len();
-    let new_root_view_id = id.unwrap();
-    editor.root_views.push(id.unwrap());
+    if let Some(id) = id {
+        editor.active_views.push(id);
+    }
 
     let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
 
@@ -1174,5 +1156,5 @@ fn open_doc_controller_load_buffer(
         editor.indexer_tx.send(msg).unwrap_or(());
     }
 
-    (idx, new_root_view_id, true)
+    return (view::Id(0), true);
 }

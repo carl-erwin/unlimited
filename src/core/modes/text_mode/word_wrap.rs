@@ -22,6 +22,7 @@ use crate::core::view::FilterData;
 use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 use crate::core::Editor;
+use crate::core::EditorEnv;
 
 use crate::core::view::View;
 
@@ -153,7 +154,8 @@ impl ContentFilter<'_> for WordWrapFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        _editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

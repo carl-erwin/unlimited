@@ -178,11 +178,13 @@ pub enum InputEvent {
     FallbackEvent, // use to map default action in input table
     RefreshUi { width: usize, height: usize }, // resize
     KeyPress { key: Key, mods: KeyModifiers },
+    KeyRelease { key: Key, mods: KeyModifiers },
     ButtonPress(ButtonEvent),
     ButtonRelease(ButtonEvent),
     PointerMotion(PointerEvent),
     WheelUp { mods: KeyModifiers, x: i32, y: i32 },
     WheelDown { mods: KeyModifiers, x: i32, y: i32 },
+    Paste(String),
 }
 
 /// List of supported keyboard keys

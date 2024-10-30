@@ -5,9 +5,12 @@ macro_rules! dbg_println {
         use crate::core::DBG_PRINTLN_FLAG;
         use std::sync::atomic::Ordering;
 
+        use std::io::Write;
+
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!());
-            eprintln!($($arg)*)
+            let mut f = crate::core::get_log_file().lock().expect("failed to lock log file");
+            writeln!(f, "[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!()).unwrap();
+            writeln!(f, $($arg)*).unwrap();
         }
     }};
 }
@@ -18,10 +21,12 @@ macro_rules! dbg_print {
     ($($arg:tt)*) => {{
         use crate::core::DBG_PRINTLN_FLAG;
         use std::sync::atomic::Ordering;
+        use std::io::Write;
 
         if DBG_PRINTLN_FLAG.load(Ordering::Relaxed) != 0 {
-            eprint!("[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!());
-            eprint!($($arg)*)
+            let mut f = crate::core::get_log_file().lock().expect("failed to lock log file");
+            write!(f, "[{}] {}:{} ", crate::core::BOOT_TIME.elapsed().unwrap().as_millis(), file!(), line!()).unwrap();
+            write!(f, $($arg)*).unwrap();
         }
     }};
 }

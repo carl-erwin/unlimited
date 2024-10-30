@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::core::Editor;
+use crate::core::EditorEnv;
 
 use crate::core::view::ContentFilter;
 use crate::core::view::FilterData;
@@ -30,7 +31,8 @@ impl ContentFilter<'_> for DirectoryReader {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        _editor_env: &mut EditorEnv<'static>,
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

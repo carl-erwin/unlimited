@@ -1,4 +1,6 @@
 use crate::core::Editor;
+use crate::core::EditorEnv;
+
 use parking_lot::RwLock;
 use std::rc::Rc;
 
@@ -36,7 +38,8 @@ impl ContentFilter<'_> for CharMapFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        editor_env: &mut EditorEnv<'static>,
         _env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

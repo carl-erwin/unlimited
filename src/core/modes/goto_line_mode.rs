@@ -17,6 +17,7 @@ use crate::core::buffer::BufferKind;
 
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
+
 use crate::core::editor::set_focus_on_view_id;
 
 use crate::core::editor::InputStageActionMap;
@@ -41,28 +42,11 @@ use crate::core::buffer::BufferEvent;
 
 use super::text_mode::run_text_mode_actions_vec;
 
-static GOTO_LINE_TRIGGER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line:start" }
-    ]
-  }
-]"#;
+static GOTO_LINE_TRIGGER_MAP: &str =
+    std::include_str!("../../../res/input-map/goto-line-mode-trigger.json");
 
-static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "ctrl+g" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "goto-line-controller:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "goto-line-controller:del-char" },
-     { "default": [],                   "action": "goto-line-controller:add-char" }
-   ]
-  }
-]"#;
+static GOTO_LINE_CONTROLLER_INTERACTIVE_MAP: &str =
+    std::include_str!("../../../res/input-map/goto-line-mode-input-map.json");
 
 impl<'a> Mode for GotoLineMode {
     fn name(&self) -> &'static str {
@@ -200,7 +184,7 @@ pub fn goto_line_start(
     mut env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_command_view_id(editor, env);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -228,36 +212,8 @@ pub fn goto_line_start(
 
     goto_line_show_controller_view(editor, env, view);
     set_focus_on_view_id(&mut editor, &mut env, controller_id);
-}
 
-pub fn goto_line_stop(
-    editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
-    view: &Rc<RwLock<View<'static>>>,
-) {
-    {
-        let v = view.write();
-        let mut input_map_stack = v.input_ctx.input_map.as_ref().borrow_mut();
-        input_map_stack.pop();
-    }
-
-    // reset status view : TODO(ceg): view::reset_status_view(&editor, view);
-    let status_view_id = view::get_status_view(editor, env, view);
-    if let Some(status_view_id) = status_view_id {
-        let status_view = get_view_by_id(editor, status_view_id);
-        let buffer = status_view.read().buffer().unwrap();
-        let mut buffer = buffer.write();
-        // clear buffer
-        let sz = buffer.size();
-        buffer.remove(0, sz, None);
-
-        {
-            let mut v = view.write();
-            let gtm = v.mode_ctx_mut::<GotoLineModeContext>("goto-line-mode");
-
-            gtm.reset();
-        }
-    }
+    env.input_grab_view_id = Some(controller_id);
 }
 
 fn create_goto_line_controller_view(
@@ -278,7 +234,7 @@ fn create_goto_line_controller_view(
         .finalize();
 
     {
-        buffer.as_ref().unwrap().write().append("Goto: ".as_bytes());
+        buffer.as_ref().unwrap().write().append(b"Goto: ");
     }
 
     // create view at mode creation
@@ -289,7 +245,8 @@ fn create_goto_line_controller_view(
         (x, y),
         (w, h),
         buffer,
-        &vec!["status-mode".to_owned()], // TODO(ceg): goto-line-controller
+        &vec![],                             // tags
+        &vec!["empty-line-mode".to_owned()], // TODO(ceg): goto-line-controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -355,7 +312,7 @@ fn goto_line_show_controller_view(
     let text_view = text_view.read();
     let gtm = text_view.mode_ctx::<GotoLineModeContext>("goto-line-mode");
 
-    status_view.children.pop(); // replace previous child
+    status_view.children.pop(); // replace previous child // clear ?
     status_view.children.push(ChildView {
         id: gtm.controller_view_id,
         layout_op: LayoutSize::Percent { p: 100.0 },
@@ -447,7 +404,7 @@ pub fn goto_line_controller_add_char(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
 
             let s: String = gtm.goto_line_str.iter().collect();
             buffer.append(s.as_bytes());
@@ -501,7 +458,7 @@ pub fn goto_line_controller_del_char(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
 
             let s: String = gtm.goto_line_str.iter().collect();
             buffer.append(s.as_bytes());
@@ -551,12 +508,15 @@ pub fn goto_line_controller_stop(
             let buffer = v.buffer().unwrap();
             let mut buffer = buffer.write();
             buffer.delete_content(None);
-            buffer.append("Goto: ".as_bytes());
+            buffer.append(b"Goto: ");
         }
 
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
     }
+
+    // reset controller grab
+    env.input_grab_view_id = None;
 }
 
 pub fn goto_line_set_target_line(

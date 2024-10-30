@@ -38,6 +38,8 @@ use crate::core::buffer::BufferPosition;
 use crate::core::config::Config;
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
+use crate::core::editor::EditorEvent;
+
 use crate::core::event::Event;
 use crate::core::event::Message;
 
@@ -48,8 +50,14 @@ use crate::core::view::View;
 use crate::core::view::ViewEventDestination;
 use crate::core::view::ViewEventSource;
 
+use crate::core::editor::get_checked_view_by_id;
 use crate::core::editor::get_view_by_id;
+use crate::core::editor::get_view_ids_by_tags;
+
 use crate::core::view::register_view_subscriber;
+
+use crate::core::editor::process_editor_events;
+use crate::core::editor::push_editor_event;
 
 //use crate::core::error::Error;
 //type UnlResult<T> = Result<T, Error>;
@@ -63,6 +71,12 @@ static OFFSET_PREFIX_REGEX: &str = r"^\+?@([0-9]+)";
 static LINE_COLUMN_PREFIX_REGEX: &str = r"^\+([0-9]+):?([0-9]+)?";
 static OFFSET_SUFFIX_REGEX: &str = r"^(.*):@([0-9]+)";
 static FILE_LINE_COLUMN_REGEX: &str = r"^([^:]+):([0-9]+):?([0-9]+)?";
+
+use std::sync::{Mutex, OnceLock};
+
+pub static LOG_FILE: OnceLock<Mutex<std::io::BufWriter<std::fs::File>>> = OnceLock::new();
+
+pub static LOG_FILENAME: OnceLock<String> = OnceLock::new();
 
 //
 pub fn get_dbg_println_flag() -> usize {
@@ -129,6 +143,19 @@ pub fn set_no_ui_render(b: bool) {
 }
 pub fn no_ui_render() -> bool {
     NO_UI_RENDER.load(Ordering::Relaxed) != 0
+}
+
+pub fn get_log_file() -> &'static Mutex<std::io::BufWriter<std::fs::File>> {
+    // TODO: handle Windows Path drive, etc..
+
+    crate::core::LOG_FILE.get_or_init(|| {
+        let logfile = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .open(crate::core::LOG_FILENAME.get_or_init(|| { "/tmp/u.log".into() }))
+            .expect("cannot open log file");
+        Mutex::new(std::io::BufWriter::new(logfile))
+    })
 }
 
 /*
@@ -227,6 +254,9 @@ pub fn run(
 
     create_layout(&mut editor, &mut env);
 
+    //
+    process_editor_events(&mut editor, &mut env);
+
     // TODO(ceg): send one event per
     // index buffers,
     {
@@ -301,14 +331,30 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                 }
 
                 // TODO(ceg): split in sub-threads/async task
+                // better: Event::IndexTask { buffer_map , Vec<id> }
+                // get buffers(Vec<id>) -> Vec<Option<Arc<Rw<Buffer>>>>
                 Event::IndexTask { buffer_map } => {
                     dbg_println!("[receive index task ]");
 
-                    let mut refresh_ui = false;
-                    let map = buffer_map.read();
-                    let mut t0 = std::time::Instant::now();
-                    for (id, buffer) in map.iter() {
-                        let is_indexed = buffer::build_index(buffer);
+                    // NB: lock contention on buffer_map.read()
+
+                    // put buffer+id in a special list
+                    let mut buffers = vec![];
+                    {
+                        let map = buffer_map.read();
+                        for (id, buffer) in map.iter() {
+                            {
+                                let buffer = buffer.read();
+                                if buffer.indexed {
+                                    continue;
+                                }
+                            }
+                            buffers.push((buffer.clone(), *id));
+                        }
+                    }
+
+                    for (buffer, id) in buffers {
+                        let is_indexed = buffer::build_index(&buffer);
                         if !is_indexed {
                             continue;
                         }
@@ -321,38 +367,9 @@ pub fn indexer(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<
                             0,
                             ts,
                             Event::Buffer {
-                                event: BufferEvent::BufferFullyIndexed { buffer_id: *id },
+                                event: BufferEvent::BufferFullyIndexed { buffer_id: id },
                             },
                         );
-                        core_tx.send(msg).unwrap_or(());
-
-                        // TODO: remove this: let the ui decide if the refresh is needed base on buffer_id
-
-                        // send ui refresh event
-                        let msg = Message::new(0, 0, ts, Event::RefreshView);
-                        crate::core::event::pending_input_event_inc(1);
-                        core_tx.send(msg).unwrap_or(());
-
-                        refresh_ui = true;
-                        let t1 = std::time::Instant::now();
-                        if (t1 - t0).as_millis() > 1000 {
-                            // send ui refresh event
-
-                            let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
-                            let msg = Message::new(0, 0, ts, Event::RefreshView);
-                            crate::core::event::pending_input_event_inc(1);
-                            core_tx.send(msg).unwrap_or(());
-
-                            refresh_ui = false;
-                            t0 = t1;
-                        }
-                    }
-
-                    // last ui refresh
-                    if refresh_ui {
-                        let ts = crate::core::BOOT_TIME.elapsed().unwrap().as_millis();
-                        let msg = Message::new(0, 0, ts, Event::RefreshView);
-                        crate::core::event::pending_input_event_inc(1);
                         core_tx.send(msg).unwrap_or(());
                     }
                 }
@@ -676,7 +693,12 @@ use crate::core::modes::CoreMode;
 use crate::core::modes::FindMode;
 use crate::core::modes::TextMode;
 
-use crate::core::modes::StatusMode;
+use crate::core::modes::EmptyLineMode;
+use crate::core::modes::SideBarMode;
+
+use crate::core::modes::TabBarMode;
+
+use crate::core::modes::StatusLineMode;
 
 use crate::core::modes::TitleBarMode;
 
@@ -696,6 +718,12 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
     // set default mode(s)
     editor.register_mode(Box::new(CoreMode::new()));
 
+    editor.register_mode(Box::new(EmptyLineMode::new()));
+
+    editor.register_mode(Box::new(SideBarMode::new()));
+
+    editor.register_mode(Box::new(TabBarMode::new()));
+
     editor.register_mode(Box::new(VsplitMode::new()));
     editor.register_mode(Box::new(HsplitMode::new()));
 
@@ -703,8 +731,9 @@ pub fn load_modes(editor: &mut Editor, _env: &mut EditorEnv) {
 
     editor.register_mode(Box::new(TitleBarMode::new()));
 
+    editor.register_mode(Box::new(StatusLineMode::new()));
+
     editor.register_mode(Box::new(TextMode::new()));
-    editor.register_mode(Box::new(StatusMode::new()));
 
     editor.register_mode(Box::new(FindMode::new()));
 
@@ -732,6 +761,7 @@ pub fn parse_layout_str(json: &str) -> Result<serde_json::Value, serde_json::err
 pub fn build_view_layout_from_json_str(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
+    all_layouts: &serde_json::Value,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
     attr: &str,
     _depth: usize,
@@ -744,12 +774,13 @@ pub fn build_view_layout_from_json_str(
 
     let attr = json.unwrap();
 
-    build_view_layout_from_attr(&mut editor, &mut env, buffer.clone(), &attr, 0)
+    build_view_layout_from_attr(&mut editor, &mut env, all_layouts, buffer.clone(), &attr, 0)
 }
 
 fn build_view_layout_from_attr(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
+    json: &Value,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
     attr: &Value,
     depth: usize,
@@ -761,6 +792,8 @@ fn build_view_layout_from_attr(
 
     let mut dir = view::LayoutDirection::Horizontal;
     let mut leader = false;
+    let mut tags: Vec<String> = vec![];
+
     let mut modes: Vec<String> = vec![];
 
     let mut sub_views_id = Vec::<Option<view::Id>>::new();
@@ -776,6 +809,12 @@ fn build_view_layout_from_attr(
     let mut allow_destroy = false;
 
     if let Value::Object(obj) = attr {
+        if let Some(val) = obj.get("sub-layout") {
+            if let Value::String(val) = val {
+                return build_view_layout_typed(&mut editor, &mut env, buffer.clone(), &json, val);
+            }
+        }
+
         if let Some(val) = obj.get("internal-buffer") {
             if let Value::String(val) = val {
                 internal_buffer_name = Some(val.clone());
@@ -789,8 +828,12 @@ fn build_view_layout_from_attr(
                 if n.is_f64() {
                     let p = n.as_f64().unwrap() as f32;
                     view_size = LayoutSize::Percent { p: f32::from(p) }
+                } else if n.is_u64() {
+                    let p = n.as_u64().unwrap() as f32;
+                    view_size = LayoutSize::Percent { p: f32::from(p) }
                 } else {
                     // syntax error
+                    panic!("percent: invalid syntax")
                 }
             }
 
@@ -809,6 +852,7 @@ fn build_view_layout_from_attr(
                     view_size = LayoutSize::Percent { p }
                 } else {
                     // syntax error
+                    panic!("remain: invalid syntax")
                 }
             }
 
@@ -816,8 +860,12 @@ fn build_view_layout_from_attr(
                 if n.is_f64() {
                     let p = n.as_f64().unwrap() as f32;
                     view_size = LayoutSize::RemainPercent { p }
+                } else if n.is_u64() {
+                    let p = n.as_u64().unwrap() as f32;
+                    view_size = LayoutSize::RemainPercent { p }
                 } else {
                     // syntax error
+                    panic!("remain_percent: invalid syntax")
                 }
             }
 
@@ -827,6 +875,7 @@ fn build_view_layout_from_attr(
                     view_size = LayoutSize::RemainMinus { minus }
                 } else {
                     // syntax error
+                    panic!("remain_minus: invalid syntax")
                 }
             }
         }
@@ -852,6 +901,19 @@ fn build_view_layout_from_attr(
                 allow_destroy = *val;
             } else {
                 // invalid type
+            }
+        }
+
+        if let Some(tags_array) = obj.get("tags") {
+            if tags_array.is_array() {
+                if let Value::Array(ref vec) = tags_array {
+                    for m in vec {
+                        if let Value::String(s) = m {
+                            dbg_println!(" --- found tag  = {}", m);
+                            tags.push(s.clone());
+                        }
+                    }
+                }
             }
         }
 
@@ -926,6 +988,7 @@ fn build_view_layout_from_attr(
         (0, 0),
         (1, 1),
         buffer.clone(),
+        &tags,
         &modes,
         0,
         dir,
@@ -942,6 +1005,22 @@ fn build_view_layout_from_attr(
 
     view.is_leader = leader;
 
+    // select first active view
+    if env.active_view.is_none() {
+        if view.tags.get("target-view").is_some() {
+            // TODO(ceg): find better naming for target view
+            // env.active_view = Some(view.id);
+        }
+    }
+
+    // select first status view
+    if env.status_view_id.is_none() {
+        if view.tags.get("status-line").is_some() {
+            // TODO(ceg): find better naming
+            env.status_view_id = Some(view.id);
+        }
+    }
+
     dbg_println!(
         "build_view_layout_from_attr [{depth}] setup view modes: {:?}",
         modes
@@ -957,6 +1036,7 @@ fn build_view_layout_from_attr(
                     let child_view = build_view_layout_from_attr(
                         &mut editor,
                         &mut env,
+                        json,
                         buffer.clone(),
                         &child_layout,
                         depth + 1,
@@ -1065,7 +1145,7 @@ fn build_view_layout_from_attr(
     }
 
     if let Some(focus_idx) = focus_idx {
-        view.focus_to = Some(view.children[focus_idx].id); // TODO(ceg):
+        view.transfer_focus_to = Some(view.children[focus_idx].id); // TODO(ceg):
     }
 
     if let Some(status_idx) = status_idx {
@@ -1087,17 +1167,18 @@ pub fn build_view_layout_typed(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     buffer: Option<Arc<RwLock<Buffer<'static>>>>,
-    json: &Value,
+    all_layouts: &Value, //
     view_type: &str,
 ) -> Option<view::Id> {
     // 1st level is object["view-type"]
     let depth = 0;
-    if let Value::Object(ref root) = *json {
+    if let Value::Object(ref root) = *all_layouts {
         if let Some((_view_type, view_layout)) = root.get_key_value(view_type) {
             //dbg_println!("view_type = {:?}, v = {:?}", view_type, view_layout);
             return build_view_layout_from_attr(
                 &mut editor,
                 &mut env,
+                all_layouts,
                 buffer.clone(),
                 &view_layout,
                 depth,
@@ -1106,6 +1187,32 @@ pub fn build_view_layout_typed(
     }
 
     return None;
+}
+
+pub fn get_view_parents(editor: &mut Editor<'static>, id: view::Id) -> Option<Vec<view::Id>> {
+    dbg_println!("get_view_parents {:?}", id);
+
+    let mut ids = vec![];
+
+    let mut id = id;
+    loop {
+        if let Some(v) = get_checked_view_by_id(editor, id) {
+            if let Some(pid) = v.read().parent_id {
+                id = pid;
+                ids.push(id);
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if ids.is_empty() {
+        None
+    } else {
+        Some(ids)
+    }
 }
 
 pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'static>) {
@@ -1131,24 +1238,119 @@ pub fn create_layout(mut editor: &mut Editor<'static>, mut env: &mut EditorEnv<'
         }
     }
 
-    // create views
-    for buffer in buffers {
-        dbg_println!("-------------");
+    // TODO(ceg): handle ctor with no buffer
+    let root_buf = BufferBuilder::new(BufferKind::File)
+        .buffer_name("root")
+        .internal(true)
+        .use_buffer_log(false)
+        //.read_only(true) // TODO
+        .finalize();
 
-        dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
-        let kind = buffer.as_ref().read().kind;
-        let id = match kind {
-            BufferKind::File => {
-                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "file-view")
+    let root_id = build_view_layout_typed(&mut editor, &mut env, root_buf, &json, "main-view");
+    dbg_println!("root_id {:?}", root_id);
+
+    // TODO: implement side bar click to create groups
+    // create a default group and attach it to "workspace-view":
+    if let Some(workspace_id) = view::get_view_by_tag(editor, env, "workspace") {
+        let group_buf = BufferBuilder::new(BufferKind::File)
+            .buffer_name("group")
+            .internal(true)
+            .use_buffer_log(false)
+            .finalize();
+
+        // add (default) group
+        if let Some(group_id) =
+            build_view_layout_typed(&mut editor, &mut env, group_buf, &json, "group-view")
+        {
+            get_view_by_id(editor, workspace_id)
+                .write()
+                .children
+                .push(ChildView {
+                    id: group_id,
+                    layout_op: LayoutSize::Percent { p: 100.0 },
+                });
+        }
+
+        // create views
+        for buffer in buffers {
+            dbg_println!("-------------");
+
+            dbg_println!("loading buffer '{}'", buffer.as_ref().read().name);
+            let kind = buffer.as_ref().read().kind;
+            let _vid = match kind {
+                BufferKind::File => build_view_layout_typed(
+                    &mut editor,
+                    &mut env,
+                    Some(buffer),
+                    &json,
+                    "single-file-view",
+                ),
+                BufferKind::Directory => {
+                    build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+                }
+            };
+        }
+
+        // populate active views (file)
+        // default behavior / no session restore yet
+        {
+            let map = editor.view_map.clone();
+            for (id, v) in map.read().iter() {
+                let v = v.read();
+                if !v.tags.contains("file-view") {
+                    continue;
+                }
+
+                if let Some(b) = v.buffer() {
+                    if b.read().kind == BufferKind::File {
+                        editor.active_views.push(*id);
+                        push_editor_event(&mut editor, EditorEvent::ViewAdded { id: *id });
+                    }
+                }
             }
-            BufferKind::Directory => {
-                build_view_layout_typed(&mut editor, &mut env, Some(buffer), &json, "dir-view")
+
+            // show 1st view
+            if !editor.active_views.is_empty() {
+                dbg_println!("active views {:?}", editor.active_views);
+
+                let id = editor.active_views[0];
+
+                env.active_view = Some(id);
+
+                dbg_println!("active view {:?}", id);
+
+                // find inner child
+                if let Some(target_ids) = get_view_ids_by_tags(&editor, "target-view") {
+                    dbg_println!("target_ids {:?}", target_ids);
+
+                    for target_id in &target_ids {
+                        // check it active view contains target-view
+                        if let Some(parents) = get_view_parents(editor, *target_id) {
+                            dbg_println!("parents {:?}", parents);
+
+                            for pid in &parents {
+                                dbg_println!("pid {:?} == id {:?}", pid, id);
+                                if *pid == id {
+                                    env.active_view = Some(*target_id);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // find in id the target-view
+                // TODO: exchange with file slot ?
+                if let Some(ids) = get_view_ids_by_tags(&editor, "file-slot") {
+                    let parent_id = ids[0];
+                    get_view_by_id(editor, parent_id)
+                        .write()
+                        .children
+                        .push(ChildView {
+                            id: id,
+                            layout_op: LayoutSize::Percent { p: 100.0 },
+                        });
+                }
             }
-        };
-        if let Some(vid) = id {
-            // top level views
-            dbg_println!("add top level view {:?}", vid);
-            editor.root_views.push(vid);
         }
     }
 }

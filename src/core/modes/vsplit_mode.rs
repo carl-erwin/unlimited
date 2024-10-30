@@ -6,6 +6,7 @@ use std::rc::Rc;
 use super::Mode;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
 
 use crate::core::editor::get_view_by_id;
 use crate::core::editor::register_input_stage_action;
@@ -20,6 +21,10 @@ use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 
 use crate::core::view::View;
+
+use crate::core::view::ViewEvent;
+use crate::core::view::ViewEventDestination;
+use crate::core::view::ViewEventSource;
 
 use crate::core::event::*;
 
@@ -43,6 +48,7 @@ pub struct VsplitMode {
 pub struct VsplitModeContext {
     // add per view fields
     pub selected: bool,
+    pub hover: bool,
 }
 
 impl<'a> Mode for VsplitMode {
@@ -58,7 +64,10 @@ impl<'a> Mode for VsplitMode {
 
     fn alloc_ctx(&self) -> Box<dyn Any> {
         dbg_println!("alloc vsplit-mode ctx");
-        let ctx = VsplitModeContext { selected: false };
+        let ctx = VsplitModeContext {
+            selected: false,
+            hover: false,
+        };
         Box::new(ctx)
     }
 
@@ -76,6 +85,40 @@ impl<'a> Mode for VsplitMode {
         view.compose_content_filters
             .borrow_mut()
             .push(Box::new(VsplitModeComposeFilter::new()));
+    }
+
+    fn on_view_event(
+        &self,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        src: ViewEventSource,
+        dst: ViewEventDestination,
+        event: &ViewEvent,
+        src_view: &mut View<'static>,
+        _parent: Option<&mut View<'static>>,
+    ) {
+        dbg_println!(
+            "mode '{}' on_view_event src: {:?} dst: {:?}, event {:?} view.id {:?}",
+            self.name(),
+            src,
+            dst,
+            event,
+            src_view.id
+        );
+
+        match event {
+            ViewEvent::Enter => {
+                let mod_ctx = src_view.mode_ctx_mut::<VsplitModeContext>("vsplit-mode");
+                mod_ctx.hover = true;
+            }
+
+            ViewEvent::Leave => {
+                let mod_ctx = src_view.mode_ctx_mut::<VsplitModeContext>("vsplit-mode");
+                mod_ctx.hover = false;
+            }
+
+            _ => {}
+        }
     }
 }
 
@@ -264,14 +307,21 @@ impl ContentFilter<'_> for VsplitModeComposeFilter {
         let mod_ctx = view.mode_ctx::<VsplitModeContext>("vsplit-mode");
         let mut cpi = CodepointInfo::new();
         cpi.style.is_selected = false;
-        if env.focus_view_id == view.id && mod_ctx.selected {
-            cpi.style.bg_color = (113, 114, 123);
+
+        cpi.style.color = (45 + 25, 49 + 25, 54 + 25);
+        if mod_ctx.selected {
+            cpi.style.color = (0, 119, 184);
+        } else {
+            if mod_ctx.hover {
+                cpi.style.color = TextStyle::default_color();
+            }
         }
+
         cpi.cp = '│';
         cpi.displayed_cp = '│';
 
         loop {
-            let (b, _) = env.screen.push(cpi);
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 env.quit = true;
                 break;
