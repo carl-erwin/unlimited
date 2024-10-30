@@ -72,6 +72,12 @@ static LINE_COLUMN_PREFIX_REGEX: &str = r"^\+([0-9]+):?([0-9]+)?";
 static OFFSET_SUFFIX_REGEX: &str = r"^(.*):@([0-9]+)";
 static FILE_LINE_COLUMN_REGEX: &str = r"^([^:]+):([0-9]+):?([0-9]+)?";
 
+use std::sync::{Mutex, OnceLock};
+
+pub static LOG_FILE: OnceLock<Mutex<std::io::BufWriter<std::fs::File>>> = OnceLock::new();
+
+pub static LOG_FILENAME: OnceLock<String> = OnceLock::new();
+
 //
 pub fn get_dbg_println_flag() -> usize {
     DBG_PRINTLN_FLAG.load(Ordering::Relaxed)
@@ -137,6 +143,19 @@ pub fn set_no_ui_render(b: bool) {
 }
 pub fn no_ui_render() -> bool {
     NO_UI_RENDER.load(Ordering::Relaxed) != 0
+}
+
+pub fn get_log_file() -> &'static Mutex<std::io::BufWriter<std::fs::File>> {
+    // TODO: handle Windows Path drive, etc..
+
+    crate::core::LOG_FILE.get_or_init(|| {
+        let logfile = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .open(crate::core::LOG_FILENAME.get_or_init(|| { "/tmp/u.log".into() }))
+            .expect("cannot open log file");
+        Mutex::new(std::io::BufWriter::new(logfile))
+    })
 }
 
 /*

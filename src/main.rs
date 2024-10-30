@@ -84,6 +84,13 @@ fn parse_command_line() -> Config {
         .arg(arg!(--ui <UI_NAME> "user interface frontend: crossterm"))
         .arg(arg!(--debug "enable debug logs on stderr (use redirection to file)"))
         .arg(
+            Arg::new("LOG_FILENAME")
+                .value_name("LOG_FILENAME")
+                .long("log-file")
+                .action(ArgAction::Append)
+                .help("debug log file name (default /tmp/u.log)"),
+        )
+        .arg(
             Arg::new("no-read-cache")
                 .long("no-read-cache")
                 .help("disable read cache (debug)")
@@ -129,6 +136,10 @@ fn parse_command_line() -> Config {
                 .trailing_var_arg(true),
         )
         .get_matches();
+
+    let log_filename = matches
+        .get_one::<String>("LOG_FILENAME")
+        .map_or("/tmp/u.log".to_owned(), |v| v.to_owned());
 
     let ui_frontend = matches
         .get_one::<String>("ui")
@@ -193,10 +204,13 @@ fn parse_command_line() -> Config {
         _ => {}
     }
 
+    crate::core::LOG_FILENAME.get_or_init(|| log_filename.clone());
+
     // debug
     dbg_println!("config vars = \n{:?}", vars);
     dbg_println!("ui_frontend = \n{:?}", ui_frontend);
     dbg_println!("files_list = \n{:?}", files_list);
+    dbg_println!("LOG_FILENAME = \n{:?}", log_filename);
 
     if fatal_error {
         std::process::exit(1);
