@@ -142,7 +142,7 @@ impl<'a> EditorEnv<'a> {
             phantom: PhantomData,
             graphic_display,
             quit: false,
-            current_input_event: crate::core::event::InputEvent::NoInputEvent,
+            current_input_event: crate::core::event::InputEvent::DummyInputEvent,
             refresh_ui: false,
             pending_events: 0,
             last_rdr_event: Instant::now(),

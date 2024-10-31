@@ -662,6 +662,25 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
     } //
 }
 
+macro_rules! build_key_press_event {
+    ($un_key:expr, $key_modifiers:expr) => {
+        InputEvent::KeyPress {
+            mods: translate_crossterm_key_modifier($key_modifiers),
+            key: $un_key,
+        }
+    };
+}
+
+macro_rules! build_key_press_event_no_shift {
+    ($un_key:expr, $key_modifiers:expr) => {
+        InputEvent::KeyPress {
+            mods: key_modifiers_no_shift($key_modifiers),
+            key: $un_key,
+        }
+    };
+}
+
+// TODO(ceg): return Option<InputEvent>
 fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     dbg_println!("CROSSTERM EVENT : {:?}", evt);
 
@@ -669,163 +688,111 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
     // select build_function based on ke.kind
     if let ::crossterm::event::Event::Key(ke) = evt {
         if ke.kind == KeyEventKind::Release {
-            return InputEvent::NoInputEvent;
+            return InputEvent::DummyInputEvent;
         }
     }
-
-    // build_modifiers(ke.modifiers)
-    // build_key(ke.modifiers)
 
     match evt {
         ::crossterm::event::Event::Key(ke) => match ke.code {
             ::crossterm::event::KeyCode::Char(c) => {
-                return InputEvent::KeyPress {
-                    mods: key_modifiers_no_shift(ke.modifiers),
-                    key: Key::Unicode(c),
-                };
+                return build_key_press_event_no_shift!(Key::Unicode(c), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Backspace => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::BackSpace,
-                };
+                return build_key_press_event!(Key::BackSpace, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Enter => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\n'),
-                };
+                return build_key_press_event!(Key::Unicode('\n'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Left => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Left,
-                };
+                return build_key_press_event!(Key::Left, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Right => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Right,
-                };
+                return build_key_press_event!(Key::Right, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Up => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Up,
-                };
+                return build_key_press_event!(Key::Up, ke.modifiers);
             }
+
             ::crossterm::event::KeyCode::Down => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Down,
-                };
+                return build_key_press_event!(Key::Down, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Home => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Home,
-                };
+                return build_key_press_event!(Key::Home, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::End => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::End,
-                };
+                return build_key_press_event!(Key::End, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::PageUp => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::PageUp,
-                };
+                return build_key_press_event!(Key::PageUp, ke.modifiers);
             }
+
             ::crossterm::event::KeyCode::PageDown => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::PageDown,
-                };
+                return build_key_press_event!(Key::PageDown, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Tab => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\t'),
-                };
+                return build_key_press_event!(Key::Unicode('\t'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::BackTab => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
 
             ::crossterm::event::KeyCode::Delete => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Delete,
-                };
+                return build_key_press_event!(Key::Delete, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Insert => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Insert,
-                };
+                return build_key_press_event!(Key::Insert, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::F(n) => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::F(n as usize),
-                };
+                return build_key_press_event!(Key::F(n as usize), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Null => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\0'),
-                };
+                return build_key_press_event!(Key::Unicode('\0'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Esc => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Escape,
-                };
+                return build_key_press_event!(Key::Escape, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Pause => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::Menu => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::KeypadBegin => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::Media(_) => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::Modifier(_) => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
 
             ::crossterm::event::KeyCode::CapsLock => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::ScrollLock => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::NumLock => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
             ::crossterm::event::KeyCode::PrintScreen => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
         },
 
@@ -867,7 +834,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             ::crossterm::event::MouseEventKind::Drag(_button) => {
                 // TODO(ceg): no Drag event in the editor yet ?
                 // TODO(ceg): filter dragged button
-                // return InputEvent::NoInputEvent;
+                // return InputEvent::DummyInputEvent;
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
@@ -877,7 +844,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
 
             ::crossterm::event::MouseEventKind::Moved => {
-                // return InputEvent::NoInputEvent;
+                // return InputEvent::DummyInputEvent;
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
@@ -888,12 +855,12 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
 
             ::crossterm::event::MouseEventKind::ScrollLeft => {
                 panic!("");
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
 
             ::crossterm::event::MouseEventKind::ScrollRight => {
                 panic!("");
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
         },
 
@@ -915,16 +882,16 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                 .map(|c| if c == '\r' { '\n' } else { c }) // TODO: move this to text mode and use Paste(s)
                 .collect();
 
-            return InputEvent::KeyPress {
-                mods: KeyModifiers::new(),
-                key: Key::UnicodeArray(v),
-            };
+            return build_key_press_event!(
+                Key::UnicodeArray(v),
+                ::crossterm::event::KeyModifiers::NONE
+            );
 
-            return InputEvent::Paste(s);
+            // return InputEvent::Paste(s);
         }
     }
 
-    InputEvent::NoInputEvent
+    InputEvent::DummyInputEvent
 }
 
 fn send_input_events(
@@ -1062,7 +1029,9 @@ fn get_input_events(
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 prev_len = accum.len();
                 let evt = translate_crossterm_event(cross_evt);
-                accum.push(evt);
+                if evt != InputEvent::DummyInputEvent {
+                    accum.push(evt);
+                }
                 if force_input {
                     break;
                 }

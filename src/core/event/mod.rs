@@ -173,8 +173,7 @@ impl PointerEvent {
 /// Supported input events
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum InputEvent {
-    InvalidInputEvent,
-    NoInputEvent,
+    DummyInputEvent,
     FallbackEvent, // use to map default action in input table
     UiResized { width: usize, height: usize }, // resize
     KeyPress { key: Key, mods: KeyModifiers },

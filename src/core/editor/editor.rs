@@ -383,7 +383,7 @@ pub fn update_view_and_send_draw_event(
     check_view_dimension(editor, env);
 
     let mut recompose = false;
-    let ev = InputEvent::NoInputEvent;
+    let ev = InputEvent::DummyInputEvent;
 
     // update focused view
     let target_id = setup_focus_and_event(&mut editor, &mut env, &ev, &mut recompose);
@@ -523,7 +523,7 @@ fn process_single_input_event<'a>(
     }
 
     let ev = &env.current_input_event; // Option ?
-    if *ev == crate::core::event::InputEvent::NoInputEvent {
+    if *ev == crate::core::event::InputEvent::DummyInputEvent {
         // ignore no input event event :-)
         return false;
     }
