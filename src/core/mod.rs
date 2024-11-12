@@ -152,7 +152,7 @@ pub fn get_log_file() -> &'static Mutex<std::io::BufWriter<std::fs::File>> {
         let logfile = std::fs::File::options()
             .create(true)
             .append(true)
-            .open(crate::core::LOG_FILENAME.get_or_init(|| { "/tmp/u.log".into() }))
+            .open(crate::core::LOG_FILENAME.get_or_init(|| "/tmp/u.log".into()))
             .expect("cannot open log file");
         Mutex::new(std::io::BufWriter::new(logfile))
     })
