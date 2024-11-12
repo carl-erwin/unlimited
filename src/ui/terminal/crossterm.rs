@@ -900,7 +900,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
         ::crossterm::event::Event::Resize(width, height) => {
             // println!("New size {}x{}", width, height)
             // TODO(ceg): not really an input
-            return InputEvent::RefreshUi {
+            return InputEvent::UiResized {
                 width: width as usize,
                 height: height as usize,
             };
@@ -940,7 +940,7 @@ fn send_input_events(
 
     if accum.len() == 1 {
         match accum[0] {
-            InputEvent::RefreshUi { width, height } => {
+            InputEvent::UiResized { width, height } => {
                 let msg = Message::new(0, 0, ts, Event::UpdateView { width, height });
 
                 // ui_tx.send(msg).unwrap_or(()); ?
@@ -967,7 +967,7 @@ fn send_input_events(
 
     for evt in accum {
         match evt {
-            InputEvent::RefreshUi { width, height } => {
+            InputEvent::UiResized { width, height } => {
                 refresh = true;
                 new_width = width;
                 new_height = height;
