@@ -414,10 +414,12 @@ mod test_regex {
     fn test_buffer_position_regex() {
         use super::*;
 
-        Regex::new(OFFSET_PREFIX_REGEX).unwrap();
-        Regex::new(LINE_COLUMN_PREFIX_REGEX).unwrap();
-        Regex::new(OFFSET_SUFFIX_REGEX).unwrap();
-        Regex::new(FILE_LINE_COLUMN_REGEX).unwrap();
+        [
+            OFFSET_PREFIX_REGEX,
+            LINE_COLUMN_PREFIX_REGEX,
+            OFFSET_SUFFIX_REGEX,
+            FILE_LINE_COLUMN_REGEX,
+        ].map(|s| Regex::new(s).unwrap());
     }
 }
 
