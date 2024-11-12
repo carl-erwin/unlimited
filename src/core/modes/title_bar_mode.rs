@@ -89,9 +89,9 @@ impl ContentFilter<'_> for EditorTitle {
 
     fn setup(
         &mut self,
-        editor: &mut Editor<'static>,
+        _editor: &mut Editor<'static>,
 
-        editor_env: &mut EditorEnv<'static>,
+        _editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

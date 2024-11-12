@@ -140,7 +140,7 @@ impl ContentFilter<'_> for StatusLineModeCompose {
     fn setup(
         &mut self,
         editor: &mut Editor<'static>,
-        editor_env: &mut EditorEnv<'static>,
+        _editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

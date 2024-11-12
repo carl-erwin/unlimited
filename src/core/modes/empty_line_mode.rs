@@ -131,7 +131,7 @@ impl ContentFilter<'_> for EmptyLineModeCompose {
     fn run(
         &mut self,
         _view: &View,
-        env: &mut LayoutEnv,
+        _env: &mut LayoutEnv,
         _input: &[FilterIo],
         _output: &mut Vec<FilterIo>,
     ) {

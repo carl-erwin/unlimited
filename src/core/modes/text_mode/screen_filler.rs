@@ -101,7 +101,7 @@ impl ContentFilter<'_> for ScreenFilter {
     fn setup(
         &mut self,
         editor: &mut Editor<'static>,
-        editor_env: &mut EditorEnv<'static>,
+        _editor_env: &mut EditorEnv<'static>,
 
         _env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,

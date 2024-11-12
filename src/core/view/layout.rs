@@ -763,7 +763,7 @@ fn run_content_filters(
 
 fn run_screen_overlay_filters(
     editor: &Editor<'static>,
-    editor_env: &EditorEnv<'static>,
+    _editor_env: &EditorEnv<'static>,
     layout_env: &mut LayoutEnv,
     time_spent: &mut Vec<u128>,
     view: &Rc<RwLock<View>>,

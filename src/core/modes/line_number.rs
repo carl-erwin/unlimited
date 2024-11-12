@@ -543,10 +543,6 @@ impl BufferEventCb for LineNumberModeBufferEventHandler {
             } => {}
 
             BufferEvent::BufferFullyIndexed { buffer_id: _ } => {}
-
-            _ => {
-                dbg_println!("unhandled event {:?}", event);
-            }
         }
 
         buffer.show_root_node_bytes_stats();

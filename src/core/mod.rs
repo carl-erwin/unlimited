@@ -419,7 +419,8 @@ mod test_regex {
             LINE_COLUMN_PREFIX_REGEX,
             OFFSET_SUFFIX_REGEX,
             FILE_LINE_COLUMN_REGEX,
-        ].map(|s| Regex::new(s).unwrap());
+        ]
+        .map(|s| Regex::new(s).unwrap());
     }
 }
 

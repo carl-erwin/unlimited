@@ -77,8 +77,8 @@ impl<'a> Mode for TabBarMode {
         view: &mut View<'static>,
     ) {
         //
-        let use_utf8_codec = true;
-        let use_tabulation_exp = !true; // char map ? with <tab>
+        let _use_utf8_codec = true;
+        let _use_tabulation_exp = !true; // char map ? with <tab>
 
         // mandatory data reader
         view.compose_content_filters
@@ -145,7 +145,7 @@ impl<'a> Mode for TabBarMode {
     //
     fn on_view_event(
         &self,
-        editor: &mut Editor<'static>,
+        _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,
@@ -266,9 +266,9 @@ impl ContentFilter<'_> for TabBarModeCompose {
         &mut self,
         mut editor: &mut Editor<'static>,
         mut editor_env: &mut EditorEnv<'static>,
-        layout_env: &mut LayoutEnv,
+        _layout_env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
-        parent_view: Option<&View<'static>>,
+        _parent_view: Option<&View<'static>>,
     ) {
         // hack
         // FIXME: move to event base populate
@@ -277,7 +277,7 @@ impl ContentFilter<'_> for TabBarModeCompose {
         {
             let mut v = view.write();
 
-            let mode_ctx = v.mode_ctx_mut::<TabBarModeContext>("tab-bar-mode");
+            let _mode_ctx = v.mode_ctx_mut::<TabBarModeContext>("tab-bar-mode");
 
             // MUST will remove view from parent.children
             for c in &v.children {
@@ -318,11 +318,11 @@ impl ContentFilter<'_> for TabBarModeCompose {
     fn run(
         &mut self,
         _view: &View,
-        env: &mut LayoutEnv,
+        _env: &mut LayoutEnv,
         _input: &[FilterIo],
         _output: &mut Vec<FilterIo>,
     ) {
     }
 
-    fn finish(&mut self, view: &View, env: &mut LayoutEnv) {}
+    fn finish(&mut self, _view: &View, _env: &mut LayoutEnv) {}
 }

@@ -1020,7 +1020,7 @@ pub fn open_doc_controller_show_buffer(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let (new_view_id, ok) = open_doc_controller_load_buffer(editor, env, view);
+    let (_new_view_id, _ok) = open_doc_controller_load_buffer(editor, env, view);
     //if !ok {
     //    //return;
     //}
@@ -1076,11 +1076,11 @@ fn open_doc_controller_load_buffer(
         return (env.root_view_id, false);
     };
 
-    return (view::Id(0), true);
+    //    return (view::Id(0), true);
+    // FIXME!
 
     // move to new core func
     // configure buffer
-
     // TODO(ceg): move this to core:: as setup_buffer_modes(buffer)
     // per mode buffer metadata
     {

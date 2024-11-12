@@ -89,7 +89,7 @@ impl<'a> Mode for HsplitMode {
 
     fn on_view_event(
         &self,
-        editor: &mut Editor<'static>,
+        _editor: &mut Editor<'static>,
         _env: &mut EditorEnv<'static>,
         src: ViewEventSource,
         dst: ViewEventDestination,

@@ -898,7 +898,7 @@ fn clip_coordinates_xy(
     mut editor: &mut Editor<'static>,
     mut env: &mut EditorEnv<'static>,
     root_view_id: view::Id,
-    vid: view::Id,
+    _vid: view::Id,
     mut x: &mut i32,
     mut y: &mut i32,
 ) -> view::Id {

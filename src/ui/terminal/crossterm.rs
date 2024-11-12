@@ -852,12 +852,12 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
 
             ::crossterm::event::MouseEventKind::ScrollLeft => {
-                panic!("");
+                //panic!("");
                 return InputEvent::DummyInputEvent;
             }
 
             ::crossterm::event::MouseEventKind::ScrollRight => {
-                panic!("");
+                //panic!("");
                 return InputEvent::DummyInputEvent;
             }
         },

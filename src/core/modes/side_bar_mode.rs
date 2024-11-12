@@ -115,14 +115,14 @@ impl ContentFilter<'_> for SideBarModeCompose {
         _editor_env: &mut EditorEnv<'static>,
 
         _env: &mut LayoutEnv,
-        view: &Rc<RwLock<View>>,
+        _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
     ) {
         // TODO(ceg): cache list
         self.buffer_list.clear();
 
         // get editor document list
-        for (id, b) in editor.buffer_map.read().iter() {
+        for (_id, b) in editor.buffer_map.read().iter() {
             let b = b.read();
             self.buffer_list.push(b.name.clone());
         }

@@ -1389,7 +1389,7 @@ pub fn remove_previous_codepoint(
 
 pub fn join_lines(
     editor: &mut Editor<'static>,
-    env: &mut EditorEnv<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // compute offsets
