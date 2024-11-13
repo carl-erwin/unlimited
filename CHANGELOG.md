@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.7]
+ - improve debug logs (default to /tmp/u.log toggle with F4)
+ - update clap version
+ - crossterm: fork not needed anymore
+  support Paste event
+ - play with sdl
+ - prepare single root view
+ - usual small fixes
+
 ## [0.0.6]
  - run cargo update
  - fix remove_until_end_of_word/remove_until_char_class_change : add missing undo/redo  operation
