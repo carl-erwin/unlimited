@@ -934,6 +934,10 @@ fn clip_coordinates_xy(
     env.global_x = Some(root_x);
     env.global_y = Some(root_y);
 
+    env.event_path.clear();
+
+    env.event_path.push((id, (root_x, root_y)));
+
     // check layout type
     dbg_println!("CLIPPING -----------------------------------BEGIN");
     dbg_println!("CLIPPING clipping orig coords ({},{})", *x, *y);
@@ -1015,10 +1019,13 @@ fn clip_coordinates_xy(
                         dbg_println!("CLIPPING         select  vid {:?}", child_v.id);
                         dbg_println!("CLIPPING         updated clipping coords ({},{})", *x, *y);
 
+                        // update local coords
                         env.local_x = Some(*x);
                         env.local_y = Some(*y);
 
                         id = child_v.id;
+
+                        env.event_path.push((id, (*x, *y)));
 
                         // restart with id as new "root"
                         break 'inner;
@@ -1151,6 +1158,8 @@ fn clip_coordinates_and_get_view_id(
         InputEvent::KeyPress { .. } => env.active_view.unwrap_or(vid),
         _ => vid,
     };
+
+    dbg_println!("EVENT_PATH : {:?}", env.event_path);
 
     // input locked ?
     // TODO: fix floting window clipping

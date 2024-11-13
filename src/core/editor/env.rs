@@ -98,6 +98,8 @@ pub struct EditorEnv<'a> {
     pub diff_x: i32,
     pub diff_y: i32,
 
+    pub event_path: Vec<(view::Id, (i32, i32))>,
+
     //
     pub prev_view_id: view::Id,
     pub root_view_id: view::Id,
@@ -158,6 +160,8 @@ impl<'a> EditorEnv<'a> {
             local_y: None,
             diff_x: 0,
             diff_y: 0,
+
+            event_path: vec![],
             //max
             prev_view_id: view::Id(1), // NB
             root_view_id: view::Id(1), // NB

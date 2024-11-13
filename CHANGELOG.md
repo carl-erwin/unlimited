@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.0.8]
+ - save event coordinates path (hierarchy from root)
+
 ## [0.0.7]
  - improve debug logs (default to /tmp/u.log toggle with F4)
  - update clap version
