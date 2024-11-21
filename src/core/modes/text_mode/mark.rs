@@ -700,7 +700,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 3 };
+        let mut m = Mark::new(3);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
@@ -725,7 +725,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 4 };
+        let mut m = Mark::new(4);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
@@ -751,7 +751,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 3 };
+        let mut m = Mark::new(3);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
@@ -776,7 +776,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 2 };
+        let mut m = Mark::new(2);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
@@ -801,7 +801,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 0 };
+        let mut m = Mark::new(0);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);
@@ -826,7 +826,7 @@ fn test_marks() {
         assert_eq!(rdata.len(), data.len());
         assert_eq!(rdata.len(), bb.size());
 
-        let mut m = Mark { offset: 1 };
+        let mut m = Mark::new(1);
 
         println!("** mark @ {} **", m.offset);
         m.move_backward(&bb, codec);

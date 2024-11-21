@@ -126,7 +126,7 @@ impl<'a> Mode for GotoLineMode {
                 let tm = view.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 tm.marks.clear();
-                tm.marks.push(Mark { offset });
+                tm.marks.push(Mark::new(offset));
 
                 tm.pre_compose_action
                     .push(PostInputAction::CenterAroundMainMark);
@@ -549,7 +549,7 @@ pub fn goto_line_set_target_line(
 
             let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
             tm.marks.clear();
-            tm.marks.push(Mark { offset });
+            tm.marks.push(Mark::new(offset));
             tm.mark_index = 0;
         }
     }

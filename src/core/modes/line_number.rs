@@ -263,7 +263,7 @@ pub fn linenum_input_event(
                         // update marks
                         let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
                         tm.marks.clear();
-                        tm.marks.push(Mark { offset });
+                        tm.marks.push(Mark::new(offset));
 
                         // TODO(ceg): ignore if view was change by user
                         // let msg = Message::new(0, 0, 0, Event::RefreshView);

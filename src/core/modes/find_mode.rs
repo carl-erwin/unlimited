@@ -517,7 +517,7 @@ pub fn find_controller_next(
                 let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 tm.select_point.clear();
-                tm.select_point.push(Mark { offset });
+                tm.select_point.push(Mark::new(offset));
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
             }
         }
@@ -617,7 +617,7 @@ pub fn find_controller_prev(
                 let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 tm.select_point.clear();
-                tm.select_point.push(Mark { offset });
+                tm.select_point.push(Mark::new(offset));
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
 
                 // TODO(ceg): controller -> text view -> center around mark

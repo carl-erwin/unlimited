@@ -457,7 +457,7 @@ impl<'a> Mode for TextMode {
             prev_buffer_log_size: 0,
             prev_mark_revision: 0,
             mark_revision: 0,
-            marks: vec![Mark { offset: 0 }],
+            marks: vec![Mark::new(0)],
             copy_buffer: vec![],
             mark_index: 0,
             select_point: vec![],
@@ -794,7 +794,7 @@ pub fn run_text_mode_actions_vec(
 
                 tm.mark_index = 0;
                 tm.marks.clear();
-                tm.marks.push(Mark { offset });
+                tm.marks.push(Mark::new(offset));
             }
 
             PostInputAction::CheckMarks => {
@@ -1505,12 +1505,12 @@ pub fn undo(
         dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
-            marks.push(Mark { offset });
+            marks.push(Mark::new(offset));
         }
 
         select_point.clear();
         for offset in selections_offsets {
-            select_point.push(Mark { offset });
+            select_point.push(Mark::new(offset));
         }
     } else {
         dbg_println!("TAG not found");
@@ -1558,12 +1558,12 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
         dbg_println!("restore selections {:?}", selections_offsets);
         marks.clear();
         for offset in marks_offsets {
-            marks.push(Mark { offset });
+            marks.push(Mark::new(offset));
         }
 
         select_point.clear();
         for offset in selections_offsets {
-            select_point.push(Mark { offset });
+            select_point.push(Mark::new(offset));
         }
     } else {
         dbg_println!("REDO: no marks ? buffer size {:?}", buffer.size());
@@ -3009,7 +3009,7 @@ pub fn button_press(
         // reset main mark
         tm.mark_index = 0;
         tm.marks.clear();
-        tm.marks.push(Mark { offset: new_offset });
+        tm.marks.push(Mark::new(new_offset));
 
         tm.prev_action = TextModeAction::Ignore;
     }
@@ -3088,7 +3088,7 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
                             tm.select_point.clear();
-                            tm.select_point.push(Mark { offset });
+                            tm.select_point.push(Mark::new(offset));
 
                             // if on last line scroll down 1 line
                             if y >= screen.height().saturating_sub(1) {
