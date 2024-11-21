@@ -131,6 +131,8 @@ pub fn main_loop(
         Clear(ClearType::All)
     )?;
 
+    // NB: this will block waiting for first key press
+    // TODO(ceg): add command line/config option for terminal type
     //    let supports_keyboard_enhancement = matches!(
     //        crossterm::terminal::supports_keyboard_enhancement(),
     //        Ok(true)

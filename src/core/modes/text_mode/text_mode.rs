@@ -555,7 +555,7 @@ impl<'a> Mode for TextMode {
         } else {
             let mut v = vec![];
 
-            // TODO(ceg): fine a way to list all plugins from command line
+            // TODO(ceg): find a way to list all plugins/filters from command line
             // --show-config
             //
             v.push("binary/raw"); // mandatory
