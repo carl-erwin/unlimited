@@ -19,6 +19,8 @@ use crate::core::view::ContentFilter;
 
 use crate::core::view::LayoutEnv;
 
+use crate::core::buffer;
+
 pub struct SideBarModeContext {}
 
 pub struct SideBarMode {}
@@ -90,14 +92,14 @@ impl<'a> Mode for SideBarMode {
 
 pub struct SideBarModeCompose {
     // add common fields
-    buffer_list: Vec<String>,
+    dir_buffer_list: Vec<String>,
 }
 
 impl SideBarModeCompose {
     pub fn new() -> Self {
         dbg_println!("SideBarMode");
         SideBarModeCompose {
-            buffer_list: vec![],
+            dir_buffer_list: vec![],
         }
     }
 
@@ -119,17 +121,20 @@ impl ContentFilter<'_> for SideBarModeCompose {
         _parent_view: Option<&View<'static>>,
     ) {
         // TODO(ceg): cache list
-        self.buffer_list.clear();
+        self.dir_buffer_list.clear();
 
         // get editor document list
         for (_id, b) in editor.buffer_map.read().iter() {
             let b = b.read();
-            self.buffer_list.push(b.name.clone());
+
+            if b.kind == buffer::BufferKind::Directory {
+                self.dir_buffer_list.push(b.name.clone());
+            }
         }
 
         // order by cmd-line -> sort by buffer id order
         // order by name
-        self.buffer_list.sort();
+        // self.dir_buffer_list.sort();
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
@@ -140,7 +145,7 @@ impl ContentFilter<'_> for SideBarModeCompose {
 
         env.screen.clear();
         let w = env.screen.width().saturating_sub(0);
-        for s in &self.buffer_list {
+        for s in &self.dir_buffer_list {
             let slen = s.len();
             for c in s.chars().take(w) {
                 let mut cpi = CodepointInfo::new();
