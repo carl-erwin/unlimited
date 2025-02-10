@@ -79,7 +79,7 @@
         "tags": [ "workspace" ],
         "modes": [ "core-mode", "open-doc-mode" ],
 
-        "size": { "percent": 80 },
+        "size": { "remain_percent": 100 },
 
         "allow-split": false,
         "allow-destroy": false
