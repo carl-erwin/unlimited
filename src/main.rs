@@ -9,6 +9,7 @@ use std::thread;
 //use std::time::Duration;
 
 // ext
+#[macro_use]
 extern crate clap;
 extern crate unlimited;
 
@@ -74,6 +75,9 @@ fn _check_env_flags() {
 }
 
 /// Parse command and an return a Config
+// TODO(ceg): remove all special flags
+// we will use a generic -c key=value
+// and put them in the returned Config (as vars HashMap)
 fn parse_command_line() -> Config {
     let mut fatal_error = false;
 
@@ -91,36 +95,35 @@ fn parse_command_line() -> Config {
                 .help("debug log file name (default /tmp/u.log)"),
         )
         .arg(
-            Arg::new("no-read-cache")
+            Arg::new("NOREADCACHE")
                 .long("no-read-cache")
                 .help("disable read cache (debug)")
-                .value_name(""),
+                .value_parser(value_parser!(bool)),
         )
         .arg(
-            Arg::new("no-byte-index")
+            Arg::new("NOBYTEINDEX")
                 .long("no-byte-index")
                 .help("disable byte index (wip)")
-                .value_name(""),
+                .value_parser(value_parser!(bool)),
         )
         .arg(
-            Arg::new("bench-to-eof")
+            Arg::new("BENCH")
                 .short('b')
-                .long("bench-to-eof")
                 .help("render all screen until EOF is reached and quit (wip: no proper quit yet)")
-                .value_name(""),
+                .value_parser(value_parser!(bool)),
         )
         .arg(
-            Arg::new("no-ui-render")
+            Arg::new("NOUIRENDER")
                 .long("no-ui-render")
                 .help("disable screen output")
-                .value_name(""),
+                .value_parser(value_parser!(bool)),
         )
         .arg(
-            Arg::new("raw-data-to-screen")
+            Arg::new("RAWDATATOSCREEN")
                 .short('r')
                 .long("raw-data-to-screen")
                 .help("disable all filters and put the file's bytes directly to screen")
-                .value_name(""),
+                .value_parser(value_parser!(bool)),
         )
         .arg(
             Arg::new("CONFIG_VAR")
@@ -156,23 +159,23 @@ fn parse_command_line() -> Config {
         }
     }
 
-    if matches.get_one::<bool>("no-read-cache").is_some() {
+    if matches.get_one::<bool>("NOREADCACHE").is_some() {
         core::disable_read_cache();
     }
 
-    if matches.get_one::<bool>("no-byte-index").is_some() {
+    if matches.get_one::<bool>("NOBYTEINDEX").is_some() {
         core::disable_byte_index();
     }
 
-    if matches.get_one::<bool>("bench-to-eof").is_some() {
+    if matches.get_one::<bool>("BENCH").is_some() {
         core::enable_bench_to_eof();
     }
 
-    if matches.get_one::<bool>("raw-data-to-screen").is_some() {
-        core::enable_raw_data_filter_to_screen();
+    if matches.get_one::<bool>("RAWDATATOSCREEN").is_some() {
+        // core::enable_raw_data_filter_to_screen();
     }
 
-    if matches.get_one::<String>("no-ui-render").is_some() {
+    if matches.get_one::<String>("NOUIRENDER").is_some() {
         core::set_no_ui_render(true);
     }
 
@@ -207,9 +210,9 @@ fn parse_command_line() -> Config {
     crate::core::LOG_FILENAME.get_or_init(|| log_filename.clone());
 
     // debug
-    dbg_println!("config vars = \n{:?}", vars);
-    dbg_println!("ui_frontend = \n{:?}", ui_frontend);
-    dbg_println!("files_list = \n{:?}", files_list);
+    dbg_println!("config vars  = \n{:?}", vars);
+    dbg_println!("ui_frontend  = \n{:?}", ui_frontend);
+    dbg_println!("files_list   = \n{:?}", files_list);
     dbg_println!("LOG_FILENAME = \n{:?}", log_filename);
 
     if fatal_error {
