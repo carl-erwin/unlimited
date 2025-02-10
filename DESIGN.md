@@ -10,19 +10,18 @@ Unlimited design will evolve at will. Suggestions are welcomed.
      1. The ui : another process/thread that presents the documents to the user<br/>
      <br/>
 
-     These two threads communicate through standard channels (mpsc) using **Message**.<br/>
+     These two threads communicate through standard channels (mpsc) using a **Message**.<br/>
 
 ------
 
 ### Editor primitives
 
 #### Message
-The **Message** main purpose is to encapsulate user inputs and internal communication between threads.<br/>
+The **Message** main purpose is to encapsulate user inputs/system events and it is used as the internal communication mechanism between threads.<br/>
 TODO(ceg): add timestamp info/ sequence / etc.<br/>
 
-
 #### Buffer
-- represents arbitrary memory.<br/>
+- represents an arbitrary sequence of bytes.<br/>
 - can be created without any file attached to it.<br/>
 - can be loaded from a file.<br/>
 - can be saved to a file.<br/>
@@ -49,7 +48,7 @@ a View contains:
    - the **View** can store a ModeContext (find by name)
 
 #### Event
-Messages sent between the ui and the core
+Event are payload found in **Message** sent between the ui and the core
 
 
 #### Codec
