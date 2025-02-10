@@ -20,14 +20,6 @@ pub fn toggle_screen_checks() {
     SCREEN_CHECK_FLAG.store(!v, Ordering::Relaxed);
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Rect {
-    pub x: usize,
-    pub y: usize,
-    pub width: usize,
-    pub height: usize,
-}
-
 /// A LineCell encapsulates code point information (CodepoinInfo).<br/>
 /// The displayed Lines are composed of LineCell
 #[derive(Hash, Default, Debug, Clone, Eq, PartialEq)]
