@@ -227,12 +227,15 @@ pub fn run(
     let (worker_tx, worker_rx) = channel();
     let (indexer_tx, indexer_rx) = channel();
 
+    let (executor_tx, executor_rx) = channel::<(i32, Box<dyn FnOnce() + Send>)>();
+
     let mut editor = Editor::new(
         config,
         core_tx.clone(),
         ui_tx.clone(),
         worker_tx.clone(),
         indexer_tx.clone(),
+        executor_tx.clone(),
     );
     let mut env = EditorEnv::new();
 
@@ -241,6 +244,13 @@ pub fn run(
         let core_tx = core_tx.clone();
         Some(thread::spawn(move || worker(&worker_rx, &core_tx)))
     };
+
+    // create executor thread
+    let executor_th = {
+        let core_tx = core_tx.clone();
+        Some(thread::spawn(move || executor_fn(&executor_rx, &core_tx)))
+    };
+
     let indexer_th = {
         let core_tx = core_tx.clone();
         Some(thread::spawn(move || indexer(&indexer_rx, &core_tx)))
@@ -275,6 +285,11 @@ pub fn run(
 
     editor::main_loop(&mut editor, &mut env, core_rx, ui_tx);
 
+    // force executor quit
+    let _ = editor.executor_tx.send((1, Box::new(|| {})));
+    if let Some(executor_handle) = executor_th {
+        executor_handle.join().unwrap()
+    }
     // wait for worker thread
     if let Some(worker_handle) = worker_th {
         worker_handle.join().unwrap()
@@ -312,6 +327,21 @@ pub fn worker(worker_rx: &Receiver<Message<'static>>, core_tx: &Sender<Message<'
                     panic!("worker thread received an unexpected message");
                 }
             }
+        }
+    }
+}
+
+pub fn executor_fn(
+    worker_rx: &Receiver<(i32, Box<dyn FnOnce() + Send>)>,
+    _core_tx: &Sender<Message<'static>>,
+) {
+    dbg_println!("[starting executor thread]");
+
+    while let Ok((_idx, task)) = worker_rx.recv() {
+        dbg_println!("receive new task");
+        task();
+        if _idx == 1 {
+            break;
         }
     }
 }

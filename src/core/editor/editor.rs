@@ -198,6 +198,7 @@ pub struct Editor<'a> {
     pub ui_tx: Sender<Message<'a>>,
     pub worker_tx: Sender<Message<'a>>,
     pub indexer_tx: Sender<Message<'a>>,
+    pub executor_tx: Sender<(i32, Box<dyn FnOnce() + Send>)>, // run arbitrary lambda
     //
     pub event_subscribers:
         Rc<RefCell<HashMap<String, (Rc<RefCell<Box<dyn Mode>>>, HashSet<view::Id>)>>>,
@@ -214,6 +215,7 @@ impl<'a> Editor<'a> {
         ui_tx: Sender<Message<'a>>,
         worker_tx: Sender<Message<'a>>,
         indexer_tx: Sender<Message<'a>>,
+        executor_tx: Sender<(i32, Box<dyn FnOnce() + Send>)>,
     ) -> Editor<'a> {
         Editor {
             config,
@@ -231,6 +233,7 @@ impl<'a> Editor<'a> {
             core_tx,
             worker_tx,
             indexer_tx,
+            executor_tx,
             //
             event_subscribers: Rc::new(RefCell::new(HashMap::new())),
 

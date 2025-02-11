@@ -132,6 +132,13 @@ impl ContentFilter<'_> for SideBarModeCompose {
             }
         }
 
+        let _ = editor.executor_tx.send((
+            0,
+            Box::new(|| {
+                println!("");
+            }),
+        ));
+
         // order by cmd-line -> sort by buffer id order
         // order by name
         // self.dir_buffer_list.sort();
