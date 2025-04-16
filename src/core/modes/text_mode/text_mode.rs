@@ -86,6 +86,7 @@ use std::time::Instant;
 use crate::sort_pair;
 
 use crate::core::editor::Editor;
+
 use crate::core::editor::EditorEnv;
 
 use crate::dbg_println;
@@ -345,13 +346,13 @@ fn build_text_mode_screen_overlay_filters_map(
     screen_overlay_filter_map
 }
 
-fn build_text_mode_char_map() -> HashMap<char, String> {
+fn build_text_mode_char_map(editor: &Editor<'static>) -> HashMap<char, String> {
     let mut char_map = HashMap::new();
 
     char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
     char_map.insert('\u{7f}', "<DEL>".to_string());
 
-    if true {
+    if config_var_is_set(&editor, "text-mode:char-map:hex", false) {
         for i in 0..0x9 {
             let fmt = format!("\\x{i:02x}");
             let c = char::from_u32(i).unwrap();
@@ -369,7 +370,7 @@ fn build_text_mode_char_map() -> HashMap<char, String> {
         }
     }
 
-    if !true {
+    if config_var_is_set(&editor, "text-mode:char-map:symbol", false) {
         // config toggle ?
         char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
         char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
@@ -443,10 +444,10 @@ impl<'a> Mode for TextMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("allocate text-mode ctx");
 
-        let char_map = build_text_mode_char_map();
+        let char_map = build_text_mode_char_map(editor);
         let color_map = build_text_mode_color_map();
 
         let ctx = TextModeContext {
@@ -586,6 +587,10 @@ impl<'a> Mode for TextMode {
 
             if config_var_is_set(&editor, "text-mode:word-wrap", true) {
                 v.push("text/word-wrap");
+            }
+
+            if config_var_is_set(&editor, "text-mode:liner", true) {
+                v.push("text/liner");
             }
 
             //

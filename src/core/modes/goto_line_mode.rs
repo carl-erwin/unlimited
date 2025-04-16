@@ -59,7 +59,7 @@ impl<'a> Mode for GotoLineMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc goto-line-mode ctx");
         let ctx = GotoLineModeContext::new();
         Box::new(ctx)

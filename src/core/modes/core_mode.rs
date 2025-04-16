@@ -74,7 +74,7 @@ impl<'a> Mode for CoreMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor) -> Box<dyn Any> {
         dbg_println!("alloc core-mode ctx");
         let ctx = CoreModeContext {};
         Box::new(ctx)

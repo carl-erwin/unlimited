@@ -59,7 +59,7 @@ impl<'a> Mode for TabBarMode {
         &"tab-bar-mode"
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         let ctx = TabBarModeContext { hover: false };
         Box::new(ctx)
     }

@@ -82,6 +82,10 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
         map.insert(k, (0, 128, 128));
     }
 
+    for k in &["this", "self"] {
+        map.insert(k, COLOR_ORANGE);
+    }
+
     for k in &["export", "return", "goto", "true", "false"] {
         map.insert(k, COLOR_BLUE);
     }
@@ -93,6 +97,11 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     }
 
     for k in &["if", "then", "else", "fi"] {
+        map.insert(k, COLOR_BRACE);
+    }
+
+    // python
+    for k in &["def"] {
         map.insert(k, COLOR_BRACE);
     }
 

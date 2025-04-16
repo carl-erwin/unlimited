@@ -529,7 +529,7 @@ impl<'a> View<'a> {
             // create per view mode context
             // allocate per view ModeCtx shared between the stages
             {
-                let ctx = m.alloc_ctx();
+                let ctx = m.alloc_ctx(editor);
                 view.set_mode_ctx(m.name(), ctx);
                 dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
                 m.configure_view(editor, env, view);

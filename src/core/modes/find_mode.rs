@@ -51,7 +51,7 @@ impl<'a> Mode for FindMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc find-mode ctx");
         let ctx = FindModeContext::new();
         Box::new(ctx)

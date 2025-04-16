@@ -67,7 +67,7 @@ impl<'a> Mode for VscrollbarMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc vscrollbar-mode ctx");
         let ctx = VscrollbarModeContext {
             target_view_id: view::Id(0),

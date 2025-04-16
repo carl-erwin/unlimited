@@ -62,7 +62,7 @@ impl<'a> Mode for HsplitMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc hsplit-mode ctx");
         let ctx = HsplitModeContext {
             selected: false,

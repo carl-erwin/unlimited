@@ -319,7 +319,7 @@ impl<'a> Mode for LineNumberMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc line-number-mode ctx");
 
         let ctx = LineNumberModeContext {

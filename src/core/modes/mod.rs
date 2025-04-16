@@ -65,7 +65,7 @@ pub trait Mode {
     fn build_action_map<'m>(&'m self) -> InputStageActionMap<'static>;
 
     /// TODO(ceg): find a better way to get back mode ctx
-    fn alloc_ctx(&self) -> Box<dyn Any>;
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any>;
 
     /// This function MUST be called once per buffer
     /// It is used to allocate buffer's mode context/metadata
