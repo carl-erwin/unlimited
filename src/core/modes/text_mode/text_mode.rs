@@ -174,7 +174,9 @@ use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::modes::text_mode::WordWrapFilter;
 
 // Text mode screen overlay filters
+use crate::core::modes::text_mode::ruler::TextRuler;
 use crate::core::modes::text_mode::DrawMarks;
+
 use crate::core::modes::text_mode::HighlightSelectionOverlay;
 
 use crate::core::modes::text_mode::ShowTrailingSpaces;
@@ -341,6 +343,12 @@ fn build_text_mode_screen_overlay_filters_map(
         .entry("text/highlight-selection-overlay")
         .or_insert(ScreenOverlayFilterInfo {
             allocator: || Box::new(HighlightSelectionOverlay::new()),
+        });
+
+    screen_overlay_filter_map
+        .entry("text/ruler")
+        .or_insert(ScreenOverlayFilterInfo {
+            allocator: || Box::new(TextRuler::new()),
         });
 
     screen_overlay_filter_map
@@ -589,10 +597,6 @@ impl<'a> Mode for TextMode {
                 v.push("text/word-wrap");
             }
 
-            if config_var_is_set(&editor, "text-mode:liner", true) {
-                v.push("text/liner");
-            }
-
             //
             v.push("text/screen"); // mandatory
 
@@ -611,7 +615,11 @@ impl<'a> Mode for TextMode {
         let use_draw_marks = true; // mandatory
 
         let screen_overlay_filters_pipeline = if use_draw_marks {
-            vec!["text/draw-marks", "text/highlight-selection-overlay"]
+            let mut v = vec!["text/draw-marks", "text/highlight-selection-overlay"];
+            if config_var_is_set(&editor, "text-mode:ruler", true) {
+                v.push("text/ruler");
+            }
+            v
         } else {
             vec![]
         };
