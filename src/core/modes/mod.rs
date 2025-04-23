@@ -22,7 +22,6 @@ pub mod text_mode;
 pub mod vscrollbar_mode;
 pub mod vsplit_mode;
 
-
 use crate::core::editor::Editor;
 use crate::core::editor::EditorEnv;
 use crate::core::editor::EditorEvent;
