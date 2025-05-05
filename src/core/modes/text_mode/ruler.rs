@@ -13,12 +13,12 @@ use parking_lot::RwLock;
 use std::rc::Rc;
 
 pub struct TextRuler {
-    column: usize,
+    columns: Vec<usize>,
 }
 
 impl TextRuler {
     pub fn new() -> Self {
-        Self { column: 0 }
+        Self { columns: vec![] }
     }
 }
 
@@ -35,31 +35,35 @@ impl ScreenOverlayFilter<'_> for TextRuler {
         _parent_view: Option<&View<'static>>,
     ) {
         if let Some(ruler_column) = config_var_get(&editor, "text-mode:ruler") {
-            let col = ruler_column
+            self.columns = ruler_column
                 .trim_ascii_start()
                 .trim_end()
-                .parse::<usize>()
-                .unwrap_or(0);
-            if col > 0 {
-                self.column = col;
-            }
+                .split(',')
+                .map(|s| s.parse::<usize>().unwrap_or(0))
+                .collect();
         }
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
-        if env.screen.is_off_screen || self.column == 0 {
+        if env.screen.is_off_screen || self.columns.is_empty() {
             return;
         }
 
-        draw_ruler(&mut env.screen, self.column);
+        draw_ruler(&mut env.screen, &self.columns);
     }
 }
 
-fn draw_ruler(screen: &mut Screen, column: usize) {
+fn draw_ruler(screen: &mut Screen, columns: &Vec<usize>) {
     for l in 0..screen.height() {
         if let Some(line) = screen.get_line_mut(l) {
-            if let Some(cell) = line.get_mut(column) {
-                cell.cpi.style.bg_color = (40, 44, 52);
+            for col in columns {
+                if *col == 0 {
+                    continue;
+                }
+
+                if let Some(cell) = line.get_mut(*col - 1) {
+                    cell.cpi.style.bg_color = (40, 44, 52);
+                }
             }
         }
     }
