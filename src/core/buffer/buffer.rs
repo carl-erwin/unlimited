@@ -1728,7 +1728,8 @@ mod tests {
                             Err(e) => panic!("couldn't find {key}: {e}"),
                         };
 
-                        format!("{base}/playground_save_test")
+                        let sep = std::path::MAIN_SEPARATOR;
+                        format!("{base}{sep}playground_save_test")
                     };
 
                     let _ = fs::remove_file(&filename);
