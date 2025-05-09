@@ -600,6 +600,19 @@ pub fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
     }
 }
 
+pub fn screen_line_apply<F: FnMut(usize, &mut [ScreenCell]) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_line_mut(l) {
+            if !on_cpi(l, line) {
+                return;
+            }
+        }
+    }
+}
+
 // TODO(ceg): test are broken
 #[test]
 fn test_screen() {}
