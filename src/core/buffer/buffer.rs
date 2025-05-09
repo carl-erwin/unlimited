@@ -1715,8 +1715,23 @@ mod tests {
                     let mut ref_vec: Vec<u8> = Vec::new();
 
                     // (re)create file
+                    #[cfg(unix)]
                     let filename = "/tmp/playground_save_test";
-                    let _ = fs::remove_file(filename);
+
+                    #[cfg(windows)]
+                    let filename = {
+                        use std::env;
+
+                        let key = "TEMP";
+                        let base = match env::var(key) {
+                            Ok(val) => val,
+                            Err(e) => panic!("couldn't find {key}: {e}"),
+                        };
+
+                        format!("{base}/playground_save_test")
+                    };
+
+                    let _ = fs::remove_file(&filename);
                     let filename = filename.to_owned();
                     let mut file = File::create(&filename).unwrap();
 
