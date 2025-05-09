@@ -53,7 +53,7 @@ impl<'a> InnerBuffer<'a> {
             return InnerBuffer::empty(id, mode);
         }
 
-        let file = match MappedFile::new(id, file_name.to_owned()) {
+        let file = match MappedFile::new(id, &file_name.to_owned()) {
             Some(file) => file,
             None => {
                 // TODO(ceg): return Result

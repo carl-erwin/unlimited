@@ -1494,7 +1494,23 @@ mod tests {
         use std::io::prelude::*;
         use std::os::unix::prelude::FileExt;
 
+        #[cfg(unix)]
         let filename = "/tmp/unl-test-file".to_owned();
+
+        #[cfg(windows)]
+        let filename = {
+            use std::env;
+
+            let key = "TEMP";
+            let base = match env::var(key) {
+                Ok(val) => val,
+                Err(e) => panic!("couldn't find {key}: {e}"),
+            };
+
+            let sep = std::path::MAIN_SEPARATOR;
+            format!("{base}{sep}unl-test-file")
+        };
+
         let _ = std::fs::remove_file(&filename);
         {
             println!("create file....");
@@ -1715,8 +1731,24 @@ mod tests {
                     let mut ref_vec: Vec<u8> = Vec::new();
 
                     // (re)create file
+                    #[cfg(unix)]
                     let filename = "/tmp/playground_save_test";
-                    let _ = fs::remove_file(filename);
+
+                    #[cfg(windows)]
+                    let filename = {
+                        use std::env;
+
+                        let key = "TEMP";
+                        let base = match env::var(key) {
+                            Ok(val) => val,
+                            Err(e) => panic!("couldn't find {key}: {e}"),
+                        };
+
+                        let sep = std::path::MAIN_SEPARATOR;
+                        format!("{base}{sep}playground_save_test")
+                    };
+
+                    let _ = fs::remove_file(&filename);
                     let filename = filename.to_owned();
                     let mut file = File::create(&filename).unwrap();
 

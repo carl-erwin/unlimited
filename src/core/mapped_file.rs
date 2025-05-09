@@ -558,7 +558,7 @@ impl<'a> MappedFile<'a> {
         Some(Arc::new(RwLock::new(file)))
     }
 
-    pub fn new(id: Id, path: String) -> Option<FileHandle<'a>> {
+    pub fn new(id: Id, path: &String) -> Option<FileHandle<'a>> {
         // TODO(ceg): check page size % 4096 // sysconfig
 
         let fd = File::open(path.clone());
@@ -2598,7 +2598,23 @@ mod tests {
         use std::fs;
         use std::fs::File;
 
+        #[cfg(unix)]
         let filename = "/tmp/playground_remove_test".to_owned();
+
+        #[cfg(windows)]
+        let filename = {
+            use std::env;
+
+            let key = "TEMP";
+            let base = match env::var(key) {
+                Ok(val) => val,
+                Err(e) => panic!("couldn't find {key}: {e}"),
+            };
+
+            let sep = std::path::MAIN_SEPARATOR;
+            format!("{base}{sep}playground_remove_test")
+        };
+
         let mut file = File::create(&filename).unwrap();
 
         // prepare file content
@@ -2621,7 +2637,7 @@ mod tests {
         drop(slc);
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(Id(0), filename) {
+        let file = match MappedFile::new(Id(0), &filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2636,7 +2652,7 @@ mod tests {
         MappedFile::remove(&mut it, nr_remove);
 
         dbg_println!("-- file.size() {}", file.read().size());
-        let _ = fs::remove_file("/tmp/playground_remove_test");
+        let _ = fs::remove_file(filename);
     }
 
     #[test]
@@ -2645,14 +2661,30 @@ mod tests {
         use std::fs;
         use std::fs::File;
 
+        #[cfg(unix)]
         let filename = "/tmp/playground_insert_test".to_owned();
-        let _ = fs::remove_file("/tmp/playground_insert_test");
+
+        #[cfg(windows)]
+        let filename = {
+            use std::env;
+
+            let key = "TEMP";
+            let base = match env::var(key) {
+                Ok(val) => val,
+                Err(e) => panic!("couldn't find {key}: {e}"),
+            };
+
+            let sep = std::path::MAIN_SEPARATOR;
+            format!("{base}{sep}playground_insert_test")
+        };
+
+        let _ = fs::remove_file(&filename);
         File::create(&filename).unwrap();
 
         crate::core::enable_dbg_println();
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(Id(0), filename) {
+        let file = match MappedFile::new(Id(0), &filename) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2669,7 +2701,7 @@ mod tests {
         }
 
         dbg_println!("-- file.size() {}", file.read().size());
-        let _ = fs::remove_file("/tmp/playground_insert_test");
+        let _ = fs::remove_file(filename);
     }
 
     #[test]
@@ -2682,7 +2714,27 @@ mod tests {
 
         crate::core::enable_dbg_println();
 
-        let filename = "/tmp/playground_insert_test".to_owned();
+        #[cfg(unix)]
+        let (filename, sync_test_file) =
+            ("/tmp/playground_insert_test", "/tmp/mapped_file.sync_test");
+
+        #[cfg(windows)]
+        let (filename, sync_test_file) = {
+            use std::env;
+
+            let key = "TEMP";
+            let base = match env::var(key) {
+                Ok(val) => val,
+                Err(e) => panic!("couldn't find {key}: {e}"),
+            };
+
+            let sep = std::path::MAIN_SEPARATOR;
+            (
+                format!("{base}{sep}playground_insert_test"),
+                format!("{base}{sep}mapped_file.sync_test"),
+            )
+        };
+
         {
             let mut file = File::create(&filename).unwrap();
 
@@ -2707,7 +2759,7 @@ mod tests {
         }
 
         dbg_println!("-- mapping the test file");
-        let file = match MappedFile::new(Id(0), filename) {
+        let file = match MappedFile::new(Id(0), &filename.to_owned()) {
             Some(file) => file,
             None => panic!("cannot map file"),
         };
@@ -2727,11 +2779,11 @@ mod tests {
             }
         }
 
-        MappedFile::sync_to_storage(&mut file.write(), &"/tmp/mapped_file.sync_test").unwrap();
+        MappedFile::sync_to_storage(&mut file.write(), &sync_test_file).unwrap();
 
         dbg_println!("-- file.size() {}", file.read().size());
 
-        let _ = fs::remove_file("/tmp/mapped_file.sync_test.result");
-        let _ = fs::remove_file("/tmp/playground_insert_test");
+        let _ = fs::remove_file(filename);
+        let _ = fs::remove_file(sync_test_file);
     }
 }
