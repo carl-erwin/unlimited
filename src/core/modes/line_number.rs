@@ -263,7 +263,7 @@ pub fn linenum_input_event(
                         // update marks
                         let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
                         tm.marks.clear();
-                        tm.marks.push(Mark { offset });
+                        tm.marks.push(Mark::new(offset));
 
                         // TODO(ceg): ignore if view was change by user
                         // let msg = Message::new(0, 0, 0, Event::RefreshView);
@@ -319,7 +319,7 @@ impl<'a> Mode for LineNumberMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc line-number-mode ctx");
 
         let ctx = LineNumberModeContext {
@@ -543,10 +543,6 @@ impl BufferEventCb for LineNumberModeBufferEventHandler {
             } => {}
 
             BufferEvent::BufferFullyIndexed { buffer_id: _ } => {}
-
-            _ => {
-                dbg_println!("unhandled event {:?}", event);
-            }
         }
 
         buffer.show_root_node_bytes_stats();
@@ -718,7 +714,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     let padding = w.saturating_sub(s.len());
                     // left-pad
                     for _ in 0..padding {
-                        env.screen.push(CodepointInfo::new());
+                        env.screen.push(&CodepointInfo::new());
                     }
                 }
 
@@ -732,7 +728,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                     cpi.displayed_cp = c;
                     cpi.style.color = final_color;
                     cpi.style.is_bold = has_mark;
-                    env.screen.push(cpi);
+                    env.screen.push(&cpi);
                 }
                 if cur_line_idx == env.screen.current_line_index() {
                     // NB screen.push selects next line automatically
@@ -754,7 +750,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
                 cpi.displayed_cp = c;
                 cpi.style.color = final_color;
                 cpi.style.is_bold = has_mark;
-                env.screen.push(cpi);
+                env.screen.push(&cpi);
             }
             if cur_line_idx == env.screen.current_line_index() {
                 // NB screen.push selects next line automatically

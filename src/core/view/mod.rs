@@ -7,6 +7,10 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use std::collections::HashSet;
+
+use bitflags::bitflags;
+
 use crate::core::buffer;
 use crate::core::buffer::Buffer;
 
@@ -16,7 +20,11 @@ use crate::core::editor::Stage;
 use crate::core::editor::StageFunction;
 use crate::core::editor::StagePosition;
 
+use crate::core::editor::add_view_tag;
 use crate::core::editor::get_view_by_id;
+use crate::core::editor::get_view_ids_by_tags;
+
+use crate::core::editor::register_editor_event_watcher;
 
 use crate::core::screen::Screen;
 
@@ -36,6 +44,8 @@ use crate::core::modes::Mode;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(pub usize);
+
+pub type Tags = HashSet<String>;
 
 // TODO(ceg):
 //
@@ -140,7 +150,9 @@ pub enum LayoutSize {
 pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
     let mut sizes = vec![];
 
-    dbg_println!("start = {}", start);
+    dbg_println!("compute_layout_sizes --------------------");
+
+    dbg_println!("compute_layout_sizes start = {}", start);
 
     if start == 0 {
         return sizes;
@@ -154,11 +166,16 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
             continue;
         }
 
+        dbg_println!("compute_layout_sizes op = {:?}", op);
+
         match op {
             LayoutSize::Floating => {}
 
             LayoutSize::Fixed { size } => {
                 remain = remain.saturating_sub(*size);
+
+                dbg_println!("compute_layout_sizes: give = {size}");
+
                 sizes.push(*size);
             }
 
@@ -166,6 +183,9 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
                 let used = (*p * start as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
 
@@ -173,6 +193,9 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
                 let used = (*p * remain as f32) / 100.0;
                 let used = used as usize;
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
 
@@ -181,10 +204,16 @@ pub fn compute_layout_sizes(start: usize, ops: &Vec<LayoutSize>) -> Vec<usize> {
             // (remain <- remain - minus))
             LayoutSize::RemainMinus { minus } => {
                 let used = remain.saturating_sub(*minus);
+
                 remain = remain.saturating_sub(used);
+
+                dbg_println!("compute_layout_sizes: give = {used}");
+
                 sizes.push(used);
             }
         }
+
+        dbg_println!("compute_layout_sizes: remain = {remain}");
     }
 
     sizes
@@ -287,6 +316,24 @@ pub type SubscriberInfo = (
     ViewEventDestination,
 );
 
+// The EventMask allows the dispatch of corresponding event(s)
+// The root view should be configured with EventMask::All
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct EventMask: u32 {
+        const None          = 0x0;
+        const All           = 0xffffffff;
+
+        const ButtonPress   = 0b00000001;
+        const ButtonRelease = 0b00000010;
+        const KeyPress      = 0b00000100;
+        const KeyRelease    = 0b00001000;
+        const EnterView     = 0b00010000;
+        const LeaveView     = 0b00100000;
+        const Motion        = 0b01000000;
+    }
+}
+
 /// The **View** is a way to present a given Buffer.<br/>
 // TODO(ceg): find a way to have marks as plugin.<br/>
 // in future version marks will be stored in buffer meta data.<br/>
@@ -302,14 +349,19 @@ pub type SubscriberInfo = (
 pub struct View<'a> {
     pub id: Id,
     pub json_attr: Option<String>,
+
     pub destroyable: bool,
     pub is_group: bool,
     pub is_leader: bool,
+
     pub is_splittable: bool, // This flags marks a view that can be cloned when doing split views
-    pub ignore_focus: bool,  // never set focus on this view
+
+    pub ignore_focus: bool, // never set focus on this view
+
+    pub event_mask: EventMask,
 
     pub parent_id: Option<Id>,
-    pub focus_to: Option<Id>,       // child id TODO(ceg): redirect input ?
+    pub transfer_focus_to: Option<Id>, // child id TODO(ceg): redirect input ?
     pub status_view_id: Option<Id>, // TODO(ceg): remove this ?  or per view see env.status_view_id
 
     pub controller: Option<ControllerView>, // REMOVE this
@@ -330,6 +382,8 @@ pub struct View<'a> {
     */
     pub buffer_id: buffer::Id,
     pub buffer: Option<Arc<RwLock<Buffer<'static>>>>, // if none and no children ... panic ?
+
+    pub tags: Tags,
 
     pub modes: Vec<String>, // TODO: add Arc<dyn Modes>
 
@@ -475,10 +529,13 @@ impl<'a> View<'a> {
             // create per view mode context
             // allocate per view ModeCtx shared between the stages
             {
-                let ctx = m.alloc_ctx();
+                let ctx = m.alloc_ctx(editor);
                 view.set_mode_ctx(m.name(), ctx);
                 dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
                 m.configure_view(editor, env, view);
+                if m.watch_editor_event() {
+                    register_editor_event_watcher(editor, m.name(), mode_rc.clone(), view.id);
+                }
                 view_self_subscribe(editor, env, mode_rc.clone(), view);
             }
         }
@@ -499,6 +556,7 @@ impl<'a> View<'a> {
         x_y: Position,
         w_h: Dimension,
         buffer: Option<Arc<RwLock<Buffer<'static>>>>,
+        tags: &Vec<String>,
         modes: &Vec<String>, // TODO(ceg): add core mode for save/quit/quit/abort/split{V,H}
         start_offset: u64,
         layout_direction: LayoutDirection,
@@ -523,6 +581,19 @@ impl<'a> View<'a> {
             }
         }
 
+        for tag in tags {
+            dbg_println!("tag {} -> view {:?}", tag, Id(id));
+            add_view_tag(editor, &tag, Id(id));
+        }
+
+        let tags = {
+            let mut hset = HashSet::new();
+            for t in tags {
+                hset.insert(t.clone());
+            }
+            hset
+        };
+
         let mut v = View {
             parent_id,
             json_attr: None,
@@ -531,7 +602,10 @@ impl<'a> View<'a> {
             is_group: false,
             is_splittable: false,
             ignore_focus: true,
-            focus_to: None,
+
+            event_mask: EventMask::None,
+
+            transfer_focus_to: None,
             status_view_id: None,
             controller: None,
             controlled_view: None,
@@ -544,7 +618,8 @@ impl<'a> View<'a> {
             //
             start_offset,
             end_offset: start_offset, // will be recomputed later
-            modes: modes.clone(),     // use this to clone the view
+            tags,
+            modes: modes.clone(), // use this to clone the view
             mode_ctx,
             //
             global_x: None,
@@ -604,7 +679,9 @@ impl<'a> View<'a> {
                 let any = box_any.as_mut();
                 match any.downcast_mut::<T>() {
                     Some(m) => m,
-                    None => panic!("internal error: wrong type registered : mode name {}", name),
+                    None => {
+                        panic!("internal error: wrong type registered : mode name '{}' | view tags {:?}", name, self.tags)
+                    }
                 }
             }
 
@@ -634,32 +711,36 @@ impl<'a> View<'a> {
 } // impl View
 
 //
-pub fn get_status_view(
+pub fn get_command_view_id(editor: &mut Editor<'static>, _env: &EditorEnv<'static>) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, "command-line")?;
+    if v.len() == 1 {
+        return Some(v[0]);
+    }
+    return None;
+}
+
+//
+pub fn get_view_by_tag(
     editor: &mut Editor<'static>,
-    env: &EditorEnv<'static>,
-    view: &Rc<RwLock<View<'static>>>,
+    _env: &EditorEnv<'static>,
+    tag: &str,
 ) -> Option<Id> {
-    if env.status_view_id.is_some() {
-        return env.status_view_id;
+    let v = get_view_ids_by_tags(&editor, tag)?;
+    if v.len() == 1 {
+        return Some(v[0]);
     }
+    return None;
+}
 
-    let view = view.read();
-
-    if view.status_view_id.is_some() {
-        return view.status_view_id;
+pub fn get_status_line_view_id(
+    editor: &mut Editor<'static>,
+    _env: &EditorEnv<'static>,
+) -> Option<Id> {
+    let v = get_view_ids_by_tags(&editor, "status-line")?;
+    if v.len() == 1 {
+        return Some(v[0]);
     }
-
-    let v = view;
-    while let Some(pvid) = v.parent_id {
-        let pv = get_view_by_id(editor, pvid);
-        let pv = pv.read();
-        if pv.status_view_id.is_some() {
-            return pv.status_view_id;
-        }
-        break; // FIXME(ceg)
-    }
-
-    None
+    return None;
 }
 
 /// TODO(ceg): rename

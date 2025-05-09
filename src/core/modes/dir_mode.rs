@@ -40,7 +40,7 @@ impl<'a> Mode for DirMode {
         &"dir-mode"
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor) -> Box<dyn Any> {
         let ctx = DirModeContext {};
         Box::new(ctx)
     }

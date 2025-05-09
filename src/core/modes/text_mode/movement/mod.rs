@@ -84,7 +84,7 @@ pub fn cancel_marks(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock
 
     tm.mark_index = 0;
     tm.marks.clear();
-    tm.marks.push(Mark { offset });
+    tm.marks.push(Mark::new(offset));
 
     tm.pre_compose_action.push(PostInputAction::ResetMarks);
 }
@@ -597,7 +597,7 @@ pub fn move_mark_to_end_of_file(
 
     let marks = &mut tm.marks;
     marks.clear();
-    marks.push(Mark { offset });
+    marks.push(Mark::new(offset));
 
     tm.pre_compose_action.push(PostInputAction::ScrollUp { n });
 }
@@ -616,7 +616,7 @@ pub fn move_mark_to_start_of_file(
     tm.mark_index = 0;
 
     tm.marks.clear();
-    tm.marks.push(Mark { offset: 0 });
+    tm.marks.push(Mark::new(0));
 }
 
 pub fn move_mark_to_screen_end(

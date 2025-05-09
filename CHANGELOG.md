@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.8]
+ - save event coordinates path (hierarchy from root)
+
+## [0.0.7]
+ - improve debug logs (default to /tmp/u.log toggle with F4)
+ - update clap version
+ - crossterm: fork not needed anymore
+  support Paste event
+ - play with sdl
+ - prepare single root view
+ - usual small fixes
+
 ## [0.0.6]
  - run cargo update
  - fix remove_until_end_of_word/remove_until_char_class_change : add missing undo/redo  operation
@@ -18,8 +30,7 @@
 - add word wrapping
 - add line numbers
 - add goto line
-- add basic fin in file (no regex)
-
+- add basic find in file (no regex)
 
 ### Removed
 
@@ -33,23 +44,20 @@
 - splits the editor in 2 threads
 - CHANGELOG.md
 
-
 ## [0.0.3]
 
 ### Added
 
 - large file support.<br/>
 
-
 ## [0.0.2]
 
 ### Added
 
 - unlimited undo/redo at the byte level:<br/> every inserted character is added to the buffer log.<br/>
-<br/>
+  <br/>
   This is the base api that will be used to implement other undo schemes (word, sentence, paragraph).
-
 
 ## [0.0.1]
 
-* basic utf-8 support
+- basic utf-8 support

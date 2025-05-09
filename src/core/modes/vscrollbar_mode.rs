@@ -67,7 +67,7 @@ impl<'a> Mode for VscrollbarMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc vscrollbar-mode ctx");
         let ctx = VscrollbarModeContext {
             target_view_id: view::Id(0),
@@ -378,7 +378,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
         cpi.cp = ' ';
         cpi.displayed_cp = ' ';
         loop {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }
@@ -407,7 +407,7 @@ impl ContentFilter<'_> for VscrollbarModeComposeFilter {
                     if mode_ctx.pointer_over {
                         cpi.style.bg_color = (0, 119, 184);
                     } else {
-                        cpi.style.bg_color = (31, 36, 59);
+                        cpi.style.bg_color = (46, 54, 88);
                     }
                 }
             }

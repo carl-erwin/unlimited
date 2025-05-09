@@ -7,13 +7,11 @@ use super::Mode;
 use crate::core::codepointinfo::CodepointInfo;
 use crate::core::codepointinfo::TextStyle;
 
-use crate::core::editor::check_view_by_id;
 use crate::core::editor::InputStageActionMap;
 
 use crate::core::Editor;
 use crate::core::EditorEnv;
 
-use crate::core::view;
 use crate::core::view::ContentFilter;
 
 use crate::core::view::FilterIo;
@@ -37,7 +35,7 @@ impl<'a> Mode for TitleBarMode {
         InputStageActionMap::new()
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc TitleBarMode-mode ctx");
         let ctx = TitleBarModeContext {};
         Box::new(ctx)
@@ -91,7 +89,9 @@ impl ContentFilter<'_> for EditorTitle {
 
     fn setup(
         &mut self,
-        editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+
+        _editor_env: &mut EditorEnv<'static>,
         env: &mut LayoutEnv,
         view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,
@@ -127,11 +127,15 @@ impl ContentFilter<'_> for EditorTitle {
         buffer_info.push_str(&format!(" {} bytes", d.size()));
         buffer_info.push_str(&format!(" (F1 for help)"));
 
-        if env.focus_view_id != view::Id(0) {
-            if let Some(_v) = check_view_by_id(editor, env.focus_view_id) {
-                buffer_info.push_str(&format!(" (focus vid: {:?})", env.focus_view_id));
+        buffer_info.push_str(&format!(" (active vid: {:?})", env.active_view_id));
+
+        /*
+        if env.target_view_id != view::Id(0) {
+            if let Some(_v) = check_view_by_id(editor, env.target_view_id) {
+                buffer_info.push_str(&format!(" (target vid: {:?})", env.target_view_id));
             }
         }
+        */
 
         self.title.push_str(&buffer_info);
     }
@@ -153,7 +157,7 @@ impl ContentFilter<'_> for EditorTitle {
             cpi.displayed_cp = c;
             cpi.style.color = color;
             cpi.style.bg_color = bg_color;
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }
@@ -165,7 +169,7 @@ impl ContentFilter<'_> for EditorTitle {
         cpi.style.color = color;
         cpi.style.bg_color = bg_color;
         for _i in count..width {
-            let (b, _) = env.screen.push(cpi.clone());
+            let (b, _) = env.screen.push(&cpi);
             if !b {
                 break;
             }

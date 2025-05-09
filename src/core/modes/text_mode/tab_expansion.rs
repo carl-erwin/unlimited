@@ -5,6 +5,7 @@ use crate::core::codec::text::u32_to_char;
 use crate::core::codepointinfo::TextStyle;
 use crate::core::view::{ContentFilter, FilterData, FilterIo, LayoutEnv, View};
 use crate::core::Editor;
+use crate::core::EditorEnv;
 
 pub struct TabFilter {
     prev_cp: char,
@@ -32,7 +33,9 @@ impl ContentFilter<'_> for TabFilter {
 
     fn setup(
         &mut self,
-        _editor: &Editor<'static>,
+        _editor: &mut Editor<'static>,
+        _editor_env: &mut EditorEnv<'static>,
+
         env: &mut LayoutEnv,
         _view: &Rc<RwLock<View>>,
         _parent_view: Option<&View<'static>>,

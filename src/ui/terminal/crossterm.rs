@@ -5,12 +5,16 @@ use std::io::{stdout, Write};
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event,
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{DisableMouseCapture, EnableBracketedPaste, EnableFocusChange, EnableMouseCapture},
     execute, queue,
     style::{Attribute, Color, Print, SetAttribute, SetBackgroundColor, SetForegroundColor},
     terminal::{Clear, ClearType},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-    Result,
+};
+
+use crossterm::event::{
+    KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+    PushKeyboardEnhancementFlags,
 };
 
 use std::vec::Vec;
@@ -66,7 +70,7 @@ pub fn main_loop(
     ui_rx: &Receiver<Message<'static>>,
     ui_tx: &Sender<Message<'static>>,
     core_tx: &Sender<Message<'static>>,
-) -> Result<()> {
+) -> Result<(), std::io::Error> {
     let mut draw_req = 0;
     let mut fps = 0;
     let mut drop = 0;
@@ -97,6 +101,8 @@ pub fn main_loop(
     let stdout = stdout();
     let mut stdout = stdout.lock();
 
+    crossterm::terminal::enable_raw_mode()?;
+
     execute!(stdout, EnterAlternateScreen)?;
 
     let cpi = CodepointInfo::new();
@@ -116,6 +122,8 @@ pub fn main_loop(
     execute!(
         stdout,
         EnableMouseCapture, // TODO(ceg): add option for mouse capture --(en|dis)able-mouse
+        EnableBracketedPaste,
+        EnableFocusChange,
         Hide,
         SetAttribute(Attribute::Reset),
         SetBackgroundColor(bg_color),
@@ -123,7 +131,25 @@ pub fn main_loop(
         Clear(ClearType::All)
     )?;
 
-    crossterm::terminal::enable_raw_mode()?;
+    // NB: this will block waiting for first key press
+    // TODO(ceg): add command line/config option for terminal type
+    //    let supports_keyboard_enhancement = matches!(
+    //        crossterm::terminal::supports_keyboard_enhancement(),
+    //        Ok(true)
+    //    );
+    let supports_keyboard_enhancement = true;
+
+    if supports_keyboard_enhancement {
+        execute!(
+            stdout,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+            )
+        )?;
+    }
 
     // first request
     // check terminal size
@@ -270,6 +296,10 @@ pub fn main_loop(
         execute!(stdout, LeaveAlternateScreen,)?;
     }
 
+    if supports_keyboard_enhancement {
+        execute!(stdout, PopKeyboardEnhancementFlags)?;
+    }
+
     crossterm::terminal::disable_raw_mode()?;
 
     Ok(())
@@ -302,7 +332,10 @@ enum ScreenOp {
     PrintText(char),
 }
 
-fn draw_screen_dumb(screen: &Screen, stdout: &mut std::io::StdoutLock) -> Result<()> {
+fn draw_screen_dumb(
+    screen: &Screen,
+    stdout: &mut std::io::StdoutLock,
+) -> Result<(), std::io::Error> {
     // queue!(stdout, ResetColor)?;
     // queue!(stdout, Clear(ClearType::All))?;
 
@@ -433,7 +466,7 @@ fn draw_screen(
     last_screen: &Screen,
     screen: &Screen,
     stdout: &mut std::io::StdoutLock,
-) -> Result<()> {
+) -> Result<(), std::io::Error> {
     let _screen_change = screen_changed(last_screen, screen);
     let width_change = screen_width_change(last_screen, screen);
     let height_change = screen_height_change(last_screen, screen);
@@ -626,135 +659,140 @@ fn translate_crossterm_mouse_button(button: ::crossterm::event::MouseButton) -> 
         ::crossterm::event::MouseButton::Left => 0,
         ::crossterm::event::MouseButton::Right => 1,
         ::crossterm::event::MouseButton::Middle => 2,
-        // ...event::MouseButton::WheelUp => 3,
-        // ...event::MouseButton::WheelDown => 4,
-    } //
+    }
 }
 
+macro_rules! build_key_press_event {
+    ($un_key:expr, $key_modifiers:expr) => {
+        InputEvent::KeyPress {
+            mods: translate_crossterm_key_modifier($key_modifiers),
+            key: $un_key,
+        }
+    };
+}
+
+macro_rules! build_key_press_event_no_shift {
+    ($un_key:expr, $key_modifiers:expr) => {
+        InputEvent::KeyPress {
+            mods: key_modifiers_no_shift($key_modifiers),
+            key: $un_key,
+        }
+    };
+}
+
+// TODO(ceg): return Option<InputEvent>
 fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
-    //    dbg_println!("CROSSTERM EVENT : {:?}", evt);
+    dbg_println!("CROSSTERM EVENT : {:?}", evt);
+
+    // TODO(ceg): return InputEvent::KeyRelease ?
+    // select build_function based on ke.kind
+    if let ::crossterm::event::Event::Key(ke) = evt {
+        if ke.kind == KeyEventKind::Release {
+            return InputEvent::DummyInputEvent;
+        }
+    }
 
     match evt {
         ::crossterm::event::Event::Key(ke) => match ke.code {
             ::crossterm::event::KeyCode::Char(c) => {
-                return InputEvent::KeyPress {
-                    mods: key_modifiers_no_shift(ke.modifiers),
-                    key: Key::Unicode(c),
-                };
+                return build_key_press_event_no_shift!(Key::Unicode(c), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Backspace => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::BackSpace,
-                };
+                return build_key_press_event!(Key::BackSpace, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Enter => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\n'),
-                };
+                return build_key_press_event!(Key::Unicode('\n'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Left => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Left,
-                };
+                return build_key_press_event!(Key::Left, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Right => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Right,
-                };
+                return build_key_press_event!(Key::Right, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Up => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Up,
-                };
+                return build_key_press_event!(Key::Up, ke.modifiers);
             }
+
             ::crossterm::event::KeyCode::Down => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Down,
-                };
+                return build_key_press_event!(Key::Down, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Home => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Home,
-                };
+                return build_key_press_event!(Key::Home, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::End => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::End,
-                };
+                return build_key_press_event!(Key::End, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::PageUp => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::PageUp,
-                };
+                return build_key_press_event!(Key::PageUp, ke.modifiers);
             }
+
             ::crossterm::event::KeyCode::PageDown => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::PageDown,
-                };
+                return build_key_press_event!(Key::PageDown, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Tab => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\t'),
-                };
+                return build_key_press_event!(Key::Unicode('\t'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::BackTab => {
-                return InputEvent::NoInputEvent;
+                return InputEvent::DummyInputEvent;
             }
 
             ::crossterm::event::KeyCode::Delete => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Delete,
-                };
+                return build_key_press_event!(Key::Delete, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Insert => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Insert,
-                };
+                return build_key_press_event!(Key::Insert, ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::F(n) => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::F(n as usize),
-                };
+                return build_key_press_event!(Key::F(n as usize), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Null => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Unicode('\0'),
-                };
+                return build_key_press_event!(Key::Unicode('\0'), ke.modifiers);
             }
 
             ::crossterm::event::KeyCode::Esc => {
-                return InputEvent::KeyPress {
-                    mods: translate_crossterm_key_modifier(ke.modifiers),
-                    key: Key::Escape,
-                };
+                return build_key_press_event!(Key::Escape, ke.modifiers);
+            }
+
+            ::crossterm::event::KeyCode::Pause => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::Menu => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::KeypadBegin => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::Media(_) => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::Modifier(_) => {
+                return InputEvent::DummyInputEvent;
+            }
+
+            ::crossterm::event::KeyCode::CapsLock => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::ScrollLock => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::NumLock => {
+                return InputEvent::DummyInputEvent;
+            }
+            ::crossterm::event::KeyCode::PrintScreen => {
+                return InputEvent::DummyInputEvent;
             }
         },
 
@@ -796,7 +834,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             ::crossterm::event::MouseEventKind::Drag(_button) => {
                 // TODO(ceg): no Drag event in the editor yet ?
                 // TODO(ceg): filter dragged button
-                // return InputEvent::NoInputEvent;
+                // return InputEvent::DummyInputEvent;
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
@@ -806,7 +844,7 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
             }
 
             ::crossterm::event::MouseEventKind::Moved => {
-                // return InputEvent::NoInputEvent;
+                // return InputEvent::DummyInputEvent;
 
                 return InputEvent::PointerMotion(PointerEvent {
                     mods: translate_crossterm_key_modifier(event.modifiers),
@@ -814,23 +852,46 @@ fn translate_crossterm_event(evt: ::crossterm::event::Event) -> InputEvent {
                     y: i32::from(event.row),
                 });
             }
+
+            ::crossterm::event::MouseEventKind::ScrollLeft => {
+                //panic!("");
+                return InputEvent::DummyInputEvent;
+            }
+
+            ::crossterm::event::MouseEventKind::ScrollRight => {
+                //panic!("");
+                return InputEvent::DummyInputEvent;
+            }
         },
 
         ::crossterm::event::Event::Resize(width, height) => {
             // println!("New size {}x{}", width, height)
             // TODO(ceg): not really an input
-            return InputEvent::RefreshUi {
+            return InputEvent::UiResized {
                 width: width as usize,
                 height: height as usize,
             };
         }
 
-        ::crossterm::event::Event::Terminate => {
-            // TODO(ceg): not really an input
+        ::crossterm::event::Event::FocusGained => {}
+        ::crossterm::event::Event::FocusLost => {}
+
+        ::crossterm::event::Event::Paste(s) => {
+            let v: Vec<char> = s
+                .chars()
+                .map(|c| if c == '\r' { '\n' } else { c }) // TODO: move this to text mode and use Paste(s)
+                .collect();
+
+            return build_key_press_event!(
+                Key::UnicodeArray(v),
+                ::crossterm::event::KeyModifiers::NONE
+            );
+
+            // return InputEvent::Paste(s);
         }
     }
 
-    InputEvent::NoInputEvent
+    InputEvent::DummyInputEvent
 }
 
 fn send_input_events(
@@ -846,7 +907,7 @@ fn send_input_events(
 
     if accum.len() == 1 {
         match accum[0] {
-            InputEvent::RefreshUi { width, height } => {
+            InputEvent::UiResized { width, height } => {
                 let msg = Message::new(0, 0, ts, Event::UpdateView { width, height });
 
                 // ui_tx.send(msg).unwrap_or(()); ?
@@ -873,7 +934,7 @@ fn send_input_events(
 
     for evt in accum {
         match evt {
-            InputEvent::RefreshUi { width, height } => {
+            InputEvent::UiResized { width, height } => {
                 refresh = true;
                 new_width = width;
                 new_height = height;
@@ -947,33 +1008,11 @@ fn send_input_events(
     }
 }
 
-/*
-  NB: There is a subtle bug in crossterm input handling.
-
-      - Level-triggered polling was removed from mio (in 0.7.xx version)
-      - On linux the (default) 0 1 2 fd points to the same pseudo terminal
-        And thus we cannot change the blocking mode of the input fd (0)
-
-      - When pasting big chunks of text with graphical terminal. The editor seams "frozen".
-        because the input file descriptor is in blocking mode.
-
-        if the user input it exactly the size of crossterm's internal buffer, the next call to 'read' will block.
-        Because the internal buffer is full, crossterm expect more bytes and loops on "read"
-
-      - It is not possible to use println!() function family in non-blocking mode.
-       println!() must ensure the data is flushed and will panic on EAGAIN error.
-
-       *) One solution is for crossterm to let the user specify the input buffer/size (compile time ?)
-         In the case of unlimitED we could use a 2M input buffer ?
-
-       *) An other solution (hack) (my fork on github)
-        change input fd from blocking to non-blocking mode, do read loop and restore mode on exit.
-*/
 fn get_input_events(
     tx: &Sender<Message>,
     ui_tx: &Sender<Message>,
     force_input: bool,
-) -> ::crossterm::Result<()> {
+) -> Result<(), std::io::Error> {
     let mut accum = Vec::<InputEvent>::with_capacity(255);
     let mut wait_ms = 60_000;
     let max_wait_ms = 150;
@@ -990,7 +1029,9 @@ fn get_input_events(
             if let Ok(cross_evt) = ::crossterm::event::read() {
                 prev_len = accum.len();
                 let evt = translate_crossterm_event(cross_evt);
-                accum.push(evt);
+                if evt != InputEvent::DummyInputEvent {
+                    accum.push(evt);
+                }
                 if force_input {
                     break;
                 }

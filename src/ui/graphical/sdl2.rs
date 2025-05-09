@@ -59,8 +59,21 @@ pub fn main_loop_sdl(
     let mut fps = 0;
     let mut t0 = std::time::Instant::now();
 
+    let mut tc = std::time::Instant::now();
+
     let max_rects = width / font_w * height / font_h;
     let mut rects = Vec::with_capacity(max_rects as usize);
+
+    //
+
+    let mut rects_color = Vec::with_capacity(max_rects as usize);
+
+    for y in (0..height).step_by(font_h as usize) {
+        for x in (0..width).step_by(font_w as usize) {
+            let rect = Rect::new(x as i32, y as i32, (font_w - 1) as u32, (font_h - 1) as u32);
+            rects.push(rect);
+        }
+    }
 
     let mut i = 0;
     'running: loop {
@@ -82,41 +95,66 @@ pub fn main_loop_sdl(
                 } => {
                     width = w as u32;
                     height = h as u32;
+
+                    rects.clear();
+                    for y in (0..height).step_by(font_h as usize) {
+                        for x in (0..width).step_by(font_w as usize) {
+                            let rect = Rect::new(
+                                (x + 2) as i32,
+                                (y + 2) as i32,
+                                font_w.saturating_sub(2) as u32,
+                                font_h.saturating_sub(2) as u32,
+                            );
+                            rects.push(rect);
+                        }
+                    }
                 }
 
                 _ => {}
             }
         }
 
-        //
-
-        rects.clear();
-        for y in (0..height).step_by(font_h as usize) {
-            for x in (0..width).step_by(font_w as usize) {
-                let rect = Rect::new(x as i32, y as i32, (font_w - 1) as u32, (font_h - 1) as u32);
-                rects.push(rect);
-            }
-        }
+        // move to resize handling code
 
         canvas.set_draw_color(Color::RGB(255, 255, 255));
         canvas.clear();
 
-        //canvas.set_draw_color(Color::RGB(101, 130, 143));
+        let dc = tc.elapsed();
+        if dc >= Duration::from_millis(16) {
+            i += 1;
+            if i == 255 {
+                i = 0
+            };
 
-        let c = i % 255;
-        //canvas.set_draw_color(Color::RGB(c, c, c));
-        //canvas.fill_rects(&rects).unwrap();
+            let r = i % 255;
+            let g = i % 25;
+            let b = i % 5;
+
+            canvas.set_draw_color(Color::RGB(r, g, b));
+
+            tc = std::time::Instant::now();
+
+            rects_color.clear();
+            for y in (0..height).step_by(font_h as usize) {
+                for x in (0..width).step_by(font_w as usize) {
+                    let r = (x + y) % 255 as u32;
+                    let g = (x as u32) % 255 as u32;
+                    let b = (y as u32) % 255 as u32;
+
+                    rects_color.push((r, g, b));
+                }
+            }
+
+            for i in 0..rects.len() {
+                let (r, g, b) = rects_color[i];
+                canvas.set_draw_color(Color::RGB(r as u8, g as u8, b as u8));
+                canvas.fill_rect(Some(rects[i].clone())).unwrap();
+            }
+        }
 
         // The rest of the game loop goes here...
         canvas.present();
         fps += 1;
-        i += 1;
-        if i == 255 {
-            i = 0
-        };
-
-        //let wait = std::time::Duration::from_millis(1);
-        // std::thread::sleep(wait);
 
         let d = t0.elapsed();
         if d >= Duration::from_millis(1000) {
@@ -124,7 +162,13 @@ pub fn main_loop_sdl(
             t0 = std::time::Instant::now();
             fps = 0;
         }
+
+        let wait = std::time::Duration::from_millis(1000 / 120);
+        std::thread::sleep(wait);
     }
+
+    // no core msg
+    std::process::exit(0);
 
     Ok(())
 }

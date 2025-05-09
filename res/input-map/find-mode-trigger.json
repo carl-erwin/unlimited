@@ -1,0 +1,8 @@
+[
+  {
+    "events": [
+     { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" },
+     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ],    "action": "find:start-reverse" }
+    ]
+  }
+]

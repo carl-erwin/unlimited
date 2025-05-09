@@ -35,35 +35,10 @@ use crate::core::modes::text_mode::center_view_around_offset;
 use crate::core::modes::text_mode::cancel_selection;
 use crate::core::modes::text_mode::movement::cancel_marks;
 
-static FIND_TRIGGER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "ctrl+f" } ],    "action": "find:start" },
-     { "in": [{ "key": "ctrl+x" }, { "key": "ctrl+f" } ],    "action": "find:start-reverse" }
-    ]
-  }
-]"#;
+static FIND_TRIGGER_MAP: &str = std::include_str!("../../../res/input-map/find-mode-trigger.json");
 
-static FIND_CONTROLLER_MAP: &str = r#"
-[
-  {
-    "events": [
-     { "in": [{ "key": "Escape" } ],    "action": "find:stop" },
-     { "in": [{ "key": "\n" } ],        "action": "find:stop" },
-     { "in": [{ "key": "ctrl+q" } ],    "action": "find:stop" },
-     { "in": [{ "key": "BackSpace" } ], "action": "find:del-char" },
-     { "in": [{ "key": "Delete" } ],    "action": "find:do-nothing" },
-     { "in": [{ "key": "ctrl+f" } ],    "action": "find:next" },
-     { "in": [{ "key": "ctrl+r" } ],    "action": "find:prev" },
-     { "in": [{ "key": "Right" } ],     "action": "find:next" },
-     { "in": [{ "key": "Left" } ],      "action": "find:prev" },
-     { "in": [{ "key": "Down" } ],      "action": "find:next" },
-     { "in": [{ "key": "Up" } ],        "action": "find:prev" },
-     { "default": [],                   "action": "find:add-char" }
-   ]
-  }
-]"#;
+static FIND_CONTROLLER_MAP: &str =
+    std::include_str!("../../../res/input-map/find-mode-input-map.json");
 
 impl<'a> Mode for FindMode {
     fn name(&self) -> &'static str {
@@ -76,7 +51,7 @@ impl<'a> Mode for FindMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("alloc find-mode ctx");
         let ctx = FindModeContext::new();
         Box::new(ctx)
@@ -154,7 +129,7 @@ pub fn find_start(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_command_view_id(editor, env);
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode / panic!("")
         return;
@@ -181,6 +156,7 @@ pub fn find_start(
 
     find_show_controller_view(editor, env, view);
     set_focus_on_view_id(editor, env, controller_id);
+    env.input_grab_view_id = Some(controller_id);
 }
 
 pub fn find_controller_stop(
@@ -221,12 +197,13 @@ pub fn find_controller_stop(
                 let buffer = v.buffer().unwrap();
                 let mut buffer = buffer.write();
                 buffer.delete_content(None);
-                buffer.append("Find: ".as_bytes());
+                buffer.append(b"Find: ");
             }
         }
 
         // set input focus to
         set_focus_on_view_id(editor, env, text_view_id);
+        env.input_grab_view_id = None;
     }
 }
 
@@ -248,7 +225,7 @@ fn create_find_controller_view(
         .finalize();
 
     {
-        buffer.as_ref().unwrap().write().append("Find: ".as_bytes());
+        buffer.as_ref().unwrap().write().append(b"Find: ");
     }
 
     // create view at mode creation
@@ -259,7 +236,8 @@ fn create_find_controller_view(
         (x, y),
         (w, h),
         buffer,
-        &vec!["status-mode".to_owned()], // TODO(ceg): find-controller
+        &vec![],                             // tags
+        &vec!["empty-line-mode".to_owned()], // TODO(ceg): find-controller
         0,
         LayoutDirection::NotSet,
         LayoutSize::Percent { p: 100.0 },
@@ -269,13 +247,15 @@ fn create_find_controller_view(
         editor,
         env,
         &mut controller_view,
-        &vec!["status-mode".to_owned()],
+        &vec!["empty-line-mode".to_owned()],
     );
     */
 
     controller_view.ignore_focus = false;
 
     controller_view.controlled_view = Some(view.id);
+
+    controller_view.tags.insert("find-controller".to_owned());
 
     // set controller target as view.id
     let fm = view.mode_ctx_mut::<FindModeContext>("find-mode");
@@ -322,6 +302,8 @@ fn find_show_controller_view(
 
     let text_view = text_view.read();
     let fm = text_view.mode_ctx::<FindModeContext>("find-mode");
+
+    dbg_println!("find-mode: status_view dim = {:?}", status_view.dimension());
 
     status_view.children.pop(); // replace previous child
     status_view.children.push(ChildView {
@@ -403,6 +385,11 @@ pub fn find_controller_del_char(
         if let Some(text_view_id) = v.controlled_view {
             let text_view = get_view_by_id(editor, text_view_id);
             let mut text_view = text_view.write();
+
+            dbg_println!(
+                "find-mode: controlled_view dim = {:?}",
+                text_view.dimension()
+            );
 
             let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
             fm.find_str.pop();
@@ -530,7 +517,7 @@ pub fn find_controller_next(
                 let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 tm.select_point.clear();
-                tm.select_point.push(Mark { offset });
+                tm.select_point.push(Mark::new(offset));
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
             }
         }
@@ -630,7 +617,7 @@ pub fn find_controller_prev(
                 let tm = text_view.mode_ctx_mut::<TextModeContext>("text-mode");
 
                 tm.select_point.clear();
-                tm.select_point.push(Mark { offset });
+                tm.select_point.push(Mark::new(offset));
                 tm.marks[tm.mark_index].offset = offset.saturating_add(encoded_str.len() as u64);
 
                 // TODO(ceg): controller -> text view -> center around mark
@@ -663,16 +650,26 @@ pub fn display_find_string(
         let text_view = get_view_by_id(editor, text_view_id);
         let mut text_view = text_view.write();
 
+        dbg_println!("find-mode: controller dim {:?}", text_view.dimension());
+
         let fm = text_view.mode_ctx_mut::<FindModeContext>("find-mode");
 
         // build find string
         let buffer = v.buffer().unwrap();
         let mut buffer = buffer.write();
         buffer.delete_content(None);
-        buffer.append("Find: ".as_bytes());
+        buffer.append(b"Find: ");
+
+        dbg_println!("find-mode: fm.find_str.len() {}", fm.find_str.len());
+
+        let dbg = format!("v.dimension() = {:?} ", v.dimension());
+
+        buffer.append(dbg.as_bytes());
 
         let s: String = fm.find_str.iter().collect();
         buffer.append(s.as_bytes());
+
+        dbg_println!("find-mode : buffer size = {}", buffer.size());
     } else {
         // panic! ?
         return;
@@ -684,7 +681,7 @@ pub fn find_start_reverse(
     env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
-    let status_view_id = view::get_status_view(editor, env, view);
+    let status_view_id = view::get_command_view_id(editor, env);
 
     if status_view_id.is_none() {
         // TODO(ceg): log missing status mode
@@ -719,7 +716,7 @@ pub fn find_start_reverse(
     buffer.delete_content(None);
 
     // set status text
-    buffer.append("Find: ".as_bytes());
+    buffer.append(b"Find: ");
 
     // push new input map for y/n
     let mut v = view.write();

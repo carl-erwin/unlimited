@@ -6,72 +6,174 @@
         "size": { "percent": 100 }
     },
 
-    "file-view": {
-        "leader": false,
-        "tags": [ "root" ],
-        "modes": [ ],
-        "children_layout_values": "vertical|horizontal",
-        "size_values": "percent, fixed, remain, remain_minus, remain_percent",
-        "floating": false,
+    "main-view": {
+        "modes": [ "core-mode" ],
+        "children_layout": "vertical",
+        "children": [
+        {
+            "tags": [ "title-bar" ],
+            "modes": [ "title-bar" ],
+            "size": { "fixed": 1 }
+        },
 
-        "size": { "percent": 100 },
+        {
+            "size": { "remain_minus": 3 },
+            "children_layout": "horizontal",
+            "children": [
+                {
+                    "internal-buffer": "",
+                    "tags": [ "side-bar" ],
+                    "size": { "percent": 10 },
+                    "children": [
+                        {
+                            "modes": [ "side-bar-mode" ],
+                            "internal-buffer": "",
+                            "size": { "remain_minus": 1 }
+                        },
+                        {
+                            "tags": [ "vscrollbar" ],
+                            "modes": [ "vscrollbar-mode" ],
+                            "internal-buffer": "vscrollbar",
+                            "size": { "fixed": 1 }
+                        }
+                    ],
+                    "children-subscribe": [ { "mode": "vscrollbar-mode", "src": 0, "dst": 1 } , { "mode": "side-bar-mode", "src": 1, "dst": 0 } ]
+                },
+                {
+                    "modes": [ "vsplit-mode" ],
+                    "internal-buffer": "left-split",
+                    "size": { "fixed": 1 }
+                },
+                {
+                    "sub-layout":  "workspace-view"
+                },
+                {
+                    "modes": [ "vsplit-mode" ],
+                    "internal-buffer": "right-split",
+                    "size": { "fixed": 1 }
+                }
+            ]
+        },
+        {
+            "modes": [ "hsplit-mode" ],
+            "size": { "fixed": 1 }
+        },
+        {
+            "tags": [ "status-line"  ],
+            "modes": [ "status-line-mode" ],
+            "internal-buffer": "status-line-buffer",
+            "size": { "fixed": 1 }
+        },
+        {
+            "tags": [ "command-line" ],
+            "modes": [ "empty-line-mode" ],
+            "internal-buffer": "command-line",
+            "size": { "fixed": 1 }
+        }
+    ]
+    },
 
+    "workspace-view":
+    {
+        "leader": true,
+        "tags": [ "workspace" ],
+        "modes": [ "core-mode", "open-doc-mode" ],
+
+        "size": { "remain_percent": 100 },
+
+        "allow-split": false,
+        "allow-destroy": false
+    },
+
+    "empty-group-view":
+    {
+        "leader": true,
+        "tags": [ "group" ],
+
+        "size": { "remain_percent": 100.0 }
+    },
+
+
+    "group-view":
+    {
+        "leader": true,
+        "tags": [ "group" ],
+
+        "size": { "remain_percent": 100.0 },
+
+        "allow-split": false,
+        "allow-destroy": false,
         "children_layout": "vertical",
         "children": [
             {
-                "tags": [ "title-bar" ],
-                "modes": [ "title-bar" ],
+                "tags": [ "tab-bar" ],
+                "modes": [ "tab-bar-mode" ],
+                "internal-buffer": "tab-bar",
                 "size": { "fixed": 1 }
             },
-
             {
-                "leader": true,
-                "tags": [ "text" ],
-                "size": { "remain_minus": 1 },
-                "allow-split": true,
-                "allow-destroy": true,
-                "children_layout": "horizontal",
-                "children": [
-                    {
-                        "tags": [ "line-number" ],
-                        "modes": [ "line-number-mode" ],
-                        "internal-buffer": "line-number",
-                        "size": { "fixed": 12 }
-                    },
-                    {
-                        "tags": [ "empty-column" ],
-                        "modes": [ "" ],
-                        "internal-buffer": "empty-col",
-                        "size": { "fixed": 1 }
-                    },
-                    {
-                        "leader": true,
-                        "tags": [ "text" ],
-                        "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
-                        "size": { "remain_minus": 1 }
-                    },
-                    {
-                        "tags": [ "vscrollbar" ],
-                        "modes": [ "vscrollbar-mode" ],
-                        "internal-buffer": "vscrollbar",
-                        "size": { "fixed": 1 }
-                    }
-                ],
-                "children-subscribe": [ { "mode": "line-number-mode", "src": 2, "dst": 0 },
-                                        { "mode": "vscrollbar-mode", "src": 2, "dst": 3 } ],
-
-                "focus_idx": 2
+                "tags": [ "file-bar" ],
+                "modes": [ "empty-line-mode" ],
+                "internal-buffer": "file-bar",
+                "size": { "fixed": 1 }
             },
             {
-                "tags": [ "status-bar" ],
-                "modes": [ "status-mode" ],
-                "internal-buffer": "status-bar",
+                "sub-layout": "file-slot"
+            },
+            {
+                "tags": [ "terminal" ],
+                "modes": [ "empty-line-mode" ],
+                "internal-buffer": "terminal",
+                "size": { "fixed": 0 }
+            }
+        ]
+    },
+
+    "file-slot":
+    {
+        "tags": [ "file-slot" ],
+        "size": { "remain_percent": 100.0 }
+    },
+
+    "single-file-view":
+    {
+        "leader": true,
+        "tags": [ "file-view" ],
+
+        "size": { "percent": 100 },
+        "allow-split": true,
+        "allow-destroy": true,
+        "children_layout": "horizontal",
+        "children": [
+            {
+                "tags": [ "line-number" ],
+                "modes": [ "line-number-mode" ],
+                "internal-buffer": "line-number",
+                "size": { "fixed": 12 }
+            },
+            {
+                "tags": [ "empty-column" ],
+                "modes": [ "" ],
+                "internal-buffer": "empty-col",
+                "size": { "fixed": 1 }
+            },
+            {
+                "leader": true,
+                "tags": [ "text-view", "target-view" ],
+                "modes": [ "core-mode", "text-mode", "find-mode", "goto-line-mode", "open-doc-mode" ],
+                "size": { "remain_minus": 1      }
+            },
+            {
+                "tags": [ "vscrollbar" ],
+                "modes": [ "vscrollbar-mode" ],
+                "internal-buffer": "vscrollbar",
                 "size": { "fixed": 1 }
             }
         ],
+        "children-subscribe": [ { "mode": "line-number-mode", "src": 2, "dst": 0 },
+                                { "mode": "vscrollbar-mode", "src": 2, "dst": 3 } ],
 
-        "focus_idx": 1,
-        "status_idx": 2
+        "focus_idx": 2
     }
 
 }

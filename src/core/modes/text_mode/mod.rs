@@ -5,6 +5,7 @@ pub mod highlight_selection_overlay;
 
 pub mod mark;
 pub mod raw_data_filter;
+pub mod ruler;
 pub mod screen_filler;
 pub mod tab_expansion;
 pub mod text_mode_codec;

@@ -3,6 +3,8 @@ extern crate unicode_width;
 use unicode_width::UnicodeWidthChar;
 
 use crate::core::codepointinfo::CodepointInfo;
+use crate::core::codepointinfo::TextStyle;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub static SCREEN_CHECK_FLAG: AtomicUsize = AtomicUsize::new(0);
@@ -16,14 +18,6 @@ pub fn disable_screen_checks() {
 pub fn toggle_screen_checks() {
     let v = SCREEN_CHECK_FLAG.load(Ordering::Relaxed);
     SCREEN_CHECK_FLAG.store(!v, Ordering::Relaxed);
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Rect {
-    pub x: usize,
-    pub y: usize,
-    pub width: usize,
-    pub height: usize,
 }
 
 /// A LineCell encapsulates code point information (CodepoinInfo).<br/>
@@ -72,6 +66,8 @@ pub struct Screen {
 
     pub line_offset: Vec<(u64, u64)>,
     pub line_index: Vec<(usize, usize)>,
+
+    pub style: TextStyle,
 }
 
 impl Screen {
@@ -103,6 +99,7 @@ impl Screen {
             buffer_max_offset: 0,
             line_offset: Vec::with_capacity(height),
             line_index: Vec::with_capacity(height),
+            style: TextStyle::new(),
         }
     }
 
@@ -238,11 +235,23 @@ impl Screen {
         UnicodeWidthChar::width(c).unwrap_or(1)
     }
 
+    /// will use self.style
+    pub fn push_char(&mut self, c: char) -> (bool, usize) {
+        let mut cpi = CodepointInfo::new();
+        cpi.cp = c;
+        cpi.displayed_cp = c;
+        cpi.style = self.style;
+        self.push(&cpi)
+    }
+
     /// Append CodepoinInfo tu the current line if it fits.
     /// filters basic blanks '\r' '\n' '\t' 0x0..0x1f and replace them by space ' '
     //#[inline(always)]
-    pub fn push(&mut self, mut cpi: CodepointInfo) -> (bool, usize) {
+    pub fn push(&mut self, cpi: &CodepointInfo) -> (bool, usize) {
         // self.check_invariants();
+
+        // internal cpi
+        let mut cpi = *cpi;
 
         // TODO(ceg):  cpi.check_invariants();
         if false {
@@ -403,7 +412,7 @@ impl Screen {
 
     pub fn append(&mut self, cpi_vec: &Vec<CodepointInfo>) -> (usize, usize, Option<u64>) {
         for (idx, cpi) in cpi_vec.iter().enumerate() {
-            let ret = self.push(*cpi);
+            let ret = self.push(&cpi);
             if !ret.0 {
                 // cannot push screen full
                 return (idx, ret.1, self.last_offset);
@@ -586,6 +595,19 @@ pub fn screen_apply<F: FnMut(usize, usize, &mut CodepointInfo) -> bool>(
                 if !on_cpi(c, l, cpi) {
                     return;
                 }
+            }
+        }
+    }
+}
+
+pub fn screen_line_apply<F: FnMut(usize, &mut [ScreenCell]) -> bool>(
+    screen: &mut Screen,
+    mut on_cpi: F,
+) {
+    for l in 0..screen.height() {
+        if let Some(line) = screen.get_line_mut(l) {
+            if !on_cpi(l, line) {
+                return;
             }
         }
     }

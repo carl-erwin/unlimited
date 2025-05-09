@@ -10,71 +10,60 @@ Unlimited design will evolve at will. Suggestions are welcomed.
      1. The ui : another process/thread that presents the documents to the user<br/>
      <br/>
 
-     These two threads communicate through standard channels (mpsc) using **Message**.<br/>
+     These two threads communicate through standard channels (mpsc) using a **Message**.<br/>
 
 ------
 
 ### Editor primitives
 
-- **Message**<br/>
-The **Message** main purpose is to encapsulate user inputs and internal communication between threads.<br/>
+#### Message
+The **Message** main purpose is to encapsulate user inputs/system events and it is used as the internal communication mechanism between threads.<br/>
 TODO(ceg): add timestamp info/ sequence / etc.<br/>
 
+#### Buffer
+- represents an arbitrary sequence of bytes.<br/>
+- can be created without any file attached to it.<br/>
+- can be loaded from a file.<br/>
+- can be saved to a file.<br/>
+- can be detached from file.<br/>
 
-- **Buffer**<br/>
-A **Buffer** represents a memory snapshot.<br/>
-a **Buffer** can be created without any file attached to it.<br/>
-a **Buffer** can be loaded from a file.<br/>
-a **Buffer** can be saved to a file.<br/>
-a **Buffer** can be detached from file.<br/>
-
-- **BufferId** <br/>
+#### BufferId
 A unique (unsigned 64 bits) integer that represents a given **Buffer** instance<br/>
 
-- **File**<br/>
+#### File
 A regular on disk file
 
-- **View**<br/>
+#### View
+
 a View contains:
-   - BufferId and/or reference to **Buffer**
-   - ViewId
-   - InputMap
-   - local Marks
+   - **BufferId** and/or reference to **Buffer**
+   - **Modes**
+   - **InputMap** stack
 
-- **Mode**<br/>
+#### Mode
+   - is a collection of action/data on View
+   - for example the
 
-- **ModeContext**<br/>
+#### ModeContext
+   - the **View** can store a ModeContext (find by name)
+
+#### Event
+Event are payload found in **Message** sent between the ui and the core
 
 
-- **Event**<br/>
-Messages sent between the ui and the core
+#### Codec
+It is responsible of the Buffer's data representation
 
+eg: TextCodec emits codepoints<br/>
+It convert from/to bytes/codepoints
 
-- **Codec**<br/>
-The codec is responsible of the Buffer interpretation
-
-    eg: TextCodec emits codepoints<br/>
-    It convert from/to bytes/codepoints
-
-- **CodecId**<br/>
+#### CodecId
 a unique 64 bits integer that represents the codec.
 
-- **CodecCtx**<br/>
+#### CodecCtx
 A codec specific data structure
 
-- **Mark**<br/>
-A Mark represent a position in a Document<br/>
-  * The **cursor** is a **Mark**
-  * A mark can be fixed (it is up to the module managing the mark
-  * A mark can be "local" to a given View  (wich is attached to a **Document**)
-  * Marks can be "shared" by Document(s)
-
-- **Selection**<br/>
-There are 2 kinds of selection:<br/>
-  * range selection : from one Mark to an other Mark
-  * block selection (visual selection) : represents a rectangular selection depending on the displayed screen
-
-- **InputMap**<br/>
+#### InputMap
 The InputMap, will hold the input sequences the user must enter to trigger an action in the core thread.
 
   TODO(ceg): describe json format
@@ -89,7 +78,7 @@ We want the Ui (the view) to pilot the Core (model/controller):<br/>
   * popup messages (+geometry hints)<br/>
   * msg + yes/no   (quit)<br/>
   * task status (unknown/running/paused/terminated/unresponsive)<br/>
-  * notifiy a specific ui target (by view id)<br/>
+  * notify a specific ui target (by view id)<br/>
 
 ------
 

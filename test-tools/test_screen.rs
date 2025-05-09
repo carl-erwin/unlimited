@@ -28,15 +28,6 @@ struct Cell {
     pub cw: u8,
 }
 
-struct Screen2 {
-    pub cells: Vec<Cell>,
-    pub cur_index: usize,
-    pub cur_x: usize,
-    pub cur_y: usize,
-    pub width: usize,
-    pub height: usize,
-}
-
 fn main() -> std::io::Result<()> {
     let os_args = env::args();
     let args: Vec<_> = os_args.collect();
@@ -104,7 +95,7 @@ fn main() -> std::io::Result<()> {
                     cpi.cp = *c as char;
                     cpi.displayed_cp = *c as char;
                     'retry: loop {
-                        let (ok, _line_index) = screen.push(cpi);
+                        let (ok, _line_index) = screen.push(&cpi);
                         if !ok {
                             screen.clear();
                             fps += 1;

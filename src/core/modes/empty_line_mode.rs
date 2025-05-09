@@ -13,6 +13,9 @@ use crate::core::modes::text_mode::UnicodeToTextFilter;
 use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::view::View;
 
+//use crate::core::view::FilterData;
+use crate::core::view::FilterIo;
+
 use crate::core::screen::screen_apply;
 
 use crate::dbg_println;
@@ -23,26 +26,26 @@ use crate::core::view::LayoutEnv;
 
 use crate::core::codepointinfo::TextStyle;
 
-pub struct StatusModeContext {}
+pub struct EmptyLineModeContext {}
 
-pub struct StatusMode {}
+pub struct EmptyLineMode {}
 
-impl StatusMode {
+impl EmptyLineMode {
     pub fn new() -> Self {
-        dbg_println!("StatusMode");
-        StatusMode {}
+        dbg_println!("EmptyLineMode");
+        EmptyLineMode {}
     }
 
     pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
 }
 
-impl<'a> Mode for StatusMode {
+impl<'a> Mode for EmptyLineMode {
     fn name(&self) -> &'static str {
-        &"status-mode"
+        &"empty-line-mode"
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
-        let ctx = StatusModeContext {};
+    fn alloc_ctx(&self, _editor: &Editor<'static>) -> Box<dyn Any> {
+        let ctx = EmptyLineModeContext {};
         Box::new(ctx)
     }
 
@@ -58,11 +61,11 @@ impl<'a> Mode for StatusMode {
         _env: &mut EditorEnv<'static>,
         view: &mut View<'static>,
     ) {
-        // let ctx = view.mode_ctx_mut::<StatusModeContext>("status-mode");
+        // let ctx = view.mode_ctx_mut::<EmptyLineModeContext>(self.name());
 
         //
         let use_utf8_codec = true;
-        let use_tabulation_exp = true;
+        let use_tabulation_exp = !true; // char map ? with <tab>
 
         // mandatory data reader
         view.compose_content_filters
@@ -100,32 +103,44 @@ impl<'a> Mode for StatusMode {
             .borrow_mut()
             .push(Box::new(screen_filter));
 
+        // move to overlay
         view.compose_content_filters
             .borrow_mut()
-            .push(Box::new(StatusModeCompose::new()));
+            .push(Box::new(EmptyLineModeCompose::new()));
     }
 }
 
-pub struct StatusModeCompose {
+pub struct EmptyLineModeCompose {
     // add common fields
 }
 
-impl StatusModeCompose {
+impl EmptyLineModeCompose {
     pub fn new() -> Self {
-        dbg_println!("StatusMode");
-        StatusModeCompose {}
+        dbg_println!("EmptyLineMode");
+        EmptyLineModeCompose {}
     }
 
     pub fn register_input_stage_actions<'a>(_map: &'a mut InputStageActionMap<'a>) {}
 }
 
-impl ContentFilter<'_> for StatusModeCompose {
+impl ContentFilter<'_> for EmptyLineModeCompose {
     fn name(&self) -> &'static str {
-        &"StatusModeCompose"
+        &"EmptyLineModeCompose"
+    }
+
+    fn run(
+        &mut self,
+        _view: &View,
+        _env: &mut LayoutEnv,
+        _input: &[FilterIo],
+        _output: &mut Vec<FilterIo>,
+    ) {
+        // FIXME move to overlay
     }
 
     fn finish(&mut self, _view: &View, env: &mut LayoutEnv) {
         // fill the whole status bar
+
         screen_apply(&mut env.screen, |_, _, cpi| {
             cpi.style.color = TextStyle::title_color();
             cpi.style.bg_color = TextStyle::title_bg_color();

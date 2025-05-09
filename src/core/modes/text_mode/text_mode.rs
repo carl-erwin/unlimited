@@ -86,6 +86,7 @@ use std::time::Instant;
 use crate::sort_pair;
 
 use crate::core::editor::Editor;
+
 use crate::core::editor::EditorEnv;
 
 use crate::dbg_println;
@@ -173,7 +174,9 @@ use crate::core::modes::text_mode::Utf8Filter;
 use crate::core::modes::text_mode::WordWrapFilter;
 
 // Text mode screen overlay filters
+use crate::core::modes::text_mode::ruler::TextRuler;
 use crate::core::modes::text_mode::DrawMarks;
+
 use crate::core::modes::text_mode::HighlightSelectionOverlay;
 
 use crate::core::modes::text_mode::ShowTrailingSpaces;
@@ -201,9 +204,9 @@ pub struct TextModeContext {
     pub center_on_mark_move: bool,
     pub scroll_on_mark_move: bool,
 
-    pub prev_buffer_log_revision: usize, // use for tag save (in undo/redo context)
-    pub prev_mark_revision: usize,       // use for tag save
-    pub mark_revision: usize,            // use for tag save
+    pub prev_buffer_log_size: usize, // use for tag save (in undo/redo context)
+    pub prev_mark_revision: usize,   // use for tag save
+    pub mark_revision: usize,        // use for tag save
 
     pub mark_index: usize, // move to text mode
     pub marks: Vec<Mark>,
@@ -343,15 +346,21 @@ fn build_text_mode_screen_overlay_filters_map(
         });
 
     screen_overlay_filter_map
+        .entry("text/ruler")
+        .or_insert(ScreenOverlayFilterInfo {
+            allocator: || Box::new(TextRuler::new()),
+        });
+
+    screen_overlay_filter_map
 }
 
-fn build_text_mode_char_map() -> HashMap<char, String> {
+fn build_text_mode_char_map(editor: &Editor<'static>) -> HashMap<char, String> {
     let mut char_map = HashMap::new();
 
     char_map.insert('\u{0A}', " ".to_string()); //  '\n' (new line)
     char_map.insert('\u{7f}', "<DEL>".to_string());
 
-    if true {
+    if config_var_is_set(&editor, "text-mode:char-map:hex", false) {
         for i in 0..0x9 {
             let fmt = format!("\\x{i:02x}");
             let c = char::from_u32(i).unwrap();
@@ -369,7 +378,7 @@ fn build_text_mode_char_map() -> HashMap<char, String> {
         }
     }
 
-    if !true {
+    if config_var_is_set(&editor, "text-mode:char-map:symbol", false) {
         // config toggle ?
         char_map.insert('\u{00}', "<NUL>".to_string()); // '\0' (null character)
         char_map.insert('\u{01}', "<SOH>".to_string()); // (start of heading)
@@ -443,10 +452,10 @@ impl<'a> Mode for TextMode {
         map
     }
 
-    fn alloc_ctx(&self) -> Box<dyn Any> {
+    fn alloc_ctx(&self, editor: &Editor<'static>) -> Box<dyn Any> {
         dbg_println!("allocate text-mode ctx");
 
-        let char_map = build_text_mode_char_map();
+        let char_map = build_text_mode_char_map(editor);
         let color_map = build_text_mode_color_map();
 
         let ctx = TextModeContext {
@@ -454,10 +463,10 @@ impl<'a> Mode for TextMode {
             scroll_on_mark_move: true,
             text_codec: Box::new(utf8::Utf8Codec::new()),
             //text_codec: Box::new(ascii::AsciiCodec::new()),
-            prev_buffer_log_revision: 0,
+            prev_buffer_log_size: 0,
             prev_mark_revision: 0,
             mark_revision: 0,
-            marks: vec![Mark { offset: 0 }],
+            marks: vec![Mark::new(0)],
             copy_buffer: vec![],
             mark_index: 0,
             select_point: vec![],
@@ -555,7 +564,7 @@ impl<'a> Mode for TextMode {
         } else {
             let mut v = vec![];
 
-            // TODO(ceg): fine a way to list all plugins from command line
+            // TODO(ceg): find a way to list all plugins/filters from command line
             // --show-config
             //
             v.push("binary/raw"); // mandatory
@@ -606,7 +615,11 @@ impl<'a> Mode for TextMode {
         let use_draw_marks = true; // mandatory
 
         let screen_overlay_filters_pipeline = if use_draw_marks {
-            vec!["text/draw-marks", "text/highlight-selection-overlay"]
+            let mut v = vec!["text/draw-marks", "text/highlight-selection-overlay"];
+            if config_var_is_set(&editor, "text-mode:ruler", true) {
+                v.push("text/ruler");
+            }
+            v
         } else {
             vec![]
         };
@@ -794,7 +807,7 @@ pub fn run_text_mode_actions_vec(
 
                 tm.mark_index = 0;
                 tm.marks.clear();
-                tm.marks.push(Mark { offset });
+                tm.marks.push(Mark::new(offset));
             }
 
             PostInputAction::CheckMarks => {
@@ -997,7 +1010,7 @@ fn run_text_mode_actions(
                 // TODO(ceg): add selection in buffer log ?
                 // ex: cut-line
                 // undo must restore marks before cut
-                tm.prev_buffer_log_revision = buffer.buffer_log.data.len();
+                tm.prev_buffer_log_size = buffer.buffer_log.data.len();
 
                 // SAVE marks copy, slow fow now
                 // add marks revision ?
@@ -1027,9 +1040,7 @@ fn run_text_mode_actions(
                     }
 
                     // save marks on buffer changes
-                    if buffer.buffer_log.pos != tm.prev_buffer_log_revision
-                        && tm.prev_action == TextModeAction::BufferModification
-                    {
+                    if buffer.buffer_log.pos > tm.prev_buffer_log_size {
                         // not undo/redo
                         save_marks = true;
                     }
@@ -1288,8 +1299,6 @@ pub fn insert_codepoint_array(
         let mut v = view.write();
         let tm = v.mode_ctx_mut::<TextModeContext>("text-mode");
 
-        tm.prev_action = TextModeAction::BufferModification;
-
         if center {
             tm.pre_compose_action
                 .push(PostInputAction::CenterAroundMainMark);
@@ -1392,8 +1401,8 @@ pub fn remove_previous_codepoint(
 }
 
 pub fn join_lines(
-    mut editor: &mut Editor<'static>,
-    mut env: &mut EditorEnv<'static>,
+    editor: &mut Editor<'static>,
+    _env: &mut EditorEnv<'static>,
     view: &Rc<RwLock<View<'static>>>,
 ) {
     // compute offsets
@@ -1437,16 +1446,6 @@ pub fn join_lines(
     }
 
     // save marks FIXME(ceg): check undo/redo duplicates ops
-    {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![PostInputAction::SaveMarks {
-                caller: &"join_lines",
-            }],
-        );
-    }
 
     // "\n\n" -> " \n"
 
@@ -1478,6 +1477,8 @@ pub fn join_lines(
         tm.pre_compose_action.push(PostInputAction::CheckMarks);
         tm.pre_compose_action
             .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+
+        tm.prev_action = TextModeAction::BufferModification;
     }
 }
 
@@ -1497,14 +1498,14 @@ pub fn undo(
     let marks = &mut tm.marks;
     let select_point = &mut tm.select_point;
 
-    buffer.buffer_log_dump();
-
-    if buffer.buffer_log_pos() == 0 {
+    if buffer.buffer_log_pos() <= 1 {
         dbg_println!("undo: no undo history");
 
         tm.prev_action = TextModeAction::Ignore; // ?
         return;
     }
+
+    buffer.buffer_log_dump();
 
     dbg_println!(
         "undo: buffer.buffer_log_count {:?}",
@@ -1517,12 +1518,12 @@ pub fn undo(
         dbg_println!("restore marks {:?}", marks_offsets);
         marks.clear();
         for offset in marks_offsets {
-            marks.push(Mark { offset });
+            marks.push(Mark::new(offset));
         }
 
         select_point.clear();
         for offset in selections_offsets {
-            select_point.push(Mark { offset });
+            select_point.push(Mark::new(offset));
         }
     } else {
         dbg_println!("TAG not found");
@@ -1570,12 +1571,12 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
         dbg_println!("restore selections {:?}", selections_offsets);
         marks.clear();
         for offset in marks_offsets {
-            marks.push(Mark { offset });
+            marks.push(Mark::new(offset));
         }
 
         select_point.clear();
         for offset in selections_offsets {
-            select_point.push(Mark { offset });
+            select_point.push(Mark::new(offset));
         }
     } else {
         dbg_println!("REDO: no marks ? buffer size {:?}", buffer.size());
@@ -1584,7 +1585,9 @@ pub fn redo(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLock<View>>)
     tm.pre_compose_action
         .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
-    tm.prev_action = TextModeAction::Redo;
+    if buffer.buffer_log_pos() <= buffer.buffer_log_count().saturating_sub(1) {
+        tm.prev_action = TextModeAction::Redo;
+    }
 
     /*
     TODO(ceg): add this function pointer attr
@@ -1723,15 +1726,29 @@ pub fn move_line_up(
         )
     };
 
-    // save marks
-    {
-        run_text_mode_actions_vec(
-            &mut editor,
-            &mut env,
-            &view,
-            &vec![PostInputAction::SaveMarks {
-                caller: &"move_line_up",
-            }],
+    // check previous action: if previous action was a mark move -> tag new positions
+    let save_marks = {
+        let v = view.read();
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+        tm.prev_action == TextModeAction::MarksMove
+    };
+
+    if save_marks {
+        trace_block!(
+            "move_line_down save marks",
+            // save marks
+                dbg_println!("save marks");
+
+                run_text_mode_actions_vec(
+                    &mut editor,
+                    &mut env,
+                    &view,
+                    &vec![PostInputAction::SaveMarks {
+                        caller: &"move_line_down",
+                    }],
+                );
+
+                dbg_println!("save marks done");
         );
     }
 
@@ -1763,6 +1780,8 @@ pub fn move_line_up(
 
         tm.pre_compose_action
             .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
+
+        tm.prev_action = TextModeAction::BufferModification;
     }
 }
 
@@ -1851,22 +1870,31 @@ pub fn move_line_down(
 
     );
 
-    trace_block!(
-        "move_line_down save marks",
-        // save marks
-            dbg_println!("save marks");
+    // check previous action: if previous action was a mark move -> tag new positions
+    let save_marks = {
+        let v = view.read();
+        let tm = v.mode_ctx::<TextModeContext>("text-mode");
+        tm.prev_action == TextModeAction::MarksMove
+    };
 
-            run_text_mode_actions_vec(
-                &mut editor,
-                &mut env,
-                &view,
-                &vec![PostInputAction::SaveMarks {
-                    caller: &"move_line_down",
-                }],
-            );
+    if save_marks {
+        trace_block!(
+            "move_line_down save marks",
+            // save marks
+                dbg_println!("save marks");
 
-            dbg_println!("save marks done");
-    );
+                run_text_mode_actions_vec(
+                    &mut editor,
+                    &mut env,
+                    &view,
+                    &vec![PostInputAction::SaveMarks {
+                        caller: &"move_line_down",
+                    }],
+                );
+
+                dbg_println!("save marks done");
+        );
+    }
 
     // apply
     dbg_println!("apply");
@@ -1926,6 +1954,7 @@ pub fn move_line_down(
                 tm.pre_compose_action
                 .push(PostInputAction::CenterAroundMainMarkIfOffScreen);
 
+                tm.prev_action = TextModeAction::BufferModification;
         );
     });
 
@@ -1951,15 +1980,19 @@ pub fn remove_until_end_of_word(
 
     let codec = tm.text_codec.as_ref();
 
-    let size = buffer.size() as u64;
+    let max_size = buffer.size() as u64;
 
-    if size == 0 {
+    if max_size == 0 {
         return;
     }
 
     let mut shrink: u64 = 0;
 
     for m in tm.marks.iter_mut() {
+        if m.offset == max_size {
+            continue;
+        }
+
         if m.offset >= shrink {
             m.offset -= shrink;
         }
@@ -1989,6 +2022,10 @@ pub fn remove_until_end_of_word(
 
         // skip until blank or end-of-line
         loop {
+            if m.offset == max_size {
+                break;
+            }
+
             data.clear();
             buffer.read(m.offset, data.capacity(), &mut data);
             let (cp, _, size) = codec.decode(SyncDirection::Forward, &data, 0);
@@ -2985,7 +3022,7 @@ pub fn button_press(
         // reset main mark
         tm.mark_index = 0;
         tm.marks.clear();
-        tm.marks.push(Mark { offset: new_offset });
+        tm.marks.push(Mark::new(new_offset));
 
         tm.prev_action = TextModeAction::Ignore;
     }
@@ -3064,7 +3101,7 @@ pub fn pointer_motion(_editor: &mut Editor, _env: &mut EditorEnv, view: &Rc<RwLo
                     if let Some(offset) = cpi.offset {
                         if tm.button_state[0] == 1 {
                             tm.select_point.clear();
-                            tm.select_point.push(Mark { offset });
+                            tm.select_point.push(Mark::new(offset));
 
                             // if on last line scroll down 1 line
                             if y >= screen.height().saturating_sub(1) {

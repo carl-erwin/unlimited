@@ -52,21 +52,27 @@ pub fn refresh_screen_selections(screen: &mut Screen, sel: &Vec<(u64, u64)>) {
         return;
     }
 
+    // this is slow
     screen_apply(screen, |_c, _l, cpi| {
         if let Some(offset) = cpi.offset {
             // get next range
             while idx < idx_max {
-                if sel[idx].0 <= offset && offset <= sel[idx].1 {
+                // offset < sel.min
+                if offset < sel[idx].0 {
+                    return true;
+                }
+
+                // offset is >= sel.min
+
+                // offet is <= sel.max -> match
+                if offset <= sel[idx].1 {
                     cpi.style.bg_color = TextStyle::default_selected_bg_color();
                     return true;
                 }
 
-                // out of range: select next range
-                if offset > sel[idx].1 {
-                    idx += 1;
-                    continue;
-                }
-                return true;
+                // offset is > sel.max -> out of range: select next range
+                idx += 1;
+                continue;
             }
 
             return false;
