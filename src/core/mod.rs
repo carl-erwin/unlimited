@@ -148,11 +148,28 @@ pub fn no_ui_render() -> bool {
 pub fn get_log_file() -> &'static Mutex<std::io::BufWriter<std::fs::File>> {
     // TODO: handle Windows Path drive, etc..
 
+    #[cfg(unix)]
+    let log_file_path = "/tmp/u.log";
+
+    #[cfg(windows)]
+    let log_file_path = {
+        use std::env;
+
+        let key = "TEMP";
+        let base = match env::var(key) {
+            Ok(val) => val,
+            Err(e) => panic!("couldn't find {key}: {e}"),
+        };
+
+        let sep = std::path::MAIN_SEPARATOR;
+        format!("{base}{sep}u.log")
+    };
+
     crate::core::LOG_FILE.get_or_init(|| {
         let logfile = std::fs::File::options()
             .create(true)
             .append(true)
-            .open(crate::core::LOG_FILENAME.get_or_init(|| "/tmp/u.log".into()))
+            .open(crate::core::LOG_FILENAME.get_or_init(|| log_file_path.into()))
             .expect("cannot open log file");
         Mutex::new(std::io::BufWriter::new(logfile))
     })
