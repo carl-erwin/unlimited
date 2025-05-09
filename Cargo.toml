@@ -1,6 +1,6 @@
 [package]
 name = "unlimited"
-version = "0.0.8-dev"
+version = "0.0.8"
 authors = ["Carl-Erwin Griffith <carl.erwin@gmail.com>"]
 license = "MIT"
 

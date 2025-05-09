@@ -584,7 +584,7 @@ checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unlimited"
-version = "0.0.8-dev"
+version = "0.0.8"
 dependencies = [
  "bitflags 2.9.0",
  "clap",
