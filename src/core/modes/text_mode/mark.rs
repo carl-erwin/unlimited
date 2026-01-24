@@ -6,6 +6,32 @@ use crate::core::codec::text::TextCodec;
 
 const DEBUG: bool = false;
 
+// private helper
+//
+#[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq)]
+enum CharClass {
+    Alpha,
+    Digit,
+    WhiteSpace,
+    Other,
+}
+
+fn get_char_class(cp: char) -> CharClass {
+    let is_alpha = cp.is_alphabetic(); // is_ascii_graphic();
+    let is_blank = cp.is_ascii_whitespace();
+    let is_digit = cp.is_digit(16);
+
+    if is_alpha {
+        CharClass::Alpha
+    } else if is_digit {
+        CharClass::Digit
+    } else if is_blank {
+        CharClass::WhiteSpace
+    } else {
+        CharClass::Other
+    }
+}
+
 //
 #[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Mark {
@@ -558,82 +584,61 @@ impl Mark {
     }
 
     pub fn move_to_prev_char_class(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
+        // beginning of buffer ?
         if self.at_start_of_buffer(buffer) {
             return self;
         }
 
-        let (cp0, _, _sz) = read_char_forward(&buffer, self.offset, codec);
+        // get current char info: class/offset
+        let (cp_ref, _off_ref, _sz) = read_char_forward(&buffer, self.offset, codec);
 
-        let (cp, off, _sz) = read_char_backward(&buffer, self.offset, codec);
-        if cp0 == '\n' {
-            self.offset = off;
-            return self;
-        }
-
-        let is_alpha = cp.is_alphabetic(); // is_ascii_graphic();
-        let is_blank = cp.is_ascii_whitespace();
-
-        if !is_alpha && !is_blank {
-            self.offset = off;
-            return self;
-        }
+        let cp_ref_class = get_char_class(cp_ref);
 
         let mut count: u64 = 0;
 
+        // while same class go to previous char
         while self.offset > 0 {
             count += 1;
             let (cp, off, _sz) = read_char_backward(&buffer, self.offset, codec);
+            // new line is special ?
             if count > 1 && cp == '\n' {
-                return self;
+                break;
             }
 
-            if is_blank {
-                if count > 1 && !cp.is_ascii_whitespace() {
-                    return self;
-                }
-
+            // skip only if same class
+            let cp_class = get_char_class(cp);
+            if cp_class != cp_ref_class {
                 self.offset = off;
-
-                continue;
+                break;
             }
 
-            if is_alpha {
-                if count > 1 && !cp.is_alphabetic() {
-                    return self;
-                }
-                self.offset = off;
-                continue;
-            }
+            self.offset = off;
         }
 
         self
     }
 
     pub fn move_to_next_char_class(&mut self, buffer: &Buffer, codec: &dyn TextCodec) -> &mut Mark {
-        if self.at_end_of_buffer(buffer) {
-            return self;
-        }
-
         let offset = self.offset;
 
-        let (cp, _off, sz) = read_char_forward(&buffer, offset, codec);
+        // read current char
+        let (cp_ref, _off, sz) = read_char_forward(&buffer, offset, codec);
 
-        let is_blank = cp.is_ascii_whitespace();
+        let is_blank = cp_ref.is_ascii_whitespace();
 
-        if is_blank && cp != '\n' {
+        // on blank ?
+        if is_blank && cp_ref != '\n' {
             self.skip_blanks_forward_until_end_of_line(buffer, codec);
             return self;
         }
 
-        let is_alpha = cp.is_alphabetic(); // is_ascii_graphic();
+        let cp_ref_class = get_char_class(cp_ref);
 
-        // skip current
+        // skip current char
         self.offset += sz as u64;
 
         loop {
-            let offset = self.offset;
-
-            let (cp, off, sz) = read_char_forward(&buffer, offset, codec);
+            let (cp, off, sz) = read_char_forward(&buffer, self.offset, codec);
             if self.offset == off {
                 break;
             }
@@ -642,12 +647,13 @@ impl Mark {
                 return self;
             }
 
-            if is_alpha && cp.is_alphabetic() {
-                self.offset += sz as u64;
-                continue;
+            let cp_class = get_char_class(cp);
+
+            if cp_ref_class != cp_class {
+                break;
             }
 
-            break;
+            self.offset += sz as u64;
         }
 
         self
