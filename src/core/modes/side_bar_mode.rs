@@ -13,8 +13,6 @@ use crate::core::modes::text_mode::RawDataFilter;
 use crate::core::modes::text_mode::ScreenFilter;
 use crate::core::view::View;
 
-use crate::dbg_println;
-
 use crate::core::view::ContentFilter;
 
 use crate::core::view::LayoutEnv;

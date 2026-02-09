@@ -8,8 +8,6 @@ use std::sync::Arc;
 
 //
 
-use crate::dbg_println;
-
 use crate::core::screen::Screen;
 
 use crate::core::editor::get_view_by_id;

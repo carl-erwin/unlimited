@@ -89,8 +89,6 @@ use crate::core::editor::Editor;
 
 use crate::core::editor::EditorEnv;
 
-use crate::dbg_println;
-
 use crate::core::screen::Screen;
 
 use super::mark::Mark;

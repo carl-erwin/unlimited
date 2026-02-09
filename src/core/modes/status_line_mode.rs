@@ -27,8 +27,6 @@ use crate::core::view::ContentFilter;
 use crate::core::view::FilterIo;
 use crate::core::view::LayoutEnv;
 
-use crate::dbg_println;
-
 pub struct StatusLineModeContext {}
 
 pub struct StatusLineMode {}
