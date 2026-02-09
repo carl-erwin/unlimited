@@ -2331,12 +2331,9 @@ impl<'a> MappedFile<'a> {
             None
         };
 
-        let mut offset = 0;
-        let (mut n, _, _) = MappedFile::find_node_by_offset(&file, offset);
+        let (mut n, _, _) = MappedFile::find_node_by_offset(&file, 0);
         while n.is_some() {
             let idx = n.unwrap();
-
-            let node_size = file.pool[idx].size;
 
             // map
             let page = file.pool[idx].map(&orig_fd).unwrap();
@@ -2348,7 +2345,6 @@ impl<'a> MappedFile<'a> {
                 panic!("write error");
             }
 
-            offset += node_size;
             n = file.pool[idx].link.next;
         }
 
