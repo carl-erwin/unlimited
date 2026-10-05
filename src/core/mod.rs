@@ -461,7 +461,7 @@ mod test_regex {
     fn test_buffer_position_regex() {
         use super::*;
 
-        [
+        let _ = [
             OFFSET_PREFIX_REGEX,
             LINE_COLUMN_PREFIX_REGEX,
             OFFSET_SUFFIX_REGEX,
