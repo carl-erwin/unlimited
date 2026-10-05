@@ -277,7 +277,7 @@ pub fn run(
 
     load_modes(&mut editor, &mut env);
 
-    configure_modes(&mut editor, &mut env);
+    configure_buffer_modes(&mut editor, &mut env);
 
     create_layout(&mut editor, &mut env);
 
@@ -712,7 +712,7 @@ pub fn load_buffers(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) 
     }
 }
 
-pub fn configure_modes(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
+pub fn configure_buffer_modes(editor: &mut Editor<'static>, env: &mut EditorEnv<'static>) {
     // configure buffer
     // TODO(ceg): use this for per mode config ? runtime configuration ?
 
