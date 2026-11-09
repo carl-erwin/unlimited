@@ -117,6 +117,96 @@ pub static KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
     map
 });
 
+pub static RUST_KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
+    let mut map: HashMap<&str, (u8, u8, u8)> = HashMap::new();
+
+    // some Rust keywords
+    for k in &["mod", "use", "crate", "pub", "unsafe"] {
+        map.insert(k, COLOR_RED);
+    }
+    for k in &["panic"] {
+        map.insert(k, COLOR_RED_BRIGHT);
+    }
+
+    for k in &["public", "private"] {
+        map.insert(k, COLOR_RED);
+    }
+
+    for k in &[
+        "let", "ref", "mut", "fn", "impl", "trait", "type", "Option", "Some", "None", "Result",
+        "borrow", "unwrap",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["self"] {
+        map.insert(k, COLOR_ORANGE);
+    }
+
+    for k in &["return", "true", "false"] {
+        map.insert(k, COLOR_BLUE);
+    }
+
+    for k in &[
+        "str", "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["if", "then", "else", "fi"] {
+        map.insert(k, COLOR_BRACE);
+    }
+
+    for k in &["#", "##"] {
+        map.insert(k, COLOR_BLUE);
+    }
+
+    map
+});
+
+pub static C_KEYWORD_MAP: Lazy<HashMap<&str, (u8, u8, u8)>> = Lazy::new(|| {
+    let mut map: HashMap<&str, (u8, u8, u8)> = HashMap::new();
+
+    for k in &["public", "private"] {
+        map.insert(k, COLOR_RED);
+    }
+
+    // some C preprocessor tokens
+    for k in &[
+        "#include", "#if", "#ifdef", "#ifndef", "#endif", "#else", "#undef", "#define", "#pragma",
+    ] {
+        map.insert(k, COLOR_RED);
+    }
+
+    // some C keywords
+    for k in &[
+        "break", "case", "char", "const", "continue", "default", "do", "double", "enum", "extern",
+        "float", "for", "int", "long", "register", "short", "signed", "sizeof", "static", "struct",
+        "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "inline",
+    ] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    // some C++ keywords
+    for k in &["bool", "class", "template", "namespace", "auto"] {
+        map.insert(k, (0, 128, 128));
+    }
+
+    for k in &["this"] {
+        map.insert(k, COLOR_ORANGE);
+    }
+
+    for k in &["return", "goto", "true", "false"] {
+        map.insert(k, COLOR_BLUE);
+    }
+
+    for k in &["if", "then", "else", "fi"] {
+        map.insert(k, COLOR_BRACE);
+    }
+
+    map
+});
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TokenType {
     Unknown,
@@ -160,6 +250,7 @@ pub struct HighlightKeywords {
     utf8_codec: Box<dyn TextCodec>, // internal token representation is utf8
     skip_filter: bool,
     max_token_size: usize,
+    keyword_map: Option<HashMap<&'static str, (u8, u8, u8)>>,
 }
 
 impl HighlightKeywords {
@@ -172,6 +263,7 @@ impl HighlightKeywords {
             utf8_codec: Box::new(utf8::Utf8Codec::new()),
             skip_filter: false,
             max_token_size: 1024,
+            keyword_map: None,
         }
     }
 
@@ -238,7 +330,12 @@ impl HighlightKeywords {
         let token_str = std::str::from_utf8(&self.utf8_token[..]);
         let token_str = if let Ok(s) = token_str { s } else { "�" };
 
-        self.new_color = if let Some((&_, &color)) = KEYWORD_MAP.get_key_value::<&str>(&token_str) {
+        self.new_color = if let Some((&_, &color)) = self
+            .keyword_map
+            .as_ref()
+            .unwrap()
+            .get_key_value::<&str>(&token_str)
+        {
             color
         } else {
             let mut non_alnum = 0;
@@ -326,6 +423,30 @@ fn get_token_type(c: char) -> TokenType {
 impl ContentFilter<'_> for HighlightKeywords {
     fn name(&self) -> &'static str {
         &"HighlightKeywords"
+    }
+
+    fn configure_view(&mut self, _editor: &Editor<'static>, view: &mut View<'static>) {
+        // select keyword map based on buffer name
+        let file_ext = if let Some(b) = view.buffer() {
+            let ext = b.read().file_name();
+            let v = ext.split('.').last().unwrap_or("").to_string();
+            v
+        } else {
+            "".to_string()
+        };
+
+        let km = match file_ext.as_str() {
+            "rs" => &RUST_KEYWORD_MAP,
+            "c" | "h" | "cpp" | "hpp" => &C_KEYWORD_MAP,
+
+            _ => &KEYWORD_MAP,
+        };
+
+        let mut map = HashMap::new();
+        for (k, v) in km.iter() {
+            map.insert(*k, *v);
+        }
+        self.keyword_map = Some(map);
     }
 
     fn prepare_run(
