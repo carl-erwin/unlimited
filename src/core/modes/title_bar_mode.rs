@@ -87,7 +87,7 @@ impl ContentFilter<'_> for EditorTitle {
         &"editor-title"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &mut Editor<'static>,
 

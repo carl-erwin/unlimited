@@ -575,7 +575,7 @@ impl ScreenOverlayFilter<'_> for LineNumberOverlayFilter {
         &"LineNumberOverlay"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         editor: &Editor<'static>,
         _env: &mut LayoutEnv,

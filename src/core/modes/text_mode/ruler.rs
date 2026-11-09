@@ -27,7 +27,7 @@ impl ScreenOverlayFilter<'_> for TextRuler {
         &"TextRuler"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         editor: &Editor<'static>,
         _env: &mut LayoutEnv,

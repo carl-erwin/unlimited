@@ -264,7 +264,7 @@ impl ContentFilter<'_> for Utf8Filter {
         &"Utf8Filter"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &mut Editor,
         _editor_env: &mut EditorEnv,

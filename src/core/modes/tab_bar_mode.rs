@@ -260,7 +260,7 @@ impl ContentFilter<'_> for TabBarModeCompose {
         &"TabBarModeCompose"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         mut editor: &mut Editor<'static>,
         mut editor_env: &mut EditorEnv<'static>,

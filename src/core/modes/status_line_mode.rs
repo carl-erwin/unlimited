@@ -135,7 +135,7 @@ impl ContentFilter<'_> for StatusLineModeCompose {
         &"status-line"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         editor: &mut Editor<'static>,
         _editor_env: &mut EditorEnv<'static>,

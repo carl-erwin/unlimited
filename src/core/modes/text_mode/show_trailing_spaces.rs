@@ -40,7 +40,7 @@ impl ContentFilter<'_> for ShowTrailingSpaces {
         &"ShowTrailingSpaces"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &mut Editor,
         _editor_env: &mut EditorEnv,

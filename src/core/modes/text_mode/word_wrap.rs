@@ -152,7 +152,7 @@ impl ContentFilter<'_> for WordWrapFilter {
         &"WordWrapFilter"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &mut Editor<'static>,
         _editor_env: &mut EditorEnv<'static>,

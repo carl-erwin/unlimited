@@ -49,7 +49,7 @@ pub struct LayoutEnv<'a> {
 pub trait ContentFilter<'a> {
     fn name(&self) -> &'static str;
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         mut _editor: &mut Editor<'static>,
         mut _editor_env: &mut EditorEnv<'static>,
@@ -94,7 +94,7 @@ pub trait ContentFilter<'a> {
 pub trait ScreenOverlayFilter<'a> {
     fn name(&self) -> &'static str;
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &Editor<'static>,
         _env: &mut LayoutEnv,
@@ -663,7 +663,7 @@ fn run_content_filters(
     for (idx, f) in filters.borrow_mut().iter_mut().enumerate() {
         //dbg_println!("setup {}", f.name());
         let t0 = std::time::Instant::now();
-        f.setup(editor, editor_env, layout_env, view, parent_view);
+        f.prepare_run(editor, editor_env, layout_env, view, parent_view);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;
@@ -778,7 +778,7 @@ fn run_screen_overlay_filters(
     for (idx, f) in filters.borrow_mut().iter_mut().enumerate() {
         //dbg_println!("setup {}", f.name());
         let t0 = std::time::Instant::now();
-        f.setup(editor, layout_env, view, parent_view);
+        f.prepare_run(editor, layout_env, view, parent_view);
         let t1 = std::time::Instant::now();
         let diff = (t1 - t0).as_micros();
         time_spent[idx] += diff;

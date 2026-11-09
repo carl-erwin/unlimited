@@ -29,7 +29,7 @@ impl ContentFilter<'_> for DirectoryReader {
         &"DirectoryReader"
     }
 
-    fn setup(
+    fn prepare_run(
         &mut self,
         _editor: &mut Editor<'static>,
         _editor_env: &mut EditorEnv<'static>,
