@@ -49,6 +49,14 @@ pub struct LayoutEnv<'a> {
 pub trait ContentFilter<'a> {
     fn name(&self) -> &'static str;
 
+    /* this is run once when the mode is configured for the view
+       it allow to do specific setup like:
+         filter configuration based on buffer name
+    */
+    fn configure_view(&mut self, _editor: &Editor<'static>, _view: &mut View<'static>) {
+        /* default implementation is empty*/
+    }
+
     fn prepare_run(
         &mut self,
         mut _editor: &mut Editor<'static>,
@@ -93,6 +101,14 @@ pub trait ContentFilter<'a> {
 
 pub trait ScreenOverlayFilter<'a> {
     fn name(&self) -> &'static str;
+
+    /* this is run once when the mode is configured for the view
+       it allow to do specific setup like:
+         filter configuration based on buffer name
+    */
+    fn configure_view(&mut self, _editor: &Editor<'static>, _view: &mut View<'static>) {
+        /* default implementation is empty*/
+    }
 
     fn prepare_run(
         &mut self,

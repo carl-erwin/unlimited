@@ -533,6 +533,10 @@ impl<'a> View<'a> {
                 view.set_mode_ctx(m.name(), ctx);
                 dbg_println!("mode[{}] configure  {:?}", m.name(), view.id);
                 m.configure_view(editor, env, view);
+
+                // configure view filters
+                m.configure_view_filters(editor, env, view);
+
                 if m.watch_editor_event() {
                     register_editor_event_watcher(editor, m.name(), mode_rc.clone(), view.id);
                 }

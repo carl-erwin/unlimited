@@ -118,6 +118,30 @@ pub trait Mode {
         _view: &mut View<'static>,
     );
 
+    /// This function MUST be called once per view
+    /// It is used to allocate view's mode context
+    fn configure_view_filters(
+        &mut self,
+        editor: &mut Editor<'static>,
+        _env: &mut EditorEnv<'static>,
+        view: &mut View<'static>,
+    ) {
+        {
+            let filters = view.compose_content_filters.clone();
+            for f in filters.borrow_mut().iter_mut() {
+                dbg_println!("configure_view {}", f.name());
+                f.configure_view(editor, view);
+            }
+        }
+        {
+            let filters = view.compose_screen_overlay_filters.clone();
+            for f in filters.borrow_mut().iter_mut() {
+                dbg_println!("configure_view {}", f.name());
+                f.configure_view(editor, view);
+            }
+        }
+    }
+
     fn on_view_event(
         &self,
         _editor: &mut Editor<'static>,
