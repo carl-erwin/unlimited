@@ -549,10 +549,14 @@ impl<'a> Mode for TextMode {
             --filter word-wrap,tab // respect order ?
         */
 
-        let content_filter_map = build_text_mode_content_filters_map();
-        let screen_overlay_filter_map = build_text_mode_screen_overlay_filters_map();
+        ////////////////////
+        // content filters
+        ///////////////////
 
-        // NB: build pipeline in this strict order
+        // load all the filters: TODO(ceg): read configuration to not allocate unused filters
+        let content_filter_map = build_text_mode_content_filters_map();
+
+        // NB: build the pipeline in this STRICT order
         let content_filters_pipeline = if crate::core::raw_data_filter_to_screen() {
             vec![
                 "binary/raw", // mandatory
@@ -612,6 +616,13 @@ impl<'a> Mode for TextMode {
 
         let use_draw_marks = true; // mandatory
 
+        ///////////////////////////
+        // screen overlay filters
+        ///////////////////////////
+
+        let screen_overlay_filter_map = build_text_mode_screen_overlay_filters_map();
+
+        // NB: build the pipeline in this STRICT order
         let screen_overlay_filters_pipeline = if use_draw_marks {
             let mut v = vec!["text/draw-marks", "text/highlight-selection-overlay"];
             if config_var_is_set(&editor, "text-mode:ruler", true) {
@@ -632,7 +643,6 @@ impl<'a> Mode for TextMode {
         }
 
         // setup view action for text mode
-
         // fix dedup marks, scrolling etc ...
         view.stage_actions
             .push((String::from("text-mode"), run_text_mode_actions));
