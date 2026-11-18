@@ -666,12 +666,10 @@ fn run_content_filters(
     parent_view: Option<&View<'static>>,
 ) {
     // setup
-    let (filters, filter_in, filter_out) = {
+    let filters = {
         let v = view.read();
-        let filter_in = v.filter_in.clone();
-        let filter_out = v.filter_out.clone();
         let filters = v.compose_content_filters.clone();
-        (filters, filter_in, filter_out)
+        filters
     };
 
     time_spent.resize(filters.borrow().len(), 0);
@@ -690,9 +688,9 @@ fn run_content_filters(
         layout_env.quit = true;
     }
 
-    let mut filter_in = filter_in.borrow_mut();
-    let mut filter_out = filter_out.borrow_mut();
-    filter_in.clear();
+    //
+    let mut filter_in = vec![];
+    let mut filter_out = vec![];
 
     let mut loop_count = 0;
 

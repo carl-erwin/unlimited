@@ -428,10 +428,6 @@ pub struct View<'a> {
     pub compose_screen_overlay_filters: Rc<RefCell<Vec<Box<dyn ScreenOverlayFilter<'a>>>>>,
     pub compose_priority: usize,
 
-    // can be moved to layout engine
-    pub filter_in: Rc<RefCell<Vec<FilterIo>>>,
-    pub filter_out: Rc<RefCell<Vec<FilterIo>>>,
-
     pub subscribers: Vec<SubscriberInfo>,
 }
 
@@ -647,10 +643,6 @@ impl<'a> View<'a> {
             compose_screen_overlay_filters: Rc::new(RefCell::new(vec![])),
 
             compose_priority: 0, //  greater first
-
-            // here ?
-            filter_in: Rc::new(RefCell::new(vec![])),
-            filter_out: Rc::new(RefCell::new(vec![])),
 
             //
             subscribers: vec![], // list of other views to notify when this view changes
